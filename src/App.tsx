@@ -363,7 +363,7 @@ export default function App() {
   };
 
   const handleDeleteData = async () => {
-    if (window.confirm("Are you sure you want to delete your account data? This will remove you from your current group and clear your profile data. (Your premium subscription, if active, is preserved). This action cannot be undone.")) {
+    if (window.confirm("Are you sure you want to delete your account data? This will remove you from your current group and clear your profile data. This action cannot be undone.")) {
       try {
         if (group) {
           const groupRef = doc(db, 'groups', group.id);
@@ -374,13 +374,11 @@ export default function App() {
             memberIds: newMemberIds
           });
         }
-        // We don't delete the user document completely so we preserve subscriptionStatus
         await updateDoc(doc(db, 'users', activeUser), {
           groupId: null,
           name: 'Anonymous',
           email: ''
         });
-        // We DO NOT delete auth.currentUser so they don't lose their subscription link
         setShowSettings(false);
         setUserProfile({} as any);
         setGroup(null);
@@ -558,7 +556,7 @@ export default function App() {
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
       await syncExpenseUpdate(updatedExp);
       
-      // Data-layer gated premium feature: Write mismatch to protected collection
+      // Write mismatch to protected collection
       const computedMismatch = computeMismatchForSettlement(selectedExpense, instrumentType);
       if (computedMismatch !== 'NOT_CLASSIFIABLE' && computedMismatch !== 'NO_MISMATCH') {
         const mismatchRef = doc(db, 'group_mismatches', group.id, 'events', newSettlement.id);
@@ -570,7 +568,7 @@ export default function App() {
           receivedBy: selectedExpense.paidBy,
           amount: amount,
           timestamp: newSettlement.timestamp
-        }).catch(e => console.error("Premium data write failed (expected if not premium)", e));
+        }).catch(e => console.error("Data write failed", e));
       }
     } catch (e) {
       console.error(e);

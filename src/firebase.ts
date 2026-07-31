@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
-import { getAuth, OAuthProvider } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -9,11 +9,8 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-// TODO: To fully enable Sign In with Apple in production:
-// 1. Go to Apple Developer Portal and create a Services ID.
-// 2. Add the Services ID and download the private key (.p8).
-// 3. Configure the Apple provider in Firebase Authentication settings.
-export const appleProvider = new OAuthProvider('apple.com');
+// Mobile integration placeholders
+// export const appleProvider = new OAuthProvider('apple.com');
 
 
 export enum OperationType {

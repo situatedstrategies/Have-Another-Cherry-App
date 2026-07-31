@@ -1,8 +1,40 @@
 {
   "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "groupId": { "type": "string" },
+        "setupComplete": { "type": "boolean" },
+        "settings": { "type": "object" },
+        "monthlyIncome": { "type": "number" },
+        "savingsGoal": { "type": "number" }
+      },
+      "required": ["displayName", "email"]
+    },
+    "Group": {
+      "title": "Group",
+      "description": "A group of users sharing expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "memberIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxLength": 10
+        },
+        "defaultSplit": { "type": "object" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "memberIds", "createdAt"]
+    },
     "Expense": {
       "title": "Expense",
-      "description": "An expense split between Olivia and Robert, settled on an individual basis.",
+      "description": "An expense split within a group.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -10,25 +42,34 @@
         "amount": { "type": "number" },
         "date": { "type": "string" },
         "category": { "type": "string" },
-        "paidBy": { "type": "string", "enum": ["olivia", "robert"] },
-        "splitType": { "type": "string", "enum": ["household_default", "fifty_fifty", "custom_percentage", "custom_amount", "third_party"] },
+        "paidBy": { "type": "string" },
+        "splitType": { "type": "string" },
         "oliviaShare": { "type": "number" },
         "robertShare": { "type": "number" },
         "thirdPersonName": { "type": "string" },
         "thirdPersonEmail": { "type": "string" },
         "thirdPersonShare": { "type": "number" },
-        "status": { "type": "string", "enum": ["unsettled", "pending_confirmation", "settled"] },
+        "status": { "type": "string" },
         "settleDetails": { "type": "object" },
         "createdAt": { "type": "string" },
-        "notes": { "type": "string" }
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" }
       },
-      "required": ["id", "title", "amount", "date", "category", "paidBy", "splitType", "oliviaShare", "robertShare", "status", "createdAt"]
+      "required": ["id", "title", "amount", "date", "category", "paidBy", "splitType", "status", "createdAt"]
     }
   },
   "firestore": {
-    "expenses/{expenseId}": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "groups/{groupId}": {
+      "schema": "Group",
+      "description": "Groups of users"
+    },
+    "groups/{groupId}/expenses/{expenseId}": {
       "schema": "Expense",
-      "description": "Collection of shared household expenses."
+      "description": "Expenses belonging to a specific group"
     }
   }
 }
