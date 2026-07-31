@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "Expense": {
+      "title": "Expense",
+      "description": "An expense split between Olivia and Robert, settled on an individual basis.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "paidBy": { "type": "string", "enum": ["olivia", "robert"] },
+        "splitType": { "type": "string", "enum": ["household_default", "fifty_fifty", "custom_percentage", "custom_amount", "third_party"] },
+        "oliviaShare": { "type": "number" },
+        "robertShare": { "type": "number" },
+        "thirdPersonName": { "type": "string" },
+        "thirdPersonEmail": { "type": "string" },
+        "thirdPersonShare": { "type": "number" },
+        "status": { "type": "string", "enum": ["unsettled", "pending_confirmation", "settled"] },
+        "settleDetails": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "title", "amount", "date", "category", "paidBy", "splitType", "oliviaShare", "robertShare", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Collection of shared household expenses."
+    }
+  }
+}

@@ -1,0 +1,1054 @@
+import { getFullMembers, getFullDefaultSplit } from './lib/members';
+import { computeMismatchForSettlement } from './lib/mismatch';
+import { encryptData, decryptData } from './lib/crypto';
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db, OperationType, handleFirestoreError } from './firebase';
+import { Expense, Group, SettleDetails, User as AppUser } from './types';
+import StatsSection from './components/StatsSection';
+import ExpenseForm from './components/ExpenseForm';
+import ExpenseDetail from './components/ExpenseDetail';
+import SettleUpModal from './components/SettleUpModal';
+import ExpenseList from './components/ExpenseList';
+import AuthScreen from './components/AuthScreen';
+import ProfileSetup from './components/ProfileSetup';
+import BackupModal from './components/BackupModal';
+import MonthlyComparisonChart from './components/MonthlyComparisonChart';
+import CryptoJS from 'crypto-js';
+import GroupSetup from './components/GroupSetup';
+import { ToastContainer, ToastMessage } from './components/Toast';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText } from 'lucide-react';
+
+function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
+  return (
+    <img src="https://static1.squarespace.com/static/6a53ee56387dd65e26655a70/t/6a681089fdfc105a22ca099d/1785204873461/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+  );
+}
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const activeUser = currentUser?.uid;
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [groupUsers, setGroupUsers] = useState<Record<string, any>>({});
+  
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Modal / Form States
+  const [showForm, setShowForm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
+  const [groupSecret, setGroupSecret] = useState('');
+  useEffect(() => {
+    if (activeUser) {
+      setGroupSecret(localStorage.getItem(`group_secret_${activeUser}`) || '');
+    }
+  }, [activeUser]);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [showSettleModal, setShowSettleModal] = useState(false);
+
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const isInitialLoadRef = useRef(true);
+  
+  const addToast = (title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setToasts(prev => [...prev, { id: Date.now().toString() + Math.random().toString(), title, message, type }]);
+  };
+  
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // 1. Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (!user) {
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Fetch User Profile
+  useEffect(() => {
+    if (!currentUser) return;
+    setIsLoading(true);
+
+    const fetchProfile = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const profile = userDoc.data();
+          setUserProfile(profile as any);
+        } else {
+          setUserProfile({}); // Setup required
+        }
+      } catch (error) {
+        console.error("Error fetching profile", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [currentUser]);
+
+  // 2b. Listen to Group
+  useEffect(() => {
+    if (!userProfile?.groupId) return;
+    const groupUnsubscribe = onSnapshot(doc(db, 'groups', userProfile.groupId), (groupSnapshot) => {
+      if (groupSnapshot.exists()) {
+        setGroup(groupSnapshot.data() as Group);
+      }
+    }, (error) => {
+      console.error('groupUnsubscribe error:', error);
+    });
+    return () => groupUnsubscribe();
+  }, [userProfile?.groupId]);
+
+  useEffect(() => {
+    if (!group || !group.memberIds || group.memberIds.length === 0) return;
+    const q = query(collection(db, 'users'), where('__name__', 'in', group.memberIds));
+    const unsub = onSnapshot(q, (snap) => {
+      const users: Record<string, any> = {};
+      snap.forEach(d => { users[d.id] = d.data(); });
+      setGroupUsers(users);
+    });
+    return () => unsub();
+  }, [group?.memberIds]);
+
+  
+  
+  
+  // Local Storage for Expenses
+  useEffect(() => {
+    if (activeUser && group) {
+      const stored = localStorage.getItem('expenses_' + group.id);
+      if (stored) {
+        try {
+          setExpenses(JSON.parse(stored));
+        } catch(e) {
+          console.error(e);
+        }
+      } else {
+        setExpenses([]);
+      }
+    }
+  }, [activeUser, group]);
+
+  // Sync Queue Listener
+  useEffect(() => {
+    if (activeUser && group) {
+      const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+
+        let newExps = [];
+        let deletedIds = [];
+        for (const change of snapshot.docChanges()) {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            try {
+              const decrypted = await decryptData(data.payload, group.id);
+              if (decrypted) {
+                if (data.action === 'DELETE') {
+                  deletedIds.push(decrypted.id);
+                } else {
+                  newExps.push(decrypted);
+                }
+              }
+              // Delete message after receiving
+              deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
+            } catch(e) {
+              console.error(e);
+            }
+          }
+        }
+        
+        if (newExps.length > 0 || deletedIds.length > 0) {
+          setExpenses(prev => {
+            let updated = [...prev];
+            // Handle deletes
+            updated = updated.filter(e => !deletedIds.includes(e.id));
+            // Handle upserts
+            for (const exp of newExps) {
+              const idx = updated.findIndex(e => e.id === exp.id);
+              if (idx >= 0) updated[idx] = exp;
+              else updated.push(exp);
+            }
+            updated.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+            return updated;
+          });
+        }
+      }, (error) => {
+        console.error('transfer_queue unsubscribe error:', error);
+      });
+      return () => unsubscribe();
+    }
+  }, [activeUser, group]);
+  
+
+  // Update selectedExpense ref if background data updates
+  useEffect(() => {
+    if (selectedExpense) {
+      const updated = expenses.find(e => e.id === selectedExpense.id);
+      if (updated) {
+        setSelectedExpense(updated);
+      }
+    }
+  }, [expenses]);
+
+  if (!currentUser) {
+    return <AuthScreen />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center">
+        <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
+        <p className="text-natural-muted text-xs font-mono">Loading data...</p>
+      </div>
+    );
+  }
+
+  if (userProfile && !userProfile.financialProfile) {
+    return <ProfileSetup userId={activeUser} onComplete={() => {
+      import('firebase/firestore').then(({ getDoc, doc }) => {
+        import('./firebase').then(({ db }) => {
+          getDoc(doc(db, 'users', activeUser)).then(userDoc => {
+            if (userDoc.exists()) {
+              setUserProfile(userDoc.data() as any);
+            }
+          });
+        });
+      });
+    }} />;
+  }
+
+  if (!userProfile?.groupId || !group) {
+    return <GroupSetup onComplete={(groupId) => {
+      // It will auto update via snapshot/effect hopefully, but we can force reload or set states
+      setUserProfile(prev => ({...prev, groupId}));
+    }} />;
+  }
+
+  const missingProfiles = group.memberIds?.filter(id => !groupUsers[id]?.financialProfile) || [];
+  if (missingProfiles.length > 0 && Object.keys(groupUsers).length > 0) {
+    return (
+      <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-natural-border text-center max-w-md">
+          <h2 className="text-xl font-bold text-natural-text mb-3">Waiting on others</h2>
+          <p className="text-natural-muted mb-4">
+            Some members of this group have not completed their financial profile. Everyone must complete the quiz before you can start using the ledger.
+          </p>
+          <div className="space-y-2 mb-6">
+            {missingProfiles.map(id => (
+              <div key={id} className="text-sm font-medium text-natural-primary">
+                {groupUsers[id]?.name || 'A member'} is still completing setup.
+              </div>
+            ))}
+          </div>
+          <button onClick={() => window.location.reload()} className="bg-natural-primary text-white px-6 py-2 rounded-lg font-bold hover:bg-natural-primary/90">
+            Refresh Status
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Active User is current user
+  let hasIncomeDiscrepancy = false;
+  if (groupUsers && Object.keys(groupUsers).length >= 2) {
+    const userIds = Object.keys(groupUsers);
+    for (let i = 0; i < userIds.length; i++) {
+      for (let j = i + 1; j < userIds.length; j++) {
+        const u1 = groupUsers[userIds[i]];
+        const u2 = groupUsers[userIds[j]];
+        
+        const u1Income = Number(u1.income);
+        const u1PartnerEst = Number(u1.partnerIncome);
+        const u2Income = Number(u2.income);
+        const u2PartnerEst = Number(u2.partnerIncome);
+        
+        if (u1Income && u2PartnerEst && Math.abs(u1Income - u2PartnerEst) > u1Income * 0.1) hasIncomeDiscrepancy = true;
+        if (u2Income && u1PartnerEst && Math.abs(u2Income - u1PartnerEst) > u2Income * 0.1) hasIncomeDiscrepancy = true;
+      }
+    }
+  }
+  
+
+  // We need to modify all our handlers to use the new group data structure
+    const handleGenerateNewInviteCode = async () => {
+    if (!group) return;
+    try {
+      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const groupRef = doc(db, 'groups', group.id);
+      await updateDoc(groupRef, { inviteCode: newCode });
+      addToast('Invite Code Updated', 'A new invite code has been generated.', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Error', 'Failed to generate new code.', 'info');
+    }
+  };
+
+  const handleSignOut = () => {
+    setUserProfile({} as any);
+    setGroup(null);
+    setExpenses([]);
+    auth.signOut();
+  };
+
+  const handleAddComment = async (expenseId: string, text: string) => {
+    if (!group) return;
+    const expense = expenses.find(e => e.id === expenseId);
+    if (!expense) return;
+
+    const newComment = {
+      id: crypto.randomUUID(),
+      userId: activeUser,
+      text,
+      timestamp: new Date().toISOString()
+    };
+    const updatedExp = { ...expense, comments: [...(expense.comments || []), newComment] };
+    await syncExpenseUpdate(updatedExp);
+      
+      
+  };
+
+  const handleExportData = () => {
+    if (!group) return;
+    
+    let csv = 'Title,Amount,Date,Category,Paid By,Status,Split Type,Who Owes What\n';
+    
+    expenses.forEach(exp => {
+      const allMembers = getFullMembers(group);
+        const paidByName = allMembers.find(m => m.uid === exp.paidBy)?.name || exp.paidBy;
+      
+      let owesStr = '';
+      Object.entries(exp.shares).forEach(([uid, amount]) => {
+        if (uid !== exp.paidBy) {
+          const name = allMembers.find(m => m.uid === uid)?.name || uid;
+          owesStr += `${name} owes $${amount.toFixed(2)}; `;
+        }
+      });
+      if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
+        owesStr += `${exp.thirdPersonName || 'Third Person'} owes $${exp.thirdPersonShare.toFixed(2)}`;
+      }
+      
+      const row = [
+        `"${exp.title.replace(/"/g, '""')}"`,
+        exp.amount.toFixed(2),
+        exp.date,
+        `"${exp.category}"`,
+        `"${paidByName}"`,
+        exp.status,
+        exp.splitType,
+        `"${owesStr}"`
+      ];
+      csv += row.join(',') + '\n';
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'expenses_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDeleteData = async () => {
+    if (window.confirm("Are you sure you want to delete your account data? This will remove you from your current group and clear your profile data. (Your premium subscription, if active, is preserved). This action cannot be undone.")) {
+      try {
+        if (group) {
+          const groupRef = doc(db, 'groups', group.id);
+          const newMembers = group.members.filter(m => m.uid !== activeUser);
+          const newMemberIds = (group.memberIds || []).filter(id => id !== activeUser);
+          await updateDoc(groupRef, {
+            members: newMembers,
+            memberIds: newMemberIds
+          });
+        }
+        // We don't delete the user document completely so we preserve subscriptionStatus
+        await updateDoc(doc(db, 'users', activeUser), {
+          groupId: null,
+          name: 'Anonymous',
+          email: ''
+        });
+        // We DO NOT delete auth.currentUser so they don't lose their subscription link
+        setShowSettings(false);
+        setUserProfile({} as any);
+        setGroup(null);
+        setExpenses([]);
+      } catch (err) {
+        console.error("Error deleting data", err);
+        alert("Failed to delete data. You may need to sign in again to perform this action.");
+      }
+    }
+  };
+
+  const pushToTransferQueue = async (expense: Expense, action: 'UPSERT' | 'DELETE') => {
+    if (!groupSecret || !group) return;
+    const payload = CryptoJS.AES.encrypt(JSON.stringify(expense), groupSecret).toString();
+    const otherMembers = group.memberIds.filter(id => id !== activeUser);
+    for (const memberId of otherMembers) {
+      const qRef = doc(collection(db, 'transfer_queue'));
+      await setDoc(qRef, {
+        to: memberId,
+        from: activeUser,
+        action,
+        payload,
+        createdAt: new Date().toISOString()
+      });
+    }
+  };
+
+  const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
+    try {
+      if (!group.categories?.includes(formData.category)) {
+        const groupRef = doc(db, 'groups', group.id);
+        const newCategories = [...(group.categories || []), formData.category];
+        await updateDoc(groupRef, { categories: newCategories });
+      }
+
+      let finalExpense: Expense;
+      if (editingExpense) {
+        finalExpense = { ...editingExpense, ...formData };
+        setExpenses(prev => {
+          const updated = prev.map(ex => ex.id === finalExpense.id ? finalExpense : ex);
+          localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+          return updated;
+        });
+        setEditingExpense(null);
+        setShowForm(false);
+        setSelectedExpense(finalExpense);
+      } else {
+        finalExpense = {
+          ...formData,
+          id: crypto.randomUUID(),
+          groupId: group.id,
+          status: 'unsettled',
+          createdAt: new Date().toISOString()
+        };
+        setExpenses(prev => {
+          const updated = [finalExpense, ...prev];
+          localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+          return updated;
+        });
+        setShowForm(false);
+      }
+
+      // Sync to cloud queue
+      if (group) {
+        const encrypted = await encryptData(finalExpense, group.id);
+        const otherMembers = group.memberIds.filter(id => id !== activeUser);
+        for (const memberId of otherMembers) {
+          const qRef = doc(collection(db, 'transfer_queue'));
+          await setDoc(qRef, {
+            to: memberId,
+            from: activeUser,
+            action: 'UPSERT',
+            payload: encrypted,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save expense locally or sync.');
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      try {
+        const expenseToDelete = expenses.find(e => e.id === id);
+        setExpenses(prev => {
+          const updated = prev.filter(e => e.id !== id);
+          localStorage.setItem('expenses_' + group?.id, JSON.stringify(updated));
+          return updated;
+        });
+        setSelectedExpense(null);
+        
+        if (expenseToDelete && group) {
+          const encrypted = await encryptData({ id }, group.id);
+          const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
+          for (const memberId of otherMembers) {
+            const qRef = doc(collection(db, 'transfer_queue'));
+            await setDoc(qRef, {
+              to: memberId,
+              from: activeUser,
+              action: 'DELETE',
+              payload: encrypted,
+              createdAt: new Date().toISOString()
+            });
+          }
+        }
+      } catch (e: any) {
+        console.error("Delete error:", e);
+        alert("Failed to delete data locally.");
+      }
+    }
+  };
+
+    const syncExpenseUpdate = async (updatedExpense: Expense) => {
+    setExpenses(prev => {
+      const updated = prev.map(e => e.id === updatedExpense.id ? updatedExpense : e);
+      localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+      return updated;
+    });
+    setSelectedExpense(updatedExpense);
+    if (group) {
+      const encrypted = await encryptData(updatedExpense, group.id);
+      const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
+      for (const memberId of otherMembers) {
+        const qRef = doc(collection(db, 'transfer_queue'));
+        await setDoc(qRef, {
+          to: memberId,
+          from: activeUser,
+          action: 'UPSERT',
+          payload: encrypted,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+  };
+
+  const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string) => {
+    if (!selectedExpense || !group) return;
+    
+    const isCreditor = selectedExpense.paidBy === activeUser;
+    
+    const newSettlement: import('./types').Settlement = {
+      id: crypto.randomUUID(),
+      expenseId: selectedExpense.id,
+      paidBy: debtorId,
+      receivedBy: selectedExpense.paidBy,
+      amount: amount,
+      instrumentType: instrumentType,
+      label: label,
+      timestamp: new Date().toISOString(),
+      status: isCreditor ? 'confirmed' : 'pending',
+      mismatchType: computeMismatchForSettlement(selectedExpense, instrumentType)
+    };
+
+    const settlements = [...(selectedExpense.settlements || []), newSettlement];
+    
+    // Check if fully settled
+    let allConfirmedTotal = 0;
+    let allOwedTotal = 0;
+    Object.entries(selectedExpense.shares || {}).forEach(([uid, share]) => {
+      if (uid !== selectedExpense.paidBy) allOwedTotal += share;
+    });
+    settlements.forEach(s => {
+      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
+    });
+    
+    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
+    const newStatus = isFullySettled ? 'settled' : (isCreditor ? 'PARTIALLY_SETTLED' : 'pending_confirmation');
+
+    const updatedExp = { ...selectedExpense, status: newStatus as any, settlements };
+    try {
+      setShowSettleModal(false);
+      addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
+      await syncExpenseUpdate(updatedExp);
+      
+      // Data-layer gated premium feature: Write mismatch to protected collection
+      const computedMismatch = computeMismatchForSettlement(selectedExpense, instrumentType);
+      if (computedMismatch !== 'NOT_CLASSIFIABLE' && computedMismatch !== 'NO_MISMATCH') {
+        const mismatchRef = doc(db, 'group_mismatches', group.id, 'events', newSettlement.id);
+        await setDoc(mismatchRef, {
+          expenseId: selectedExpense.id,
+          settlementId: newSettlement.id,
+          mismatchType: computedMismatch,
+          paidBy: debtorId,
+          receivedBy: selectedExpense.paidBy,
+          amount: amount,
+          timestamp: newSettlement.timestamp
+        }).catch(e => console.error("Premium data write failed (expected if not premium)", e));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleConfirmSettleReceipt = async (settlementId: string) => {
+    if (!group || !selectedExpense) return;
+    const expense = expenses.find(e => e.id === selectedExpense.id);
+    if (!expense) return;
+
+    const settlements = (expense.settlements || []).map(s => 
+      s.id === settlementId ? { ...s, status: 'confirmed' as const } : s
+    );
+
+    // Check if fully settled
+    let allConfirmedTotal = 0;
+    let allOwedTotal = 0;
+    Object.entries(expense.shares || {}).forEach(([uid, share]) => {
+      if (uid !== expense.paidBy) allOwedTotal += share;
+    });
+    settlements.forEach(s => {
+      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
+    });
+
+    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
+    const newStatus = isFullySettled ? 'settled' : 'PARTIALLY_SETTLED';
+
+    const updatedExp = { 
+      ...expense, 
+      status: newStatus as any, 
+      settlements 
+    };
+    await syncExpenseUpdate(updatedExp);
+    addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+  };
+
+  return (
+    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12" id="app-root">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      {/* Cherry Checkered Border Top Strip */}
+      <div className="h-px bg-slate-200 w-full" />
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
+        
+        {hasIncomeDiscrepancy && (
+          <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
+            <div className="flex gap-3 items-start">
+              <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-natural-text">Conversation Starter: Financial Alignment</h3>
+                <p className="text-sm text-natural-muted mt-1">
+                  It looks like there's a discrepancy between what you reported as your income and what your partner estimated (or vice versa).
+                  Money conversations can be tough, but clarity is the first step to fairness!
+                </p>
+                <div className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline">
+                  Review Financial Profiles
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top bar */}
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8" id="app-header">
+          <div className="flex items-start gap-4 relative">
+            <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
+              <CherryLogo className="h-14 w-14" />
+            </div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-natural-text mt-1">
+                Have Another Cherry
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3" id="header-controls">
+            <button
+              onClick={() => {
+                setEditingExpense(null);
+                setShowForm(true);
+              }}
+              className="bg-natural-primary hover:bg-natural-dark text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> Log Expense
+            </button>
+          </div>
+        </header>
+
+        <div className="space-y-6" id="dashboard-content">
+          <div className="bg-white border border-natural-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" id="welcome-banner">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-natural-sage text-natural-primary rounded-xl">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-natural-text">
+                  Welcome back, <span className="capitalize">{userProfile?.name || currentUser?.displayName || 'Friend'}</span>!
+                </h3>
+                <p className="text-[11px] text-natural-muted mt-0.5">
+                  Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="text-natural-muted hover:text-natural-primary flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 border border-natural-border rounded-md shadow-sm"
+                title="Account Settings"
+              >
+                <Settings size={14} />
+                <span className="text-xs font-semibold uppercase tracking-widest">Settings</span>
+              </button>
+            </div>
+          </div>
+
+          <StatsSection expenses={expenses} group={group} activeUser={activeUser} />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+            </div>
+            <ExpenseList 
+              expenses={expenses} 
+              group={group}
+              activeUser={activeUser} 
+              onExpenseClick={(exp) => setSelectedExpense(exp)} 
+            />
+          </div>
+
+          <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
+        </div>
+
+        <footer className="text-center text-[10px] text-natural-muted mt-12 space-y-1" id="app-footer">
+          <p>Have Another Cherry • Shared Home Ledger</p>
+          <p className="font-mono">Real-time Cloud Sync Active</p>
+        </footer>
+      </main>
+
+      {/* MODALS */}
+      {showBackup && (
+        <BackupModal 
+          onClose={() => setShowBackup(false)}
+          activeUser={activeUser}
+          localExpenses={expenses}
+          setLocalExpenses={setExpenses}
+          groupSecret={groupSecret}
+          setGroupSecret={setGroupSecret}
+        />
+      )}
+      {showSettings && (
+        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-natural-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b border-natural-border bg-natural-bg/30 shrink-0">
+              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
+                <Settings className="h-5 w-5 text-natural-primary" />
+                Account Settings
+              </h2>
+              <button onClick={() => setShowSettings(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6 overflow-y-auto">
+              <div>
+                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>
+                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-natural-muted">Name</span>
+                    <span className="text-sm font-semibold text-natural-text capitalize">{userProfile?.name || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-natural-muted">Annual Income</span>
+                    <span className="text-sm font-semibold text-natural-text">
+                      {userProfile?.income ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(userProfile.income)) : 'N/A'}
+                    </span>
+                  </div>
+                  {userProfile?.financialProfile && (
+                    <div className="pt-2 mt-2 border-t border-natural-border">
+                      <span className="text-xs text-natural-muted block mb-1">Financial Style</span>
+                      <span className="text-sm font-semibold text-natural-primary block">{userProfile.financialProfile.type}</span>
+                      <p className="text-xs text-natural-text mt-1 leading-relaxed">{userProfile.financialProfile.description}</p>
+                      {userProfile.financialProfile.quote && (
+                        <blockquote className="mt-3 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
+                          {userProfile.financialProfile.quote}
+                        </blockquote>
+                      )}
+                      <button 
+                        onClick={() => {
+                          import('firebase/firestore').then(({ updateDoc, doc }) => {
+                            import('./firebase').then(({ db }) => {
+                              updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
+                              setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
+                            });
+                          });
+                        }} 
+                        className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
+                      >
+                        Retake Profile Quiz
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Group Details</h3>
+                <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-natural-muted">Group Name</span>
+                    <span className="text-sm font-semibold text-natural-text">{group?.name || 'Unnamed Group'}</span>
+                  </div>
+                  
+                  <div className="border-t border-natural-border/50 pt-3">
+                    <span className="text-sm text-natural-muted block mb-2">Group Members</span>
+                    <div className="space-y-3">
+                      {group && Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
+                        const isGhost = uid.startsWith('ghost_');
+                        const memberName = isGhost 
+                          ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name || 'Unknown'
+                          : groupUsers[uid]?.name || 'Unknown';
+                        return (
+                          <div key={uid} className="flex justify-between items-center text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0">
+                            <div>
+                              <span className="text-natural-text font-semibold">{memberName}</span>
+                              <span className="ml-2 text-xs font-mono text-natural-muted">{Number(pct)}% split</span>
+                            </div>
+                            <div>
+                              {!isGhost ? (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Joined</span>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
+                                  <button 
+                                    onClick={() => {
+                                      const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
+                                      if (email) {
+                                        fetch('/api/send-invite', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            email,
+                                            groupName: group.name,
+                                            inviteCode: group.inviteCode
+                                          })
+                                        }).then(res => {
+                                          if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
+                                          else addToast('Error', 'Failed to send invite', 'error');
+                                        });
+                                      }
+                                    }}
+                                    className="text-[10px] uppercase font-bold text-natural-primary hover:underline"
+                                  >
+                                    Resend Invite
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {Object.keys(groupUsers).length === 2 && (
+                       <button
+                         className="mt-3 w-full text-xs font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
+                         onClick={async () => {
+                           const uids = Object.keys(groupUsers);
+                           const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
+                           const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
+                           if (inc1 > 0 && inc2 > 0) {
+                             const total = inc1 + inc2;
+                             const pct1 = Math.round((inc1 / total) * 100);
+                             const pct2 = 100 - pct1;
+                             
+                             import('firebase/firestore').then(({ updateDoc, doc }) => {
+                               import('./firebase').then(({ db }) => {
+                                 updateDoc(doc(db, 'groups', group!.id), {
+                                   [`defaultSplit.${uids[0]}`]: pct1,
+                                   [`defaultSplit.${uids[1]}`]: pct2,
+                                 });
+                                 addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
+                               });
+                             });
+                           } else {
+                             addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
+                           }
+                         }}
+                       >
+                         Recalculate Using Reported Incomes
+                       </button>
+                    )}
+                  </div>
+                  
+                  <div className="border-t border-natural-border/50 pt-3">
+                    <span className="text-sm text-natural-muted block mb-2">Invite Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
+                        {group?.inviteCode}
+                      </div>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(group?.inviteCode || '')}
+                        className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        <Copy size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handleGenerateNewInviteCode}
+                    className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
+                  >
+                    <RefreshCw size={14} /> Generate New Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div>
+                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Local Ledger</h3>
+                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3 mb-4">
+                  <button 
+                    onClick={() => { setShowSettings(false); setShowBackup(true); }}
+                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
+                  >
+                    <span className="flex items-center gap-2"><Cloud size={16} className="text-natural-primary" /> Backup & Sync Options</span>
+                  </button>
+                </div>
+              </div>
+              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Legal & Privacy</h3>
+                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3">
+                  <button 
+                    onClick={() => setShowPrivacyModal(true)}
+                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
+                  >
+                    <span className="flex items-center gap-2"><Shield size={16} className="text-natural-primary" /> Data, Privacy & Security</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-5 border-t border-natural-border bg-natural-bg/30">
+              <button 
+                onClick={() => {
+                  setShowSettings(false);
+                  handleSignOut();
+                }}
+                className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
+              >
+                <LogOut size={16} /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrivacyModal && (
+        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl border border-natural-border w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-natural-border bg-natural-bg/30 sticky top-0 z-10 backdrop-blur-md">
+              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
+                <Shield className="h-5 w-5 text-natural-primary" />
+                Data, Privacy & Security
+              </h2>
+              <button onClick={() => setShowPrivacyModal(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-8">
+              
+              <section>
+                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
+                  <Lock size={16} className="text-natural-muted" /> How Your Data Is Protected
+                </h3>
+                <div className="bg-natural-sage/20 p-5 rounded-2xl border border-natural-sage/30 text-sm text-natural-text leading-relaxed space-y-4">
+                  <p>
+                    Your privacy is our top priority. We have implemented robust technical controls to ensure your financial ledgers and personal information are completely confidential and unreadable by anyone outside your group, including our own developers.
+                  </p>
+                  <ul className="list-disc pl-5 space-y-2 text-natural-muted">
+                    <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
+                    <li><strong>Anonymized Profiles:</strong> We completely hash your email address (using SHA-256) before storing it in the database. We do not store raw emails alongside your data.</li>
+                    <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
+                    <li><strong>Complete Data Deletion:</strong> When you delete your account, your data is fully and permanently wiped from the database and you are completely scrubbed from your group's member list—no backups, no "soft deletes", no recovery possible.</li>
+                  </ul>
+                  <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
+                    Have Another Cherry was conceived by real people in real relationships. We are only interested in sweetening your finances using simple technology, rather than souring your perception of another financial management app.
+                  </div>
+                  <p className="text-xs text-natural-muted mt-2 border-t border-natural-border pt-3">
+                    <em>Google Cloud and Firebase are trademarks of Google LLC.</em>
+                  </p>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-natural-muted" /> Legal Documents
+                </h3>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
+                    <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
+                    <span className="text-xs text-natural-muted">Full Terms of Service will be available here soon.</span>
+                  </div>
+                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
+                    <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
+                    <span className="text-xs text-natural-muted">A comprehensive Privacy Policy is being finalized and will be published here.</span>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-natural-text mb-3">Your Data Controls</h3>
+                <div className="bg-white p-4 rounded-2xl border border-natural-border space-y-3">
+                  <button 
+                    onClick={handleExportData}
+                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-natural-text hover:bg-natural-bg/50 border border-natural-border rounded-xl transition-all shadow-sm"
+                  >
+                    <span className="flex items-center gap-2"><Download size={18} className="text-natural-primary" /> Export Data (CSV)</span>
+                  </button>
+                  
+                  <div className="border-t border-natural-border/50"></div>
+                  
+                  <button 
+                    onClick={handleDeleteData}
+                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
+                  >
+                    <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account Data</span>
+                  </button>
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <ExpenseForm
+          group={group}
+          activeUser={activeUser}
+          onClose={() => {
+            setShowForm(false);
+            setEditingExpense(null);
+          }}
+          onSubmit={handleAddOrEditExpense}
+          editingExpense={editingExpense}
+        />
+      )}
+
+      {selectedExpense && (
+        <ExpenseDetail
+          expense={selectedExpense}
+          group={group}
+          activeUser={activeUser}
+          onClose={() => setSelectedExpense(null)}
+          onEdit={() => {
+            setEditingExpense(selectedExpense);
+            setSelectedExpense(null);
+            setShowForm(true);
+          }}
+          onDelete={() => handleDeleteExpense(selectedExpense.id)}
+          onSettleClick={() => setShowSettleModal(true)}
+          onConfirmReceipt={() => handleConfirmSettleReceipt(selectedExpense.id)}
+          onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
+        />
+      )}
+
+      {showSettleModal && selectedExpense && (
+        <SettleUpModal
+          expense={selectedExpense}
+          group={group}
+          activeUser={activeUser}
+          onClose={() => setShowSettleModal(false)}
+          onSubmit={handleSettleUpProposal}
+        />
+      )}
+    </div>
+  );
+}
+

@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", Helvetica, Arial, sans-serif;
+  --font-display: "Lora", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Minimal High Contrast Cherry Palette based on haveanothercherry.com */
+  --color-natural-bg: #F4F4F5;
+  --color-natural-text: #18181B;
+  --color-natural-sidebar: #E4E4E7;
+  --color-natural-border: #D4D4D8;
+  --color-natural-primary: #C41200; /* bold cherry red */
+  --color-natural-accent: #71717A;
+  --color-natural-muted: #52525B;
+  --color-natural-sage: #E4E4E7;
+  --color-natural-dark: #181818;
+}
+
+/* Custom styles for professional scrollbars and subtle animations */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 34, 34, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 34, 34, 0.45);
+}

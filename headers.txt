@@ -1,0 +1,10 @@
+HTTP/2 301 
+age: 109
+date: Wed, 29 Jul 2026 17:49:11 GMT
+location: https://www.haveanothercherry.com/
+server: Squarespace
+set-cookie: crumb=BcbKI83o25ZANDQ5ODNhNzVhYjBkMmM2Yjg5N2U5NjczYWIwYzRk;Secure;Path=/
+strict-transport-security: max-age=15552000
+x-contextid: ifOlJvZ7/4idHCg7S
+content-length: 0
+
