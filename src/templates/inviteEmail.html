@@ -1,126 +1,69 @@
-<!-- 
-  Have Another Cherry - Invite Email Template
-  
-  Instructions for Resend:
-  1. You can paste this HTML directly into your Resend dashboard as a new template or send it via the API.
-  2. The placeholders {{groupName}} and {{inviteCode}} should be dynamically replaced in your code before sending.
-  3. Note: The current app has disabled this email logic to prioritize user privacy and ensure no email addresses are stored or processed unnecessarily.
--->
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You've been invited to Have Another Cherry</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #FAFAFA;
-      margin: 0;
-      padding: 0;
-      color: #333333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background-color: #FFFFFF;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #E5E7EB;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    .header {
-      background: linear-gradient(135deg, #D13447 0%, #FFB5A7 100%);
-      padding: 32px 24px;
-      text-align: center;
-    }
-    .header h1 {
-      color: #FFFFFF;
-      margin: 0;
-      font-size: 24px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .content {
-      padding: 32px 24px;
-      line-height: 1.6;
-    }
-    .content p {
-      margin-top: 0;
-      margin-bottom: 20px;
-      font-size: 16px;
-      color: #4B5563;
-    }
-    .invite-box {
-      background-color: #F3F4F6;
-      border: 1px dashed #D1D5DB;
-      border-radius: 12px;
-      padding: 24px;
-      text-align: center;
-      margin: 32px 0;
-    }
-    .invite-label {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #6B7280;
-      margin-bottom: 12px;
-    }
-    .invite-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 32px;
-      font-weight: 700;
-      color: #111827;
-      letter-spacing: 0.2em;
-      margin: 0;
-    }
-    .button {
-      display: inline-block;
-      background-color: #D13447;
-      color: #FFFFFF;
-      text-decoration: none;
-      padding: 14px 28px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      text-align: center;
-    }
-    .footer {
-      background-color: #F9FAFB;
-      padding: 24px;
-      text-align: center;
-      border-top: 1px solid #E5E7EB;
-    }
-    .footer p {
-      margin: 0;
-      font-size: 12px;
-      color: #9CA3AF;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>You've been invited to Have Another Cherry</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Have Another Cherry</h1>
-    </div>
-    <div class="content">
-      <p>Hello!</p>
-      <p>You have been invited to join the expense group <strong>{{groupName}}</strong> on Have Another Cherry, a simple app to sweeten sharing expenses.</p>
-      
-      <div class="invite-box">
-        <div class="invite-label">Your Invite Code</div>
-        <p class="invite-code">{{inviteCode}}</p>
-      </div>
-      
-      <p style="text-align: center;">
-        <a href="https://haveanothercherry.com" class="button">Join the Group</a>
-      </p>
-    </div>
-    <div class="footer">
-      <p>Have Another Cherry – Built by real people in real relationships.</p>
-      <p>We do not sell or unnecessarily store your data.</p>
-    </div>
-  </div>
+<body style="margin:0;padding:0;background-color:#F4F4F5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;padding:32px 12px;">
+<tr>
+<td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border:1px solid #D4D4D8;border-radius:16px;overflow:hidden;">
+<tr>
+<td align="center" style="padding:36px 24px 20px 24px;">
+<img src="https://static1.squarespace.com/static/6a53ee56387dd65e26655a70/t/6a681089fdfc105a22ca099d/1785204873461/cherry2transparent.png" width="48" height="48" alt="Cherry" style="display:block;width:48px;height:48px;object-fit:contain;margin:0 auto 12px auto;">
+<div style="font-family:'Lora',Georgia,serif;font-size:26px;font-weight:700;color:#18181B;letter-spacing:-0.01em;">Have Another Cherry</div>
+<div style="height:3px;width:44px;background-color:#C41200;border-radius:999px;margin:14px auto 0 auto;"></div>
+</td>
+</tr>
+<tr>
+<td style="padding:12px 36px 8px 36px;font-family:'Inter',Helvetica,Arial,sans-serif;">
+<p style="margin:0 0 16px 0;font-size:17px;line-height:1.5;color:#18181B;font-weight:600;">Hi {{recipientName}},</p>
+<p style="margin:0 0 22px 0;font-size:15px;line-height:1.65;color:#52525B;"><strong style="color:#18181B;">{{fromName}}</strong> invited you to join <strong style="color:#18181B;">{{groupName}}</strong> on Have Another Cherry — a simpler, sweeter way to share household expenses.</p>
+</td>
+</tr>
+<tr>
+<td style="padding:0 36px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;border:1px dashed #D4D4D8;border-radius:12px;">
+<tr>
+<td align="center" style="padding:22px 16px;">
+<div style="font-family:'Inter',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#52525B;margin-bottom:10px;">Your Invite Code</div>
+<div style="font-family:'JetBrains Mono',ui-monospace,Menlo,Monaco,monospace;font-size:28px;font-weight:700;letter-spacing:0.14em;color:#18181B;">{{inviteCode}}</div>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding:26px 36px 6px 36px;font-family:'Inter',Helvetica,Arial,sans-serif;">
+<div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#52525B;margin-bottom:6px;">How {{groupName}} splits</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+{{splitRows}}
+</table>
+</td>
+</tr>
+<tr>
+<td align="center" style="padding:28px 36px 8px 36px;">
+<a href="https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/" style="display:inline-block;background-color:#C41200;color:#FFFFFF;text-decoration:none;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:10px;">Join the Group</a>
+</td>
+</tr>
+<tr>
+<td align="center" style="padding:0 36px 30px 36px;font-family:'Inter',Helvetica,Arial,sans-serif;">
+<p style="margin:12px 0 0 0;font-size:12px;color:#71717A;">Already have the app? Just enter your invite code above.</p>
+</td>
+</tr>
+<tr>
+<td align="center" style="background-color:#F4F4F5;border-top:1px solid #E4E4E7;padding:22px 24px;font-family:'Inter',Helvetica,Arial,sans-serif;">
+<p style="margin:0 0 4px 0;font-size:12px;color:#52525B;font-weight:500;">Have Another Cherry — built by real people in real relationships.</p>
+<p style="margin:0;font-size:11px;color:#A1A1AA;">We don't sell or unnecessarily store your data.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
 </body>
 </html>
