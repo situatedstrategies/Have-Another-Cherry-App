@@ -18,7 +18,7 @@ export async function sendInviteEmail(email: string, groupName: string, inviteCo
   }
 
   const resend = new Resend(apiKey);
-  
+
   // Load the branded HTML template
   const templatePath = path.join(process.cwd(), "src/templates/inviteEmail.html");
   let htmlTemplate = "";
@@ -33,9 +33,9 @@ export async function sendInviteEmail(email: string, groupName: string, inviteCo
   const htmlContent = htmlTemplate
     .replace(/{{groupName}}/g, groupName)
     .replace(/{{inviteCode}}/g, inviteCode);
-  
+
   const { data, error } = await resend.emails.send({
-    from: 'Have Another Cherry <onboarding@resend.dev>', 
+    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
     to: [email],
     subject: `You've been invited to ${groupName} on Have Another Cherry`,
     html: htmlContent,
@@ -47,4 +47,3 @@ export async function sendInviteEmail(email: string, groupName: string, inviteCo
 
   return data;
 }
-
