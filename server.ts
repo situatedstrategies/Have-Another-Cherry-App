@@ -15,39 +15,22 @@ async function startServer() {
   // API Routes
 
   // 1. Gemini Multimodal API (Receipt Scanning)
-  // Extracts receipt amount, description, and date using the @google/genai SDK.
+  // Extracts receipt amount, description, and date using the @google/genai SDK via Vertex AI (ADC).
   app.post("/api/scan-receipt", async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.warn("GEMINI_API_KEY is not configured. Falling back to high-quality mock scanning.");
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return res.status(200).json({ 
-          success: true, 
-          data: {
-            amount: 84.50,
-            description: "Grocery Store Run (Mocked AI Parse)"
-          } 
-        });
-      }
-
       const { GoogleGenAI, Type } = await import("@google/genai");
       const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
       });
 
       const base64Image = req.body?.image;
       if (base64Image) {
-        // Clean base64 string
         const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
         const mimeType = req.body?.mimeType || "image/jpeg";
 
-        console.log("Analyzing uploaded receipt image with Gemini API...");
+        console.log("Analyzing uploaded receipt image with Gemini API (Vertex)...");
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: [
@@ -88,12 +71,12 @@ async function startServer() {
 
       // Standard fallback or if no image payload was supplied
       await new Promise(resolve => setTimeout(resolve, 1200));
-      res.status(200).json({ 
-        success: true, 
+      res.status(200).json({
+        success: true,
         data: {
           amount: 84.50,
           description: "Grocery Store Run (Mocked AI Parse)"
-        } 
+        }
       });
     } catch (err: any) {
       console.error("Receipt Scan Error:", err);
@@ -105,7 +88,7 @@ async function startServer() {
   app.post("/api/send-invite", async (req, res) => {
     try {
       const { email, groupName, inviteCode } = req.body;
-      
+
       const data = await sendInviteEmail(email, groupName, inviteCode);
       res.status(200).json({ success: true, data });
     } catch (err: any) {
@@ -115,7 +98,6 @@ async function startServer() {
   });
 
   // 7. Firebase Cloud Messaging (FCM) API Infrastructure
-  // Fully constructs and formats FCM notifications for delivery.
   app.post("/api/send-notification", async (req, res) => {
     try {
       const { token, title, body, data } = req.body;
@@ -136,9 +118,9 @@ async function startServer() {
       };
 
       console.log("[FCM] Formatted Message Payload:", JSON.stringify(payload));
-      res.status(200).json({ 
-        success: true, 
-        messageId: `mock-fcm-id-${Date.now()}` 
+      res.status(200).json({
+        success: true,
+        messageId: `mock-fcm-id-${Date.now()}`
       });
     } catch (err: any) {
       console.error("FCM Delivery Error:", err);
@@ -149,20 +131,16 @@ async function startServer() {
   // 8. Financial Profile Generation API
   app.post("/api/generate-profile", async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
       const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
-
-      if (!apiKey) {
-        return res.status(200).json({
-          success: true,
-          data: FINANCIAL_PROFILES[0]
-        });
-      }
       const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey });
-      
+      const ai = new GoogleGenAI({
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+      });
+
       const { answers } = req.body;
-      
+
       const prompt = `Analyze the following user quiz responses regarding financial habits:
 ${JSON.stringify(answers, null, 2)}
 
@@ -187,12 +165,12 @@ Return ONLY the exact profile object you selected from the list (with 'type', 'd
           }
         }
       });
-      
+
       if (response.text) {
         const parsed = JSON.parse(response.text.trim());
         return res.status(200).json({ success: true, data: parsed });
       }
-      
+
       throw new Error("Failed to generate profile");
     } catch (err: any) {
       console.error("Profile Gen Error:", err);
