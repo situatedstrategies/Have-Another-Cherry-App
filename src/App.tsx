@@ -956,7 +956,7 @@ export default function App() {
                     <li><strong>Complete Data Deletion:</strong> When you delete your account, your data is fully and permanently wiped from the database and you are completely scrubbed from your group's member list—no backups, no "soft deletes", no recovery possible.</li>
                   </ul>
                   <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
-                    Have Another Cherry was conceived by real people in real relationships. We are only interested in sweetening your finances using simple technology, rather than souring your perception of another financial management app.
+                    Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so money stays a detail, not a conversation.
                   </div>
                   <p className="text-xs text-natural-muted mt-2 border-t border-natural-border pt-3">
                     <em>Google Cloud and Firebase are trademarks of Google LLC.</em>
