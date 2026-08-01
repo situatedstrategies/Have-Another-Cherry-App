@@ -2,13 +2,29 @@ import { Resend } from "resend";
 import fs from "fs/promises";
 import path from "path";
 
-// Emails are now enabled by default
 const EMAIL_INVITES_ACTIVE = true;
 
-export async function sendInviteEmail(email: string, groupName: string, inviteCode: string) {
+function escapeHtml(input: string): string {
+  return String(input == null ? "" : input)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+interface SplitEntry { name: string; split: number; }
+
+export async function sendInviteEmail(
+  email: string,
+  groupName: string,
+  inviteCode: string,
+  recipientName?: string,
+  fromName?: string,
+  split?: SplitEntry[]
+) {
   if (!EMAIL_INVITES_ACTIVE) {
-    console.log(`[PRIVACY MODE] Suppressed email invite to ${email} for group ${groupName}`);
-    // Return a mocked success to the frontend without processing the email
+    console.log("[PRIVACY MODE] Suppressed email invite to " + email + " for group " + groupName);
     return { id: "mocked_privacy_id_12345" };
   }
 
@@ -19,7 +35,6 @@ export async function sendInviteEmail(email: string, groupName: string, inviteCo
 
   const resend = new Resend(apiKey);
 
-  // Load the branded HTML template
   const templatePath = path.join(process.cwd(), "src/templates/inviteEmail.html");
   let htmlTemplate = "";
   try {
@@ -29,15 +44,34 @@ export async function sendInviteEmail(email: string, groupName: string, inviteCo
     throw new Error("Could not load email template.");
   }
 
-  // Replace placeholders
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
+  const safeFrom = fromName && fromName.trim() ? fromName.trim() : "A friend";
+
+  const rowStyleName = "padding:11px 0;border-bottom:1px solid #E4E4E7;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;color:#18181B;font-weight:500;";
+  const rowStylePct = "padding:11px 0;border-bottom:1px solid #E4E4E7;text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;color:#C41200;font-weight:700;";
+
+  const entries = Array.isArray(split) ? split.filter((s) => s && s.name) : [];
+  let splitRows: string;
+  if (entries.length) {
+    splitRows = entries.map((s) => {
+      const pct = Math.round((Number(s.split) || 0) * 10) / 10;
+      return '<tr><td style="' + rowStyleName + '">' + escapeHtml(s.name) + '</td><td style="' + rowStylePct + '">' + pct + '%</td></tr>';
+    }).join("");
+  } else {
+    splitRows = '<tr><td style="padding:11px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;color:#52525B;">You will set up the split together in the app.</td></tr>';
+  }
+
   const htmlContent = htmlTemplate
-    .replace(/{{groupName}}/g, groupName)
-    .replace(/{{inviteCode}}/g, inviteCode);
+    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
+    .split("{{fromName}}").join(escapeHtml(safeFrom))
+    .split("{{groupName}}").join(escapeHtml(groupName || "your group"))
+    .split("{{inviteCode}}").join(escapeHtml(inviteCode || ""))
+    .split("{{splitRows}}").join(splitRows);
 
   const { data, error } = await resend.emails.send({
-    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    from: "Have Another Cherry <notifications@haveanothercherry.com>",
     to: [email],
-    subject: `You've been invited to ${groupName} on Have Another Cherry`,
+    subject: safeFrom + " invited you to " + groupName + " on Have Another Cherry",
     html: htmlContent,
   });
 
