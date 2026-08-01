@@ -8,7 +8,7 @@ import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'luci
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
-    <img src="https://static1.squarespace.com/static/6a53ee56387dd65e26655a70/t/6a681089fdfc105a22ca099d/1785204873461/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+    <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
   );
 }
 
@@ -31,6 +31,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [partnerIncome, setPartnerIncome] = useState('');
+  const [inviteName, setInviteName] = useState('');
 
   const recommendSplit = async () => {
     try {
@@ -68,13 +69,17 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         body: JSON.stringify({
           email: inviteEmail,
           groupName: createdGroupInfo.groupName,
-          inviteCode: createdGroupInfo.inviteCode
+          inviteCode: createdGroupInfo.inviteCode,
+          recipientName: inviteName,
+          fromName: (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'A friend'),
+          split: splits.map((s, i) => ({ name: i === 0 ? (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'You') : (memberNames[i]?.trim() || ('Person ' + (i + 1))), split: parseFloat(s) || 0 }))
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send invite');
       setInviteStatus('success');
       setInviteEmail('');
+      setInviteName('');
       setTimeout(() => setInviteStatus('idle'), 3000);
     } catch (err: any) {
       console.error(err);
@@ -287,6 +292,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
 
             <form onSubmit={handleSendInvite} className="mb-8 p-6 bg-natural-sage/20 border border-natural-sage/30 rounded-xl">
               <p className="text-sm font-bold text-natural-text mb-3">Send Invite via Email</p>
+              <input type="text" required placeholder="Their name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="w-full mb-2 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60" />
               <div className="flex gap-2">
                 <input 
                   type="email"
