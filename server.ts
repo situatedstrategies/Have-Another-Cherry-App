@@ -12,10 +12,7 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // API Routes
-
-  // 1. Gemini Multimodal API (Receipt Scanning)
-  // Extracts receipt amount, description, and date using the @google/genai SDK via Vertex AI (ADC).
+  // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
   app.post("/api/scan-receipt", async (req, res) => {
     try {
       const { GoogleGenAI, Type } = await import("@google/genai");
@@ -34,12 +31,7 @@ async function startServer() {
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType
-              }
-            },
+            { inlineData: { data: base64Data, mimeType } },
             "Extract the total amount, date, and description from this receipt. Return ONLY valid JSON."
           ],
           config: {
@@ -69,14 +61,10 @@ async function startServer() {
         }
       }
 
-      // Standard fallback or if no image payload was supplied
       await new Promise(resolve => setTimeout(resolve, 1200));
       res.status(200).json({
         success: true,
-        data: {
-          amount: 84.50,
-          description: "Grocery Store Run (Mocked AI Parse)"
-        }
+        data: { amount: 84.50, description: "Grocery Store Run (Mocked AI Parse)" }
       });
     } catch (err: any) {
       console.error("Receipt Scan Error:", err);
@@ -87,9 +75,9 @@ async function startServer() {
   // 6. Resend Invite Endpoint
   app.post("/api/send-invite", async (req, res) => {
     try {
-      const { email, groupName, inviteCode } = req.body;
+      const { email, groupName, inviteCode, recipientName, fromName, split } = req.body;
 
-      const data = await sendInviteEmail(email, groupName, inviteCode);
+      const data = await sendInviteEmail(email, groupName, inviteCode, recipientName, fromName, split);
       res.status(200).json({ success: true, data });
     } catch (err: any) {
       console.error("Server Invite Error:", err);
@@ -105,23 +93,11 @@ async function startServer() {
         return res.status(400).json({ error: "Missing token, title, or body" });
       }
 
-      console.log(`[FCM] Constructing notification for token: ${token}`);
-      const payload = {
-        message: {
-          token,
-          notification: {
-            title,
-            body
-          },
-          data: data || {}
-        }
-      };
+      console.log("[FCM] Constructing notification for token: " + token);
+      const payload = { message: { token, notification: { title, body }, data: data || {} } };
 
       console.log("[FCM] Formatted Message Payload:", JSON.stringify(payload));
-      res.status(200).json({
-        success: true,
-        messageId: `mock-fcm-id-${Date.now()}`
-      });
+      res.status(200).json({ success: true, messageId: "mock-fcm-id-" + Date.now() });
     } catch (err: any) {
       console.error("FCM Delivery Error:", err);
       res.status(500).json({ error: err.message });
@@ -141,13 +117,12 @@ async function startServer() {
 
       const { answers } = req.body;
 
-      const prompt = `Analyze the following user quiz responses regarding financial habits:
-${JSON.stringify(answers, null, 2)}
-
-Match the user to the most appropriate financial profile from this list:
-${JSON.stringify(FINANCIAL_PROFILES, null, 2)}
-
-Return ONLY the exact profile object you selected from the list (with 'type', 'description', and 'quote' fields).`;
+      const prompt =
+        "Analyze the following user quiz responses regarding financial habits:\n" +
+        JSON.stringify(answers, null, 2) +
+        "\n\nMatch the user to the most appropriate financial profile from this list:\n" +
+        JSON.stringify(FINANCIAL_PROFILES, null, 2) +
+        "\n\nReturn ONLY the exact profile object you selected from the list (with 'type', 'description', and 'quote' fields).";
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -174,7 +149,6 @@ Return ONLY the exact profile object you selected from the list (with 'type', 'd
       throw new Error("Failed to generate profile");
     } catch (err: any) {
       console.error("Profile Gen Error:", err);
-      // Fallback instead of failing
       const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
       return res.status(200).json({
         success: true,
@@ -183,12 +157,8 @@ Return ONLY the exact profile object you selected from the list (with 'type', 'd
     }
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
@@ -199,7 +169,7 @@ Return ONLY the exact profile object you selected from the list (with 'type', 'd
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log("Server running on http://localhost:" + PORT);
   });
 }
 
