@@ -399,6 +399,7 @@ export default function App() {
       await setDoc(qRef, {
         to: memberId,
         from: activeUser,
+        groupId: group.id,
         action,
         payload,
         createdAt: new Date().toISOString()
@@ -450,6 +451,7 @@ export default function App() {
           await setDoc(qRef, {
             to: memberId,
             from: activeUser,
+            groupId: group.id,
             action: 'UPSERT',
             payload: encrypted,
             createdAt: new Date().toISOString()
