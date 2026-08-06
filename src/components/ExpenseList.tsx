@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { Expense, Group, SplitType } from '../types';
+import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled } from '../lib/money';
 import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
 
 interface ExpenseListProps {
@@ -179,60 +180,30 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             const payerMember = members.find(m => m.uid === exp.paidBy);
             const payerName = payerMember?.name || 'Unknown';
             const isPayerActive = exp.paidBy === activeUser;
-            const myShare = exp.shares?.[activeUser] || 0;
+            const isFullySettled = isExpenseFullySettled(exp);
+            const myRemainingBalance = getRemainingSettlementAmount(exp, activeUser, false);
+            const totalRemainingToPayer = getTotalRemainingOwedToPayer(exp, false);
 
-            // Determine relation to active user
-            // If active user paid: others owe them
-            // If active user didn't pay: active user owes payer
-            
             let balanceText = '';
             let balanceStyle = '';
-            
-            let settledByDebtor: Record<string, number> = {};
-            if (exp.settlements) {
-              exp.settlements.forEach(s => {
-                if (s.status === 'confirmed') {
-                  settledByDebtor[s.paidBy] = (settledByDebtor[s.paidBy] || 0) + s.amount;
-                }
-              });
-            }
 
-            if (exp.status === 'settled' || exp.status === 'CLOSED') {
+            if (isFullySettled) {
               balanceText = 'Fully Settled';
               balanceStyle = 'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
-            } else {
-              if (isPayerActive) {
-                // I paid, so people owe me (total amount minus my share minus what they've paid)
-                let totalRemainder = 0;
-                Object.entries(exp.shares || {}).forEach(([uid, share]) => {
-                  if (uid !== activeUser) {
-                    const paid = settledByDebtor[uid] || 0;
-                    const left = share - paid;
-                    if (left > 0.01) {
-                      totalRemainder += left;
-                    }
-                  }
-                });
-                
-                if (totalRemainder > 0.01) {
-                  balanceText = `Others owe you $${totalRemainder.toFixed(2)}`;
-                  balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
-                } else {
-                  balanceText = 'No balance for you';
-                  balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
-                }
+            } else if (isPayerActive) {
+              if (totalRemainingToPayer > 0.01) {
+                balanceText = `Others owe you $${totalRemainingToPayer.toFixed(2)}`;
+                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
-                // Someone else paid, I owe my share to them minus what I've paid
-                const paidByMe = settledByDebtor[activeUser] || 0;
-                const leftToPay = myShare - paidByMe;
-                if (leftToPay > 0.01) {
-                  balanceText = `You owe ${payerName} $${leftToPay.toFixed(2)}`;
-                  balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
-                } else {
-                  balanceText = 'No balance for you';
-                  balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
-                }
+                balanceText = 'No balance for you';
+                balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
               }
+            } else if (myRemainingBalance > 0.01) {
+              balanceText = `You owe ${payerName} $${myRemainingBalance.toFixed(2)}`;
+              balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
+            } else {
+              balanceText = 'No balance for you';
+              balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
             }
 
             return (

@@ -1,4 +1,5 @@
 import { Expense, Group } from '../types';
+import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
 import { CreditCard, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
 
 interface StatsSectionProps {
@@ -16,52 +17,30 @@ export default function StatsSection({ expenses, group, activeUser }: StatsSecti
   let settledTotalAmount = 0;
 
   expenses.forEach(exp => {
-    let settledByDebtor: Record<string, number> = {};
-    let isFullySettled = exp.status === 'settled' || exp.status === 'CLOSED';
-    
-    if (exp.settlements) {
-      exp.settlements.forEach(s => {
-        if (s.status === 'confirmed') {
-          settledByDebtor[s.paidBy] = (settledByDebtor[s.paidBy] || 0) + s.amount;
-        }
-      });
-    }
+    const isFullySettled = isExpenseFullySettled(exp);
 
-    // Determine how much is owed to the payer by each person
-    const myShare = exp.shares?.[activeUser] || 0;
-    
     if (exp.paidBy === activeUser) {
-      // You paid, others owe you the remainder
-      let totalRemainder = 0;
-      Object.entries(exp.shares || {}).forEach(([uid, share]) => {
-        if (uid !== activeUser) {
-          const paid = settledByDebtor[uid] || 0;
-          const left = share - paid;
-          if (left > 0.01 && !isFullySettled) {
-            totalRemainder += left;
-          }
-        }
-      });
-      if (totalRemainder > 0.01) {
+      const totalRemaining = getTotalRemainingOwedToPayer(exp, false);
+
+      if (!isFullySettled && totalRemaining > 0.01) {
         othersOweYouCount++;
-        othersOweYouAmount += totalRemainder;
+        othersOweYouAmount = roundCurrency(othersOweYouAmount + totalRemaining);
       }
     } else {
-      // Someone else paid, you owe your share minus what you've paid
-      const paidByMe = settledByDebtor[activeUser] || 0;
-      const leftToPay = myShare - paidByMe;
-      if (leftToPay > 0.01 && !isFullySettled) {
+      const remainingForMe = getRemainingSettlementAmount(exp, activeUser, false);
+
+      if (!isFullySettled && remainingForMe > 0.01) {
         youOweCount++;
-        youOweAmount += leftToPay;
+        youOweAmount = roundCurrency(youOweAmount + remainingForMe);
       }
     }
 
-    // For settled audit
     if (isFullySettled) {
       settledCount++;
-      // If it's settled, the total amount that was settled is the original amount minus the payer's own share
       const payerShare = exp.shares?.[exp.paidBy] || 0;
-      settledTotalAmount += (exp.amount - payerShare);
+      settledTotalAmount = roundCurrency(
+        settledTotalAmount + Math.max(0, exp.amount - payerShare)
+      );
     }
   });
 

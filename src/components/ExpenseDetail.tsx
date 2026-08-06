@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
+import { getRemainingSettlementAmount, isExpenseFullySettled } from '../lib/money';
 import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send } from 'lucide-react';
 
 interface ExpenseDetailProps {
@@ -289,17 +290,10 @@ export default function ExpenseDetail({
           
           {/* State changes (Pay/Confirm) */}
           <div className="flex flex-col sm:flex-row justify-end gap-2 order-1 sm:order-2 w-full sm:w-auto">
-            {expense.status !== 'settled' && isDebtorActive && (() => {
-              let paidByMe = 0;
-              if (expense.settlements) {
-                expense.settlements.forEach(s => {
-                  if (s.paidBy === activeUser && s.status === 'confirmed') {
-                    paidByMe += s.amount;
-                  }
-                });
-              }
-              const leftToPay = Math.max(0, myShare - paidByMe);
-              return leftToPay > 0 ? (
+            {!isExpenseFullySettled(expense) && isDebtorActive && (() => {
+              const leftToPay = getRemainingSettlementAmount(expense, activeUser, true);
+
+              return leftToPay > 0.01 ? (
                 <button
                   onClick={onSettleClick}
                   className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -309,7 +303,7 @@ export default function ExpenseDetail({
               ) : null;
             })()}
             
-            {expense.status !== 'settled' && isCreditorActive && (
+            {!isExpenseFullySettled(expense) && isCreditorActive && (
               <button
                 onClick={onSettleClick}
                 className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -318,7 +312,7 @@ export default function ExpenseDetail({
               </button>
             )}
 
-            {expense.status === 'settled' && (
+            {isExpenseFullySettled(expense) && (
               <div className="text-xs font-bold text-natural-primary bg-natural-sage px-3 py-2 rounded-xl flex items-center gap-1.5 border border-natural-primary/20">
                 <ShieldCheck className="h-4 w-4" /> Settle Completed
               </div>

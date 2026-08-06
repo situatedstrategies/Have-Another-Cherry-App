@@ -28,3 +28,35 @@ export const getRemainingSettlementAmount = (
 
   return Math.max(0, roundCurrency(share - settled));
 };
+
+export const isExpenseFullySettled = (expense: Expense): boolean => {
+  if (expense.status === 'settled' || expense.status === 'CLOSED') {
+    return true;
+  }
+
+  const debtors = Object.keys(expense.shares || {}).filter(
+    userId => userId !== expense.paidBy
+  );
+
+  return (
+    debtors.length > 0 &&
+    debtors.every(
+      userId => getRemainingSettlementAmount(expense, userId, false) <= 0.01
+    )
+  );
+};
+
+export const getTotalRemainingOwedToPayer = (
+  expense: Expense,
+  includePending = false
+): number =>
+  roundCurrency(
+    Object.entries(expense.shares || {})
+      .filter(([userId]) => userId !== expense.paidBy)
+      .reduce(
+        (total, [userId]) =>
+          total +
+          getRemainingSettlementAmount(expense, userId, includePending),
+        0
+      )
+  );
