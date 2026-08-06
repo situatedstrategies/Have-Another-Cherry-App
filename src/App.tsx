@@ -629,9 +629,9 @@ export default function App() {
     });
     
     const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
+    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
-    const updatedExp = { ...selectedExpense, status: newStatus, settlements };
+    const updatedExp: Expense = { ...selectedExpense, status: newStatus, settlements };
     try {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
@@ -676,7 +676,7 @@ export default function App() {
     });
 
     const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
+    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
     const updatedExp = { 
       ...expense, 
