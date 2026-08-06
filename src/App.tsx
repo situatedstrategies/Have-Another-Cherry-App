@@ -1,6 +1,6 @@
 import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
-import { getRemainingSettlementAmount, roundCurrency } from './lib/money';
+import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where } from 'firebase/firestore';
@@ -322,45 +322,99 @@ export default function App() {
 
   const handleExportData = () => {
     if (!group) return;
-    
-    let csv = 'Title,Amount,Date,Category,Paid By,Status,Split Type,Who Owes What\n';
-    
-    expenses.forEach(exp => {
-      const allMembers = getFullMembers(group);
-        const paidByName = allMembers.find(m => m.uid === exp.paidBy)?.name || exp.paidBy;
-      
-      let owesStr = '';
-      Object.entries(exp.shares).forEach(([uid, amount]) => {
-        if (uid !== exp.paidBy) {
-          const name = allMembers.find(m => m.uid === uid)?.name || uid;
-          owesStr += `${name} owes $${amount.toFixed(2)}; `;
-        }
+
+    const allMembers = getFullMembers(group);
+
+    const escapeCsv = (value: unknown): string => {
+      const text = String(value ?? '');
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    let csv = [
+      'Title',
+      'Amount',
+      'Date',
+      'Category',
+      'Paid By',
+      'Status',
+      'Split Type',
+      'Participant',
+      'Original Share',
+      'Confirmed Paid',
+      'Remaining Balance'
+    ].join(',') + '\n';
+
+    expenses.forEach(expense => {
+      const paidByName =
+        allMembers.find(member => member.uid === expense.paidBy)?.name ||
+        expense.paidBy;
+
+      Object.entries(expense.shares || {}).forEach(([userId, originalShare]) => {
+        if (userId === expense.paidBy) return;
+
+        const participantName =
+          allMembers.find(member => member.uid === userId)?.name || userId;
+
+        const confirmedPaid = getSettlementTotal(expense, userId, false);
+        const remainingBalance = getRemainingSettlementAmount(
+          expense,
+          userId,
+          false
+        );
+
+        const row = [
+          escapeCsv(expense.title),
+          roundCurrency(expense.amount).toFixed(2),
+          escapeCsv(expense.date),
+          escapeCsv(expense.category),
+          escapeCsv(paidByName),
+          escapeCsv(getExpenseStatusLabel(expense)),
+          escapeCsv(expense.splitType),
+          escapeCsv(participantName),
+          roundCurrency(originalShare).toFixed(2),
+          confirmedPaid.toFixed(2),
+          remainingBalance.toFixed(2)
+        ];
+
+        csv += row.join(',') + '\n';
       });
-      if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
-        owesStr += `${exp.thirdPersonName || 'Third Person'} owes $${exp.thirdPersonShare.toFixed(2)}`;
+
+      if (
+        expense.splitType === 'third_party' &&
+        expense.thirdPersonShare
+      ) {
+        const row = [
+          escapeCsv(expense.title),
+          roundCurrency(expense.amount).toFixed(2),
+          escapeCsv(expense.date),
+          escapeCsv(expense.category),
+          escapeCsv(paidByName),
+          escapeCsv(getExpenseStatusLabel(expense)),
+          escapeCsv(expense.splitType),
+          escapeCsv(expense.thirdPersonName || 'Third Person'),
+          roundCurrency(expense.thirdPersonShare).toFixed(2),
+          '0.00',
+          roundCurrency(expense.thirdPersonShare).toFixed(2)
+        ];
+
+        csv += row.join(',') + '\n';
       }
-      
-      const row = [
-        `"${exp.title.replace(/"/g, '""')}"`,
-        exp.amount.toFixed(2),
-        exp.date,
-        `"${exp.category}"`,
-        `"${paidByName}"`,
-        exp.status,
-        exp.splitType,
-        `"${owesStr}"`
-      ];
-      csv += row.join(',') + '\n';
     });
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'expenses_export.csv');
+
+    link.href = url;
+    link.download = 'have-another-cherry-ledger.csv';
+
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
+
+    URL.revokeObjectURL(url);
   };
 
   const handleLeaveGroupAndClearProfile = async () => {
@@ -380,6 +434,13 @@ export default function App() {
           name: 'Anonymous',
           email: ''
         });
+
+        if (group) {
+          localStorage.removeItem(`expenses_${group.id}`);
+        }
+        localStorage.removeItem(`group_secret_${activeUser}`);
+
+        setGroupSecret('');
         setShowSettings(false);
         setUserProfile({} as any);
         setGroup(null);
@@ -733,6 +794,7 @@ export default function App() {
         <BackupModal 
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
+          groupId={group.id}
           localExpenses={expenses}
           setLocalExpenses={setExpenses}
           groupSecret={groupSecret}

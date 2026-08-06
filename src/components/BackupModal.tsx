@@ -7,13 +7,14 @@ import CryptoJS from 'crypto-js';
 interface BackupModalProps {
   onClose: () => void;
   activeUser: string;
+  groupId: string;
   localExpenses: any[];
   setLocalExpenses: (expenses: any[]) => void;
   groupSecret: string;
   setGroupSecret: (secret: string) => void;
 }
 
-export default function BackupModal({ onClose, activeUser, localExpenses, setLocalExpenses, groupSecret, setGroupSecret }: BackupModalProps) {
+export default function BackupModal({ onClose, activeUser, groupId, localExpenses, setLocalExpenses, groupSecret, setGroupSecret }: BackupModalProps) {
   const [personalSecret, setPersonalSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -63,7 +64,7 @@ export default function BackupModal({ onClose, activeUser, localExpenses, setLoc
         }
         const parsed = JSON.parse(decryptedStr);
         setLocalExpenses(parsed);
-        localStorage.setItem(`expenses_${activeUser}`, JSON.stringify(parsed));
+        localStorage.setItem(`expenses_${groupId}`, JSON.stringify(parsed));
         setMessage('Restore successful! Local ledger updated.');
       } else {
         setMessage('No backup found in the cloud.');
