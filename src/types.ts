@@ -96,7 +96,7 @@ export interface Expense {
   isRecurring?: boolean;
   recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
   nextRecurringDate?: string;
-  status: 'unsettled' | 'pending_confirmation' | 'settled' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED';
+  status: 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED' | 'unsettled' | 'pending_confirmation' | 'settled'; // legacy values retained for existing records
   settleDetails?: SettleDetails; // legacy
   settlements?: Settlement[];
   comments?: Comment[];

@@ -432,7 +432,7 @@ export default function App() {
           ...formData,
           id: crypto.randomUUID(),
           groupId: group.id,
-          status: 'unsettled',
+          status: 'OPEN',
           createdAt: new Date().toISOString()
         };
         setExpenses(prev => {
@@ -568,9 +568,9 @@ export default function App() {
     });
     
     const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus = isFullySettled ? 'settled' : (isCreditor ? 'PARTIALLY_SETTLED' : 'pending_confirmation');
+    const newStatus = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
-    const updatedExp = { ...selectedExpense, status: newStatus as any, settlements };
+    const updatedExp = { ...selectedExpense, status: newStatus, settlements };
     try {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
@@ -615,11 +615,11 @@ export default function App() {
     });
 
     const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus = isFullySettled ? 'settled' : 'PARTIALLY_SETTLED';
+    const newStatus = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
     const updatedExp = { 
       ...expense, 
-      status: newStatus as any, 
+      status: newStatus, 
       settlements 
     };
     await syncExpenseUpdate(updatedExp);

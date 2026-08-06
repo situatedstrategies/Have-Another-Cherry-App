@@ -60,3 +60,44 @@ export const getTotalRemainingOwedToPayer = (
         0
       )
   );
+
+export type NormalizedExpenseStatus =
+  | 'OPEN'
+  | 'PARTIALLY_SETTLED'
+  | 'CLOSED';
+
+export const getNormalizedExpenseStatus = (
+  expense: Expense
+): NormalizedExpenseStatus => {
+  if (isExpenseFullySettled(expense)) {
+    return 'CLOSED';
+  }
+
+  const hasConfirmedSettlement = (expense.settlements || []).some(
+    settlement => settlement.status === 'confirmed'
+  );
+
+  const hasPendingSettlement = (expense.settlements || []).some(
+    settlement => settlement.status === 'pending'
+  );
+
+  if (
+    hasConfirmedSettlement ||
+    hasPendingSettlement ||
+    expense.status === 'PARTIALLY_SETTLED' ||
+    expense.status === 'pending_confirmation'
+  ) {
+    return 'PARTIALLY_SETTLED';
+  }
+
+  return 'OPEN';
+};
+
+export const getExpenseStatusLabel = (expense: Expense): string => {
+  const status = getNormalizedExpenseStatus(expense);
+
+  if (status === 'CLOSED') return 'Fully Settled';
+  if (status === 'PARTIALLY_SETTLED') return 'Partially Settled';
+
+  return 'Open';
+};

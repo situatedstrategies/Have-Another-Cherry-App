@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { Expense, Group, SplitType } from '../types';
-import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled } from '../lib/money';
+import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus } from '../lib/money';
 import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
 
 interface ExpenseListProps {
@@ -18,7 +18,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unsettled' | 'pending_confirmation' | 'settled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -30,7 +30,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       const matchesSearch = exp.title.toLowerCase().includes(search.toLowerCase()) || 
                             exp.category.toLowerCase().includes(search.toLowerCase());
       // Status
-      const matchesStatus = statusFilter === 'all' || exp.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || getNormalizedExpenseStatus(exp) === statusFilter;
       // Category
       const matchesCategory = categoryFilter === 'all' || exp.category === categoryFilter;
 
@@ -92,7 +92,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
           
           {/* Quick Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0" id="status-filters">
-            {(['all', 'unsettled', 'pending_confirmation', 'settled'] as const).map((status) => (
+            {(['all', 'OPEN', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -103,7 +103,13 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 }`}
                 id={`filter-status-${status}`}
               >
-                {status === 'all' ? 'All Items' : status.replace('_', ' ')}
+                {status === 'all'
+                  ? 'All Items'
+                  : status === 'OPEN'
+                    ? 'Open'
+                    : status === 'PARTIALLY_SETTLED'
+                      ? 'Partially Settled'
+                      : 'Fully Settled'}
               </button>
             ))}
           </div>
@@ -216,11 +222,11 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 <div className="flex items-start gap-4 min-w-0 flex-1">
                   {/* Status indicator ring */}
                   <div className="mt-1" id={`status-ring-${exp.id}`}>
-                    {exp.status === 'settled' ? (
+                    {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
                       <div className="p-2 bg-natural-sage text-natural-primary rounded-full border border-natural-primary/20">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
-                    ) : exp.status === 'pending_confirmation' ? (
+                    ) : getNormalizedExpenseStatus(exp) === 'PARTIALLY_SETTLED' ? (
                       <div className="p-2 bg-natural-sidebar text-natural-text rounded-full border border-natural-border/20 animate-pulse">
                         <Clock className="h-4 w-4" />
                       </div>

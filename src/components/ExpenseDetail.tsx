@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
-import { getRemainingSettlementAmount, isExpenseFullySettled } from '../lib/money';
+import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel } from '../lib/money';
 import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send } from 'lucide-react';
 
 interface ExpenseDetailProps {
@@ -71,7 +71,7 @@ export default function ExpenseDetail({
                 ? 'bg-natural-sidebar text-natural-text border-natural-border/20'
                 : 'bg-natural-sidebar text-natural-muted border-natural-border'
             }`} id="detail-status-badge">
-              {expense.status.replace('_', ' ')}
+              {getExpenseStatusLabel(expense)}
             </span>
           </div>
           <button 

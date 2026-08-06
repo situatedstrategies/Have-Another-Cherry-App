@@ -34,7 +34,7 @@ export function getExpenseSettlementStatus(expense: Expense, userId: string): {
   
   // Check legacy settleDetails if no new settlements exist
   let amountSettledByMe = mySettlements.reduce((sum, s) => sum + s.amount, 0);
-  if (amountSettledByMe === 0 && expense.settleDetails?.paidBy === userId && expense.status === 'settled') {
+  if (amountSettledByMe === 0 && expense.settleDetails?.paidBy === userId && (expense.status === 'settled' || expense.status === 'CLOSED')) {
     amountSettledByMe = expense.settleDetails.amount;
   }
   
