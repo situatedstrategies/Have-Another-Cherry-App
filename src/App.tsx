@@ -1,5 +1,6 @@
 import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
+import { getRemainingSettlementAmount, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where } from 'firebase/firestore';
@@ -521,6 +522,23 @@ export default function App() {
 
   const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string) => {
     if (!selectedExpense || !group) return;
+
+    const normalizedAmount = roundCurrency(amount);
+    const remainingAmount = getRemainingSettlementAmount(selectedExpense, debtorId, true);
+
+    if (
+      !group.memberIds.includes(debtorId) ||
+      !Number.isFinite(normalizedAmount) ||
+      normalizedAmount <= 0 ||
+      normalizedAmount > remainingAmount
+    ) {
+      addToast(
+        'Invalid Payment',
+        `Payment must be between $0.01 and $${remainingAmount.toFixed(2)}.`,
+        'info'
+      );
+      return;
+    }
     
     const isCreditor = selectedExpense.paidBy === activeUser;
     
@@ -529,7 +547,7 @@ export default function App() {
       expenseId: selectedExpense.id,
       paidBy: debtorId,
       receivedBy: selectedExpense.paidBy,
-      amount: amount,
+      amount: normalizedAmount,
       instrumentType: instrumentType,
       label: label,
       timestamp: new Date().toISOString(),
@@ -568,7 +586,7 @@ export default function App() {
           mismatchType: computedMismatch,
           paidBy: debtorId,
           receivedBy: selectedExpense.paidBy,
-          amount: amount,
+          amount: normalizedAmount,
           timestamp: newSettlement.timestamp
         }).catch(e => console.error("Data write failed", e));
       }

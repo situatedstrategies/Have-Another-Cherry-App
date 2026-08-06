@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Expense, Group, PaymentInstrument } from '../types';
 import { X, Check } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
+import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
 
 interface SettleUpModalProps {
   expense: Expense;
@@ -14,6 +15,7 @@ interface SettleUpModalProps {
 export default function SettleUpModal({ expense, group, activeUser, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
   
   const isCreditor = expense.paidBy === activeUser;
   
@@ -23,18 +25,10 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   
   const [selectedDebtor, setSelectedDebtor] = useState(isCreditor ? (debtors[0] || '') : activeUser);
   
-  // Calculate remaining amount for the selected debtor
-  const getRemainingAmount = (uid: string) => {
-    let paid = 0;
-    if (expense.settlements) {
-      expense.settlements.forEach(s => {
-        if (s.paidBy === uid && s.status === 'confirmed') {
-          paid += s.amount;
-        }
-      });
-    }
-    return Math.max(0, (expense.shares?.[uid] || 0) - paid);
-  };
+  // Pending payments reserve part of the balance so the same debt
+  // cannot be submitted repeatedly while awaiting confirmation.
+  const getRemainingAmount = (uid: string) =>
+    getRemainingSettlementAmount(expense, uid, true);
 
   const [amountToPay, setAmountToPay] = useState(getRemainingAmount(selectedDebtor).toString());
 
@@ -45,7 +39,32 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
 
   const handleSettleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(paymentMethod, parseFloat(amountToPay), notes.trim(), selectedDebtor);
+    setError('');
+
+    const amount = roundCurrency(Number(amountToPay));
+    const remaining = getRemainingAmount(selectedDebtor);
+
+    if (!selectedDebtor) {
+      setError('Please select the person making the payment.');
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter a valid payment amount greater than zero.');
+      return;
+    }
+
+    if (remaining <= 0) {
+      setError('This person has no remaining balance on this transaction.');
+      return;
+    }
+
+    if (amount > remaining) {
+      setError(`Payment cannot exceed the remaining balance of $${remaining.toFixed(2)}.`);
+      return;
+    }
+
+    onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor);
   };
 
   const methods: { label: string; value: PaymentInstrument }[] = [
@@ -69,6 +88,11 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
         </div>
         
         <form onSubmit={handleSettleSubmit} className="p-6 space-y-5 overflow-y-auto">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+              {error}
+            </div>
+          )}
           <div className="bg-natural-sidebar/30 p-4 rounded-2xl border border-natural-border space-y-2">
             <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest">Expense Details</span>
             <span className="block text-sm font-bold text-natural-text">{expense.title}</span>
@@ -104,6 +128,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
                 type="number"
                 step="0.01"
                 min="0.01"
+                max={getRemainingAmount(selectedDebtor)}
                 value={amountToPay}
                 onChange={(e) => setAmountToPay(e.target.value)}
                 className="bg-transparent border-none outline-none w-32 text-center"
@@ -146,7 +171,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
             <button type="button" onClick={onClose} className="w-full py-2.5 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
               Cancel
             </button>
-            <button type="submit" disabled={!selectedDebtor} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={!selectedDebtor || getRemainingAmount(selectedDebtor) <= 0} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
               <Check className="h-4 w-4" /> Log Payment
             </button>
           </div>
