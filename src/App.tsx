@@ -362,8 +362,8 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  const handleDeleteData = async () => {
-    if (window.confirm("Are you sure you want to delete your account data? This will remove you from your current group and clear your profile data. This action cannot be undone.")) {
+  const handleLeaveGroupAndClearProfile = async () => {
+    if (window.confirm("Leave this group and clear your app profile? This removes you from the current group and clears your stored profile fields. Your sign-in account will remain active.")) {
       try {
         if (group) {
           const groupRef = doc(db, 'groups', group.id);
@@ -384,8 +384,8 @@ export default function App() {
         setGroup(null);
         setExpenses([]);
       } catch (err) {
-        console.error("Error deleting data", err);
-        alert("Failed to delete data. You may need to sign in again to perform this action.");
+        console.error("Error leaving group and clearing profile", err);
+        alert("Unable to leave the group and clear your profile. Please try again.");
       }
     }
   };
@@ -955,7 +955,7 @@ export default function App() {
                     <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
                     <li><strong>Anonymized Profiles:</strong> We completely hash your email address (using SHA-256) before storing it in the database. We do not store raw emails alongside your data.</li>
                     <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
-                    <li><strong>Complete Data Deletion:</strong> When you delete your account, your data is fully and permanently wiped from the database and you are completely scrubbed from your group's member list—no backups, no "soft deletes", no recovery possible.</li>
+                    <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
                   </ul>
                   <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
                     Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so money stays a detail, not a conversation.
@@ -995,10 +995,10 @@ export default function App() {
                   <div className="border-t border-natural-border/50"></div>
                   
                   <button 
-                    onClick={handleDeleteData}
+                    onClick={handleLeaveGroupAndClearProfile}
                     className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
                   >
-                    <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account Data</span>
+                    <span className="flex items-center gap-2"><Trash2 size={18} /> Leave Group & Clear Profile</span>
                   </button>
                 </div>
               </section>
