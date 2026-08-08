@@ -4,7 +4,7 @@ import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
@@ -20,7 +20,7 @@ import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, Edit2 } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -51,6 +51,8 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showSettleModal, setShowSettleModal] = useState(false);
@@ -86,8 +88,14 @@ export default function App() {
       try {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
-          const profile = userDoc.data();
-          setUserProfile(profile as any);
+          const profile = userDoc.data() as any;
+          // Backfill a missing/legacy name from the account's sign-in display name
+          // (covers both Google and email/password accounts).
+          if ((!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') && currentUser.displayName) {
+            profile.name = currentUser.displayName;
+            updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(() => {});
+          }
+          setUserProfile(profile);
         } else {
           setUserProfile({}); // Setup required
         }
@@ -727,6 +735,32 @@ export default function App() {
     addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
   };
 
+  // Let the user set/change their display name regardless of how they signed in.
+  const handleSaveName = async () => {
+    const newName = nameInput.trim();
+    if (!newName) {
+      addToast('Name Required', 'Please enter a name.', 'info');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { name: newName });
+      if (auth.currentUser) {
+        try { await updateProfile(auth.currentUser, { displayName: newName }); } catch (e) { console.error(e); }
+      }
+      // Keep the group's stored member list in sync so the name shows everywhere.
+      if (group && group.members?.some(m => m.uid === activeUser)) {
+        const newMembers = group.members.map(m => m.uid === activeUser ? { ...m, name: newName } : m);
+        await updateDoc(doc(db, 'groups', group.id), { members: newMembers });
+      }
+      setUserProfile((prev: any) => ({ ...(prev || {}), name: newName }));
+      setEditingName(false);
+      addToast('Name Updated', 'Your name has been updated.', 'success');
+    } catch (e) {
+      console.error('Failed to update name', e);
+      addToast('Error', 'Could not update your name. Please try again.', 'error');
+    }
+  };
+
   // Payments logged by others that are waiting for THIS user to confirm receipt.
   const pendingToConfirm = expenses.filter(e =>
     (e.settlements || []).some(s => s.status === 'pending' && s.receivedBy === activeUser)
@@ -919,9 +953,41 @@ export default function App() {
               <div>
                 <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>
                 <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <span className="text-sm text-natural-muted">Name</span>
-                    <span className="text-sm font-semibold text-natural-text capitalize">{userProfile?.name || 'Unknown'}</span>
+                    {editingName ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          value={nameInput}
+                          onChange={(e) => setNameInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                          autoFocus
+                          placeholder="Your name"
+                          className="w-36 px-2 py-1 text-sm text-right border border-natural-border focus:border-natural-primary rounded-md outline-none"
+                        />
+                        <button onClick={handleSaveName} className="text-natural-primary hover:text-natural-dark p-1" title="Save"><Check size={16} /></button>
+                        <button onClick={() => setEditingName(false)} className="text-natural-muted hover:text-natural-text p-1" title="Cancel"><X size={16} /></button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const current = userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name)
+                            ? userProfile.name
+                            : (currentUser?.displayName || '');
+                          setNameInput(current);
+                          setEditingName(true);
+                        }}
+                        className="flex items-center gap-1.5 group"
+                        title="Edit your name"
+                      >
+                        <span className="text-sm font-semibold text-natural-text capitalize">
+                          {userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name)
+                            ? userProfile.name
+                            : (currentUser?.displayName || 'Add your name')}
+                        </span>
+                        <Edit2 size={13} className="text-natural-muted group-hover:text-natural-primary" />
+                      </button>
+                    )}
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-natural-muted">Annual Income</span>
