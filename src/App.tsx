@@ -20,7 +20,7 @@ import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText } from 'lucide-react';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -620,7 +620,7 @@ export default function App() {
     }
   };
 
-  const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string) => {
+  const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate?: string) => {
     if (!selectedExpense || !group) return;
 
     const normalizedAmount = roundCurrency(amount);
@@ -651,6 +651,7 @@ export default function App() {
       instrumentType: instrumentType,
       label: label,
       timestamp: new Date().toISOString(),
+      paymentDate: paymentDate || new Date().toISOString().split('T')[0],
       status: isCreditor ? 'confirmed' : 'pending',
       mismatchType: computeMismatchForSettlement(selectedExpense, instrumentType)
     };
@@ -725,6 +726,15 @@ export default function App() {
     await syncExpenseUpdate(updatedExp);
     addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
   };
+
+  // Payments logged by others that are waiting for THIS user to confirm receipt.
+  const pendingToConfirm = expenses.filter(e =>
+    (e.settlements || []).some(s => s.status === 'pending' && s.receivedBy === activeUser)
+  );
+  const pendingConfirmCount = pendingToConfirm.reduce(
+    (n, e) => n + (e.settlements || []).filter(s => s.status === 'pending' && s.receivedBy === activeUser).length,
+    0
+  );
 
   return (
     <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12" id="app-root">
@@ -804,6 +814,31 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {pendingConfirmCount > 0 && (
+            <div className="bg-natural-primary/5 border border-natural-primary/30 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="relative shrink-0 mt-0.5">
+                <AlertCircle className="h-5 w-5 text-natural-primary" />
+                <span className="absolute -top-1.5 -right-1.5 bg-natural-primary text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                  {pendingConfirmCount}
+                </span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-natural-text">
+                  {pendingConfirmCount === 1 ? 'A payment needs your confirmation' : `${pendingConfirmCount} payments need your confirmation`}
+                </h3>
+                <p className="text-xs text-natural-muted mt-1">
+                  Someone logged a payment to you. Confirm receipt so it clears and updates their balance.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedExpense(pendingToConfirm[0])}
+                className="shrink-0 bg-natural-primary hover:bg-natural-dark text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
+              >
+                Review
+              </button>
+            </div>
+          )}
 
           {missingProfiles.length > 0 && !dismissedWaiting && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -1205,7 +1240,7 @@ export default function App() {
           }}
           onDelete={() => handleDeleteExpense(selectedExpense.id)}
           onSettleClick={() => setShowSettleModal(true)}
-          onConfirmReceipt={() => handleConfirmSettleReceipt(selectedExpense.id)}
+          onConfirmReceipt={(settlementId) => handleConfirmSettleReceipt(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
         />
       )}

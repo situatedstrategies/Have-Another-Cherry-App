@@ -9,12 +9,20 @@ interface SettleUpModalProps {
   group: Group;
   activeUser: string;
   onClose: () => void;
-  onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string) => void;
+  onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
 }
+
+// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
+const todayLocal = () => {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().split('T')[0];
+};
 
 export default function SettleUpModal({ expense, group, activeUser, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
   const [notes, setNotes] = useState('');
+  const [paymentDate, setPaymentDate] = useState(todayLocal());
   const [error, setError] = useState('');
   
   const isCreditor = expense.paidBy === activeUser;
@@ -30,11 +38,12 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   const getRemainingAmount = (uid: string) =>
     getRemainingSettlementAmount(expense, uid, true);
 
-  const [amountToPay, setAmountToPay] = useState(getRemainingAmount(selectedDebtor).toString());
+  // Default to empty ($0) — the user enters how much they're settling.
+  const [amountToPay, setAmountToPay] = useState('');
 
   const handleDebtorChange = (uid: string) => {
     setSelectedDebtor(uid);
-    setAmountToPay(getRemainingAmount(uid).toString());
+    setAmountToPay('');
   };
 
   const handleSettleSubmit = (e: React.FormEvent) => {
@@ -64,7 +73,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
       return;
     }
 
-    onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor);
+    onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor, paymentDate);
   };
 
   const methods: { label: string; value: PaymentInstrument }[] = [
@@ -121,19 +130,43 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
           </div>
 
           <div className="flex flex-col items-center justify-center py-4 bg-natural-sage/20 rounded-2xl border border-dashed border-natural-primary/50">
-            <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">Settlement Transfer Amount</span>
+            <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">Settle Amount</span>
             <div className="flex items-center text-4xl font-display font-bold text-natural-text mt-1">
               $
-              <input 
+              <input
                 type="number"
                 step="0.01"
-                min="0.01"
+                min="0"
                 max={getRemainingAmount(selectedDebtor)}
                 value={amountToPay}
                 onChange={(e) => setAmountToPay(e.target.value)}
-                className="bg-transparent border-none outline-none w-32 text-center"
+                placeholder="0.00"
+                className="bg-transparent border-none outline-none w-32 text-center placeholder-natural-muted/40"
               />
             </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] font-medium text-natural-muted">
+                Remaining owed: <span className="font-bold text-natural-text">${getRemainingAmount(selectedDebtor).toFixed(2)}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setAmountToPay(getRemainingAmount(selectedDebtor).toFixed(2))}
+                className="text-[11px] font-bold text-natural-primary hover:underline"
+              >
+                Settle full
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Payment Date</label>
+            <input
+              type="date"
+              value={paymentDate}
+              max={todayLocal()}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all"
+            />
           </div>
 
           <div>
