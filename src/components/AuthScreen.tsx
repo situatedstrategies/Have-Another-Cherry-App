@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -19,6 +19,16 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
+  const [isReset, setIsReset] = useState(false);
+  const [info, setInfo] = useState('');
+
+  // Switch between Log in / Sign up / Reset views, clearing any messages.
+  const switchMode = (next: 'login' | 'signup' | 'reset') => {
+    setError('');
+    setInfo('');
+    setIsReset(next === 'reset');
+    if (next !== 'reset') setIsLogin(next === 'login');
+  };
 
   // Password policy for new accounts: at least 8 chars, a letter, a number, and a special character.
   const passwordChecks = {
@@ -45,9 +55,37 @@ export default function AuthScreen() {
     }
   };
 
+  // Send a Firebase Auth password reset email. Uses a generic confirmation so we
+  // don't reveal whether an email is registered.
+  const handleResetPassword = async () => {
+    setError('');
+    setInfo('');
+    if (!email) {
+      setError('Enter your email address to reset your password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      if (err?.code && err.code !== 'auth/user-not-found') {
+        setError(err.message);
+        setLoading(false);
+        return;
+      }
+    }
+    setInfo(`If an account exists for ${email}, a password reset link is on its way. Check your inbox (and your spam folder).`);
+    setLoading(false);
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isReset) {
+      await handleResetPassword();
+      return;
+    }
 
     if (!isLogin) {
       if (!passwordValid) {
@@ -91,7 +129,7 @@ export default function AuthScreen() {
 
           <div className="text-center mb-6">
             <h2 className="text-sm font-medium text-natural-muted">
-              {isLogin ? 'Log in to your account' : 'Create a new account'}
+              {isReset ? 'Reset your password' : (isLogin ? 'Log in to your account' : 'Create a new account')}
             </h2>
           </div>
 
@@ -102,8 +140,21 @@ export default function AuthScreen() {
             </div>
           )}
 
+          {info && (
+            <div className="bg-green-50 text-green-700 p-3 rounded-md mb-6 text-sm font-medium border border-green-100 flex items-start gap-2">
+              <span className="shrink-0">✅</span>
+              <span>{info}</span>
+            </div>
+          )}
+
           <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
-            {!isLogin && (
+            {isReset && (
+              <p className="text-sm text-natural-muted -mt-1">
+                Enter the email address for your account and we'll send you a link to create a new password.
+              </p>
+            )}
+
+            {!isLogin && !isReset && (
               <div>
                 <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">Name</label>
                 <div className="relative">
@@ -135,6 +186,7 @@ export default function AuthScreen() {
               </div>
             </div>
 
+            {!isReset && (
             <div>
               <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">Password</label>
               <div className="relative">
@@ -149,23 +201,38 @@ export default function AuthScreen() {
                   minLength={isLogin ? undefined : 8}
                 />
               </div>
-              {!isLogin && password.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {[
-                    { ok: passwordChecks.length, label: 'At least 8 characters' },
-                    { ok: passwordChecks.letter, label: 'Contains a letter' },
-                    { ok: passwordChecks.number, label: 'Contains a number' },
-                    { ok: passwordChecks.special, label: 'Contains a special character' },
-                  ].map((req) => (
-                    <li key={req.label} className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-green-600' : 'text-natural-muted'}`}>
-                      <span>{req.ok ? '✓' : '○'}</span> {req.label}
-                    </li>
-                  ))}
-                </ul>
+              {!isLogin && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-natural-text mb-1">Create a password with:</p>
+                  <ul className="space-y-1">
+                    {[
+                      { ok: passwordChecks.length, label: 'At least 8 characters' },
+                      { ok: passwordChecks.letter, label: 'A letter (a–z or A–Z)' },
+                      { ok: passwordChecks.number, label: 'A number (0–9)' },
+                      { ok: passwordChecks.special, label: 'A special character (e.g. ! ? @ # $ %)' },
+                    ].map((req) => (
+                      <li key={req.label} className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-green-600' : 'text-natural-muted'}`}>
+                        <span>{req.ok ? '✓' : '○'}</span> {req.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {isLogin && (
+                <div className="text-right mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('reset')}
+                    className="text-xs font-medium text-natural-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               )}
             </div>
+            )}
 
-            {!isLogin && (
+            {!isLogin && !isReset && (
               <label className="flex items-start gap-2 text-xs text-natural-muted cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -184,13 +251,15 @@ export default function AuthScreen() {
 
             <button
               type="submit"
-              disabled={loading || (!isLogin && (!passwordValid || !agreeTerms))}
+              disabled={loading || (!isReset && !isLogin && (!passwordValid || !agreeTerms))}
               className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? 'Please wait...' : (isLogin ? 'Log In' : 'Sign Up')}
+              {loading ? 'Please wait...' : (isReset ? 'Send reset link' : (isLogin ? 'Log In' : 'Sign Up'))}
             </button>
           </form>
 
+          {!isReset && (
+          <>
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-natural-border"></div>
@@ -226,16 +295,30 @@ export default function AuthScreen() {
             </svg>
             Continue with Google
           </button>
+          </>
+          )}
 
-          <p className="text-center text-sm text-natural-muted mt-6">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-natural-text hover:underline font-medium transition-colors"
-            >
-              {isLogin ? 'Sign up' : 'Log in'}
-            </button>
-          </p>
+          {isReset ? (
+            <p className="text-center text-sm text-natural-muted mt-6">
+              Remembered your password?{' '}
+              <button
+                onClick={() => switchMode('login')}
+                className="text-natural-text hover:underline font-medium transition-colors"
+              >
+                Back to log in
+              </button>
+            </p>
+          ) : (
+            <p className="text-center text-sm text-natural-muted mt-6">
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              <button
+                onClick={() => switchMode(isLogin ? 'signup' : 'login')}
+                className="text-natural-text hover:underline font-medium transition-colors"
+              >
+                {isLogin ? 'Sign up' : 'Log in'}
+              </button>
+            </p>
+          )}
         </div>
       </div>
 
