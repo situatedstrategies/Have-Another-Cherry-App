@@ -12,6 +12,34 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Lightweight Alpha Lite abuse protection for public email endpoints.
+  // App Hosting instances may have separate memory, so production launch
+  // should eventually use managed rate limiting.
+  const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+  const emailRateLimit = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const maxRequests = 5;
+
+    const bucket = requestBuckets.get(key);
+
+    if (!bucket || now >= bucket.resetAt) {
+      requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    if (bucket.count >= maxRequests) {
+      return res.status(429).json({
+        error: 'Too many requests. Please wait before trying again.'
+      });
+    }
+
+    bucket.count += 1;
+    next();
+  };
+
   // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
   app.post("/api/scan-receipt", async (req, res) => {
     try {
@@ -73,7 +101,7 @@ async function startServer() {
   });
 
   // 6. Resend Invite Endpoint
-  app.post("/api/send-invite", async (req, res) => {
+  app.post("/api/send-invite", emailRateLimit, async (req, res) => {
     try {
       const { email, groupName, inviteCode, recipientName, fromName, split } = req.body;
 
@@ -89,7 +117,7 @@ async function startServer() {
   // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
   // delivers it via Resend from reset@haveanothercherry.com. Responds generically
   // so we never reveal whether an email is registered.
-  app.post("/api/send-password-reset", async (req, res) => {
+  app.post("/api/send-password-reset", emailRateLimit, async (req, res) => {
     const { email } = req.body || {};
     if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Email is required" });

@@ -460,25 +460,23 @@ export default function App() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm("Permanently delete your account? This removes you from your group, deletes your profile and financial data, and deletes your sign-in account. This action cannot be undone.")) return;
+    if (!window.confirm("Permanently delete your account? This removes you from your current group, deletes your app profile, clears local ledger data, and deletes your sign-in account. This action cannot be undone.")) return;
     try {
+      // Authenticate before performing destructive operations so a cancelled
+      // or failed reauthentication cannot leave the account half-deleted.
+      await reauthenticate();
+
       // 1. Remove from the shared group.
       await removeSelfFromGroup();
-      // 2. Delete the Firestore user document (profile, income, financial profile).
+
+      // 2. Delete the Firestore profile.
       await deleteDoc(doc(db, 'users', activeUser));
-      // 3. Clear local caches.
+
+      // 3. Clear local cached ledger data.
       clearLocalData();
-      // 4. Delete the Firebase Auth account so no ghost sign-in remains.
-      try {
-        await deleteUser(auth.currentUser!);
-      } catch (authErr: any) {
-        if (authErr?.code === 'auth/requires-recent-login') {
-          await reauthenticate();
-          await deleteUser(auth.currentUser!);
-        } else {
-          throw authErr;
-        }
-      }
+
+      // 4. Delete the Firebase Authentication account.
+      await deleteUser(auth.currentUser!);
       // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
       setShowSettings(false);
       setShowPrivacyModal(false);
