@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
+import LegalModal, { LegalDoc } from './LegalModal';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
-    <img src="https://static1.squarespace.com/static/6a53ee56387dd65e26655a70/t/6a681089fdfc105a22ca099d/1785204873461/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+    <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
   );
 }
 
@@ -16,6 +17,17 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
+
+  // Password policy for new accounts: at least 8 chars, a letter, a number, and a special character.
+  const passwordChecks = {
+    length: password.length >= 8,
+    letter: /[A-Za-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
+  const passwordValid = Object.values(passwordChecks).every(Boolean);
 
   
   // Mobile integration placeholders
@@ -36,6 +48,18 @@ export default function AuthScreen() {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isLogin) {
+      if (!passwordValid) {
+        setError('Password must be at least 8 characters and include a letter, a number, and a special character.');
+        return;
+      }
+      if (!agreeTerms) {
+        setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       if (isLogin) {
@@ -122,14 +146,45 @@ export default function AuthScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 rounded-md text-natural-text placeholder-slate-400 font-sans text-sm outline-none transition-all"
                   placeholder="••••••••"
-                  minLength={6}
+                  minLength={isLogin ? undefined : 8}
                 />
               </div>
+              {!isLogin && password.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {[
+                    { ok: passwordChecks.length, label: 'At least 8 characters' },
+                    { ok: passwordChecks.letter, label: 'Contains a letter' },
+                    { ok: passwordChecks.number, label: 'Contains a number' },
+                    { ok: passwordChecks.special, label: 'Contains a special character' },
+                  ].map((req) => (
+                    <li key={req.label} className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-green-600' : 'text-natural-muted'}`}>
+                      <span>{req.ok ? '✓' : '○'}</span> {req.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
+            {!isLogin && (
+              <label className="flex items-start gap-2 text-xs text-natural-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-natural-primary focus:ring-natural-primary"
+                />
+                <span>
+                  I agree to the{' '}
+                  <button type="button" onClick={() => setLegalDoc('terms')} className="font-semibold text-natural-primary hover:underline">Terms of Service</button>
+                  {' '}and{' '}
+                  <button type="button" onClick={() => setLegalDoc('privacy')} className="font-semibold text-natural-primary hover:underline">Privacy Policy</button>.
+                </span>
+              </label>
+            )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && (!passwordValid || !agreeTerms))}
               className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
             >
               {loading ? 'Please wait...' : (isLogin ? 'Log In' : 'Sign Up')}
@@ -183,6 +238,8 @@ export default function AuthScreen() {
           </p>
         </div>
       </div>
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
     </div>
   );
 }

@@ -3,8 +3,8 @@ import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
+import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider } from 'firebase/auth';
 import { auth, db, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
@@ -18,12 +18,13 @@ import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
+import LegalModal, { LegalDoc } from './components/LegalModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
-    <img src="https://static1.squarespace.com/static/6a53ee56387dd65e26655a70/t/6a681089fdfc105a22ca099d/1785204873461/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+    <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
   );
 }
 
@@ -48,6 +49,8 @@ export default function App() {
     }
   }, [activeUser]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [dismissedWaiting, setDismissedWaiting] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showSettleModal, setShowSettleModal] = useState(false);
@@ -237,29 +240,12 @@ export default function App() {
     }} />;
   }
 
-  const missingProfiles = group.memberIds?.filter(id => !groupUsers[id]?.financialProfile) || [];
-  if (missingProfiles.length > 0 && Object.keys(groupUsers).length > 0) {
-    return (
-      <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-natural-border text-center max-w-md">
-          <h2 className="text-xl font-bold text-natural-text mb-3">Waiting on others</h2>
-          <p className="text-natural-muted mb-4">
-            Some members of this group have not completed their financial profile. Everyone must complete the quiz before you can start using the ledger.
-          </p>
-          <div className="space-y-2 mb-6">
-            {missingProfiles.map(id => (
-              <div key={id} className="text-sm font-medium text-natural-primary">
-                {groupUsers[id]?.name || 'A member'} is still completing setup.
-              </div>
-            ))}
-          </div>
-          <button onClick={() => window.location.reload()} className="bg-natural-primary text-white px-6 py-2 rounded-lg font-bold hover:bg-natural-primary/90">
-            Refresh Status
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Non-blocking: members who are in the group but haven't finished their quiz yet.
+  // We no longer lock the whole app on this — the ledger is usable right away and we
+  // surface a gentle, dismissible banner instead (see below).
+  const missingProfiles = (group.memberIds || []).filter(
+    id => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
+  );
 
   // Active User is current user
   let hasIncomeDiscrepancy = false;
@@ -417,38 +403,93 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleLeaveGroupAndClearProfile = async () => {
-    if (window.confirm("Leave this group and clear your app profile? This removes you from the current group and clears your stored profile fields. Your sign-in account will remain active.")) {
+  // Scrub the current user out of their group document (members list, memberIds,
+  // and their slot in the default split). Shared by "Leave Group" and "Delete Account".
+  const removeSelfFromGroup = async () => {
+    if (!group) return;
+    const groupRef = doc(db, 'groups', group.id);
+    const newMembers = group.members.filter(m => m.uid !== activeUser);
+    const newMemberIds = (group.memberIds || []).filter(id => id !== activeUser);
+    await updateDoc(groupRef, {
+      members: newMembers,
+      memberIds: newMemberIds,
+      [`defaultSplit.${activeUser}`]: deleteField()
+    });
+  };
+
+  // Clear any locally cached ledger data for this user/group.
+  const clearLocalData = () => {
+    if (group) localStorage.removeItem('expenses_' + group.id);
+    if (activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!window.confirm("Leave this group? You'll be removed from the member list and returned to the group setup screen. Your account stays active and you can create or join another group.")) return;
+    try {
+      await removeSelfFromGroup();
+      await updateDoc(doc(db, 'users', activeUser), { groupId: deleteField() });
+      clearLocalData();
+      setShowSettings(false);
+      setShowPrivacyModal(false);
+      setUserProfile((prev: any) => ({ ...(prev || {}), groupId: null }));
+      setGroup(null);
+      setGroupUsers({});
+      setExpenses([]);
+    } catch (err) {
+      console.error("Error leaving group", err);
+      alert("Failed to leave the group. Please try again.");
+    }
+  };
+
+  // Re-authenticate the current user when Firebase requires a recent login before
+  // a sensitive operation (account deletion). Handles both Google and email/password.
+  const reauthenticate = async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No signed-in user");
+    const providerId = user.providerData[0]?.providerId;
+    if (providerId === 'google.com') {
+      await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    } else if (providerId === 'password') {
+      const pw = window.prompt("For your security, please re-enter your password to permanently delete your account:");
+      if (!pw) throw new Error("cancelled");
+      const credential = EmailAuthProvider.credential(user.email || '', pw);
+      await reauthenticateWithCredential(user, credential);
+    } else {
+      throw new Error("Please sign out and sign back in, then try deleting your account again.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Permanently delete your account? This removes you from your group, deletes your profile and financial data, and deletes your sign-in account. This action cannot be undone.")) return;
+    try {
+      // 1. Remove from the shared group.
+      await removeSelfFromGroup();
+      // 2. Delete the Firestore user document (profile, income, financial profile).
+      await deleteDoc(doc(db, 'users', activeUser));
+      // 3. Clear local caches.
+      clearLocalData();
+      // 4. Delete the Firebase Auth account so no ghost sign-in remains.
       try {
-        if (group) {
-          const groupRef = doc(db, 'groups', group.id);
-          const newMembers = group.members.filter(m => m.uid !== activeUser);
-          const newMemberIds = (group.memberIds || []).filter(id => id !== activeUser);
-          await updateDoc(groupRef, {
-            members: newMembers,
-            memberIds: newMemberIds
-          });
+        await deleteUser(auth.currentUser!);
+      } catch (authErr: any) {
+        if (authErr?.code === 'auth/requires-recent-login') {
+          await reauthenticate();
+          await deleteUser(auth.currentUser!);
+        } else {
+          throw authErr;
         }
-        await updateDoc(doc(db, 'users', activeUser), {
-          groupId: null,
-          name: 'Anonymous',
-          email: ''
-        });
-
-        if (group) {
-          localStorage.removeItem(`expenses_${group.id}`);
-        }
-        localStorage.removeItem(`group_secret_${activeUser}`);
-
-        setGroupSecret('');
-        setShowSettings(false);
-        setUserProfile({} as any);
-        setGroup(null);
-        setExpenses([]);
-      } catch (err) {
-        console.error("Error leaving group and clearing profile", err);
-        alert("Unable to leave the group and clear your profile. Please try again.");
       }
+      // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
+      setShowSettings(false);
+      setShowPrivacyModal(false);
+      setUserProfile(null);
+      setGroup(null);
+      setGroupUsers({});
+      setExpenses([]);
+    } catch (err: any) {
+      if (err?.message === 'cancelled') return;
+      console.error("Error deleting account", err);
+      alert(err?.message || "Failed to delete your account. Please sign out, sign back in, and try again.");
     }
   };
 
@@ -766,6 +807,33 @@ export default function App() {
             </div>
           </div>
 
+          {missingProfiles.length > 0 && !dismissedWaiting && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-natural-text">Some members are still setting up</h3>
+                <p className="text-xs text-natural-muted mt-1">
+                  You can start logging and settling expenses right away. Income-based splits and financial
+                  insights will get more accurate once everyone finishes their profile quiz.
+                </p>
+                <div className="mt-2 space-y-0.5">
+                  {missingProfiles.map(id => (
+                    <div key={id} className="text-xs font-medium text-amber-700">
+                      {groupUsers[id]?.name || 'A member'} hasn't completed setup yet.
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => setDismissedWaiting(true)}
+                className="text-amber-500 hover:text-amber-700 bg-white/60 p-1 rounded-full border border-amber-200 shrink-0"
+                title="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           <StatsSection expenses={expenses} group={group} activeUser={activeUser} />
 
           <div className="space-y-4">
@@ -960,12 +1028,22 @@ export default function App() {
                     </div>
                   </div>
                   
-                  <button 
+                  <button
                     onClick={handleGenerateNewInviteCode}
                     className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
                   >
                     <RefreshCw size={14} /> Generate New Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}
                   </button>
+
+                  <div className="border-t border-natural-border/50 pt-3">
+                    <button
+                      onClick={handleLeaveGroup}
+                      className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-red-500 bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
+                    >
+                      <LogOut size={14} /> Leave This Group
+                    </button>
+                    <p className="text-[11px] text-natural-muted mt-1.5 text-center">Removes you from this group but keeps your account.</p>
+                  </div>
                 </div>
               </div>
 
@@ -1051,14 +1129,26 @@ export default function App() {
                   <FileText size={16} className="text-natural-muted" /> Legal Documents
                 </h3>
                 <div className="space-y-3">
-                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
-                    <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
-                    <span className="text-xs text-natural-muted">Full Terms of Service will be available here soon.</span>
-                  </div>
-                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
-                    <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
-                    <span className="text-xs text-natural-muted">A comprehensive Privacy Policy is being finalized and will be published here.</span>
-                  </div>
+                  <button
+                    onClick={() => setLegalDoc('terms')}
+                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
+                      <span className="text-xs text-natural-muted">Read our terms of service.</span>
+                    </span>
+                    <FileText size={16} className="text-natural-primary shrink-0" />
+                  </button>
+                  <button
+                    onClick={() => setLegalDoc('privacy')}
+                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
+                      <span className="text-xs text-natural-muted">Read how we handle your data.</span>
+                    </span>
+                    <Shield size={16} className="text-natural-primary shrink-0" />
+                  </button>
                 </div>
               </section>
 
@@ -1074,12 +1164,15 @@ export default function App() {
                   
                   <div className="border-t border-natural-border/50"></div>
                   
-                  <button 
-                    onClick={handleLeaveGroupAndClearProfile}
+                  <button
+                    onClick={handleDeleteAccount}
                     className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
                   >
-                    <span className="flex items-center gap-2"><Trash2 size={18} /> Leave Group & Clear Profile</span>
+                    <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account &amp; All Data</span>
                   </button>
+                  <p className="text-[11px] text-natural-muted px-1 leading-relaxed">
+                    Permanently deletes your profile, financial data, group membership, and your sign-in account. This cannot be undone.
+                  </p>
                 </div>
               </section>
 
@@ -1128,6 +1221,8 @@ export default function App() {
           onSubmit={handleSettleUpProposal}
         />
       )}
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
     </div>
   );
 }
