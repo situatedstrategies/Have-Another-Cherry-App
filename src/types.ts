@@ -55,7 +55,8 @@ export interface Settlement {
   amount: number;
   instrumentType: PaymentInstrument;
   label?: string; // e.g., "Chase Checking"
-  timestamp: string;
+  timestamp: string;        // when the settlement was logged in-app
+  paymentDate?: string;     // the actual date the payment was made (user-provided)
   status: 'pending' | 'confirmed';
   mismatchType?: MismatchType;
 }

@@ -29,6 +29,14 @@ export default function ExpenseDetail({
 }: ExpenseDetailProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [expandedSettlement, setExpandedSettlement] = useState<string | null>(null);
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    // Date-only strings (YYYY-MM-DD) should render without timezone shifting.
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
   
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,8 +131,11 @@ export default function ExpenseDetail({
                         {members.find(m => m.uid === s.paidBy)?.name || 'Someone'} paid ${s.amount.toFixed(2)}
                       </p>
                       <p className="text-natural-muted mt-0.5">
-                        via {s.instrumentType}
+                        via {s.instrumentType}{s.paymentDate ? ` · ${formatDate(s.paymentDate)}` : ''}
                       </p>
+                      {s.label && (
+                        <p className="text-natural-muted mt-0.5 italic">"{s.label}"</p>
+                      )}
                     </div>
                   </div>
                   <button
@@ -197,25 +208,46 @@ export default function ExpenseDetail({
               </div>
 
               {/* Settlements */}
-              {expense.settlements?.map((s) => (
+              {expense.settlements?.map((s) => {
+                const isExpanded = expandedSettlement === s.id;
+                return (
                 <div key={s.id} className="relative">
                   <div className={`absolute -left-[27px] top-0 bg-white border-2 ${s.status === 'confirmed' ? 'border-natural-primary text-natural-primary' : 'border-natural-border/50 text-natural-text'} p-1 rounded-full flex items-center justify-center`}>
                     {s.status === 'confirmed' ? <ShieldCheck className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                   </div>
-                  <div>
-                    <span className="block text-xs font-bold text-natural-text">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSettlement(isExpanded ? null : s.id)}
+                    className="text-left w-full group"
+                  >
+                    <span className="block text-xs font-bold text-natural-text flex items-center gap-1">
                       {s.status === 'confirmed' ? 'Payment Confirmed' : 'Payment Logged (Pending)'}
+                      <span className="text-[10px] font-normal text-natural-primary group-hover:underline">{isExpanded ? 'Hide' : 'Details'}</span>
                     </span>
                     <p className="text-xs text-natural-muted mt-0.5">
                       <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid <strong>${s.amount.toFixed(2)}</strong> to <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
                     </p>
-
                     <span className="text-[10px] text-natural-muted font-mono mt-1 block">
                       {formatDateTime(s.timestamp)}
                     </span>
-                  </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-2 bg-natural-sidebar/40 border border-natural-border/60 rounded-lg p-3 text-xs space-y-1.5">
+                      <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Method</span><span className="font-semibold text-natural-text">{s.instrumentType}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Logged</span><span className="font-semibold text-natural-text">{formatDateTime(s.timestamp)}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Status</span><span className={`font-bold ${s.status === 'confirmed' ? 'text-natural-primary' : 'text-natural-text'}`}>{s.status === 'confirmed' ? 'Confirmed' : 'Pending confirmation'}</span></div>
+                      <div className="pt-1.5 border-t border-natural-border/50">
+                        <span className="text-natural-muted block mb-0.5">Note</span>
+                        <span className="text-natural-text">{s.label ? s.label : <span className="italic text-natural-muted">No note added.</span>}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
