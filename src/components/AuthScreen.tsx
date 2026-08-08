@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -55,8 +55,9 @@ export default function AuthScreen() {
     }
   };
 
-  // Send a Firebase Auth password reset email. Uses a generic confirmation so we
-  // don't reveal whether an email is registered.
+  // Request a password reset email. This hits our server endpoint, which mints a
+  // Firebase reset link and delivers it via Resend from reset@haveanothercherry.com.
+  // Uses a generic confirmation so we don't reveal whether an email is registered.
   const handleResetPassword = async () => {
     setError('');
     setInfo('');
@@ -66,16 +67,21 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (err: any) {
-      if (err?.code && err.code !== 'auth/user-not-found') {
-        setError(err.message);
-        setLoading(false);
-        return;
+      const res = await fetch('/api/send-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Unable to send reset email. Please try again later.');
       }
+      setInfo(`If an account exists for ${email}, a password reset link is on its way. Check your inbox (and your spam folder).`);
+    } catch (err: any) {
+      setError(err.message || 'Unable to send reset email. Please try again later.');
+    } finally {
+      setLoading(false);
     }
-    setInfo(`If an account exists for ${email}, a password reset link is on its way. Check your inbox (and your spam folder).`);
-    setLoading(false);
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {

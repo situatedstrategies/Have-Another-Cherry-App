@@ -81,3 +81,46 @@ export async function sendInviteEmail(
 
   return data;
 }
+
+// Send a password reset email via Resend from reset@haveanothercherry.com.
+// The resetLink is generated server-side by the Firebase Admin SDK.
+export async function sendResetEmail(
+  email: string,
+  resetLink: string,
+  recipientName?: string
+) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const resend = new Resend(apiKey);
+
+  const templatePath = path.join(process.cwd(), "src/templates/resetEmail.html");
+  let htmlTemplate = "";
+  try {
+    htmlTemplate = await fs.readFile(templatePath, "utf-8");
+  } catch (error) {
+    console.error("Failed to load reset email template:", error);
+    throw new Error("Could not load reset email template.");
+  }
+
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
+
+  const htmlContent = htmlTemplate
+    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
+    .split("{{resetLink}}").join(escapeHtml(resetLink));
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <reset@haveanothercherry.com>",
+    to: [email],
+    subject: "Reset your Have Another Cherry password",
+    html: htmlContent,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}

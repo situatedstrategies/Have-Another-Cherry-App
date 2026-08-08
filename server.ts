@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail } from "./src/lib/resend";
 
 async function startServer() {
   const app = express();
@@ -82,6 +82,46 @@ async function startServer() {
     } catch (err: any) {
       console.error("Server Invite Error:", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 6b. Password Reset Endpoint (Resend + Firebase Admin SDK)
+  // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
+  // delivers it via Resend from reset@haveanothercherry.com. Responds generically
+  // so we never reveal whether an email is registered.
+  app.post("/api/send-password-reset", async (req, res) => {
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
+      const { getAuth } = await import("firebase-admin/auth");
+
+      if (!getApps().length) {
+        initializeApp({
+          credential: applicationDefault(),
+          projectId: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        });
+      }
+
+      let resetLink: string;
+      try {
+        resetLink = await getAuth().generatePasswordResetLink(email);
+      } catch (linkErr: any) {
+        // Don't reveal whether the account exists.
+        if (linkErr?.code === "auth/user-not-found" || linkErr?.code === "auth/email-not-found") {
+          return res.status(200).json({ success: true });
+        }
+        throw linkErr;
+      }
+
+      await sendResetEmail(email, resetLink);
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Password Reset Error:", err?.message || err);
+      return res.status(500).json({ error: "Unable to send reset email. Please try again later." });
     }
   });
 
