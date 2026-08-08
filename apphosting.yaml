@@ -6,3 +6,7 @@ env:
     secret: RESEND_API_KEY
     availability:
       - RUNTIME
+  - variable: RESET_RESEND_API
+    secret: RESET_RESEND_API
+    availability:
+      - RUNTIME

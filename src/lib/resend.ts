@@ -89,9 +89,11 @@ export async function sendResetEmail(
   resetLink: string,
   recipientName?: string
 ) {
-  const apiKey = process.env.RESEND_API_KEY;
+  // Reset emails use their own Resend key (RESET_RESEND_API); fall back to the
+  // shared RESEND_API_KEY if the dedicated one isn't configured.
+  const apiKey = process.env.RESET_RESEND_API || process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error("RESET_RESEND_API is not configured");
   }
 
   const resend = new Resend(apiKey);
