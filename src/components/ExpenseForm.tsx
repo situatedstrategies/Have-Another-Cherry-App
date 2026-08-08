@@ -17,40 +17,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   
   const [title, setTitle] = useState(editingExpense?.title || '');
   const [amount, setAmount] = useState(editingExpense?.amount?.toString() || '');
-  const [category, setCategory] = useState<string>(editingExpense?.category || categories[0] || 'Rent');
-  const prevCategory = useRef(category);
+  // Start empty so the placeholder shows and nothing "sticks" in the field.
+  const [category, setCategory] = useState<string>(editingExpense?.category || '');
   const categoryInputRef = useRef<HTMLInputElement>(null);
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Check if the user is deleting by comparing lengths (or if selection is involved, it might be tricky, but length is a good proxy)
-    // Actually, if the current input value length is less than previous, it's deleting.
-    // However, if there was selected text and they typed a character, length might be less.
-    // Let's just use the native input event if possible, but React's onChange is fine for basic check.
-    const isDeleting = e.nativeEvent && (e.nativeEvent as any).inputType === 'deleteContentBackward';
-    
-    let nextVal = val;
-    let matchFound = false;
-    let selectionStart = val.length;
-
-    if (!isDeleting && val.length > 0) {
-      const match = categories.find(c => c.toLowerCase().startsWith(val.toLowerCase()));
-      if (match) {
-        nextVal = val + match.slice(val.length);
-        matchFound = true;
-      }
-    }
-    
-    setCategory(nextVal);
-    prevCategory.current = nextVal;
-    
-    if (matchFound) {
-      setTimeout(() => {
-        if (categoryInputRef.current) {
-          categoryInputRef.current.setSelectionRange(selectionStart, nextVal.length);
-        }
-      }, 0);
-    }
+    setCategory(e.target.value);
   };
     const [date, setDate] = useState(editingExpense?.date || new Date().toISOString().split('T')[0]);
   const [paidBy, setPaidBy] = useState<string>(editingExpense?.paidBy || activeUser);
@@ -70,6 +42,13 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [thirdPersonEmail, setThirdPersonEmail] = useState(editingExpense?.thirdPersonEmail || '');
   
   const [thirdPartyPct, setThirdPartyPct] = useState<Record<string, string>>({});
+
+  // Per-transaction "cherries": extra people added only to this expense's split.
+  const [guests, setGuests] = useState<{ id: string; name: string; pct: string }[]>([]);
+  const addGuest = () => setGuests(prev => [...prev, { id: crypto.randomUUID(), name: '', pct: '' }]);
+  const updateGuest = (id: string, field: 'name' | 'pct', val: string) =>
+    setGuests(prev => prev.map(g => (g.id === id ? { ...g, [field]: val } : g)));
+  const removeGuest = (id: string) => setGuests(prev => prev.filter(g => g.id !== id));
 
   const [notes, setNotes] = useState(editingExpense?.notes || '');
   const [isRecurring, setIsRecurring] = useState(editingExpense?.isRecurring || false);
@@ -96,6 +75,14 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           pcts[uid] = Math.round((editingExpense.shares[uid] / total) * 100).toString();
         }
         setCustomPct(pcts);
+        // Restore any per-transaction guests as percentage lines.
+        if (editingExpense.extraParticipants?.length) {
+          setGuests(editingExpense.extraParticipants.map(g => ({
+            id: crypto.randomUUID(),
+            name: g.name,
+            pct: total ? ((g.share / total) * 100).toFixed(2) : '0'
+          })));
+        }
       } else if (editingExpense.splitType === 'custom_amount') {
         const amts: Record<string, string> = {};
         for (const uid in editingExpense.shares) {
@@ -210,38 +197,60 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
     let finalShares: Record<string, number> = {};
     let finalThirdPersonShare: number | undefined = undefined;
+    let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-    if (splitType === 'household_default' || splitType === 'equal' || splitType === 'custom_percentage') {
-      if (splitType === 'custom_percentage') {
-        let totalPct = 0;
-        members.forEach(m => totalPct += (parseFloat(customPct[m.uid]) || 0));
-        if (Math.abs(totalPct - 100) > 0.01) {
-          setError('Custom percentages must add up to 100%.');
-          return;
-        }
-      }
-
+    if (splitType === 'household_default' || splitType === 'equal') {
       let runningTotal = 0;
       members.forEach((m, index) => {
-        let pct = 0;
-        if (splitType === 'household_default') {
-          pct = getFullDefaultSplit(group)[m.uid] || 0;
-        } else if (splitType === 'equal') {
-          pct = 100 / members.length;
-        } else {
-          pct = parseFloat(customPct[m.uid]) || 0;
-        }
-        
-        const share = Math.round((numericAmount * pct) / 100 * 100) / 100;
-        
+        const pct = splitType === 'household_default'
+          ? (getFullDefaultSplit(group)[m.uid] || 0)
+          : (100 / members.length);
+        const share = round2((numericAmount * pct) / 100);
         // Adjust the last member's share to account for rounding errors
         if (index === members.length - 1) {
-          finalShares[m.uid] = Math.round((numericAmount - runningTotal) * 100) / 100;
+          finalShares[m.uid] = round2(numericAmount - runningTotal);
         } else {
           finalShares[m.uid] = share;
           runningTotal += share;
         }
       });
+    } else if (splitType === 'custom_percentage') {
+      const guestEntries = guests.map(g => ({ name: g.name.trim(), pct: parseFloat(g.pct) || 0 }));
+      if (guestEntries.some(g => !g.name)) {
+        setError('Please enter a name for each added cherry.');
+        return;
+      }
+      let totalPct = 0;
+      members.forEach(m => (totalPct += parseFloat(customPct[m.uid]) || 0));
+      guestEntries.forEach(g => (totalPct += g.pct));
+      if (Math.abs(totalPct - 100) > 0.01) {
+        setError('Percentages (members + added cherries) must add up to 100%.');
+        return;
+      }
+      // Round each share, then absorb any leftover cent into the last line
+      // so the parts sum exactly to the total.
+      let running = 0;
+      members.forEach(m => {
+        const share = round2((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
+        finalShares[m.uid] = share;
+        running += share;
+      });
+      const guestShares = guestEntries.map(g => {
+        const share = round2((numericAmount * g.pct) / 100);
+        running += share;
+        return { name: g.name, share };
+      });
+      const diff = round2(numericAmount - running);
+      if (Math.abs(diff) >= 0.01) {
+        if (guestShares.length) {
+          guestShares[guestShares.length - 1].share = round2(guestShares[guestShares.length - 1].share + diff);
+        } else if (members.length) {
+          const lastUid = members[members.length - 1].uid;
+          finalShares[lastUid] = round2(finalShares[lastUid] + diff);
+        }
+      }
+      if (guestShares.length) finalExtraParticipants = guestShares;
     } else if (splitType === 'custom_amount') {
       let totalAmt = 0;
       members.forEach(m => totalAmt += (parseFloat(customAmt[m.uid]) || 0));
@@ -327,6 +336,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       thirdPersonName: splitType === 'third_party' ? (thirdPersonName.trim() || null) : null,
       thirdPersonEmail: splitType === 'third_party' ? (thirdPersonEmail.trim() || null) : null,
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
+      extraParticipants: splitType === 'custom_percentage' ? (finalExtraParticipants || null) : null,
       notes: notes.trim() || null,
       isRecurring,
       ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null })
@@ -535,11 +545,17 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   type="text"
                   value={category}
                   onChange={handleCategoryChange}
-                  placeholder="Type to search"
+                  placeholder="Type or pick a category"
+                  list="category-options"
                   className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
                   id="expense-category-input"
                   autoComplete="off"
                 />
+                <datalist id="category-options">
+                  {categories.map(c => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -679,7 +695,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           </div>
 
           {/* Custom Percentage Inputs (Conditional) */}
-          {splitType === 'custom_percentage' && (
+          {splitType === 'custom_percentage' && (() => {
+            const memberPctTotal = members.reduce((s, m) => s + (parseFloat(customPct[m.uid]) || 0), 0);
+            const guestPctTotal = guests.reduce((s, g) => s + (parseFloat(g.pct) || 0), 0);
+            const pctTotal = memberPctTotal + guestPctTotal;
+            const balanced = Math.abs(pctTotal - 100) <= 0.01;
+            return (
             <div className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150" id="custom-pct-inputs">
               <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">Set Split Percentages</span>
               <div className="grid grid-cols-2 gap-4">
@@ -700,8 +721,55 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   </div>
                 ))}
               </div>
+
+              {/* Per-transaction guests ("cherries") */}
+              {guests.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-natural-border/60">
+                  <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider">Added for this expense only</span>
+                  {guests.map(g => (
+                    <div key={g.id} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={g.name}
+                        onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
+                        placeholder="Name (e.g. 🍒 guest)"
+                        className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
+                      />
+                      <div className="relative w-24 shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={g.pct}
+                          onChange={(e) => updateGuest(g.id, 'pct', e.target.value)}
+                          placeholder="0"
+                          className="w-full pr-7 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
+                      </div>
+                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-red-500 p-1.5 shrink-0" title="Remove">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={addGuest}
+                  className="flex items-center gap-1.5 text-xs font-bold text-natural-primary hover:text-natural-dark"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add a cherry
+                </button>
+                <span className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}>
+                  Total: {pctTotal.toFixed(1)}%{balanced ? ' ✓' : ' / 100%'}
+                </span>
+              </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Custom Amount Inputs (Conditional) */}
           {splitType === 'custom_amount' && (
@@ -819,6 +887,15 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     <span className="text-[10px] text-natural-text font-medium">
                       {paidBy === m.uid ? 'Paid - No debt' : 'Owes payer'}
                     </span>
+                  </div>
+                ))}
+                {splitType === 'custom_percentage' && guests.filter(g => g.name.trim() || g.pct).map(g => (
+                  <div key={`preview-${g.id}`} className="flex flex-col">
+                    <span className="text-xs text-natural-muted font-semibold">{g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)</span>
+                    <span className="text-lg font-display font-bold text-natural-text">
+                      ${((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-natural-text font-medium">Guest (this expense)</span>
                   </div>
                 ))}
               </div>

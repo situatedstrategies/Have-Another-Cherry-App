@@ -183,6 +183,14 @@ export default function ExpenseDetail({
                   </span>
                 </div>
               )}
+              {expense.extraParticipants?.map((g, i) => (
+                <div key={`extra-${i}`} className="p-3 rounded-xl border bg-transparent border-natural-border/50">
+                  <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">{g.name} (guest)</span>
+                  <span className="text-lg font-bold font-display text-natural-text mt-1 block">
+                    ${g.share.toFixed(2)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 

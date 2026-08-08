@@ -94,6 +94,9 @@ export interface Expense {
   thirdPersonName?: string;
   thirdPersonEmail?: string;
   thirdPersonShare?: number;
+  // Per-transaction "cherries" — extra people added to a single expense's split
+  // (not permanent group members). Each gets a dollar share of this expense only.
+  extraParticipants?: { name: string; share: number }[];
   isRecurring?: boolean;
   recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
   nextRecurringDate?: string;
