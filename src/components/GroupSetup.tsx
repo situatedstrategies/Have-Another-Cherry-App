@@ -1,5 +1,5 @@
 import { hashString } from '../lib/crypto';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
@@ -31,31 +31,45 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [partnerIncome, setPartnerIncome] = useState('');
+  const [myIncome, setMyIncome] = useState('');
+  const [recMessage, setRecMessage] = useState('');
   const [inviteName, setInviteName] = useState('');
 
-  const recommendSplit = async () => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-      const myIncome = userDoc.data()?.income;
-      
-      const incomeValues: Record<string, number> = {
-        'under_50k': 35000,
-        '50k_100k': 75000,
-        '100k_150k': 125000,
-        'over_150k': 175000
-      };
+  // Pre-fill the creator's income from their saved profile (from the quiz), if available.
+  useEffect(() => {
+    const loadIncome = async () => {
+      try {
+        if (!auth.currentUser) return;
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        const saved = userDoc.data()?.income;
+        if (saved != null && String(saved).trim() !== '') setMyIncome(String(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadIncome();
+  }, []);
 
-      const myVal = incomeValues[myIncome] || 75000;
-      const partnerVal = incomeValues[partnerIncome] || 75000;
-      
-      const total = myVal + partnerVal;
-      const myPct = Math.round((myVal / total) * 100);
-      const partnerPct = 100 - myPct;
-      
-      setSplits([String(myPct), String(partnerPct)]);
-    } catch (e) {
-      console.error(e);
+  // Recommend a split proportional to the two annual incomes.
+  const recommendSplit = () => {
+    const myVal = parseFloat(myIncome);
+    const partnerVal = parseFloat(partnerIncome);
+
+    if (!myVal || myVal <= 0) {
+      setRecMessage('Enter your income first to calculate a split.');
+      return;
     }
+    if (!partnerVal || partnerVal <= 0) {
+      setRecMessage("Enter your partner's income first to calculate a split.");
+      return;
+    }
+
+    const total = myVal + partnerVal;
+    const myPct = Math.round((myVal / total) * 100);
+    const partnerPct = 100 - myPct;
+
+    setSplits([String(myPct), String(partnerPct)]);
+    setRecMessage(`Recommended: you ${myPct}% / partner ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -471,27 +485,47 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">Want an income-based split recommendation?</p>
-                    <div className="flex gap-2">
-                      <select 
-                        value={partnerIncome} 
-                        onChange={(e) => setPartnerIncome(e.target.value)}
-                        className="flex-1 p-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-                      >
-                        <option value="">Partner's Income...</option>
-                        <option value="under_50k">Under $50,000</option>
-                        <option value="50k_100k">$50,000 - $100,000</option>
-                        <option value="100k_150k">$100,000 - $150,000</option>
-                        <option value="over_150k">Over $150,000</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={recommendSplit}
-                        disabled={!partnerIncome}
-                        className="bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90 disabled:opacity-50"
-                      >
-                        Calculate
-                      </button>
+                    <p className="text-xs text-natural-muted">Enter both annual incomes and we'll suggest a split proportional to income. You can still adjust the percentages below.</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">Your annual income</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={myIncome}
+                            onChange={(e) => { setMyIncome(e.target.value); setRecMessage(''); }}
+                            placeholder="e.g. 75000"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">Partner's annual income</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={partnerIncome}
+                            onChange={(e) => { setPartnerIncome(e.target.value); setRecMessage(''); }}
+                            placeholder="e.g. 60000"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                          />
+                        </div>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={recommendSplit}
+                      className="w-full bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90"
+                    >
+                      Calculate Recommended Split
+                    </button>
+                    {recMessage && (
+                      <p className="text-xs font-medium text-natural-primary">{recMessage}</p>
+                    )}
                   </div>
                 )}
                 <div className="space-y-3">

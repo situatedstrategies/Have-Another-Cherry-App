@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
+import LegalModal, { LegalDoc } from './LegalModal';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -17,6 +18,7 @@ export default function AuthScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
   // Password policy for new accounts: at least 8 chars, a letter, a number, and a special character.
   const passwordChecks = {
@@ -172,8 +174,10 @@ export default function AuthScreen() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-natural-primary focus:ring-natural-primary"
                 />
                 <span>
-                  I agree to the <span className="font-semibold text-natural-text">Terms of Service</span> and{' '}
-                  <span className="font-semibold text-natural-text">Privacy Policy</span>.
+                  I agree to the{' '}
+                  <button type="button" onClick={() => setLegalDoc('terms')} className="font-semibold text-natural-primary hover:underline">Terms of Service</button>
+                  {' '}and{' '}
+                  <button type="button" onClick={() => setLegalDoc('privacy')} className="font-semibold text-natural-primary hover:underline">Privacy Policy</button>.
                 </span>
               </label>
             )}
@@ -234,6 +238,8 @@ export default function AuthScreen() {
           </p>
         </div>
       </div>
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
+import LegalModal, { LegalDoc } from './components/LegalModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export default function App() {
   }, [activeUser]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showSettleModal, setShowSettleModal] = useState(false);
@@ -1052,14 +1054,26 @@ export default function App() {
                   <FileText size={16} className="text-natural-muted" /> Legal Documents
                 </h3>
                 <div className="space-y-3">
-                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
-                    <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
-                    <span className="text-xs text-natural-muted">Full Terms of Service will be available here soon.</span>
-                  </div>
-                  <div className="p-4 rounded-xl border border-natural-border bg-natural-bg/50 flex flex-col gap-1">
-                    <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
-                    <span className="text-xs text-natural-muted">A comprehensive Privacy Policy is being finalized and will be published here.</span>
-                  </div>
+                  <button
+                    onClick={() => setLegalDoc('terms')}
+                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
+                      <span className="text-xs text-natural-muted">Read our terms of service.</span>
+                    </span>
+                    <FileText size={16} className="text-natural-primary shrink-0" />
+                  </button>
+                  <button
+                    onClick={() => setLegalDoc('privacy')}
+                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
+                      <span className="text-xs text-natural-muted">Read how we handle your data.</span>
+                    </span>
+                    <Shield size={16} className="text-natural-primary shrink-0" />
+                  </button>
                 </div>
               </section>
 
@@ -1132,6 +1146,8 @@ export default function App() {
           onSubmit={handleSettleUpProposal}
         />
       )}
+
+      {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
     </div>
   );
 }
