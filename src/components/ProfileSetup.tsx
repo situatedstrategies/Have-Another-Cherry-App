@@ -237,12 +237,11 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       const financialProfile = result.data || fallbackProfile;
 
       // Append genuinely AI-generated profiles to the standalone profile_log
-      // collection (record + future fallback catalog). Per-user for now via uid.
+      // collection (record + fallback catalog). Anonymous — timestamp only, no
+      // user or group reference.
       if (result.source === 'ai' && result.data) {
         addDoc(collection(db, 'profile_log'), {
           ...result.data,
-          uid: userId,
-          source: 'ai',
           createdAt: new Date().toISOString(),
         }).catch(e => console.error('profile_log write failed', e));
       }

@@ -40,6 +40,46 @@ async function startServer() {
     next();
   };
 
+  // Lazily initialize the Firebase Admin SDK (ADC) once, shared across endpoints.
+  const ensureAdminApp = async () => {
+    const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
+    if (!getApps().length) {
+      initializeApp({
+        credential: applicationDefault(),
+        projectId: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+      });
+    }
+  };
+
+  // Once the profile_log has at least this many entries, AI failures fall back
+  // to a random logged profile instead of the small curated list.
+  const MIN_LOG_FALLBACK = 50;
+
+  // Pick a fallback profile: prefer a random entry from profile_log once it's
+  // large enough; otherwise use the curated FINANCIAL_PROFILES list.
+  const getFallbackProfile = async () => {
+    try {
+      await ensureAdminApp();
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const dbAdmin = getFirestore();
+      const snap = await dbAdmin
+        .collection("profile_log")
+        .orderBy("createdAt", "desc")
+        .limit(500)
+        .get();
+      if (snap.size >= MIN_LOG_FALLBACK) {
+        const pick: any = snap.docs[Math.floor(Math.random() * snap.size)].data();
+        const { createdAt, source, uid, ...profile } = pick;
+        return { ...profile, greetingTone: profile.greetingTone || "harmonious" };
+      }
+    } catch (e: any) {
+      console.error("profile_log fallback read failed:", e?.message || e);
+    }
+    const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
+    const f = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
+    return { ...f, greetingTone: "harmonious" };
+  };
+
   // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
   app.post("/api/scan-receipt", async (req, res) => {
     try {
@@ -124,15 +164,8 @@ async function startServer() {
     }
 
     try {
-      const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
+      await ensureAdminApp();
       const { getAuth } = await import("firebase-admin/auth");
-
-      if (!getApps().length) {
-        initializeApp({
-          credential: applicationDefault(),
-          projectId: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        });
-      }
 
       let resetLink: string;
       try {
@@ -236,13 +269,8 @@ async function startServer() {
       throw new Error("Failed to generate profile");
     } catch (err: any) {
       console.error("Profile Gen Error:", err);
-      const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
-      const fallback = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
-      return res.status(200).json({
-        success: true,
-        source: "fallback",
-        data: { ...fallback, greetingTone: "harmonious" }
-      });
+      const data = await getFallbackProfile();
+      return res.status(200).json({ success: true, source: "fallback", data });
     }
   });
 
