@@ -569,9 +569,14 @@ export default function App() {
         await updateDoc(groupRef, { categories: newCategories });
       }
 
+      // "Quick settle": when logging an expense that's already been paid back,
+      // mark every debtor's share as a confirmed settlement so it lands closed.
+      const quickSettle = (formData as any).quickSettle === true;
+      const { quickSettle: _omitQuickSettle, ...cleanForm } = formData as any;
+
       let finalExpense: Expense;
       if (editingExpense) {
-        finalExpense = { ...editingExpense, ...formData };
+        finalExpense = { ...editingExpense, ...cleanForm };
         setExpenses(prev => {
           const updated = prev.map(ex => ex.id === finalExpense.id ? finalExpense : ex);
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
@@ -581,11 +586,37 @@ export default function App() {
         setShowForm(false);
         setSelectedExpense(finalExpense);
       } else {
+        const newId = crypto.randomUUID();
+        let status: Expense['status'] = 'OPEN';
+        let settlements = cleanForm.settlements || [];
+
+        if (quickSettle) {
+          const debtors = Object.entries(cleanForm.shares || {}).filter(
+            ([uid, share]) => uid !== cleanForm.paidBy && Number(share) > 0
+          );
+          if (debtors.length > 0) {
+            settlements = debtors.map(([uid, share]) => ({
+              id: crypto.randomUUID(),
+              expenseId: newId,
+              paidBy: uid,
+              receivedBy: cleanForm.paidBy,
+              amount: roundCurrency(Number(share)),
+              instrumentType: cleanForm.contributions?.[0]?.instrumentType || 'OTHER',
+              label: 'Logged as already settled',
+              timestamp: new Date().toISOString(),
+              paymentDate: cleanForm.date,
+              status: 'confirmed' as const,
+            }));
+            status = 'CLOSED';
+          }
+        }
+
         finalExpense = {
-          ...formData,
-          id: crypto.randomUUID(),
+          ...cleanForm,
+          settlements,
+          id: newId,
           groupId: group.id,
-          status: 'OPEN',
+          status,
           createdAt: new Date().toISOString()
         };
         setExpenses(prev => {
@@ -637,6 +668,7 @@ export default function App() {
             await setDoc(qRef, {
               to: memberId,
               from: activeUser,
+              groupId: group.id,
               action: 'DELETE',
               payload: encrypted,
               createdAt: new Date().toISOString()
@@ -665,6 +697,7 @@ export default function App() {
         await setDoc(qRef, {
           to: memberId,
           from: activeUser,
+          groupId: group.id,
           action: 'UPSERT',
           payload: encrypted,
           createdAt: new Date().toISOString()

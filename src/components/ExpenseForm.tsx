@@ -53,6 +53,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [notes, setNotes] = useState(editingExpense?.notes || '');
   const [isRecurring, setIsRecurring] = useState(editingExpense?.isRecurring || false);
   const [recurringInterval, setRecurringInterval] = useState<any>(editingExpense?.recurringInterval || 'monthly');
+  const [alreadySettled, setAlreadySettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load editing values if present
@@ -339,7 +340,9 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       extraParticipants: splitType === 'custom_percentage' ? (finalExtraParticipants || null) : null,
       notes: notes.trim() || null,
       isRecurring,
-      ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null })
+      ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null }),
+      // Quick settle: only meaningful when creating a new expense.
+      quickSettle: !editingExpense && alreadySettled,
     };
 
     // Remove any strictly undefined values just in case, though we used null
@@ -900,6 +903,25 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Quick settle (new expenses only) */}
+          {!editingExpense && (
+            <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
+              <input
+                type="checkbox"
+                checked={alreadySettled}
+                onChange={(e) => setAlreadySettled(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
+              />
+              <span>
+                <span className="block text-sm font-bold text-natural-text">Already settled</span>
+                <span className="block text-xs text-natural-muted mt-0.5">
+                  Everyone's paid up on this one — log it as fully settled (no balances owed). Great for recording a
+                  past expense that's already been paid back.
+                </span>
+              </span>
+            </label>
           )}
 
           {/* Notes */}
