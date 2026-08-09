@@ -172,10 +172,10 @@ async function startServer() {
     }
   });
 
-  // 8. Financial Profile Generation API
+  // 8. Financial Profile Generation API — generates a UNIQUE, bespoke profile
+  //    from the quiz answers, analyzed holistically/interconnected.
   app.post("/api/generate-profile", async (req, res) => {
     try {
-      const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
       const { GoogleGenAI, Type } = await import("@google/genai");
       const ai = new GoogleGenAI({
         vertexai: true,
@@ -186,25 +186,44 @@ async function startServer() {
       const { answers } = req.body;
 
       const prompt =
-        "Analyze the following user quiz responses regarding financial habits:\n" +
-        JSON.stringify(answers, null, 2) +
-        "\n\nMatch the user to the most appropriate financial profile from this list:\n" +
-        JSON.stringify(FINANCIAL_PROFILES, null, 2) +
-        "\n\nReturn ONLY the exact profile object you selected from the list (with 'type', 'description', and 'quote' fields).";
+        "You are a behavioral-economics-informed relationship finance analyst for \"Have Another Cherry\", " +
+        "a warm, non-judgmental household expense-splitting app.\n\n" +
+        "Analyze these quiz answers HOLISTICALLY and as an INTERCONNECTED whole — for example, how the person's " +
+        "credit-card and cash habits relate to how they feel about money, and to how they prefer to talk about it. " +
+        "Look for tension or harmony between answers (e.g., a spender who avoids money talk, or a saver who loves it).\n\n" +
+        "Quiz answers (JSON):\n" + JSON.stringify(answers, null, 2) + "\n\n" +
+        "Generate ONE unique, bespoke financial-personality profile that feels tailor-made for THIS combination of answers. " +
+        "Invent a distinctive, evocative 'type' name of 2-4 words (do not reuse generic textbook labels). " +
+        "Write in warm, encouraging second person. Be specific to their answers, insightful, and never judgmental.\n\n" +
+        "Return JSON with fields: " +
+        "type (2-4 word name), " +
+        "description (2-3 sentences, second person), " +
+        "quote (a real, correctly-attributed quote about money, sharing, or relationships, formatted as: \"<quote>\" — <Author>), " +
+        "traits (an array of 3-5 short descriptive phrases), " +
+        "strengths (one encouraging sentence), " +
+        "watchouts (one gentle, constructive sentence), " +
+        "communicationStyle (one sentence about how this person likely prefers to discuss money with a partner/housemate), " +
+        "greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous).";
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
+          temperature: 1.0,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
               type: { type: Type.STRING },
               description: { type: Type.STRING },
-              quote: { type: Type.STRING }
+              quote: { type: Type.STRING },
+              traits: { type: Type.ARRAY, items: { type: Type.STRING } },
+              strengths: { type: Type.STRING },
+              watchouts: { type: Type.STRING },
+              communicationStyle: { type: Type.STRING },
+              greetingTone: { type: Type.STRING }
             },
-            required: ["type", "description", "quote"]
+            required: ["type", "description", "quote", "greetingTone"]
           }
         }
       });
@@ -218,10 +237,76 @@ async function startServer() {
     } catch (err: any) {
       console.error("Profile Gen Error:", err);
       const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
+      const fallback = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
       return res.status(200).json({
         success: true,
-        data: FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)]
+        data: { ...fallback, greetingTone: "harmonious" }
       });
+    }
+  });
+
+  // 9. Weekly Dashboard Greeting — a short, warm, cherry-themed, relationship-
+  //    focused line tailored to group size and the user's profile tone.
+  app.post("/api/generate-greeting", async (req, res) => {
+    const { memberCount, profileType, greetingTone } = req.body || {};
+    const count = Number(memberCount) || 1;
+
+    // Curated fallback lines (used if the AI call fails).
+    const fallbackBySize: Record<string, string> = {
+      solo: "A cherry's sweeter shared — but savoring your own bowl today is just as ripe. 🍒",
+      pair: "Two cherries on one stem: share the sweet, split the pits, and keep it fair. 🍒",
+      group: "A bowl of cherries is best passed around — here's to sharing every sweet bite together. 🍒",
+    };
+    const sizeKey = count <= 1 ? "solo" : count === 2 ? "pair" : "group";
+
+    try {
+      const { GoogleGenAI, Type } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+      });
+
+      const audience =
+        count <= 1 ? "one person managing their own bowl"
+        : count === 2 ? "a pair sharing everything"
+        : `a household of ${count} people sharing together`;
+
+      const prompt =
+        "Write a VERY short greeting for the home screen of \"Have Another Cherry\", a warm household " +
+        "expense-sharing app. Requirements:\n" +
+        "- 1 to 2 lines, roughly 20 words maximum.\n" +
+        "- Positive and relationship-focused, about sharing/fairness/togetherness.\n" +
+        "- Must charmingly reference cherries (sharing cherries). A tiny rhyme or limerick feel is welcome.\n" +
+        `- Written for ${audience}.\n` +
+        `- Match this tone: ${greetingTone || "harmonious"}.\n` +
+        (profileType ? `- Subtly fit someone whose money style is "${profileType}".\n` : "") +
+        "- At most one 🍒 emoji. No hashtags, no surrounding quotes.\n" +
+        "Output ONLY the greeting text.";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 1.1,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: { greeting: { type: Type.STRING } },
+            required: ["greeting"]
+          }
+        }
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text.trim());
+        const greeting = (parsed.greeting || "").trim();
+        if (greeting) return res.status(200).json({ success: true, greeting });
+      }
+      throw new Error("Empty greeting");
+    } catch (err: any) {
+      console.error("Greeting Gen Error:", err?.message || err);
+      return res.status(200).json({ success: true, greeting: fallbackBySize[sizeKey] });
     }
   });
 

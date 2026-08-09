@@ -3,10 +3,22 @@ export interface User {
   name: string;
   email: string;
   income?: string;
+  partnerIncome?: string;
   financialProfile?: {
     type: string;
     description: string;
     quote?: string;
+    traits?: string[];
+    strengths?: string;
+    watchouts?: string;
+    communicationStyle?: string;
+    greetingTone?: string; // guides the weekly dashboard greeting
+  };
+  // Cached AI-generated weekly greeting. `key` is `${isoWeek}-${memberCount}` so
+  // it refreshes weekly and when the group size changes.
+  weeklyGreeting?: {
+    text: string;
+    key: string;
   };
 }
 

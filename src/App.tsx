@@ -28,6 +28,18 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   );
 }
 
+// A key that changes weekly (ISO week) and when the group size changes, so the
+// cached greeting refreshes at most once per week (or when membership changes).
+function getGreetingKey(memberCount: number): string {
+  const d = new Date();
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const activeUser = currentUser?.uid;
@@ -203,6 +215,39 @@ export default function App() {
     }
   }, [activeUser, group]);
   
+
+  // Weekly cherry greeting: generate once per week (per group size) and cache it
+  // on the user doc so we don't call the AI on every load.
+  useEffect(() => {
+    if (!activeUser || !userProfile?.financialProfile || !group) return;
+    const memberCount = group.memberIds?.length || 1;
+    const key = getGreetingKey(memberCount);
+    if (userProfile.weeklyGreeting?.key === key && userProfile.weeklyGreeting?.text) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/generate-greeting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberCount,
+            profileType: userProfile.financialProfile?.type,
+            greetingTone: userProfile.financialProfile?.greetingTone,
+          }),
+        });
+        const data = await res.json();
+        const text = (data.greeting || '').trim();
+        if (!text || cancelled) return;
+        const weeklyGreeting = { text, key };
+        updateDoc(doc(db, 'users', activeUser), { weeklyGreeting }).catch(() => {});
+        setUserProfile((prev: any) => ({ ...(prev || {}), weeklyGreeting }));
+      } catch (e) {
+        console.error('Weekly greeting fetch failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeUser, group?.memberIds?.length, userProfile?.financialProfile?.type, userProfile?.weeklyGreeting?.key]);
 
   // Update selectedExpense ref if background data updates
   useEffect(() => {
@@ -832,6 +877,11 @@ export default function App() {
                 <h3 className="text-sm font-semibold text-natural-text">
                   Welcome back, <span className="capitalize">{userProfile?.name || currentUser?.displayName || 'Friend'}</span>!
                 </h3>
+                {userProfile?.weeklyGreeting?.text && (
+                  <p className="text-xs text-natural-primary font-medium mt-1 italic leading-snug max-w-md">
+                    {userProfile.weeklyGreeting.text}
+                  </p>
+                )}
                 <p className="text-[11px] text-natural-muted mt-0.5">
                   Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
                 </p>
@@ -1000,6 +1050,22 @@ export default function App() {
                       <span className="text-xs text-natural-muted block mb-1">Financial Style</span>
                       <span className="text-sm font-semibold text-natural-primary block">{userProfile.financialProfile.type}</span>
                       <p className="text-xs text-natural-text mt-1 leading-relaxed">{userProfile.financialProfile.description}</p>
+                      {Array.isArray(userProfile.financialProfile.traits) && userProfile.financialProfile.traits.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {userProfile.financialProfile.traits.map((t: string, i: number) => (
+                            <span key={i} className="text-[10px] font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      {userProfile.financialProfile.strengths && (
+                        <p className="text-xs text-natural-text mt-2"><strong className="text-natural-muted">Strength:</strong> {userProfile.financialProfile.strengths}</p>
+                      )}
+                      {userProfile.financialProfile.watchouts && (
+                        <p className="text-xs text-natural-text mt-1"><strong className="text-natural-muted">Watch-out:</strong> {userProfile.financialProfile.watchouts}</p>
+                      )}
+                      {userProfile.financialProfile.communicationStyle && (
+                        <p className="text-xs text-natural-text mt-1"><strong className="text-natural-muted">Money talk:</strong> {userProfile.financialProfile.communicationStyle}</p>
+                      )}
                       {userProfile.financialProfile.quote && (
                         <blockquote className="mt-3 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
                           {userProfile.financialProfile.quote}
