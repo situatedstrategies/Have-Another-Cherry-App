@@ -324,6 +324,11 @@ export default function App() {
       return `"${text.replace(/"/g, '""')}"`;
     };
 
+    // The CSV only gains the "Participant Type" column (and guest rows) once at
+    // least one expense includes an added cherry (extra participant). With no
+    // extras anywhere, the export format is unchanged.
+    const hasExtras = expenses.some(e => (e.extraParticipants || []).length > 0);
+
     let csv = [
       'Title',
       'Amount',
@@ -333,9 +338,34 @@ export default function App() {
       'Status',
       'Split Type',
       'Participant',
+      ...(hasExtras ? ['Participant Type'] : []),
       'Original Share',
       'Confirmed Paid',
       'Remaining Balance'
+    ].join(',') + '\n';
+
+    // Build a row, inserting the type column only when the extras format is active.
+    const rowFor = (
+      expense: Expense,
+      paidByName: string,
+      participant: string,
+      type: string,
+      originalShare: number,
+      confirmedPaid: number,
+      remaining: number
+    ) => [
+      escapeCsv(expense.title),
+      roundCurrency(expense.amount).toFixed(2),
+      escapeCsv(expense.date),
+      escapeCsv(expense.category),
+      escapeCsv(paidByName),
+      escapeCsv(getExpenseStatusLabel(expense)),
+      escapeCsv(expense.splitType),
+      escapeCsv(participant),
+      ...(hasExtras ? [escapeCsv(type)] : []),
+      roundCurrency(originalShare).toFixed(2),
+      roundCurrency(confirmedPaid).toFixed(2),
+      roundCurrency(remaining).toFixed(2)
     ].join(',') + '\n';
 
     expenses.forEach(expense => {
@@ -350,49 +380,19 @@ export default function App() {
           allMembers.find(member => member.uid === userId)?.name || userId;
 
         const confirmedPaid = getSettlementTotal(expense, userId, false);
-        const remainingBalance = getRemainingSettlementAmount(
-          expense,
-          userId,
-          false
-        );
+        const remainingBalance = getRemainingSettlementAmount(expense, userId, false);
 
-        const row = [
-          escapeCsv(expense.title),
-          roundCurrency(expense.amount).toFixed(2),
-          escapeCsv(expense.date),
-          escapeCsv(expense.category),
-          escapeCsv(paidByName),
-          escapeCsv(getExpenseStatusLabel(expense)),
-          escapeCsv(expense.splitType),
-          escapeCsv(participantName),
-          roundCurrency(originalShare).toFixed(2),
-          confirmedPaid.toFixed(2),
-          remainingBalance.toFixed(2)
-        ];
-
-        csv += row.join(',') + '\n';
+        csv += rowFor(expense, paidByName, participantName, 'Member', originalShare || 0, confirmedPaid, remainingBalance);
       });
 
-      if (
-        expense.splitType === 'third_party' &&
-        expense.thirdPersonShare
-      ) {
-        const row = [
-          escapeCsv(expense.title),
-          roundCurrency(expense.amount).toFixed(2),
-          escapeCsv(expense.date),
-          escapeCsv(expense.category),
-          escapeCsv(paidByName),
-          escapeCsv(getExpenseStatusLabel(expense)),
-          escapeCsv(expense.splitType),
-          escapeCsv(expense.thirdPersonName || 'Third Person'),
-          roundCurrency(expense.thirdPersonShare).toFixed(2),
-          '0.00',
-          roundCurrency(expense.thirdPersonShare).toFixed(2)
-        ];
-
-        csv += row.join(',') + '\n';
+      if (expense.splitType === 'third_party' && expense.thirdPersonShare) {
+        csv += rowFor(expense, paidByName, expense.thirdPersonName || 'Third Person', 'Guest', expense.thirdPersonShare, 0, expense.thirdPersonShare);
       }
+
+      // Per-transaction cherries (guests) — only present when hasExtras is true.
+      (expense.extraParticipants || []).forEach(g => {
+        csv += rowFor(expense, paidByName, g.name, 'Guest', g.share, 0, g.share);
+      });
     });
 
     const blob = new Blob([csv], {
