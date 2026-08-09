@@ -109,6 +109,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Append-only log of AI-generated financial profiles. Standalone (not tied
+    // to a user/group doc); used as a growing record and future fixed fallback
+    // catalog. Signed-in users may append; the log is curated via the console,
+    // so it is not client-readable/editable.
+    match /profile_log/{docId} {
+      allow create: if signedIn();
+      allow read, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

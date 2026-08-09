@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 
 interface ProfileSetupProps {
   userId: string;
@@ -235,6 +235,17 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       });
       const result = await res.json();
       const financialProfile = result.data || fallbackProfile;
+
+      // Append genuinely AI-generated profiles to the standalone profile_log
+      // collection (record + future fallback catalog). Per-user for now via uid.
+      if (result.source === 'ai' && result.data) {
+        addDoc(collection(db, 'profile_log'), {
+          ...result.data,
+          uid: userId,
+          source: 'ai',
+          createdAt: new Date().toISOString(),
+        }).catch(e => console.error('profile_log write failed', e));
+      }
 
       await setDoc(
         doc(db, 'users', userId),

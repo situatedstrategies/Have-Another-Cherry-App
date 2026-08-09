@@ -230,7 +230,7 @@ async function startServer() {
 
       if (response.text) {
         const parsed = JSON.parse(response.text.trim());
-        return res.status(200).json({ success: true, data: parsed });
+        return res.status(200).json({ success: true, source: "ai", data: parsed });
       }
 
       throw new Error("Failed to generate profile");
@@ -240,6 +240,7 @@ async function startServer() {
       const fallback = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
       return res.status(200).json({
         success: true,
+        source: "fallback",
         data: { ...fallback, greetingTone: "harmonious" }
       });
     }
