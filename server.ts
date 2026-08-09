@@ -51,30 +51,45 @@ async function startServer() {
     }
   };
 
-  // Once the profile_log has at least this many entries, AI failures fall back
-  // to a random logged profile instead of the small curated list.
-  const MIN_LOG_FALLBACK = 50;
+  // Once profile_log reaches CATALOG_TARGET entries, the catalog is "frozen":
+  // stop generating new AI profiles and always serve from that finite set.
+  // Before then, AI failures fall back to a random logged profile once the log
+  // has at least MIN_LOG_FALLBACK entries (else the curated list).
+  const CATALOG_TARGET = 250;
+  const MIN_LOG_FALLBACK = 20;
 
-  // Pick a fallback profile: prefer a random entry from profile_log once it's
-  // large enough; otherwise use the curated FINANCIAL_PROFILES list.
-  const getFallbackProfile = async () => {
+  const getLogCount = async (): Promise<number> => {
     try {
       await ensureAdminApp();
       const { getFirestore } = await import("firebase-admin/firestore");
-      const dbAdmin = getFirestore();
-      const snap = await dbAdmin
+      const snap = await getFirestore().collection("profile_log").count().get();
+      return snap.data().count;
+    } catch (e: any) {
+      console.error("profile_log count failed:", e?.message || e);
+      return -1; // unknown -> behave as if not yet full
+    }
+  };
+
+  const getRandomFromLog = async (): Promise<any | null> => {
+    try {
+      await ensureAdminApp();
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const snap = await getFirestore()
         .collection("profile_log")
         .orderBy("createdAt", "desc")
         .limit(500)
         .get();
-      if (snap.size >= MIN_LOG_FALLBACK) {
-        const pick: any = snap.docs[Math.floor(Math.random() * snap.size)].data();
-        const { createdAt, source, uid, ...profile } = pick;
-        return { ...profile, greetingTone: profile.greetingTone || "harmonious" };
-      }
+      if (snap.empty) return null;
+      const pick: any = snap.docs[Math.floor(Math.random() * snap.size)].data();
+      const { createdAt, source, uid, ...profile } = pick;
+      return { ...profile, greetingTone: profile.greetingTone || "harmonious" };
     } catch (e: any) {
-      console.error("profile_log fallback read failed:", e?.message || e);
+      console.error("profile_log read failed:", e?.message || e);
+      return null;
     }
+  };
+
+  const getCuratedProfile = async () => {
     const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
     const f = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
     return { ...f, greetingTone: "harmonious" };
@@ -208,6 +223,19 @@ async function startServer() {
   // 8. Financial Profile Generation API — generates a UNIQUE, bespoke profile
   //    from the quiz answers, analyzed holistically/interconnected.
   app.post("/api/generate-profile", async (req, res) => {
+    const { answers } = req.body || {};
+    const logCount = await getLogCount();
+
+    // Catalog frozen at CATALOG_TARGET entries: stop generating and always
+    // serve a random profile from the finite log.
+    if (logCount >= CATALOG_TARGET) {
+      const catalogProfile = await getRandomFromLog();
+      if (catalogProfile) {
+        return res.status(200).json({ success: true, source: "catalog", data: catalogProfile });
+      }
+      // If the read unexpectedly failed, fall through to generation below.
+    }
+
     try {
       const { GoogleGenAI, Type } = await import("@google/genai");
       const ai = new GoogleGenAI({
@@ -215,8 +243,6 @@ async function startServer() {
         project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
         location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
       });
-
-      const { answers } = req.body;
 
       const prompt =
         "You are a behavioral-economics-informed relationship finance analyst for \"Have Another Cherry\", " +
@@ -269,7 +295,9 @@ async function startServer() {
       throw new Error("Failed to generate profile");
     } catch (err: any) {
       console.error("Profile Gen Error:", err);
-      const data = await getFallbackProfile();
+      const data =
+        (logCount >= MIN_LOG_FALLBACK ? await getRandomFromLog() : null) ||
+        (await getCuratedProfile());
       return res.status(200).json({ success: true, source: "fallback", data });
     }
   });
