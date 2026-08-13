@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -7,13 +7,17 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
+import LegalModal, { LegalDoc } from './LegalModal';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
+
   return (
+    <>
     <div className="min-h-screen bg-natural-bg text-natural-text">
       <header className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -225,15 +229,44 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row gap-4 items-center justify-between text-xs text-natural-muted">
           <div>© 2026 Have Another Cherry</div>
           <div className="flex gap-5">
-            <button onClick={onGetStarted} className="hover:text-natural-text">
+            <button
+              onClick={onGetStarted}
+              className="hover:text-natural-text transition-colors"
+            >
               Log In
             </button>
-            <span>Privacy</span>
-            <span>Terms</span>
-            <span>Support</span>
+
+            <button
+              onClick={() => setLegalDoc('privacy')}
+              className="hover:text-natural-text transition-colors"
+            >
+              Privacy
+            </button>
+
+            <button
+              onClick={() => setLegalDoc('terms')}
+              className="hover:text-natural-text transition-colors"
+            >
+              Terms
+            </button>
+
+            <a
+              href="mailto:support@haveanothercherry.com"
+              className="hover:text-natural-text transition-colors"
+            >
+              Support
+            </a>
           </div>
         </div>
       </footer>
     </div>
+
+    {legalDoc && (
+      <LegalModal
+        doc={legalDoc}
+        onClose={() => setLegalDoc(null)}
+      />
+    )}
+    </>
   );
 }
