@@ -216,12 +216,12 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
               <div
                 key={exp.id}
                 onClick={() => onExpenseClick(exp)}
-                className="p-4 sm:p-5 flex items-center justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
                 id={`expense-row-${exp.id}`}
               >
-                <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
                   {/* Status indicator ring */}
-                  <div className="mt-1" id={`status-ring-${exp.id}`}>
+                  <div className="mt-0.5 shrink-0" id={`status-ring-${exp.id}`}>
                     {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
                       <div className="p-2 bg-natural-sage text-natural-primary rounded-full border border-natural-primary/20">
                         <CheckCircle2 className="h-4 w-4" />
@@ -238,8 +238,8 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate max-w-full">
                         {exp.title}
                       </span>
                       <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}>
@@ -265,9 +265,9 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                   </div>
                 </div>
 
-                {/* Right Area: Amount and Share Balance */}
-                <div className="flex items-center gap-4 pl-4 shrink-0" id={`expense-balance-${exp.id}`}>
-                  <div className="text-right">
+                {/* Right (desktop) / bottom (mobile): amount + share balance */}
+                <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
+                  <div className="sm:text-right">
                     <span className="block text-base font-display font-bold text-natural-text">
                       {formatCurrency(exp.amount)}
                     </span>
@@ -275,7 +275,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       {balanceText}
                     </span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="hidden sm:block h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </div>
             );

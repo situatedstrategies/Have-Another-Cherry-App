@@ -40,6 +40,17 @@ function getGreetingKey(memberCount: number): string {
   return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
 }
 
+// Consistent, branded loading screen — same background as every other screen so
+// switching between them never flashes white or a stale page.
+function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center animate-in fade-in duration-300">
+      <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
+      <p className="text-natural-muted text-xs font-mono">{label}</p>
+    </div>
+  );
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const activeUser = currentUser?.uid;
@@ -260,20 +271,15 @@ export default function App() {
   }, [expenses]);
 
   if (!currentUser) {
-    return <AuthScreen />;
+    return <div className="animate-in fade-in duration-300"><AuthScreen /></div>;
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center">
-        <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
-        <p className="text-natural-muted text-xs font-mono">Loading data...</p>
-      </div>
-    );
+    return <LoadingScreen label="Loading your ledger…" />;
   }
 
   if (userProfile && !userProfile.financialProfile) {
-    return <ProfileSetup userId={activeUser} onComplete={() => {
+    return <div className="animate-in fade-in duration-300"><ProfileSetup userId={activeUser} onComplete={() => {
       import('firebase/firestore').then(({ getDoc, doc }) => {
         import('./firebase').then(({ db }) => {
           getDoc(doc(db, 'users', activeUser)).then(userDoc => {
@@ -283,14 +289,19 @@ export default function App() {
           });
         });
       });
-    }} />;
+    }} /></div>;
   }
 
-  if (!userProfile?.groupId || !group) {
-    return <GroupSetup onComplete={(groupId) => {
-      // It will auto update via snapshot/effect hopefully, but we can force reload or set states
+  // The user belongs to a group but its data hasn't arrived yet — show a loading
+  // screen, NOT the create/join screen, so we never flash the wrong page.
+  if (userProfile?.groupId && !group) {
+    return <LoadingScreen label="Loading your group…" />;
+  }
+
+  if (!userProfile?.groupId) {
+    return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={(groupId) => {
       setUserProfile(prev => ({...prev, groupId}));
-    }} />;
+    }} /></div>;
   }
 
   // Non-blocking: members who are in the group but haven't finished their quiz yet.
@@ -849,7 +860,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12" id="app-root">
+    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12 animate-in fade-in duration-300" id="app-root">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-slate-200 w-full" />
