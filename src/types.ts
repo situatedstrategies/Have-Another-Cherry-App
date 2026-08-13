@@ -33,6 +33,7 @@ export interface Group {
   availableSplits?: { name: string; split: number }[] | number[];
   categories: string[];
   memberIncomes?: Record<string, string>;
+  keyHash?: string; // SHA-256 of the group backup key (never the key itself)
 }
 
 export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party';

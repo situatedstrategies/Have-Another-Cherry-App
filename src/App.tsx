@@ -1009,10 +1009,11 @@ export default function App() {
 
       {/* MODALS */}
       {showBackup && (
-        <BackupModal 
+        <BackupModal
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
           groupId={group.id}
+          groupKeyHash={group.keyHash}
           localExpenses={expenses}
           setLocalExpenses={setExpenses}
           groupSecret={groupSecret}
