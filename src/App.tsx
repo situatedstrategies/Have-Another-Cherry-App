@@ -19,6 +19,7 @@ import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
+import Modal from './components/Modal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, Edit2 } from 'lucide-react';
 
@@ -1032,19 +1033,20 @@ export default function App() {
         />
       )}
       {showSettings && (
-        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-natural-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-natural-border bg-natural-bg/30 shrink-0">
-              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
-                <Settings className="h-5 w-5 text-natural-primary" />
-                Account Settings
-              </h2>
-              <button onClick={() => setShowSettings(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6 overflow-y-auto">
+        <Modal
+          onClose={() => setShowSettings(false)}
+          icon={<Settings className="h-5 w-5 text-natural-primary" />}
+          title="Account Settings"
+          bodyClassName="p-6 space-y-6"
+          footer={
+            <button
+              onClick={() => { setShowSettings(false); handleSignOut(); }}
+              className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
+            >
+              <LogOut size={16} /> Sign Out
+            </button>
+          }
+        >
               <div>
                 <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>
                 <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
@@ -1279,37 +1281,17 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </div>
-            
-            <div className="p-5 border-t border-natural-border bg-natural-bg/30">
-              <button 
-                onClick={() => {
-                  setShowSettings(false);
-                  handleSignOut();
-                }}
-                className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
-              >
-                <LogOut size={16} /> Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {showPrivacyModal && (
-        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl border border-natural-border w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-6 border-b border-natural-border bg-natural-bg/30 sticky top-0 z-10 backdrop-blur-md">
-              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
-                <Shield className="h-5 w-5 text-natural-primary" />
-                Data, Privacy & Security
-              </h2>
-              <button onClick={() => setShowPrivacyModal(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-8">
+        <Modal
+          onClose={() => setShowPrivacyModal(false)}
+          size="lg"
+          icon={<Shield className="h-5 w-5 text-natural-primary" />}
+          title="Data, Privacy & Security"
+          bodyClassName="p-6 space-y-8"
+        >
               
               <section>
                 <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
@@ -1385,10 +1367,7 @@ export default function App() {
                   </p>
                 </div>
               </section>
-
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {showForm && (
