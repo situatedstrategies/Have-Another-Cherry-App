@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Shield, FileText } from 'lucide-react';
+import { Shield, FileText } from 'lucide-react';
+import Modal from './Modal';
 
 export type LegalDoc = 'terms' | 'privacy';
 
@@ -143,21 +144,13 @@ function TermsOfService() {
 export default function LegalModal({ doc, onClose }: { doc: LegalDoc; onClose: () => void }) {
   const isTerms = doc === 'terms';
   return (
-    <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-[60] flex justify-center items-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl border border-natural-border w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-        <div className="flex justify-between items-center p-6 border-b border-natural-border bg-natural-bg/30 sticky top-0 z-10 backdrop-blur-md">
-          <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
-            {isTerms ? <FileText className="h-5 w-5 text-natural-primary" /> : <Shield className="h-5 w-5 text-natural-primary" />}
-            {isTerms ? 'Terms of Service' : 'Privacy Policy'}
-          </h2>
-          <button onClick={onClose} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-6">
-          {isTerms ? <TermsOfService /> : <PrivacyPolicy />}
-        </div>
-      </div>
-    </div>
+    <Modal
+      onClose={onClose}
+      size="lg"
+      icon={isTerms ? <FileText className="h-5 w-5 text-natural-primary" /> : <Shield className="h-5 w-5 text-natural-primary" />}
+      title={isTerms ? 'Terms of Service' : 'Privacy Policy'}
+    >
+      {isTerms ? <TermsOfService /> : <PrivacyPolicy />}
+    </Modal>
   );
 }

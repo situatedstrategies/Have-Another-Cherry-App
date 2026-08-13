@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles } from 'lucide-react';
+import Modal from './Modal';
 
 interface ExpenseFormProps {
   group: Group;
@@ -352,25 +353,32 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   };
 
   return (
-    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" id="form-overlay">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150" id="form-container">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border" id="form-header">
-          <h2 className="text-xl font-display font-bold text-natural-text">
-            {editingExpense ? 'Edit Expense' : 'Log New Expense'}
-          </h2>
-          <button 
+    <Modal
+      onClose={onClose}
+      size="lg"
+      title={editingExpense ? 'Edit Expense' : 'Log New Expense'}
+      bodyClassName=""
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
             onClick={onClose}
-            className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer"
-            id="close-form-btn"
+            className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="expense-form"
+            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            {editingExpense ? 'Update Expense' : 'Save Expense'}
           </button>
         </div>
-
-        
+      }
+    >
         {/* Form Body */}
-        <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-6 space-y-5" id="expense-form">
+        <form onSubmit={handleFormSubmit} className="p-6 space-y-5" id="expense-form">
           {error && (
             <div className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold" id="form-error">
               {error}
@@ -937,27 +945,6 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             />
           </div>
         </form>
-
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-natural-border flex items-center justify-end gap-3" id="form-actions">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
-            id="cancel-btn"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="expense-form"
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
-            id="save-expense-btn"
-          >
-            {editingExpense ? 'Update Expense' : 'Save Expense'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

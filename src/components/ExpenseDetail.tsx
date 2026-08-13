@@ -65,8 +65,8 @@ export default function ExpenseDetail({
   const isCreditorActive = isPayerActive;
 
   return (
-    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" id="detail-overlay">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150" id="detail-container">
+    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200" id="detail-overlay">
+      <div className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-lg shadow-2xl sm:border border-natural-border flex flex-col max-h-full sm:max-h-[90vh]" id="detail-container">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border shrink-0" id="detail-header">
