@@ -13,6 +13,7 @@ import ExpenseDetail from './components/ExpenseDetail';
 import SettleUpModal from './components/SettleUpModal';
 import ExpenseList from './components/ExpenseList';
 import AuthScreen from './components/AuthScreen';
+import LandingPage from './components/LandingPage';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
@@ -29,6 +30,7 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
 }
 
 export default function App() {
+  const [showAuth, setShowAuth] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const activeUser = currentUser?.uid;
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -207,7 +209,11 @@ export default function App() {
   }, [expenses]);
 
   if (!currentUser) {
-    return <AuthScreen />;
+    if (showAuth) {
+      return <AuthScreen />;
+    }
+
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
   }
 
   if (isLoading) {
