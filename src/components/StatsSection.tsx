@@ -6,9 +6,15 @@ interface StatsSectionProps {
   expenses: Expense[];
   group: Group;
   activeUser: string;
+  /**
+   * 'band'  – full-width row of three cards (default).
+   * 'rail'  – full-width band on phone/tablet-portrait, but a single stacked
+   *           column once there's room for a side rail (lg+).
+   */
+  orientation?: 'band' | 'rail';
 }
 
-export default function StatsSection({ expenses, group, activeUser }: StatsSectionProps) {
+export default function StatsSection({ expenses, group, activeUser, orientation = 'band' }: StatsSectionProps) {
   let youOweAmount = 0;
   let othersOweYouAmount = 0;
   let youOweCount = 0;
@@ -45,7 +51,14 @@ export default function StatsSection({ expenses, group, activeUser }: StatsSecti
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8" id="stats-container">
+    <div
+      id="stats-container"
+      className={
+        orientation === 'rail'
+          ? 'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-1 gap-4'
+          : 'grid grid-cols-1 md:grid-cols-3 gap-5 mb-8'
+      }
+    >
       {/* You owe */}
       <div className="bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200" id="stat-card-you-owe">
         <div className="flex items-center justify-between mb-3">

@@ -20,8 +20,10 @@ import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import Modal from './components/Modal';
+import SettingsModal from './components/SettingsModal';
+import PrivacyModal from './components/PrivacyModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, Edit2 } from 'lucide-react';
+import { Plus, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -75,8 +77,6 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
-  const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [showSettleModal, setShowSettleModal] = useState(false);
@@ -826,8 +826,7 @@ export default function App() {
   };
 
   // Let the user set/change their display name regardless of how they signed in.
-  const handleSaveName = async () => {
-    const newName = nameInput.trim();
+  const handleSaveName = async (newName: string) => {
     if (!newName) {
       addToast('Name Required', 'Please enter a name.', 'info');
       return;
@@ -843,11 +842,54 @@ export default function App() {
         await updateDoc(doc(db, 'groups', group.id), { members: newMembers });
       }
       setUserProfile((prev: any) => ({ ...(prev || {}), name: newName }));
-      setEditingName(false);
       addToast('Name Updated', 'Your name has been updated.', 'success');
     } catch (e) {
       console.error('Failed to update name', e);
       addToast('Error', 'Could not update your name. Please try again.', 'error');
+    }
+  };
+
+  const handleRetakeQuiz = async () => {
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
+      setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
+    } catch (e) { console.error('Failed to reset profile', e); }
+  };
+
+  const handleResendInvite = (memberName: string) => {
+    const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
+    if (!email || !group) return;
+    fetch('/api/send-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
+    }).then(res => {
+      if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
+      else addToast('Error', 'Failed to send invite', 'error');
+    });
+  };
+
+  const handleRecalculateSplit = async () => {
+    if (!group) return;
+    const uids = Object.keys(groupUsers);
+    const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
+    const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
+    if (inc1 <= 0 || inc2 <= 0) {
+      addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
+      return;
+    }
+    const total = inc1 + inc2;
+    const pct1 = Math.round((inc1 / total) * 100);
+    const pct2 = 100 - pct1;
+    try {
+      await updateDoc(doc(db, 'groups', group.id), {
+        [`defaultSplit.${uids[0]}`]: pct1,
+        [`defaultSplit.${uids[1]}`]: pct2,
+      });
+      addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
+    } catch (e) {
+      console.error('Failed to recalculate split', e);
+      addToast('Error', 'Could not update the split. Please try again.', 'error');
     }
   };
 
@@ -866,7 +908,7 @@ export default function App() {
       {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-slate-200 w-full" />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
+      <main className="max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
         
         {hasIncomeDiscrepancy && (
           <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
@@ -996,21 +1038,29 @@ export default function App() {
             </div>
           )}
 
-          <StatsSection expenses={expenses} group={group} activeUser={activeUser} />
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+          {/* Two-column on large screens: balances become a sticky right rail
+              beside the ledger; on phones/iPad-portrait they stay a full-width
+              band above the ledger so nothing gets cut off. */}
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+                </div>
+                <ExpenseList
+                  expenses={expenses}
+                  group={group}
+                  activeUser={activeUser}
+                  onExpenseClick={(exp) => setSelectedExpense(exp)}
+                />
+              </div>
+              <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
             </div>
-            <ExpenseList 
-              expenses={expenses} 
-              group={group}
-              activeUser={activeUser} 
-              onExpenseClick={(exp) => setSelectedExpense(exp)} 
-            />
-          </div>
 
-          <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
+            <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6">
+              <StatsSection expenses={expenses} group={group} activeUser={activeUser} orientation="rail" />
+            </div>
+          </div>
         </div>
 
         <footer className="text-center text-[10px] text-natural-muted mt-12 space-y-1" id="app-footer">
@@ -1032,342 +1082,32 @@ export default function App() {
           setGroupSecret={setGroupSecret}
         />
       )}
-      {showSettings && (
-        <Modal
+      {showSettings && group && (
+        <SettingsModal
           onClose={() => setShowSettings(false)}
-          icon={<Settings className="h-5 w-5 text-natural-primary" />}
-          title="Account Settings"
-          bodyClassName="p-6 space-y-6"
-          footer={
-            <button
-              onClick={() => { setShowSettings(false); handleSignOut(); }}
-              className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
-            >
-              <LogOut size={16} /> Sign Out
-            </button>
-          }
-        >
-              <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-sm text-natural-muted">Name</span>
-                    {editingName ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          value={nameInput}
-                          onChange={(e) => setNameInput(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
-                          autoFocus
-                          placeholder="Your name"
-                          className="w-36 px-2 py-1 text-sm text-right border border-natural-border focus:border-natural-primary rounded-md outline-none"
-                        />
-                        <button onClick={handleSaveName} className="text-natural-primary hover:text-natural-dark p-1" title="Save"><Check size={16} /></button>
-                        <button onClick={() => setEditingName(false)} className="text-natural-muted hover:text-natural-text p-1" title="Cancel"><X size={16} /></button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          const current = userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name)
-                            ? userProfile.name
-                            : (currentUser?.displayName || '');
-                          setNameInput(current);
-                          setEditingName(true);
-                        }}
-                        className="flex items-center gap-1.5 group"
-                        title="Edit your name"
-                      >
-                        <span className="text-sm font-semibold text-natural-text capitalize">
-                          {userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name)
-                            ? userProfile.name
-                            : (currentUser?.displayName || 'Add your name')}
-                        </span>
-                        <Edit2 size={13} className="text-natural-muted group-hover:text-natural-primary" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-natural-muted">Annual Income</span>
-                    <span className="text-sm font-semibold text-natural-text">
-                      {userProfile?.income ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(userProfile.income)) : 'N/A'}
-                    </span>
-                  </div>
-                  {userProfile?.financialProfile && (
-                    <div className="pt-2 mt-2 border-t border-natural-border">
-                      <span className="text-xs text-natural-muted block mb-1">Financial Style</span>
-                      <span className="text-sm font-semibold text-natural-primary block">{userProfile.financialProfile.type}</span>
-                      <p className="text-xs text-natural-text mt-1 leading-relaxed">{userProfile.financialProfile.description}</p>
-                      {Array.isArray(userProfile.financialProfile.traits) && userProfile.financialProfile.traits.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {userProfile.financialProfile.traits.map((t: string, i: number) => (
-                            <span key={i} className="text-[10px] font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full">{t}</span>
-                          ))}
-                        </div>
-                      )}
-                      {userProfile.financialProfile.strengths && (
-                        <p className="text-xs text-natural-text mt-2"><strong className="text-natural-muted">Strength:</strong> {userProfile.financialProfile.strengths}</p>
-                      )}
-                      {userProfile.financialProfile.watchouts && (
-                        <p className="text-xs text-natural-text mt-1"><strong className="text-natural-muted">Watch-out:</strong> {userProfile.financialProfile.watchouts}</p>
-                      )}
-                      {userProfile.financialProfile.communicationStyle && (
-                        <p className="text-xs text-natural-text mt-1"><strong className="text-natural-muted">Money talk:</strong> {userProfile.financialProfile.communicationStyle}</p>
-                      )}
-                      {userProfile.financialProfile.quote && (
-                        <blockquote className="mt-3 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
-                          {userProfile.financialProfile.quote}
-                        </blockquote>
-                      )}
-                      <button 
-                        onClick={() => {
-                          import('firebase/firestore').then(({ updateDoc, doc }) => {
-                            import('./firebase').then(({ db }) => {
-                              updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
-                              setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
-                            });
-                          });
-                        }} 
-                        className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
-                      >
-                        Retake Profile Quiz
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Group Details</h3>
-                <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-natural-muted">Group Name</span>
-                    <span className="text-sm font-semibold text-natural-text">{group?.name || 'Unnamed Group'}</span>
-                  </div>
-                  
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <span className="text-sm text-natural-muted block mb-2">Group Members</span>
-                    <div className="space-y-3">
-                      {group && Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
-                        const isGhost = uid.startsWith('ghost_');
-                        const memberName = isGhost 
-                          ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name || 'Unknown'
-                          : groupUsers[uid]?.name || 'Unknown';
-                        return (
-                          <div key={uid} className="flex justify-between items-center text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0">
-                            <div>
-                              <span className="text-natural-text font-semibold">{memberName}</span>
-                              <span className="ml-2 text-xs font-mono text-natural-muted">{Number(pct)}% split</span>
-                            </div>
-                            <div>
-                              {!isGhost ? (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Joined</span>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
-                                  <button 
-                                    onClick={() => {
-                                      const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
-                                      if (email) {
-                                        fetch('/api/send-invite', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            email,
-                                            groupName: group.name,
-                                            inviteCode: group.inviteCode
-                                          })
-                                        }).then(res => {
-                                          if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
-                                          else addToast('Error', 'Failed to send invite', 'error');
-                                        });
-                                      }
-                                    }}
-                                    className="text-[10px] uppercase font-bold text-natural-primary hover:underline"
-                                  >
-                                    Resend Invite
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {Object.keys(groupUsers).length === 2 && (
-                       <button
-                         className="mt-3 w-full text-xs font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
-                         onClick={async () => {
-                           const uids = Object.keys(groupUsers);
-                           const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
-                           const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
-                           if (inc1 > 0 && inc2 > 0) {
-                             const total = inc1 + inc2;
-                             const pct1 = Math.round((inc1 / total) * 100);
-                             const pct2 = 100 - pct1;
-                             
-                             import('firebase/firestore').then(({ updateDoc, doc }) => {
-                               import('./firebase').then(({ db }) => {
-                                 updateDoc(doc(db, 'groups', group!.id), {
-                                   [`defaultSplit.${uids[0]}`]: pct1,
-                                   [`defaultSplit.${uids[1]}`]: pct2,
-                                 });
-                                 addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
-                               });
-                             });
-                           } else {
-                             addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
-                           }
-                         }}
-                       >
-                         Recalculate Using Reported Incomes
-                       </button>
-                    )}
-                  </div>
-                  
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <span className="text-sm text-natural-muted block mb-2">Invite Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
-                        {group?.inviteCode}
-                      </div>
-                      <button 
-                        onClick={() => navigator.clipboard.writeText(group?.inviteCode || '')}
-                        className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
-                        title="Copy to clipboard"
-                      >
-                        <Copy size={18} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleGenerateNewInviteCode}
-                    className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
-                  >
-                    <RefreshCw size={14} /> Generate New Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}
-                  </button>
-
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <button
-                      onClick={handleLeaveGroup}
-                      className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-red-500 bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
-                    >
-                      <LogOut size={14} /> Leave This Group
-                    </button>
-                    <p className="text-[11px] text-natural-muted mt-1.5 text-center">Removes you from this group but keeps your account.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Local Ledger</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3 mb-4">
-                  <button 
-                    onClick={() => { setShowSettings(false); setShowBackup(true); }}
-                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
-                  >
-                    <span className="flex items-center gap-2"><Cloud size={16} className="text-natural-primary" /> Backup & Sync Options</span>
-                  </button>
-                </div>
-              </div>
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Legal & Privacy</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3">
-                  <button 
-                    onClick={() => setShowPrivacyModal(true)}
-                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
-                  >
-                    <span className="flex items-center gap-2"><Shield size={16} className="text-natural-primary" /> Data, Privacy & Security</span>
-                  </button>
-                </div>
-              </div>
-        </Modal>
+          userProfile={userProfile}
+          currentUser={currentUser}
+          group={group}
+          groupUsers={groupUsers}
+          onSaveName={handleSaveName}
+          onRetakeQuiz={handleRetakeQuiz}
+          onRecalculateSplit={handleRecalculateSplit}
+          onResendInvite={handleResendInvite}
+          onGenerateNewCode={handleGenerateNewInviteCode}
+          onLeaveGroup={handleLeaveGroup}
+          onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
+          onOpenPrivacy={() => setShowPrivacyModal(true)}
+          onSignOut={() => { setShowSettings(false); handleSignOut(); }}
+        />
       )}
 
       {showPrivacyModal && (
-        <Modal
+        <PrivacyModal
           onClose={() => setShowPrivacyModal(false)}
-          size="lg"
-          icon={<Shield className="h-5 w-5 text-natural-primary" />}
-          title="Data, Privacy & Security"
-          bodyClassName="p-6 space-y-8"
-        >
-              
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
-                  <Lock size={16} className="text-natural-muted" /> How Your Data Is Protected
-                </h3>
-                <div className="bg-natural-sage/20 p-5 rounded-2xl border border-natural-sage/30 text-sm text-natural-text leading-relaxed space-y-4">
-                  <p>
-                    Your privacy is our top priority. We have implemented robust technical controls to ensure your financial ledgers and personal information are completely confidential and unreadable by anyone outside your group, including our own developers.
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2 text-natural-muted">
-                    <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
-                    <li><strong>Anonymized Profiles:</strong> We completely hash your email address (using SHA-256) before storing it in the database. We do not store raw emails alongside your data.</li>
-                    <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
-                    <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
-                  </ul>
-                  <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
-                    Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so money stays a detail, not a conversation.
-                  </div>
-                  <p className="text-xs text-natural-muted mt-2 border-t border-natural-border pt-3">
-                    <em>Google Cloud and Firebase are trademarks of Google LLC.</em>
-                  </p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
-                  <FileText size={16} className="text-natural-muted" /> Legal Documents
-                </h3>
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setLegalDoc('terms')}
-                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
-                  >
-                    <span className="flex flex-col gap-0.5">
-                      <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
-                      <span className="text-xs text-natural-muted">Read our terms of service.</span>
-                    </span>
-                    <FileText size={16} className="text-natural-primary shrink-0" />
-                  </button>
-                  <button
-                    onClick={() => setLegalDoc('privacy')}
-                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
-                  >
-                    <span className="flex flex-col gap-0.5">
-                      <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
-                      <span className="text-xs text-natural-muted">Read how we handle your data.</span>
-                    </span>
-                    <Shield size={16} className="text-natural-primary shrink-0" />
-                  </button>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3">Your Data Controls</h3>
-                <div className="bg-white p-4 rounded-2xl border border-natural-border space-y-3">
-                  <button 
-                    onClick={handleExportData}
-                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-natural-text hover:bg-natural-bg/50 border border-natural-border rounded-xl transition-all shadow-sm"
-                  >
-                    <span className="flex items-center gap-2"><Download size={18} className="text-natural-primary" /> Export Data (CSV)</span>
-                  </button>
-                  
-                  <div className="border-t border-natural-border/50"></div>
-                  
-                  <button
-                    onClick={handleDeleteAccount}
-                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
-                  >
-                    <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account &amp; All Data</span>
-                  </button>
-                  <p className="text-[11px] text-natural-muted px-1 leading-relaxed">
-                    Permanently deletes your profile, financial data, group membership, and your sign-in account. This cannot be undone.
-                  </p>
-                </div>
-              </section>
-        </Modal>
+          onOpenLegal={(d) => setLegalDoc(d)}
+          onExportData={handleExportData}
+          onDeleteAccount={handleDeleteAccount}
+        />
       )}
 
       {showForm && (
