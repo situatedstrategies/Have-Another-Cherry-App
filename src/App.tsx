@@ -3,7 +3,7 @@ import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
@@ -497,18 +497,60 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Scrub the current user out of their group document (members list, memberIds,
-  // and their slot in the default split). Shared by "Leave Group" and "Delete Account".
+  // Scrub the current user out of their group document. Shared by "Leave Group"
+  // and "Delete Account". Redistributes the leaver's split percentage across the
+  // remaining members so household-default expenses still bill 100%, and deletes
+  // the group entirely if the last member leaves (no orphaned dead group).
   const removeSelfFromGroup = async () => {
     if (!group) return;
     const groupRef = doc(db, 'groups', group.id);
     const newMembers = group.members.filter(m => m.uid !== activeUser);
     const newMemberIds = (group.memberIds || []).filter(id => id !== activeUser);
+
+    // Last member out — delete the whole group rather than leaving a dead,
+    // empty group that still occupies its invite code.
+    if (newMemberIds.length === 0) {
+      await deleteDoc(groupRef);
+      return;
+    }
+
+    // Redistribute the leaver's percentage across the remaining joined members
+    // (proportional to their current shares) so the default split still sums to
+    // 100. Pending ghost slots in availableSplits are left untouched.
+    const split = group.defaultSplit || {};
+    const leaverPct = Number(split[activeUser]) || 0;
+    const newDefault: Record<string, number> = {};
+    newMemberIds.forEach(uid => { newDefault[uid] = Number(split[uid]) || 0; });
+    const joinedSum = newMemberIds.reduce((sum, uid) => sum + (Number(split[uid]) || 0), 0);
+    if (leaverPct > 0) {
+      let acc = 0;
+      newMemberIds.forEach((uid, i) => {
+        const base = Number(split[uid]) || 0;
+        const add = i === newMemberIds.length - 1
+          ? leaverPct - acc
+          : Math.round(leaverPct * (joinedSum > 0 ? base / joinedSum : 1 / newMemberIds.length));
+        acc += add;
+        newDefault[uid] = base + add;
+      });
+    }
+
     await updateDoc(groupRef, {
       members: newMembers,
       memberIds: newMemberIds,
-      [`defaultSplit.${activeUser}`]: deleteField()
+      defaultSplit: newDefault,
     });
+  };
+
+  // Delete the queue messages addressed to this user (allowed by the rules for
+  // to == self). Best-effort cleanup during account deletion.
+  const deleteMyInboundQueue = async () => {
+    if (!activeUser) return;
+    try {
+      const snap = await getDocs(query(collection(db, 'transfer_queue'), where('to', '==', activeUser)));
+      await Promise.allSettled(snap.docs.map(d => deleteDoc(d.ref)));
+    } catch (e) {
+      console.error('Failed to clean up inbound queue', e);
+    }
   };
 
   // Clear any locally cached ledger data for this user/group.
@@ -560,16 +602,22 @@ export default function App() {
       // or failed reauthentication cannot leave the account half-deleted.
       await reauthenticate();
 
-      // 1. Remove from the shared group.
+      // Firestore cleanup must happen while still authenticated (these writes
+      // need auth), so they precede the auth-account deletion.
+      // 1. Remove from the shared group (re-normalizes split / deletes empty group).
       await removeSelfFromGroup();
 
-      // 2. Delete the Firestore profile.
+      // 2. Clean up the queue messages addressed to this user.
+      await deleteMyInboundQueue();
+
+      // 3. Delete the Firestore profile.
       await deleteDoc(doc(db, 'users', activeUser));
 
-      // 3. Clear local cached ledger data.
+      // 4. Clear local cached ledger data.
       clearLocalData();
 
-      // 4. Delete the Firebase Authentication account.
+      // 5. Delete the Firebase Authentication account (last — it revokes the
+      //    auth needed for the steps above).
       await deleteUser(auth.currentUser!);
       // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
       setShowSettings(false);
