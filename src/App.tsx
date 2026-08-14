@@ -2,11 +2,11 @@ import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
-import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
-import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
-import { Expense, Group, SettleDetails, User as AppUser } from './types';
+import { auth, db, authHeader } from './firebase';
+import { Expense, Group } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -112,15 +112,14 @@ export default function App() {
   const [showSettleModal, setShowSettleModal] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const isInitialLoadRef = useRef(true);
-  
-  const addToast = (title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
+  // Stable identities so Toast's auto-dismiss timer isn't reset on every re-render.
+  const addToast = useCallback((title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToasts(prev => [...prev, { id: Date.now().toString() + Math.random().toString(), title, message, type }]);
-  };
-  
-  const removeToast = (id: string) => {
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
 
   // 1. Auth Listener
   useEffect(() => {
@@ -195,21 +194,21 @@ export default function App() {
   
   
   
-  // Local Storage for Expenses
+  // Load the cached ledger when the active user or group *id* changes — not on
+  // every unrelated group field update (which reloaded and could flicker state).
   useEffect(() => {
-    if (activeUser && group) {
-      const stored = localStorage.getItem('expenses_' + group.id);
-      if (stored) {
-        try {
-          setExpenses(JSON.parse(stored));
-        } catch(e) {
-          console.error(e);
-        }
-      } else {
-        setExpenses([]);
+    if (!activeUser || !group) return;
+    const stored = localStorage.getItem('expenses_' + group.id);
+    if (stored) {
+      try {
+        setExpenses(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to parse cached expenses', e);
       }
+    } else {
+      setExpenses([]);
     }
-  }, [activeUser, group]);
+  }, [activeUser, group?.id]);
 
   // Sync Queue Listener
   useEffect(() => {
@@ -315,15 +314,9 @@ export default function App() {
 
   if (userProfile && !userProfile.financialProfile) {
     return <div className="animate-in fade-in duration-300"><ProfileSetup userId={activeUser} onComplete={() => {
-      import('firebase/firestore').then(({ getDoc, doc }) => {
-        import('./firebase').then(({ db }) => {
-          getDoc(doc(db, 'users', activeUser)).then(userDoc => {
-            if (userDoc.exists()) {
-              setUserProfile(userDoc.data() as any);
-            }
-          });
-        });
-      });
+      getDoc(doc(db, 'users', activeUser)).then(userDoc => {
+        if (userDoc.exists()) setUserProfile(userDoc.data() as any);
+      }).catch(e => console.error('Failed to reload profile', e));
     }} /></div>;
   }
 

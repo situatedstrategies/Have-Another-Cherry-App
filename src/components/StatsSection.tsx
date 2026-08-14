@@ -43,10 +43,13 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
 
     if (isFullySettled) {
       settledCount++;
-      const payerShare = exp.shares?.[exp.paidBy] || 0;
-      settledTotalAmount = roundCurrency(
-        settledTotalAmount + Math.max(0, exp.amount - payerShare)
-      );
+      // Count only what non-payer MEMBERS owed (the tracked, settleable debt).
+      // Using amount - payerShare wrongly folded in guest / third-party portions
+      // that are part of the amount but never actually settled to the payer.
+      const memberDebt = Object.entries(exp.shares || {})
+        .filter(([uid]) => uid !== exp.paidBy)
+        .reduce((total, [, share]) => total + (Number(share) || 0), 0);
+      settledTotalAmount = roundCurrency(settledTotalAmount + memberDebt);
     }
   });
 
