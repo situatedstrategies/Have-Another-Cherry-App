@@ -13,8 +13,14 @@ built to deploy on **Cloudflare Pages**. It links visitors to the live web app.
 | `index.html`    | `/`           | Hero / landing page |
 | `features.html` | `/features`   | Free vs Premium highlights + pricing (`#pricing`) |
 | `about.html`    | `/about`      | About Olivia (founder) and Matt (developer) |
-| `privacy.html`  | `/privacy`    | Privacy & Security |
+| `privacy.html`  | `/privacy`    | Privacy Policy (full legal language) |
+| `terms.html`    | `/terms`      | Terms of Service |
 | `404.html`      | (fallback)    | Not-found page |
+
+**Legal:** `privacy.html` and `terms.html` are plain-language templates describing how the app
+works today. They are **not legal advice** — fill in the `[bracketed]` placeholders (business
+mailing address, governing-law state) and have counsel review them before launch. The privacy/legal
+contact is `olivia@situatedstrategies.org`; the product is owned by **Situated Strategies LLC**.
 
 Shared files: `styles.css` (design system), `main.js` (mobile nav), `assets/` (logo + screenshots),
 plus `_headers`, `robots.txt`, `sitemap.xml`.
