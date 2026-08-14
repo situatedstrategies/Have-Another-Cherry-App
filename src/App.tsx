@@ -1,6 +1,6 @@
 import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
-import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, roundCurrency } from './lib/money';
+import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
@@ -589,6 +589,10 @@ export default function App() {
       let finalExpense: Expense;
       if (editingExpense) {
         finalExpense = { ...editingExpense, ...cleanForm };
+        // Shares/amount may have changed — re-derive status from the new shares
+        // vs. the existing settlements so a previously-"settled" expense doesn't
+        // keep hiding newly-created debt (or stay open after a reduction).
+        finalExpense.status = getNormalizedExpenseStatus(finalExpense);
         setExpenses(prev => {
           const updated = prev.map(ex => ex.id === finalExpense.id ? finalExpense : ex);
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
@@ -755,21 +759,12 @@ export default function App() {
     };
 
     const settlements = [...(selectedExpense.settlements || []), newSettlement];
-    
-    // Check if fully settled
-    let allConfirmedTotal = 0;
-    let allOwedTotal = 0;
-    Object.entries(selectedExpense.shares || {}).forEach(([uid, share]) => {
-      if (uid !== selectedExpense.paidBy) allOwedTotal += share;
-    });
-    settlements.forEach(s => {
-      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
-    });
-    
-    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
-    const updatedExp: Expense = { ...selectedExpense, status: newStatus, settlements };
+    // Status is derived per-debtor from the actual shares vs. settlements
+    // (getNormalizedExpenseStatus), not an aggregate sum — so one overpaid
+    // debtor can't mask another's shortfall and mark the whole expense closed.
+    const updatedExp: Expense = { ...selectedExpense, settlements };
+    updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
@@ -799,28 +794,12 @@ export default function App() {
     const expense = expenses.find(e => e.id === selectedExpense.id);
     if (!expense) return;
 
-    const settlements = (expense.settlements || []).map(s => 
+    const settlements = (expense.settlements || []).map(s =>
       s.id === settlementId ? { ...s, status: 'confirmed' as const } : s
     );
 
-    // Check if fully settled
-    let allConfirmedTotal = 0;
-    let allOwedTotal = 0;
-    Object.entries(expense.shares || {}).forEach(([uid, share]) => {
-      if (uid !== expense.paidBy) allOwedTotal += share;
-    });
-    settlements.forEach(s => {
-      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
-    });
-
-    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
-
-    const updatedExp = { 
-      ...expense, 
-      status: newStatus, 
-      settlements 
-    };
+    const updatedExp: Expense = { ...expense, settlements };
+    updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     await syncExpenseUpdate(updatedExp);
     addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
   };
