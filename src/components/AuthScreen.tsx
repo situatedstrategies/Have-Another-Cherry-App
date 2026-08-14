@@ -1,8 +1,47 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendEmailVerification, getAdditionalUserInfo } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
+
+const TERMS_VERSION = '2026-08-08';
+
+// Turn Firebase's internal auth error codes into friendly, non-enumerating text.
+function friendlyAuthError(err: any): string {
+  switch (err?.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return "That email or password doesn't match. Please try again.";
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/email-already-in-use':
+      return 'An account already exists for this email. Try logging in instead.';
+    case 'auth/weak-password':
+      return 'Please choose a stronger password.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in was cancelled.';
+    case 'auth/account-exists-with-different-credential':
+      return 'You already have an account with this email using a different sign-in method. Try that one.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/network-request-failed':
+      return 'Network error. Check your connection and try again.';
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+// Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
+async function recordTermsAcceptance(uid: string) {
+  try {
+    await setDoc(doc(db, 'users', uid), { termsAcceptedAt: new Date().toISOString(), termsVersion: TERMS_VERSION }, { merge: true });
+  } catch (e) {
+    console.error('Failed to record terms acceptance', e);
+  }
+}
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -30,12 +69,13 @@ export default function AuthScreen() {
     if (next !== 'reset') setIsLogin(next === 'login');
   };
 
-  // Password policy for new accounts: at least 8 chars, a letter, a number, and a special character.
+  // Password policy for new accounts: at least 8 chars, a letter, a number, and a
+  // special character (from a defined set — whitespace doesn't count).
   const passwordChecks = {
-    length: password.length >= 8,
+    length: password.length >= 8 && password.length <= 128,
     letter: /[A-Za-z]/.test(password),
     number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password),
   };
   const passwordValid = Object.values(passwordChecks).every(Boolean);
 
@@ -45,12 +85,21 @@ export default function AuthScreen() {
   // const handleGoogleAuthMobile = async () => { ... }
 
   const handleGoogleAuth = async () => {
+    // New (sign-up) accounts must accept the terms first — matches the email flow.
+    if (!isLogin && !agreeTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+      return;
+    }
     try {
       setLoading(true);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // Record consent for brand-new accounts (Google already verifies the email).
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        await recordTermsAcceptance(result.user.uid);
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };
@@ -113,9 +162,12 @@ export default function AuthScreen() {
         if (name.trim()) {
           await updateProfile(userCred.user, { displayName: name.trim() });
         }
+        await recordTermsAcceptance(userCred.user.uid);
+        // Send a verification email (best-effort; the app doesn't hard-gate on it yet).
+        try { await sendEmailVerification(userCred.user); } catch (e) { console.error(e); }
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };

@@ -216,7 +216,16 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
   const setAnswer = (key: string, value: string) => setAnswers(prev => ({ ...prev, [key]: value }));
 
   const currentStep = STEPS[step];
-  const isStepComplete = currentStep.questions.every(q => (answers[q.key] || '').toString().trim() !== '');
+  const isStepComplete = currentStep.questions.every(q => {
+    const raw = (answers[q.key] ?? '').toString().trim();
+    if (raw === '') return false;
+    // Numeric answers (income) must be a sane, non-negative number.
+    if (q.type === 'number') {
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 && n < 1_000_000_000;
+    }
+    return true;
+  });
   const isLastStep = step === STEPS.length - 1;
 
   const handleSubmit = async () => {
@@ -315,6 +324,9 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted">$</span>
                   <input
                     type="number"
+                    min="0"
+                    max="100000000"
+                    step="1000"
                     value={answers[q.key] || ''}
                     onChange={e => setAnswer(q.key, e.target.value)}
                     placeholder={q.placeholder}

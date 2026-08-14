@@ -368,9 +368,9 @@ export default function App() {
   
 
   const handleSignOut = () => {
-    setUserProfile({} as any);
-    setGroup(null);
-    setExpenses([]);
+    // Just sign out and let the auth listener reset state. Clearing userProfile
+    // synchronously here briefly renders ProfileSetup (no financialProfile) for a
+    // frame before currentUser clears — so we don't.
     auth.signOut();
   };
 
