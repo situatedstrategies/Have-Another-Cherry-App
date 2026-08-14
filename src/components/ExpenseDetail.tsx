@@ -73,9 +73,9 @@ export default function ExpenseDetail({
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Expense Details</span>
             <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
-              expense.status === 'settled' 
-                ? 'bg-natural-sage text-natural-primary border-natural-primary/20' 
-                : expense.status === 'pending_confirmation'
+              getNormalizedExpenseStatus(expense) === 'CLOSED'
+                ? 'bg-natural-sage text-natural-primary border-natural-primary/20'
+                : getNormalizedExpenseStatus(expense) === 'PARTIALLY_SETTLED'
                 ? 'bg-natural-sidebar text-natural-text border-natural-border/20'
                 : 'bg-natural-sidebar text-natural-muted border-natural-border'
             }`} id="detail-status-badge">
@@ -100,7 +100,7 @@ export default function ExpenseDetail({
                 {expense.title}
               </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-natural-muted">
-                <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {new Date(expense.date).toLocaleDateString()}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {formatDate(expense.date)}</span>
                 <span className="flex items-center gap-1.5 uppercase tracking-wider"><Tag className="h-3.5 w-3.5" /> {expense.category}</span>
                 {expense.isRecurring && (
                   <span className="flex items-center gap-1 text-natural-primary bg-natural-primary/10 px-1.5 py-0.5 rounded-md border border-natural-primary/20">

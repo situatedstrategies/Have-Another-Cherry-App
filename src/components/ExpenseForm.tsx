@@ -151,30 +151,33 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       });
       setCustomPct(initPct);
     }
-  }, [editingExpense, members, group]);
+    // Seed only when the form opens or switches to a different expense — NOT on
+    // every group snapshot, which would wipe the user's in-progress input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingExpense?.id]);
 
-  // Adjust categories automatically on title or type change to be helpful
+  // Suggest a category/split from the title, but only while the user hasn't
+  // chosen a category yet (and never when editing) — so we don't override them.
   useEffect(() => {
-    if (!editingExpense) {
-      const lowerTitle = title.toLowerCase();
-      if (lowerTitle.includes('rent')) {
-        setCategory('Rent');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
-        setCategory('Internet');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('power') || lowerTitle.includes('water') || lowerTitle.includes('utility') || lowerTitle.includes('gas') || lowerTitle.includes('electric')) {
-        setCategory('Utilities');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('grocery') || lowerTitle.includes('groceries') || lowerTitle.includes('food')) {
-        setCategory('Groceries');
-        setSplitType('equal');
-      } else if (lowerTitle.includes('dinner') || lowerTitle.includes('restaurant') || lowerTitle.includes('lunch') || lowerTitle.includes('cafe')) {
-        setCategory('Dining Out');
-        setSplitType('equal');
-      }
+    if (editingExpense || category) return;
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('rent')) {
+      setCategory('Rent');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
+      setCategory('Internet');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('power') || lowerTitle.includes('water') || lowerTitle.includes('utility') || lowerTitle.includes('gas') || lowerTitle.includes('electric')) {
+      setCategory('Utilities');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('grocery') || lowerTitle.includes('groceries') || lowerTitle.includes('food')) {
+      setCategory('Groceries');
+      setSplitType('equal');
+    } else if (lowerTitle.includes('dinner') || lowerTitle.includes('restaurant') || lowerTitle.includes('lunch') || lowerTitle.includes('cafe')) {
+      setCategory('Dining Out');
+      setSplitType('equal');
     }
-  }, [title]);
+  }, [title, category, editingExpense]);
 
   const numericAmount = parseFloat(amount) || 0;
 
@@ -294,13 +297,24 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       }
       if (guestShares.length) finalExtraParticipants = guestShares;
     } else if (splitType === 'custom_amount') {
-      let totalAmt = 0;
-      members.forEach(m => totalAmt += (parseFloat(customAmt[m.uid]) || 0));
-      if (Math.abs(totalAmt - numericAmount) > 0.02) {
-        setError(`Individual shares ($${totalAmt}) must equal the total amount ($${numericAmount}).`);
+      const amts = members.map(m => parseFloat(customAmt[m.uid]) || 0);
+      if (amts.some(a => a < 0)) {
+        setError('Individual shares cannot be negative.');
         return;
       }
-      members.forEach(m => finalShares[m.uid] = parseFloat(customAmt[m.uid]) || 0);
+      const totalAmt = amts.reduce((a, b) => a + b, 0);
+      if (Math.abs(totalAmt - numericAmount) > 0.02) {
+        setError(`Individual shares ($${totalAmt.toFixed(2)}) must equal the total amount ($${numericAmount.toFixed(2)}).`);
+        return;
+      }
+      members.forEach((m, i) => finalShares[m.uid] = amts[i]);
+      // Absorb any sub-cent rounding into the last member so shares sum EXACTLY
+      // to the expense amount (otherwise balances won't reconcile to the total).
+      const lastUid = members[members.length - 1]?.uid;
+      if (lastUid !== undefined) {
+        const others = members.slice(0, -1).reduce((s, m) => s + (finalShares[m.uid] || 0), 0);
+        finalShares[lastUid] = Math.round((numericAmount - others) * 100) / 100;
+      }
     } else if (splitType === 'third_party') {
       if (!thirdPersonName.trim()) {
         setError('Please enter the third person\'s name.');

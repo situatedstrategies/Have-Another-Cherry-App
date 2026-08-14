@@ -4,6 +4,13 @@ import { Expense, Group, SplitType } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus } from '../lib/money';
 import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
 
+// Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
+// bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
+const fmtDate = (dateStr: string) => {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 interface ExpenseListProps {
   expenses: Expense[];
   group: Group;
@@ -180,6 +187,14 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             <AlertCircle className="h-10 w-10 text-natural-muted mx-auto mb-3" />
             <p className="text-natural-text font-semibold text-sm">No expenses found</p>
             <p className="text-natural-muted text-xs mt-1">Try relaxing your search terms or filters.</p>
+            {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
+              <button
+                onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
+                className="mt-3 text-natural-primary hover:underline text-xs font-bold inline-flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Clear filters
+              </button>
+            )}
           </div>
         ) : (
           filteredExpenses.map((exp) => {
@@ -253,7 +268,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-natural-muted">
-                      <span className="font-mono">{new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span className="font-mono">{fmtDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
@@ -287,7 +302,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       {filteredExpenses.length > 0 && (
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl" id="list-footer-stats">
           <span className="font-medium font-mono">Showing {filteredExpenses.length} of {expenses.length} expense items</span>
-          {statusFilter !== 'all' && (
+          {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button 
               onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
               className="text-natural-text hover:text-[#c49363] font-bold flex items-center gap-1 cursor-pointer"

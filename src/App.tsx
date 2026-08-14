@@ -726,23 +726,26 @@ export default function App() {
   };
 
   const handleDeleteExpense = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      try {
-        const expenseToDelete = expenses.find(e => e.id === id);
-        setExpenses(prev => {
-          const updated = prev.filter(e => e.id !== id);
-          localStorage.setItem('expenses_' + group?.id, JSON.stringify(updated));
-          return updated;
-        });
-        setSelectedExpense(null);
-        
-        if (expenseToDelete && group) {
-          await broadcastToMembers('DELETE', { id });
-        }
-      } catch (e: any) {
-        console.error("Delete error:", e);
-        alert("Failed to delete data locally.");
+    // ExpenseDetail already gates this behind an inline "Confirm Delete?" step,
+    // so no second native confirm here.
+    if (!group) return;
+    const groupId = group.id;
+    try {
+      const expenseToDelete = expenses.find(e => e.id === id);
+      setExpenses(prev => {
+        const updated = prev.filter(e => e.id !== id);
+        try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
+        catch (e) { console.error('Failed to persist expenses', e); }
+        return updated;
+      });
+      setSelectedExpense(null);
+
+      if (expenseToDelete) {
+        await broadcastToMembers('DELETE', { id });
       }
+    } catch (e: any) {
+      console.error("Delete error:", e);
+      alert("Failed to delete data locally.");
     }
   };
 
