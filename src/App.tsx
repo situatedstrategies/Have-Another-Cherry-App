@@ -5,7 +5,7 @@ import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
-import { auth, db, OperationType, handleFirestoreError } from './firebase';
+import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
@@ -275,7 +275,7 @@ export default function App() {
       try {
         const res = await fetch('/api/generate-greeting', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
           body: JSON.stringify({
             memberCount,
             profileType: userProfile.financialProfile?.type,
@@ -875,17 +875,20 @@ export default function App() {
     } catch (e) { console.error('Failed to reset profile', e); }
   };
 
-  const handleResendInvite = (memberName: string) => {
+  const handleResendInvite = async (memberName: string) => {
     const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
     if (!email || !group) return;
-    fetch('/api/send-invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
-    }).then(res => {
+    try {
+      const res = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
+      });
       if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
       else addToast('Error', 'Failed to send invite', 'error');
-    });
+    } catch {
+      addToast('Error', 'Failed to send invite', 'error');
+    }
   };
 
   const handleRecalculateSplit = async () => {

@@ -2,7 +2,7 @@ import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth } from '../firebase';
+import { db, auth, authHeader } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 
@@ -79,7 +79,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           email: inviteEmail,
           groupName: createdGroupInfo.groupName,

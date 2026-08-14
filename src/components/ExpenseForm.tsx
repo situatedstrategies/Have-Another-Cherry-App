@@ -3,6 +3,7 @@ import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles } from 'lucide-react';
 import Modal from './Modal';
+import { authHeader } from '../firebase';
 
 interface ExpenseFormProps {
   group: Group;
@@ -56,6 +57,45 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [recurringInterval, setRecurringInterval] = useState<any>(editingExpense?.recurringInterval || 'monthly');
   const [alreadySettled, setAlreadySettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
+  // Read the chosen receipt photo, send it to the AI scan endpoint, and prefill
+  // the form from the result. Replaces the old mock that always returned $84.50.
+  const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    setScanning(true);
+    setError(null);
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch('/api/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ image: dataUrl, mimeType: file.type || 'image/jpeg' }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success && result.data) {
+        if (result.data.description) setTitle(String(result.data.description));
+        const amt = Number(result.data.amount);
+        if (Number.isFinite(amt) && amt > 0) { setAmount(amt.toFixed(2)); setCustomAmt({}); }
+        if (result.data.date) setDate(String(result.data.date));
+      } else {
+        setError('Could not read that receipt. Try a clearer photo, or enter the details manually.');
+      }
+    } catch (err) {
+      console.error('Scan failed', err);
+      setError('Receipt scan failed. Please enter the details manually.');
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // Load editing values if present
   useEffect(() => {
@@ -394,34 +434,21 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               </h3>
               <p className="text-xs text-natural-muted mt-1">Auto-fill details by scanning a receipt.</p>
             </div>
-            <button 
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleScanFile}
+            />
+            <button
               type="button"
-              onClick={async () => {
-                try {
-                  // MOCK CLIENT-SIDE INTEGRATION
-                  const btn = document.getElementById('scan-receipt-btn');
-                  if (btn) btn.innerHTML = 'Scanning...';
-                  
-                  const response = await fetch('/api/scan-receipt', { method: 'POST' });
-                  const result = await response.json();
-                  
-                  if (result.success) {
-                    setTitle(result.data.description);
-                    setAmount(result.data.amount.toString());
-                    setCustomAmt({});
-                  }
-                  
-                  if (btn) btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg> Scan Receipt';
-                } catch (e) {
-                  console.error("Scan failed", e);
-                  const btn = document.getElementById('scan-receipt-btn');
-                  if (btn) btn.innerHTML = 'Scan Failed';
-                }
-              }}
-              id="scan-receipt-btn"
-              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors"
+              onClick={() => scanInputRef.current?.click()}
+              disabled={scanning}
+              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
             >
-              <Camera size={16} /> Scan Receipt
+              <Camera size={16} /> {scanning ? 'Scanning…' : 'Scan Receipt'}
             </button>
           </div>
 

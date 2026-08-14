@@ -9,36 +9,59 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(cors());
-  app.use(express.json());
+  // Behind App Hosting / Cloud Run every request arrives via Google's front-end
+  // proxy; trust it so req.ip reflects the real client (X-Forwarded-For) and the
+  // rate limiter buckets per user instead of collapsing to one global bucket.
+  app.set("trust proxy", true);
+
+  // Restrict cross-origin browser access to our own app origins (the SPA is
+  // same-origin, so this doesn't affect it — it just blocks other sites).
+  const allowedOrigins = (
+    process.env.ALLOWED_ORIGINS ||
+    "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000"
+  ).split(",").map(o => o.trim()).filter(Boolean);
+  app.use(cors({
+    origin: (origin, cb) => {
+      // Allow same-origin / non-browser requests (no Origin header) and our list.
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+  }));
+
+  // Receipt images are sent as base64, so allow a generous body size.
+  app.use(express.json({ limit: "10mb" }));
 
   // Lightweight Alpha Lite abuse protection for public email endpoints.
   // App Hosting instances may have separate memory, so production launch
   // should eventually use managed rate limiting.
   const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+  let lastSweep = 0;
 
-  const emailRateLimit = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-    const windowMs = 15 * 60 * 1000;
-    const maxRequests = 5;
-
-    const bucket = requestBuckets.get(key);
-
-    if (!bucket || now >= bucket.resetAt) {
-      requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
-      return next();
-    }
-
-    if (bucket.count >= maxRequests) {
-      return res.status(429).json({
-        error: 'Too many requests. Please wait before trying again.'
-      });
-    }
-
-    bucket.count += 1;
-    next();
+  // Drop expired buckets occasionally so the map can't grow without bound.
+  const sweepBuckets = (now: number) => {
+    if (now - lastSweep < 60_000) return;
+    lastSweep = now;
+    for (const [k, b] of requestBuckets) if (now >= b.resetAt) requestBuckets.delete(k);
   };
+
+  // Per-endpoint rate limiter, keyed on the real client IP so one abuser is
+  // isolated instead of throttling everyone. Each `name` gets its own quota.
+  const rateLimit = (name: string, maxRequests = 5, windowMs = 15 * 60 * 1000) =>
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const now = Date.now();
+      sweepBuckets(now);
+      const key = `${name}:${req.ip || req.socket.remoteAddress || "unknown"}`;
+      const bucket = requestBuckets.get(key);
+      if (!bucket || now >= bucket.resetAt) {
+        requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+        return next();
+      }
+      if (bucket.count >= maxRequests) {
+        return res.status(429).json({ error: "Too many requests. Please wait before trying again." });
+      }
+      bucket.count += 1;
+      next();
+    };
 
   // Lazily initialize the Firebase Admin SDK (ADC) once, shared across endpoints.
   const ensureAdminApp = async () => {
@@ -48,6 +71,24 @@ async function startServer() {
         credential: applicationDefault(),
         projectId: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
       });
+    }
+  };
+
+  // Require a valid Firebase ID token. Protects the billed AI endpoints and the
+  // authenticated email endpoint from anonymous abuse.
+  const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const header = req.headers.authorization || "";
+      const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+      if (!token) return res.status(401).json({ error: "Authentication required." });
+      await ensureAdminApp();
+      const { getAuth } = await import("firebase-admin/auth");
+      const decoded = await getAuth().verifyIdToken(token);
+      (req as any).uid = decoded.uid;
+      next();
+    } catch (e: any) {
+      console.error("Auth verification failed:", e?.message || e);
+      return res.status(401).json({ error: "Authentication required." });
     }
   };
 
@@ -96,7 +137,7 @@ async function startServer() {
   };
 
   // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
-  app.post("/api/scan-receipt", async (req, res) => {
+  app.post("/api/scan-receipt", requireAuth, rateLimit("scan", 60), async (req, res) => {
     try {
       const { GoogleGenAI, Type } = await import("@google/genai");
       const ai = new GoogleGenAI({
@@ -106,7 +147,10 @@ async function startServer() {
       });
 
       const base64Image = req.body?.image;
-      if (base64Image) {
+      if (!base64Image || typeof base64Image !== "string") {
+        return res.status(400).json({ error: "No receipt image was provided." });
+      }
+      {
         const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
         const mimeType = req.body?.mimeType || "image/jpeg";
 
@@ -136,7 +180,7 @@ async function startServer() {
           return res.status(200).json({
             success: true,
             data: {
-              amount: parsed.amount || 0,
+              amount: Math.max(0, Number(parsed.amount) || 0),
               description: parsed.description || "Receipt Scan",
               date: parsed.date || new Date().toISOString().split('T')[0]
             }
@@ -144,27 +188,27 @@ async function startServer() {
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      res.status(200).json({
-        success: true,
-        data: { amount: 84.50, description: "Grocery Store Run (Mocked AI Parse)" }
-      });
+      // The model returned nothing usable.
+      return res.status(422).json({ error: "Could not read the receipt. Please enter the details manually." });
     } catch (err: any) {
       console.error("Receipt Scan Error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Could not scan the receipt. Please try again." });
     }
   });
 
   // 6. Resend Invite Endpoint
-  app.post("/api/send-invite", emailRateLimit, async (req, res) => {
+  app.post("/api/send-invite", requireAuth, rateLimit("invite"), async (req, res) => {
     try {
-      const { email, groupName, inviteCode, recipientName, fromName, split } = req.body;
+      const { email, groupName, inviteCode, recipientName, fromName, split } = req.body || {};
+      if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "A valid recipient email is required." });
+      }
 
       const data = await sendInviteEmail(email, groupName, inviteCode, recipientName, fromName, split);
       res.status(200).json({ success: true, data });
     } catch (err: any) {
       console.error("Server Invite Error:", err);
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Could not send the invite. Please try again." });
     }
   });
 
@@ -172,7 +216,7 @@ async function startServer() {
   // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
   // delivers it via Resend from reset@haveanothercherry.com. Responds generically
   // so we never reveal whether an email is registered.
-  app.post("/api/send-password-reset", emailRateLimit, async (req, res) => {
+  app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
     const { email } = req.body || {};
     if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Email is required" });
@@ -201,29 +245,15 @@ async function startServer() {
     }
   });
 
-  // 7. Firebase Cloud Messaging (FCM) API Infrastructure
-  app.post("/api/send-notification", async (req, res) => {
-    try {
-      const { token, title, body, data } = req.body;
-      if (!token || !title || !body) {
-        return res.status(400).json({ error: "Missing token, title, or body" });
-      }
-
-      console.log("[FCM] Constructing notification for token: " + token);
-      const payload = { message: { token, notification: { title, body }, data: data || {} } };
-
-      console.log("[FCM] Formatted Message Payload:", JSON.stringify(payload));
-      res.status(200).json({ success: true, messageId: "mock-fcm-id-" + Date.now() });
-    } catch (err: any) {
-      console.error("FCM Delivery Error:", err);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   // 8. Financial Profile Generation API — generates a UNIQUE, bespoke profile
   //    from the quiz answers, analyzed holistically/interconnected.
-  app.post("/api/generate-profile", async (req, res) => {
+  app.post("/api/generate-profile", requireAuth, rateLimit("profile", 30), async (req, res) => {
     const { answers } = req.body || {};
+    // Cap the user-supplied answers that get embedded in the AI prompt, to bound
+    // token usage and limit prompt-injection surface.
+    if (answers && JSON.stringify(answers).length > 4000) {
+      return res.status(400).json({ error: "Quiz answers are too large." });
+    }
     const logCount = await getLogCount();
 
     // Catalog frozen at CATALOG_TARGET entries: stop generating and always
@@ -304,9 +334,13 @@ async function startServer() {
 
   // 9. Weekly Dashboard Greeting — a short, warm, cherry-themed, relationship-
   //    focused line tailored to group size and the user's profile tone.
-  app.post("/api/generate-greeting", async (req, res) => {
-    const { memberCount, profileType, greetingTone } = req.body || {};
+  app.post("/api/generate-greeting", requireAuth, rateLimit("greeting", 60), async (req, res) => {
+    const { memberCount, profileType: rawProfileType, greetingTone: rawTone } = req.body || {};
     const count = Number(memberCount) || 1;
+    // Validate/sanitize the user-influenced fields before they enter the prompt.
+    const ALLOWED_TONES = ["playful", "pragmatic", "nurturing", "analytical", "adventurous", "harmonious", "thrifty", "generous"];
+    const greetingTone = ALLOWED_TONES.includes(rawTone) ? rawTone : "harmonious";
+    const profileType = typeof rawProfileType === "string" ? rawProfileType.slice(0, 60) : "";
 
     // Curated fallback lines (used if the AI call fails).
     const fallbackBySize: Record<string, string> = {
@@ -367,6 +401,9 @@ async function startServer() {
     }
   });
 
+  // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
+  app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
@@ -392,4 +429,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((e) => {
+  console.error("Fatal startup error:", e);
+  process.exit(1);
+});

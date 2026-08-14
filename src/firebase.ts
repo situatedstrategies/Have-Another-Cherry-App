@@ -9,6 +9,18 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
+// Build the Authorization header for calls to our authenticated API endpoints.
+// Returns {} when signed out so callers degrade gracefully.
+export async function authHeader(): Promise<Record<string, string>> {
+  const user = auth.currentUser;
+  if (!user) return {};
+  try {
+    return { Authorization: `Bearer ${await user.getIdToken()}` };
+  } catch {
+    return {};
+  }
+}
+
 // Mobile integration placeholders
 // export const appleProvider = new OAuthProvider('apple.com');
 
