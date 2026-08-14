@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Have Another Cherry — Split shared expenses, fairly</title>
+  <meta name="description" content="Have Another Cherry is the household expense splitter for couples and roommates. Set a fair percentage split, log shared costs, scan receipts with AI, and settle up — without the awkward math." />
+  <meta property="og:title" content="Have Another Cherry — Split shared expenses, fairly" />
+  <meta property="og:description" content="Set a fair split, log shared costs, scan receipts with AI, and settle up without the awkward math." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="assets/cherry.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header">
+    <div class="container">
+      <nav class="nav" data-open="false">
+        <a class="brand" href="index.html">
+          <img src="assets/cherry.png" alt="Have Another Cherry logo" />
+          <span>Have Another Cherry</span>
+        </a>
+        <div class="nav-links">
+          <a href="index.html">Home</a>
+          <a href="features.html">Features</a>
+          <a href="about.html">About</a>
+          <a href="privacy.html">Privacy &amp; Security</a>
+        </div>
+        <div class="nav-cta">
+          <a class="btn btn-ghost" href="features.html#pricing">Pricing</a>
+          <!-- APP LOGIN LINK — swap for https://app.haveanothercherry.com once DNS is live -->
+          <a class="btn btn-primary" href="https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/">Log in</a>
+        </div>
+        <button class="nav-toggle" aria-label="Menu" aria-expanded="false"><span></span></button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="container">
+      <span class="hero-badge"><span class="dot"></span> For couples, roommates &amp; households</span>
+      <h1>Share the bills. <span class="accent">Skip the awkward math.</span></h1>
+      <p class="lead">Have Another Cherry splits shared expenses the way real life works — by a fair percentage, not a rigid 50/50. Log costs, scan receipts with AI, and settle up in a couple of taps.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg btn-arrow" href="https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/">Open the app</a>
+        <a class="btn btn-ghost btn-lg" href="features.html">See how it works</a>
+      </div>
+      <p class="hero-note">Free to start · No credit card required</p>
+
+      <!-- ---- Hero screenshot (replaceable mockup) ---- -->
+      <div class="hero-visual shot">
+        <span class="shot-note">Replaceable mockup → drop a real screenshot here</span>
+        <div class="browser">
+          <div class="browser-bar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="url">app.haveanothercherry.com</div>
+          </div>
+          <div class="appui">
+            <div class="topbar">
+              <div class="g"><img src="assets/cherry.png" alt="" /> The Cherry House</div>
+              <div class="avatars">
+                <span style="background:#C41200">O</span>
+                <span style="background:#18181B">M</span>
+              </div>
+            </div>
+            <div class="body appbody-2col" style="grid-template-columns:1.1fr 1fr; display:grid; gap:14px;">
+              <div style="display:grid; gap:12px;">
+                <div class="balance">
+                  <div class="lbl">You are owed</div>
+                  <div class="amt">$248<small>.50</small></div>
+                  <div class="who">Matt owes you for this month</div>
+                  <div class="split-pill">◑ Split 65 / 35 by income</div>
+                </div>
+                <div class="btnrow">
+                  <div class="minibtn pri">Settle up</div>
+                  <div class="minibtn gho">Add expense</div>
+                </div>
+              </div>
+              <div class="list">
+                <div class="row">
+                  <div class="ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 13h6"/></svg>
+                  </div>
+                  <div class="meta"><div class="t">Groceries — Whole Foods</div><div class="s">Aug 12 · Groceries</div></div>
+                  <div style="text-align:right"><div class="amt">$142.80</div><span class="chip unsettled">Unsettled</span></div>
+                </div>
+                <div class="row">
+                  <div class="ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V7l9-4 9 4v14"/><path d="M9 21v-6h6v6"/></svg>
+                  </div>
+                  <div class="meta"><div class="t">Rent — September</div><div class="s">Aug 1 · Rent</div></div>
+                  <div style="text-align:right"><div class="amt">$2,100</div><span class="chip settled">Settled</span></div>
+                </div>
+                <div class="row">
+                  <div class="ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg>
+                  </div>
+                  <div class="meta"><div class="t">Internet — Fiber</div><div class="s">Aug 6 · Utilities</div></div>
+                  <div style="text-align:right"><div class="amt">$79.00</div><span class="chip unsettled">Unsettled</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VALUE PROPS ============ -->
+  <section class="section section--tight">
+    <div class="container">
+      <div class="badge-list center" style="justify-content:center">
+        <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Fair percentage splits</span>
+        <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> AI receipt scanning</span>
+        <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> One-tap settle up</span>
+        <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Private by design</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURE TRIO ============ -->
+  <section class="section">
+    <div class="container">
+      <div class="head-block center" style="margin:0 auto">
+        <p class="eyebrow">Why Have Another Cherry</p>
+        <h2>Built for the way you actually share money</h2>
+        <p class="lead">Most splitters assume everyone pays equally. Real households don't. Cherry starts from a split that feels fair — then keeps the running math out of your way.</p>
+      </div>
+      <div class="grid grid-3" style="margin-top:44px">
+        <div class="card feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          <h3>Splits that match income</h3>
+          <p>Set any percentage between members — 50/50, 65/35, whatever's fair. Every expense divides automatically, no calculator required.</p>
+        </div>
+        <div class="card feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M8 14h4"/></svg></div>
+          <h3>Snap a receipt, done</h3>
+          <p>Point your camera at a receipt and AI reads the merchant, total, and category — then drops it into your shared ledger.</p>
+        </div>
+        <div class="card feature">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M5 8h9a3 3 0 0 1 0 6H8"/><path d="M5 16h11"/></svg></div>
+          <h3>Settle without the spreadsheet</h3>
+          <p>See exactly who owes whom at any moment. Record a payment, confirm it, and the balance zeroes out — cleanly.</p>
+        </div>
+      </div>
+      <div class="center" style="margin-top:32px">
+        <a class="btn btn-ghost btn-arrow" href="features.html">Explore all features</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SHOWCASE ============ -->
+  <section class="section" style="background:var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border)">
+    <div class="container">
+      <div class="grid split-2" style="grid-template-columns:1fr 1fr; align-items:center; gap:48px">
+        <div class="stack">
+          <p class="eyebrow">Receipt scanning</p>
+          <h2 style="font-size:clamp(26px,4vw,36px)">Let the AI do the typing</h2>
+          <p class="lead">Groceries, dinner, the hardware store — scan the receipt and Cherry fills in the amount, date, and category for you. Review, split, and move on.</p>
+          <div class="badge-list">
+            <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Reads totals &amp; merchants</span>
+            <span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Auto-categorizes</span>
+          </div>
+        </div>
+        <!-- phone mockup: receipt scan -->
+        <div class="shot">
+          <span class="shot-note">Replaceable mockup</span>
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="phone-notch"></div>
+              <div class="appui">
+                <div class="topbar"><div class="g"><img src="assets/cherry.png" alt="" /> Add expense</div></div>
+                <div class="body">
+                  <div class="scan">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="30" height="30" style="margin:0 auto"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/><circle cx="12" cy="13" r="2.5"/></svg>
+                    <div class="big">Scan a receipt</div>
+                    <div class="sm">AI reads it in a second</div>
+                  </div>
+                  <div class="card2">
+                    <div class="sectionlabel" style="margin-bottom:8px">Detected</div>
+                    <div class="field"><span class="k">Merchant</span><span class="v">Whole Foods</span></div>
+                    <div class="field"><span class="k">Total</span><span class="v">$142.80</span></div>
+                    <div class="field"><span class="k">Date</span><span class="v">Aug 12, 2026</span></div>
+                    <div class="field"><span class="k">Category</span><span class="v">Groceries</span></div>
+                    <div class="field"><span class="k">Your share (65%)</span><span class="v" style="color:var(--primary)">$92.82</span></div>
+                  </div>
+                  <div class="minibtn pri">Save &amp; split</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="section">
+    <div class="container">
+      <div class="head-block center" style="margin:0 auto">
+        <p class="eyebrow">How it works</p>
+        <h2>Up and running in four steps</h2>
+      </div>
+      <div class="grid grid-4" style="margin-top:44px">
+        <div class="card">
+          <div class="mono" style="color:var(--primary); font-size:14px">01</div>
+          <h3 style="font-size:18px; margin-top:8px">Create your group</h3>
+          <p style="color:var(--muted); font-size:14.5px; margin-top:8px">Name your household and invite your partner or roommates by email.</p>
+        </div>
+        <div class="card">
+          <div class="mono" style="color:var(--primary); font-size:14px">02</div>
+          <h3 style="font-size:18px; margin-top:8px">Set the split</h3>
+          <p style="color:var(--muted); font-size:14.5px; margin-top:8px">Pick a fair percentage — equal, by income, or custom.</p>
+        </div>
+        <div class="card">
+          <div class="mono" style="color:var(--primary); font-size:14px">03</div>
+          <h3 style="font-size:18px; margin-top:8px">Log expenses</h3>
+          <p style="color:var(--muted); font-size:14.5px; margin-top:8px">Type it in or scan a receipt. Cherry does the split instantly.</p>
+        </div>
+        <div class="card">
+          <div class="mono" style="color:var(--primary); font-size:14px">04</div>
+          <h3 style="font-size:18px; margin-top:8px">Settle up</h3>
+          <p style="color:var(--muted); font-size:14.5px; margin-top:8px">Pay what you owe, confirm it, and start the next month clean.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA BAND ============ -->
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="cta-band">
+        <p class="eyebrow" style="color:#f7c9c3">Have another cherry</p>
+        <h2>Start splitting fairly today</h2>
+        <p>Set up your household in minutes. It's free to start, and there's nothing to install.</p>
+        <div class="hero-actions" style="justify-content:center">
+          <a class="btn btn-primary btn-lg btn-arrow" href="https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/">Open the app</a>
+          <a class="btn btn-ghost btn-lg" href="features.html#pricing">Compare plans</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a class="brand" href="index.html"><img src="assets/cherry.png" alt="" /> <span>Have Another Cherry</span></a>
+          <p>The fair-by-default expense splitter for households. Made with care by a two-person team.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="features.html">Features</a>
+          <a href="features.html#pricing">Pricing</a>
+          <a href="https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/">Log in</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="about.html">About</a>
+          <a href="privacy.html">Privacy &amp; Security</a>
+          <a href="mailto:hello@haveanothercherry.com">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Have Another Cherry. All rights reserved.</span>
+        <span class="mono">Split fairly. Settle easily.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
