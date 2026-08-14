@@ -16,7 +16,6 @@ import AuthScreen from './components/AuthScreen';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
-import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import Modal from './components/Modal';
@@ -41,6 +40,37 @@ function getGreetingKey(memberCount: number): string {
   const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
   return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
+}
+
+// Union two lists of {id,...} without losing either side's entries. Used to
+// merge an incoming (remote) expense onto our local copy so a concurrently-added
+// settlement and comment don't clobber each other. A settlement that is
+// 'confirmed' on either side stays confirmed (status only moves forward).
+function mergeById<T extends { id: string }>(local: T[] = [], incoming: T[] = []): T[] {
+  const byId = new Map<string, T>();
+  for (const item of local) byId.set(item.id, item);
+  for (const item of incoming) {
+    const existing = byId.get(item.id) as any;
+    if (existing && (existing.status === 'confirmed' || (item as any).status === 'confirmed')) {
+      byId.set(item.id, { ...existing, ...item, status: 'confirmed' });
+    } else {
+      byId.set(item.id, existing ? { ...existing, ...item } : item);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+// Merge a remote expense onto the local copy: scalar fields take the incoming
+// version, but settlements/comments are unioned by id so concurrent edits from
+// two members don't erase each other. Status is re-derived from the result.
+function mergeExpense(local: Expense, incoming: Expense): Expense {
+  const merged: Expense = {
+    ...incoming,
+    settlements: mergeById(local.settlements, incoming.settlements),
+    comments: mergeById(local.comments, incoming.comments),
+  };
+  merged.status = getNormalizedExpenseStatus(merged);
+  return merged;
 }
 
 // Consistent, branded loading screen — same background as every other screen so
@@ -178,54 +208,53 @@ export default function App() {
 
   // Sync Queue Listener
   useEffect(() => {
-    if (activeUser && group) {
-      const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
+    if (!activeUser || !group) return;
+    const groupId = group.id;
+    const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const newExps: Expense[] = [];
+      const deletedIds: string[] = [];
+      for (const change of snapshot.docChanges()) {
+        if (change.type !== 'added') continue;
+        const data = change.doc.data();
+        // Ignore (but don't delete) messages for a different group — e.g. leftover
+        // items from a group the user has since left.
+        if (data.groupId && data.groupId !== groupId) continue;
+        try {
+          const decrypted = await decryptData(data.payload, groupId);
+          // Decrypt failed: leave the message queued so it can be retried later,
+          // instead of silently and permanently dropping the update.
+          if (!decrypted) continue;
+          if (data.action === 'DELETE') deletedIds.push(decrypted.id);
+          else newExps.push(decrypted);
+          // Only remove the message once we've successfully decrypted it.
+          deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
+        } catch (e) {
+          console.error(e);
+        }
+      }
 
-        let newExps = [];
-        let deletedIds = [];
-        for (const change of snapshot.docChanges()) {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            try {
-              const decrypted = await decryptData(data.payload, group.id);
-              if (decrypted) {
-                if (data.action === 'DELETE') {
-                  deletedIds.push(decrypted.id);
-                } else {
-                  newExps.push(decrypted);
-                }
-              }
-              // Delete message after receiving
-              deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
-            } catch(e) {
-              console.error(e);
-            }
-          }
+      if (newExps.length === 0 && deletedIds.length === 0) return;
+      setExpenses(prev => {
+        let updated = prev.filter(e => !deletedIds.includes(e.id));
+        for (const exp of newExps) {
+          const idx = updated.findIndex(e => e.id === exp.id);
+          if (idx >= 0) updated[idx] = mergeExpense(updated[idx], exp);
+          else updated.push(exp);
         }
-        
-        if (newExps.length > 0 || deletedIds.length > 0) {
-          setExpenses(prev => {
-            let updated = [...prev];
-            // Handle deletes
-            updated = updated.filter(e => !deletedIds.includes(e.id));
-            // Handle upserts
-            for (const exp of newExps) {
-              const idx = updated.findIndex(e => e.id === exp.id);
-              if (idx >= 0) updated[idx] = exp;
-              else updated.push(exp);
-            }
-            updated.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
-            return updated;
-          });
+        updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        try {
+          localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to persist expenses to localStorage', e);
         }
-      }, (error) => {
-        console.error('transfer_queue unsubscribe error:', error);
+        return updated;
       });
-      return () => unsubscribe();
-    }
-  }, [activeUser, group]);
+    }, (error) => {
+      console.error('transfer_queue listener error:', error);
+    });
+    return () => unsubscribe();
+  }, [activeUser, group?.id]);
   
 
   // Weekly cherry greeting: generate once per week (per group size) and cache it
@@ -556,21 +585,27 @@ export default function App() {
     }
   };
 
-  const pushToTransferQueue = async (expense: Expense, action: 'UPSERT' | 'DELETE') => {
-    if (!groupSecret || !group) return;
-    const payload = CryptoJS.AES.encrypt(JSON.stringify(expense), groupSecret).toString();
-    const otherMembers = group.memberIds.filter(id => id !== activeUser);
-    for (const memberId of otherMembers) {
-      const qRef = doc(collection(db, 'transfer_queue'));
-      await setDoc(qRef, {
-        to: memberId,
-        from: activeUser,
-        groupId: group.id,
-        action,
-        payload,
-        createdAt: new Date().toISOString()
-      });
-    }
+  // Encrypt `payloadObj` and enqueue it for every other group member. Uses
+  // allSettled so one member's failed write doesn't abort delivery to the rest,
+  // and guards the optional memberIds so a malformed group can't crash the app.
+  const broadcastToMembers = async (action: 'UPSERT' | 'DELETE', payloadObj: any) => {
+    if (!group) return;
+    const encrypted = await encryptData(payloadObj, group.id);
+    const otherMembers = (group.memberIds || []).filter(id => id !== activeUser);
+    const results = await Promise.allSettled(
+      otherMembers.map(memberId =>
+        setDoc(doc(collection(db, 'transfer_queue')), {
+          to: memberId,
+          from: activeUser,
+          groupId: group.id,
+          action,
+          payload: encrypted,
+          createdAt: new Date().toISOString(),
+        })
+      )
+    );
+    const failed = results.filter(r => r.status === 'rejected').length;
+    if (failed > 0) console.error(`broadcastToMembers: ${failed}/${otherMembers.length} member writes failed`);
   };
 
   const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
@@ -644,21 +679,7 @@ export default function App() {
       }
 
       // Sync to cloud queue
-      if (group) {
-        const encrypted = await encryptData(finalExpense, group.id);
-        const otherMembers = group.memberIds.filter(id => id !== activeUser);
-        for (const memberId of otherMembers) {
-          const qRef = doc(collection(db, 'transfer_queue'));
-          await setDoc(qRef, {
-            to: memberId,
-            from: activeUser,
-            groupId: group.id,
-            action: 'UPSERT',
-            payload: encrypted,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
+      await broadcastToMembers('UPSERT', finalExpense);
     } catch (e) {
       console.error(e);
       alert('Failed to save expense locally or sync.');
@@ -677,19 +698,7 @@ export default function App() {
         setSelectedExpense(null);
         
         if (expenseToDelete && group) {
-          const encrypted = await encryptData({ id }, group.id);
-          const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
-          for (const memberId of otherMembers) {
-            const qRef = doc(collection(db, 'transfer_queue'));
-            await setDoc(qRef, {
-              to: memberId,
-              from: activeUser,
-              groupId: group.id,
-              action: 'DELETE',
-              payload: encrypted,
-              createdAt: new Date().toISOString()
-            });
-          }
+          await broadcastToMembers('DELETE', { id });
         }
       } catch (e: any) {
         console.error("Delete error:", e);
@@ -699,27 +708,19 @@ export default function App() {
   };
 
     const syncExpenseUpdate = async (updatedExpense: Expense) => {
+    if (!group) return;
+    const groupId = group.id;
     setExpenses(prev => {
       const updated = prev.map(e => e.id === updatedExpense.id ? updatedExpense : e);
-      localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+      try {
+        localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to persist expenses to localStorage', e);
+      }
       return updated;
     });
     setSelectedExpense(updatedExpense);
-    if (group) {
-      const encrypted = await encryptData(updatedExpense, group.id);
-      const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
-      for (const memberId of otherMembers) {
-        const qRef = doc(collection(db, 'transfer_queue'));
-        await setDoc(qRef, {
-          to: memberId,
-          from: activeUser,
-          groupId: group.id,
-          action: 'UPSERT',
-          payload: encrypted,
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
+    await broadcastToMembers('UPSERT', updatedExpense);
   };
 
   const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate?: string) => {
