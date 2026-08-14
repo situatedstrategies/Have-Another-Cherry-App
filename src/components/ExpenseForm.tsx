@@ -604,8 +604,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   autoComplete="off"
                 />
                 <datalist id="category-options">
-                  {categories.map(c => (
-                    <option key={c} value={c} />
+                  {categories.map((c, i) => (
+                    <option key={`${c}-${i}`} value={c} />
                   ))}
                 </datalist>
               </div>

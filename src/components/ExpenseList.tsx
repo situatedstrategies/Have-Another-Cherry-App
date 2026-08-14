@@ -261,7 +261,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
+                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
                           <Repeat size={10} />
                         </span>
                       )}

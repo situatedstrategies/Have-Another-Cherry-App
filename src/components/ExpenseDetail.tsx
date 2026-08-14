@@ -82,8 +82,9 @@ export default function ExpenseDetail({
               {getExpenseStatusLabel(expense)}
             </span>
           </div>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Close"
             className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />

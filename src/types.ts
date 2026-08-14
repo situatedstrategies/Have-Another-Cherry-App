@@ -32,7 +32,6 @@ export interface Group {
   targetNumPeople?: number;
   availableSplits?: { name: string; split: number }[] | number[];
   categories: string[];
-  memberIncomes?: Record<string, string>;
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)
 }
 
@@ -119,7 +118,6 @@ export interface Expense {
   comments?: Comment[];
   createdAt: string;
   notes?: string;
-  encryptedData?: string;
 }
 
 export const DEFAULT_CATEGORIES = [
