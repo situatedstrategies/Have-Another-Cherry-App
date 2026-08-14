@@ -21,12 +21,19 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
   let othersOweYouCount = 0;
   let settledCount = 0;
   let settledTotalAmount = 0;
+  // Amounts that have been logged as paid but not yet confirmed. The headline
+  // balances are confirmed-only; these are surfaced separately so the cards
+  // agree with the settle screen (which reserves pending payments).
+  let youOwePending = 0;
+  let othersOwePending = 0;
 
   expenses.forEach(exp => {
     const isFullySettled = isExpenseFullySettled(exp);
 
     if (exp.paidBy === activeUser) {
       const totalRemaining = getTotalRemainingOwedToPayer(exp, false);
+      // Difference between confirmed-only and pending-inclusive = amount in-flight.
+      othersOwePending = roundCurrency(othersOwePending + Math.max(0, totalRemaining - getTotalRemainingOwedToPayer(exp, true)));
 
       if (!isFullySettled && totalRemaining > 0.01) {
         othersOweYouCount++;
@@ -34,6 +41,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
       }
     } else {
       const remainingForMe = getRemainingSettlementAmount(exp, activeUser, false);
+      youOwePending = roundCurrency(youOwePending + Math.max(0, remainingForMe - getRemainingSettlementAmount(exp, activeUser, true)));
 
       if (!isFullySettled && remainingForMe > 0.01) {
         youOweCount++;
@@ -78,6 +86,11 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         <p className="text-xs text-natural-muted mt-2 font-mono">
           Across {youOweCount} individual {youOweCount === 1 ? 'item' : 'items'}
         </p>
+        {youOwePending > 0.01 && (
+          <p className="text-[11px] text-amber-600 mt-1 font-medium">
+            ${youOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} awaiting confirmation
+          </p>
+        )}
       </div>
 
       {/* Others owe you */}
@@ -96,6 +109,11 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         <p className="text-xs text-natural-text mt-2 font-mono">
           Across {othersOweYouCount} individual {othersOweYouCount === 1 ? 'item' : 'items'}
         </p>
+        {othersOwePending > 0.01 && (
+          <p className="text-[11px] text-amber-600 mt-1 font-medium">
+            ${othersOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending your confirmation
+          </p>
+        )}
       </div>
 
       {/* Settled Audit Summary */}
