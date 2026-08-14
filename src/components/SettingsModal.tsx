@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, LogOut, Copy, RefreshCw, Cloud, Shield, Check, X, Edit2 } from 'lucide-react';
+import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2 } from 'lucide-react';
 import { Group } from '../types';
 import { getFullDefaultSplit } from '../lib/members';
 import Modal from './Modal';
@@ -14,7 +14,6 @@ interface SettingsModalProps {
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => void;
   onResendInvite: (memberName: string) => void;
-  onGenerateNewCode: () => void;
   onLeaveGroup: () => void;
   onOpenBackup: () => void;
   onOpenPrivacy: () => void;
@@ -26,7 +25,7 @@ const RESERVED_NAMES = ['Anonymous', 'Unknown'];
 export default function SettingsModal({
   onClose, userProfile, currentUser, group, groupUsers,
   onSaveName, onRetakeQuiz, onRecalculateSplit, onResendInvite,
-  onGenerateNewCode, onLeaveGroup, onOpenBackup, onOpenPrivacy, onSignOut,
+  onLeaveGroup, onOpenBackup, onOpenPrivacy, onSignOut,
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -178,13 +177,6 @@ export default function SettingsModal({
               </button>
             </div>
           </div>
-
-          <button
-            onClick={onGenerateNewCode}
-            className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
-          >
-            <RefreshCw size={14} /> Generate New Code{multiPerson ? 's' : ''}
-          </button>
 
           <div className="border-t border-natural-border/50 pt-3">
             <button

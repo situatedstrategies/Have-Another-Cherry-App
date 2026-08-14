@@ -362,20 +362,6 @@ export default function App() {
   }
   
 
-  // We need to modify all our handlers to use the new group data structure
-    const handleGenerateNewInviteCode = async () => {
-    if (!group) return;
-    try {
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const groupRef = doc(db, 'groups', group.id);
-      await updateDoc(groupRef, { inviteCode: newCode });
-      addToast('Invite Code Updated', 'A new invite code has been generated.', 'success');
-    } catch (e) {
-      console.error(e);
-      addToast('Error', 'Failed to generate new code.', 'info');
-    }
-  };
-
   const handleSignOut = () => {
     setUserProfile({} as any);
     setGroup(null);
@@ -1121,7 +1107,6 @@ export default function App() {
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}
-          onGenerateNewCode={handleGenerateNewInviteCode}
           onLeaveGroup={handleLeaveGroup}
           onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
