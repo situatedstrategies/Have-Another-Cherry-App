@@ -183,6 +183,11 @@ export default function App() {
       const users: Record<string, any> = {};
       snap.forEach(d => { users[d.id] = d.data(); });
       setGroupUsers(users);
+    }, (error) => {
+      // Surface (don't swallow) a permission/query failure — otherwise the
+      // member roster silently stays empty and every feature built on it
+      // (names, income recalc, discrepancy banner) quietly does nothing.
+      console.error('group members listener error:', error);
     });
     return () => unsub();
   }, [group?.memberIds]);
