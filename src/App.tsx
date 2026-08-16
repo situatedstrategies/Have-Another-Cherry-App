@@ -3,7 +3,7 @@ import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField } from 'firebase/firestore';
+import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader } from './firebase';
 import { Expense, Group } from './types';
@@ -22,7 +22,7 @@ import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check } from 'lucide-react';
+import { Plus, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -90,7 +90,15 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [groupUsers, setGroupUsers] = useState<Record<string, any>>({});
-  
+
+  // A user can belong to several groups. `activeGroupId` is the one being viewed;
+  // `groupIds` is the full set. Both fall back to the legacy single `groupId`
+  // field for accounts created before multi-group support.
+  const activeGroupId: string | null = userProfile?.activeGroupId || userProfile?.groupId || null;
+  const groupIds: string[] = Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
+    ? userProfile.groupIds
+    : (userProfile?.groupId ? [userProfile.groupId] : []);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -98,6 +106,11 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  // Multi-group UI state: the header switcher menu, the "add another group"
+  // overlay, and cached names for the groups this user belongs to.
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [groupSummaries, setGroupSummaries] = useState<Record<string, { name?: string }>>({});
   const [groupSecret, setGroupSecret] = useState('');
   useEffect(() => {
     if (activeUser) {
@@ -119,6 +132,29 @@ export default function App() {
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Called after the user creates or joins a group (initial setup or "add another
+  // group"). The group doc + user membership were already written by GroupSetup;
+  // here we make the new group active locally and clear the previous group's
+  // transient view state so nothing from the old group bleeds through.
+  const applyJoinedGroup = useCallback((gid: string) => {
+    setUserProfile((prev: any) => {
+      const prevIds: string[] = Array.isArray(prev?.groupIds) && prev.groupIds.length
+        ? prev.groupIds
+        : (prev?.groupId ? [prev.groupId] : []);
+      const gids = Array.from(new Set([...prevIds, gid]));
+      return { ...(prev || {}), groupId: gid, activeGroupId: gid, groupIds: gids };
+    });
+    setSelectedExpense(null);
+    setEditingExpense(null);
+    setExpenses([]);
+    setGroup(null);
+    setGroupUsers({});
+    setShowAddGroup(false);
+    setShowSettings(false);
+    setShowGroupMenu(false);
+    setDismissedWaiting(false);
   }, []);
 
   // 1. Auth Listener
@@ -148,6 +184,16 @@ export default function App() {
             profile.name = currentUser.displayName;
             updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(() => {});
           }
+          // Migrate legacy single-group accounts to the multi-group shape so the
+          // group switcher and security rules have the fields they expect.
+          if (profile.groupId && (!Array.isArray(profile.groupIds) || profile.groupIds.length === 0 || !profile.activeGroupId)) {
+            profile.groupIds = Array.isArray(profile.groupIds) && profile.groupIds.length ? profile.groupIds : [profile.groupId];
+            profile.activeGroupId = profile.activeGroupId || profile.groupId;
+            updateDoc(doc(db, 'users', currentUser.uid), {
+              groupIds: profile.groupIds,
+              activeGroupId: profile.activeGroupId,
+            }).catch(() => {});
+          }
           setUserProfile(profile);
         } else {
           setUserProfile({}); // Setup required
@@ -162,10 +208,10 @@ export default function App() {
     fetchProfile();
   }, [currentUser]);
 
-  // 2b. Listen to Group
+  // 2b. Listen to the active Group
   useEffect(() => {
-    if (!userProfile?.groupId) return;
-    const groupUnsubscribe = onSnapshot(doc(db, 'groups', userProfile.groupId), (groupSnapshot) => {
+    if (!activeGroupId) return;
+    const groupUnsubscribe = onSnapshot(doc(db, 'groups', activeGroupId), (groupSnapshot) => {
       if (groupSnapshot.exists()) {
         setGroup(groupSnapshot.data() as Group);
       }
@@ -173,7 +219,27 @@ export default function App() {
       console.error('groupUnsubscribe error:', error);
     });
     return () => groupUnsubscribe();
-  }, [userProfile?.groupId]);
+  }, [activeGroupId]);
+
+  // Cache the names of every group this user belongs to, for the header switcher.
+  // The rules allow any signed-in user to `get` a group by id, so a light read
+  // per group is enough — no schema bloat on the user doc.
+  useEffect(() => {
+    if (!groupIds.length) { setGroupSummaries({}); return; }
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(groupIds.map(async (gid) => {
+        try {
+          const snap = await getDoc(doc(db, 'groups', gid));
+          return [gid, { name: snap.exists() ? (snap.data() as any).name : undefined }] as const;
+        } catch {
+          return [gid, {}] as const;
+        }
+      }));
+      if (!cancelled) setGroupSummaries(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [groupIds.join(',')]);
 
   useEffect(() => {
     if (!group || !group.memberIds || group.memberIds.length === 0) return;
@@ -322,14 +388,12 @@ export default function App() {
 
   // The user belongs to a group but its data hasn't arrived yet — show a loading
   // screen, NOT the create/join screen, so we never flash the wrong page.
-  if (userProfile?.groupId && !group) {
+  if (activeGroupId && !group) {
     return <LoadingScreen label="Loading your group…" />;
   }
 
-  if (!userProfile?.groupId) {
-    return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={(groupId) => {
-      setUserProfile(prev => ({...prev, groupId}));
-    }} /></div>;
+  if (!activeGroupId) {
+    return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={applyJoinedGroup} /></div>;
   }
 
   // Non-blocking: members who are in the group but haven't finished their quiz yet.
@@ -481,15 +545,19 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Scrub the current user out of their group document. Shared by "Leave Group"
-  // and "Delete Account". Redistributes the leaver's split percentage across the
-  // remaining members so household-default expenses still bill 100%, and deletes
-  // the group entirely if the last member leaves (no orphaned dead group).
-  const removeSelfFromGroup = async () => {
-    if (!group) return;
-    const groupRef = doc(db, 'groups', group.id);
-    const newMembers = group.members.filter(m => m.uid !== activeUser);
-    const newMemberIds = (group.memberIds || []).filter(id => id !== activeUser);
+  // Scrub the current user out of a specific group document. Shared by "Leave
+  // Group" and "Delete Account". Redistributes the leaver's split percentage
+  // across the remaining members so household-default expenses still bill 100%,
+  // and deletes the group entirely if the last member leaves (no orphaned dead
+  // group). Reads the group fresh so it works for any of the user's groups, not
+  // just the one currently loaded into view.
+  const removeSelfFromGroupById = async (gid: string) => {
+    const groupRef = doc(db, 'groups', gid);
+    const snap = await getDoc(groupRef);
+    if (!snap.exists()) return;
+    const g = snap.data() as Group;
+    const newMembers = (g.members || []).filter(m => m.uid !== activeUser);
+    const newMemberIds = (g.memberIds || []).filter(id => id !== activeUser);
 
     // Last member out — delete the whole group rather than leaving a dead,
     // empty group that still occupies its invite code.
@@ -501,7 +569,7 @@ export default function App() {
     // Redistribute the leaver's percentage across the remaining joined members
     // (proportional to their current shares) so the default split still sums to
     // 100. Pending ghost slots in availableSplits are left untouched.
-    const split = group.defaultSplit || {};
+    const split = g.defaultSplit || {};
     const leaverPct = Number(split[activeUser]) || 0;
     const newDefault: Record<string, number> = {};
     newMemberIds.forEach(uid => { newDefault[uid] = Number(split[uid]) || 0; });
@@ -537,24 +605,59 @@ export default function App() {
     }
   };
 
-  // Clear any locally cached ledger data for this user/group.
+  // Clear any locally cached ledger data for this user across every group they
+  // belong to, plus their backup secret. Used during account deletion.
   const clearLocalData = () => {
+    groupIds.forEach(gid => localStorage.removeItem('expenses_' + gid));
     if (group) localStorage.removeItem('expenses_' + group.id);
     if (activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
   };
 
-  const handleLeaveGroup = async () => {
-    if (!window.confirm("Leave this group? You'll be removed from the member list and returned to the group setup screen. Your account stays active and you can create or join another group.")) return;
+  // Switch the active group. The ledger, roster and sync inbox all re-key off
+  // `activeGroupId`, so we just persist the choice and clear the previous group's
+  // transient view state.
+  const handleSwitchGroup = async (gid: string) => {
+    setShowGroupMenu(false);
+    if (!gid || gid === activeGroupId) return;
     try {
-      await removeSelfFromGroup();
-      await updateDoc(doc(db, 'users', activeUser), { groupId: deleteField() });
-      clearLocalData();
+      await updateDoc(doc(db, 'users', activeUser), { activeGroupId: gid, groupId: gid });
+    } catch (e) {
+      console.error('Failed to switch group', e);
+    }
+    setUserProfile((prev: any) => ({ ...(prev || {}), activeGroupId: gid, groupId: gid }));
+    setGroup(null);
+    setGroupUsers({});
+    setExpenses([]);
+    setSelectedExpense(null);
+    setEditingExpense(null);
+    setDismissedWaiting(false);
+    setShowSettings(false);
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!activeGroupId) return;
+    const remaining = groupIds.filter(id => id !== activeGroupId);
+    const nextActive = remaining[0] || null;
+    const message = nextActive
+      ? "Leave this group? You'll be removed from its member list and switched to another of your groups. Your account and your other groups stay intact."
+      : "Leave this group? You'll be removed from the member list and returned to the group setup screen. Your account stays active and you can create or join another group.";
+    if (!window.confirm(message)) return;
+    try {
+      await removeSelfFromGroupById(activeGroupId);
+      await updateDoc(doc(db, 'users', activeUser), {
+        groupIds: arrayRemove(activeGroupId),
+        activeGroupId: nextActive ?? deleteField(),
+        groupId: nextActive ?? deleteField(),
+      });
+      localStorage.removeItem('expenses_' + activeGroupId);
       setShowSettings(false);
       setShowPrivacyModal(false);
-      setUserProfile((prev: any) => ({ ...(prev || {}), groupId: null }));
+      setShowGroupMenu(false);
+      setUserProfile((prev: any) => ({ ...(prev || {}), groupIds: remaining, activeGroupId: nextActive, groupId: nextActive }));
       setGroup(null);
       setGroupUsers({});
       setExpenses([]);
+      setSelectedExpense(null);
     } catch (err) {
       console.error("Error leaving group", err);
       alert("Failed to leave the group. Please try again.");
@@ -588,8 +691,12 @@ export default function App() {
 
       // Firestore cleanup must happen while still authenticated (these writes
       // need auth), so they precede the auth-account deletion.
-      // 1. Remove from the shared group (re-normalizes split / deletes empty group).
-      await removeSelfFromGroup();
+      // 1. Remove from every group the user belongs to (re-normalizes each split
+      //    / deletes any group they were the last member of).
+      for (const gid of groupIds) {
+        try { await removeSelfFromGroupById(gid); }
+        catch (e) { console.error('Failed to leave group during account deletion', gid, e); }
+      }
 
       // 2. Clean up the queue messages addressed to this user.
       await deleteMyInboundQueue();
@@ -987,9 +1094,48 @@ export default function App() {
                     {userProfile.weeklyGreeting.text}
                   </p>
                 )}
-                <p className="text-[11px] text-natural-muted mt-0.5">
-                  Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
-                </p>
+                <div className="relative mt-0.5">
+                  <button
+                    onClick={() => setShowGroupMenu(v => !v)}
+                    className="text-[11px] text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
+                    title="Switch group"
+                  >
+                    Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
+                    <ChevronDown size={12} className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showGroupMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
+                      <div className="absolute left-0 mt-1 z-20 w-64 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
+                        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">Your Groups</p>
+                        {groupIds.map(gid => {
+                          const isActive = gid === activeGroupId;
+                          const name = gid === group.id
+                            ? (group.name || 'Unnamed Group')
+                            : (groupSummaries[gid]?.name || 'Unnamed Group');
+                          return (
+                            <button
+                              key={gid}
+                              onClick={() => handleSwitchGroup(gid)}
+                              disabled={isActive}
+                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${isActive ? 'font-bold text-natural-primary bg-natural-sage/20 cursor-default' : 'text-natural-text hover:bg-natural-bg'}`}
+                            >
+                              <span className="truncate">{name}</span>
+                              {isActive && <Check size={14} className="text-natural-primary shrink-0" />}
+                            </button>
+                          );
+                        })}
+                        <div className="border-t border-natural-border my-1" />
+                        <button
+                          onClick={() => { setShowGroupMenu(false); setShowAddGroup(true); }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
+                        >
+                          <Plus size={14} /> Join or create another group
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex justify-end">
@@ -1088,6 +1234,11 @@ export default function App() {
       </main>
 
       {/* MODALS */}
+      {showAddGroup && (
+        <div className="fixed inset-0 z-50 overflow-auto animate-in fade-in duration-200">
+          <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
+        </div>
+      )}
       {showBackup && (
         <BackupModal
           onClose={() => setShowBackup(false)}

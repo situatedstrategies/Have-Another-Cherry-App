@@ -26,6 +26,13 @@ service cloud.firestore {
         && request.auth.uid in resource.data.memberIds;
     }
 
+    // The set of groups the requesting user belongs to (multi-group support).
+    // Defaults to an empty list for accounts not yet migrated to `groupIds`.
+    function myGroupIds() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid))
+        .data.get('groupIds', []);
+    }
+
     // Allows a signed-in user to add only themselves through the
     // invite-code join flow. Existing group members may update normal
     // group settings.
@@ -51,15 +58,18 @@ service cloud.firestore {
       allow create, update, delete:
         if signedIn() && request.auth.uid == userId;
 
-      // A user can read their own doc, or the doc of someone in the same group
-      // (the app loads member names, incomes, and profile state for the roster).
+      // A user can read their own doc, or the doc of someone with whom they share
+      // at least one group (the app loads member names, incomes, and profile
+      // state for the roster). Supports users who belong to several groups; the
+      // legacy single-`groupId` branch keeps un-migrated members readable.
       allow read:
         if signedIn()
         && (
           request.auth.uid == userId
+          || resource.data.get('groupIds', []).hasAny(myGroupIds())
           || (
-            resource.data.groupId != null
-            && isGroupMember(resource.data.groupId)
+            resource.data.get('groupId', null) != null
+            && isGroupMember(resource.data.get('groupId', null))
           )
         );
     }

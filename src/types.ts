@@ -2,6 +2,13 @@ export interface User {
   uid: string;
   name: string;
   email: string;
+  // A user account can belong to several groups at once and switch between them.
+  // `groupIds` is the full membership set; `activeGroupId` is the one currently
+  // being viewed. `groupId` is the legacy single-group field, kept mirrored to
+  // `activeGroupId` for backward compatibility.
+  groupIds?: string[];
+  activeGroupId?: string;
+  groupId?: string;
   income?: string;
   partnerIncome?: string;
   financialProfile?: {
