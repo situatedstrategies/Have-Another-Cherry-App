@@ -7,6 +7,11 @@
 # deploy branch, so rules land at or before the moment the app that needs them
 # ships — never after. Deploying rules early is safe; deploying them late breaks
 # whatever feature depended on them.
+#
+# Both the production and beta Firebase projects get the same firestore.rules.
+# Each leg is independent: a project whose secret is absent is skipped with a
+# warning rather than failing the run, so the beta leg stays dormant until the
+# beta project exists.
 
 name: Deploy Firestore Rules
 
@@ -29,6 +34,18 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    strategy:
+      # One project failing must not cancel the other's deploy.
+      fail-fast: false
+      matrix:
+        include:
+          - name: production
+            project: gen-lang-client-0987674990
+            secret_name: FIREBASE_SERVICE_ACCOUNT
+          - name: beta
+            project: REPLACE_ME_BETA_PROJECT_ID
+            secret_name: FIREBASE_SERVICE_ACCOUNT_BETA
+    name: deploy (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
 
@@ -36,30 +53,33 @@ jobs:
         with:
           node-version: 20
 
-      - name: Check for deploy credentials
+      - name: Check target is configured
         id: creds
         env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA: ${{ secrets[matrix.secret_name] }}
         run: |
-          if [ -n "$SA" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
+          if [ -z "$SA" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::${{ matrix.secret_name }} is not set - skipping ${{ matrix.name }}. Its Firestore rules are NOT being deployed from this repo."
+          elif [ "${{ matrix.project }}" = "REPLACE_ME_BETA_PROJECT_ID" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::The ${{ matrix.name }} project id is still a placeholder - skipping. Set it in this workflow and in .firebaserc."
           else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::FIREBASE_SERVICE_ACCOUNT secret is not set - skipping deploy. The Firestore rules in this repo are NOT live."
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       # The service account JSON is written to a workspace file because the
       # firebase CLI authenticates via GOOGLE_APPLICATION_CREDENTIALS, which must
       # point at a file path rather than hold the key inline.
-      - name: Deploy firestore.rules
-        if: steps.creds.outputs.present == 'true'
+      - name: Deploy firestore.rules to ${{ matrix.name }}
+        if: steps.creds.outputs.ready == 'true'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA: ${{ secrets[matrix.secret_name] }}
         run: |
           printf '%s' "$SA" > "$GITHUB_WORKSPACE/sa.json"
           trap 'rm -f "$GITHUB_WORKSPACE/sa.json"' EXIT
           npx --yes firebase-tools@14 deploy \
             --only firestore:rules \
-            --project gen-lang-client-0987674990 \
+            --project ${{ matrix.project }} \
             --non-interactive

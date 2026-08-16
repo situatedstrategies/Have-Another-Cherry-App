@@ -1,0 +1,13 @@
+{
+  "_comment": "Beta/staging Firebase project. Fill every REPLACE_ME value from Firebase Console -> Project settings -> Your apps -> Web app (SDK setup and configuration), plus a reCAPTCHA v3 site key registered for the beta domain. Until these are replaced, selecting the beta environment fails fast with a clear error instead of silently writing to production. These are public client-side identifiers, not secrets.",
+  "projectId": "REPLACE_ME_BETA_PROJECT_ID",
+  "appId": "REPLACE_ME_BETA_APP_ID",
+  "apiKey": "REPLACE_ME_BETA_API_KEY",
+  "authDomain": "REPLACE_ME_BETA_PROJECT_ID.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "REPLACE_ME_BETA_PROJECT_ID.firebasestorage.app",
+  "messagingSenderId": "REPLACE_ME_BETA_SENDER_ID",
+  "measurementId": "",
+  "oAuthClientId": "REPLACE_ME_BETA_OAUTH_CLIENT_ID",
+  "recaptchaSiteKey": "REPLACE_ME_BETA_RECAPTCHA_SITE_KEY"
+}

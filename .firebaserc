@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "gen-lang-client-0987674990"
+    "default": "gen-lang-client-0987674990",
+    "beta": "REPLACE_ME_BETA_PROJECT_ID"
   }
 }
