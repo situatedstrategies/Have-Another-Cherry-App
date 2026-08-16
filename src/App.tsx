@@ -978,6 +978,7 @@ export default function App() {
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
           groupId={group.id}
+          groupKeyHash={group.keyHash}
           localExpenses={expenses}
           setLocalExpenses={setExpenses}
           groupSecret={groupSecret}
