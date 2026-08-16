@@ -21,6 +21,7 @@ export interface Group {
   availableSplits?: { name: string; split: number }[] | number[];
   categories: string[];
   memberIncomes?: Record<string, string>;
+  keyHash?: string; // SHA-256 of the backup/recovery group key
 }
 
 export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party';
