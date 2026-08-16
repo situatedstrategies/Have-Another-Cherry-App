@@ -1,0 +1,65 @@
+# Firebase App Hosting builds and serves the app but never reads firestore.rules,
+# so rule changes would otherwise sit committed but unapplied — production keeps
+# running whatever was last pasted into the console, and the two silently diverge
+# until a user hits "Missing or insufficient permissions".
+#
+# This workflow closes that gap. It runs on both the integration branch and the
+# deploy branch, so rules land at or before the moment the app that needs them
+# ships — never after. Deploying rules early is safe; deploying them late breaks
+# whatever feature depended on them.
+
+name: Deploy Firestore Rules
+
+on:
+  push:
+    branches:
+      - main
+      - development/web-production
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firestore-rules.yml'
+  workflow_dispatch:
+
+# Two pushes in quick succession must not race to publish different rule sets.
+concurrency:
+  group: firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check for deploy credentials
+        id: creds
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$SA" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT secret is not set - skipping deploy. The Firestore rules in this repo are NOT live."
+          fi
+
+      # The service account JSON is written to a workspace file because the
+      # firebase CLI authenticates via GOOGLE_APPLICATION_CREDENTIALS, which must
+      # point at a file path rather than hold the key inline.
+      - name: Deploy firestore.rules
+        if: steps.creds.outputs.present == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA" > "$GITHUB_WORKSPACE/sa.json"
+          trap 'rm -f "$GITHUB_WORKSPACE/sa.json"' EXIT
+          npx --yes firebase-tools@14 deploy \
+            --only firestore:rules \
+            --project gen-lang-client-0987674990 \
+            --non-interactive

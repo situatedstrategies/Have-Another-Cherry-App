@@ -64,6 +64,12 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Push to `main` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
+- **Firestore rules deploy separately from the app.** App Hosting never reads
+  `firestore.rules`. `.github/workflows/deploy-firestore-rules.yml` publishes them on
+  any push to `main` or `development/web-production` that touches the file, using the
+  `FIREBASE_SERVICE_ACCOUNT` repo secret. To deploy by hand instead: `npm run rules:deploy`
+  (needs `npx firebase-tools login` once). If rules and app ever disagree, users hit
+  "Missing or insufficient permissions".
 
 ## Conventions / gotchas
 - Source of truth is GitHub `main` — that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
