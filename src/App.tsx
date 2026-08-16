@@ -2,6 +2,7 @@ import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
+import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider } from 'firebase/auth';
@@ -145,6 +146,15 @@ export default function App() {
       }
     }
   }, [activeUser, group]);
+
+  // Shared encrypted group snapshot provides historical ledger backfill
+  // when a new member/device joins an existing active group.
+  useGroupLedgerSnapshot({
+    activeUser,
+    groupId: group?.id,
+    expenses,
+    setExpenses,
+  });
 
   // Sync Queue Listener
   useEffect(() => {
