@@ -1,6 +1,6 @@
 import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
-import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, roundCurrency } from './lib/money';
+import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,7 +18,6 @@ import LandingPage from './components/LandingPage';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
-import CryptoJS from 'crypto-js';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -28,6 +27,52 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
     <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
   );
+}
+
+
+function mergeById<T extends { id: string }>(
+  local: T[] = [],
+  incoming: T[] = []
+): T[] {
+  const byId = new Map<string, T>();
+
+  for (const item of local) byId.set(item.id, item);
+
+  for (const item of incoming) {
+    const existing = byId.get(item.id) as any;
+
+    if (
+      existing &&
+      (existing.status === 'confirmed' || (item as any).status === 'confirmed')
+    ) {
+      byId.set(item.id, {
+        ...existing,
+        ...item,
+        status: 'confirmed',
+      });
+    } else {
+      byId.set(item.id, existing ? { ...existing, ...item } : item);
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
+function mergeExpense(local: Expense, incoming: Expense): Expense {
+  const merged: Expense = {
+    ...incoming,
+    settlements: mergeById(
+      local.settlements || [],
+      incoming.settlements || []
+    ),
+    comments: mergeById(
+      local.comments || [],
+      incoming.comments || []
+    ),
+  };
+
+  merged.status = getNormalizedExpenseStatus(merged);
+  return merged;
 }
 
 export default function App() {
@@ -158,55 +203,95 @@ export default function App() {
 
   // Sync Queue Listener
   useEffect(() => {
-    if (activeUser && group) {
-      const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
+    if (!activeUser || !group) return;
 
-        let newExps = [];
-        let deletedIds = [];
+    const groupId = group.id;
+    const q = query(
+      collection(db, 'transfer_queue'),
+      where('to', '==', activeUser)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        const newExps: Expense[] = [];
+        const deletedIds: string[] = [];
+
         for (const change of snapshot.docChanges()) {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            try {
-              const decrypted = await decryptData(data.payload, group.id);
-              if (decrypted) {
-                if (data.action === 'DELETE') {
-                  deletedIds.push(decrypted.id);
-                } else {
-                  newExps.push(decrypted);
-                }
-              }
-              // Delete message after receiving
-              deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
-            } catch(e) {
-              console.error(e);
+          if (change.type !== 'added') continue;
+
+          const data = change.doc.data();
+
+          // Messages from another group may be leftovers from a group the
+          // user previously belonged to. Leave them untouched.
+          if (data.groupId && data.groupId !== groupId) continue;
+
+          try {
+            const decrypted = await decryptData(data.payload, groupId);
+
+            // Never destroy a queue item we could not decrypt.
+            if (!decrypted) continue;
+
+            if (data.action === 'DELETE') {
+              deletedIds.push(decrypted.id);
+            } else {
+              newExps.push(decrypted as Expense);
             }
+
+            // Delete only after successful decryption/processing.
+            deleteDoc(
+              doc(db, 'transfer_queue', change.doc.id)
+            ).catch(console.error);
+          } catch (e) {
+            console.error('Transfer queue decrypt failed', e);
           }
         }
-        
-        if (newExps.length > 0 || deletedIds.length > 0) {
-          setExpenses(prev => {
-            let updated = [...prev];
-            // Handle deletes
-            updated = updated.filter(e => !deletedIds.includes(e.id));
-            // Handle upserts
-            for (const exp of newExps) {
-              const idx = updated.findIndex(e => e.id === exp.id);
-              if (idx >= 0) updated[idx] = exp;
-              else updated.push(exp);
+
+        if (newExps.length === 0 && deletedIds.length === 0) return;
+
+        setExpenses(prev => {
+          let updated = prev.filter(
+            expense => !deletedIds.includes(expense.id)
+          );
+
+          for (const incoming of newExps) {
+            const idx = updated.findIndex(
+              expense => expense.id === incoming.id
+            );
+
+            if (idx >= 0) {
+              updated[idx] = mergeExpense(updated[idx], incoming);
+            } else {
+              updated.push(incoming);
             }
-            updated.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
-            return updated;
-          });
-        }
-      }, (error) => {
-        console.error('transfer_queue unsubscribe error:', error);
-      });
-      return () => unsubscribe();
-    }
-  }, [activeUser, group]);
-  
+          }
+
+          updated.sort(
+            (a, b) =>
+              new Date(b.date).getTime() -
+              new Date(a.date).getTime()
+          );
+
+          try {
+            localStorage.setItem(
+              `expenses_${groupId}`,
+              JSON.stringify(updated)
+            );
+          } catch (e) {
+            console.error('Failed to persist synced ledger', e);
+          }
+
+          return updated;
+        });
+      },
+      error => {
+        console.error('transfer_queue listener error:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [activeUser, group?.id]);
+
 
   // Update selectedExpense ref if background data updates
   useEffect(() => {
@@ -507,20 +592,39 @@ export default function App() {
     }
   };
 
-  const pushToTransferQueue = async (expense: Expense, action: 'UPSERT' | 'DELETE') => {
-    if (!groupSecret || !group) return;
-    const payload = CryptoJS.AES.encrypt(JSON.stringify(expense), groupSecret).toString();
-    const otherMembers = group.memberIds.filter(id => id !== activeUser);
-    for (const memberId of otherMembers) {
-      const qRef = doc(collection(db, 'transfer_queue'));
-      await setDoc(qRef, {
-        to: memberId,
-        from: activeUser,
-        groupId: group.id,
-        action,
-        payload,
-        createdAt: new Date().toISOString()
-      });
+  const broadcastToMembers = async (
+    action: 'UPSERT' | 'DELETE',
+    payloadObject: unknown
+  ) => {
+    if (!group) return;
+
+    const encrypted = await encryptData(payloadObject, group.id);
+
+    const otherMembers = (group.memberIds || []).filter(
+      id => id !== activeUser
+    );
+
+    const results = await Promise.allSettled(
+      otherMembers.map(memberId =>
+        setDoc(doc(collection(db, 'transfer_queue')), {
+          to: memberId,
+          from: activeUser,
+          groupId: group.id,
+          action,
+          payload: encrypted,
+          createdAt: new Date().toISOString(),
+        })
+      )
+    );
+
+    const failed = results.filter(
+      result => result.status === 'rejected'
+    ).length;
+
+    if (failed > 0) {
+      console.error(
+        `broadcastToMembers: ${failed}/${otherMembers.length} writes failed`
+      );
     }
   };
 
@@ -559,22 +663,8 @@ export default function App() {
         setShowForm(false);
       }
 
-      // Sync to cloud queue
-      if (group) {
-        const encrypted = await encryptData(finalExpense, group.id);
-        const otherMembers = group.memberIds.filter(id => id !== activeUser);
-        for (const memberId of otherMembers) {
-          const qRef = doc(collection(db, 'transfer_queue'));
-          await setDoc(qRef, {
-            to: memberId,
-            from: activeUser,
-            groupId: group.id,
-            action: 'UPSERT',
-            payload: encrypted,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
+      // Sync to every other group member.
+      await broadcastToMembers('UPSERT', finalExpense);
     } catch (e) {
       console.error(e);
       alert('Failed to save expense locally or sync.');
@@ -592,19 +682,8 @@ export default function App() {
         });
         setSelectedExpense(null);
         
-        if (expenseToDelete && group) {
-          const encrypted = await encryptData({ id }, group.id);
-          const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
-          for (const memberId of otherMembers) {
-            const qRef = doc(collection(db, 'transfer_queue'));
-            await setDoc(qRef, {
-              to: memberId,
-              from: activeUser,
-              action: 'DELETE',
-              payload: encrypted,
-              createdAt: new Date().toISOString()
-            });
-          }
+        if (expenseToDelete) {
+          await broadcastToMembers('DELETE', { id });
         }
       } catch (e: any) {
         console.error("Delete error:", e);
@@ -620,20 +699,7 @@ export default function App() {
       return updated;
     });
     setSelectedExpense(updatedExpense);
-    if (group) {
-      const encrypted = await encryptData(updatedExpense, group.id);
-      const otherMembers = group.memberIds.filter(mid => mid !== activeUser);
-      for (const memberId of otherMembers) {
-        const qRef = doc(collection(db, 'transfer_queue'));
-        await setDoc(qRef, {
-          to: memberId,
-          from: activeUser,
-          action: 'UPSERT',
-          payload: encrypted,
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
+    await broadcastToMembers('UPSERT', updatedExpense);
   };
 
   const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate?: string) => {
