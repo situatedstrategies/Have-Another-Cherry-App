@@ -79,6 +79,13 @@ service cloud.firestore {
       }
     }
 
+    // Encrypted shared ledger snapshot used to hydrate new devices/members.
+    // Only authenticated members of the corresponding group may access it.
+    match /group_ledgers/{groupId} {
+      allow read, create, update, delete:
+        if isGroupMember(groupId);
+    }
+
     match /group_mismatches/{groupId}/events/{eventId} {
       allow read, create, update, delete:
         if isGroupMember(groupId);
