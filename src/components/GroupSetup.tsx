@@ -1,6 +1,6 @@
 import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
@@ -128,8 +128,17 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         }
       }
 
-      const newInviteCode = generateInviteCode();
-      const groupId = newInviteCode; // Use invite code as document ID
+      // Use the invite code as the document ID, but make sure we don't reuse an
+      // existing group's code — setDoc would overwrite (and destroy) that group.
+      let newInviteCode = generateInviteCode();
+      let groupId = newInviteCode;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const existing = await getDoc(doc(db, 'groups', groupId));
+        if (!existing.exists()) break;
+        newInviteCode = generateInviteCode();
+        groupId = newInviteCode;
+        if (attempt === 5) throw new Error('Could not generate a unique invite code. Please try again.');
+      }
 
       const totalSplit = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
       if (Math.abs(totalSplit - 100) > 0.01) {
@@ -194,70 +203,54 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         email: auth.currentUser.email || ''
       };
 
-      // In a real app we might query for the invite code. For simplicity if the code is the document ID we could do that.
-      // Wait, we need to query the 'groups' collection where inviteCode == inviteCode
-      // Instead of writing a complex query, we can query by inviteCode.
-      // But let's assume we do a quick query. Wait, we need to import query, collection, where, getDocs.
-      const { doc, getDoc } = await import('firebase/firestore');
-      const groupDocRef = doc(db, 'groups', inviteCode.toUpperCase());
-      const groupDocSnap = await getDoc(groupDocRef);
-      
-      if (!groupDocSnap.exists()) {
-        throw new Error("Invalid invite code");
-      }
-      
-      const groupDoc = groupDocSnap;
-      const groupData = groupDoc.data() as Group;
-      
-      if (groupData.members.length >= 5) {
-        throw new Error("This group is already full (max 5 members)");
-      }
-      
-      if (groupData.members.find(m => m.uid === currentUser.uid)) {
-         // Already a member
-      } else {
-        // Calculate remaining split
-        let currentSplitSum = 0;
-        if (groupData.defaultSplit) {
-           currentSplitSum = Object.values(groupData.defaultSplit).reduce((a, b) => a + b, 0);
+      const groupRef = doc(db, 'groups', inviteCode.toUpperCase());
+
+      // Join inside a transaction so two people joining at once can't both take
+      // the same split slot or leave a ghost behind (read-modify-write is atomic
+      // and retried on conflict).
+      const joinedGroupId = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(groupRef);
+        if (!snap.exists()) throw new Error("Invalid invite code");
+        const groupData = snap.data() as Group;
+
+        // Already a member — nothing to change.
+        if (groupData.members?.find(m => m.uid === currentUser.uid)) return snap.id;
+
+        const capacity = groupData.targetNumPeople || 5;
+        if ((groupData.members?.length || 0) >= capacity) {
+          throw new Error(`This group is already full (${capacity} members).`);
         }
-        const targetNumPeople = groupData.targetNumPeople || 2;
-        const membersLeft = targetNumPeople - groupData.members.length;
-        
-        // Take the next available split
+
+        // Take the next available split slot, or fall back to the even remainder.
+        const newAvailable = [...(groupData.availableSplits || [])];
         let mySplit = 0;
-        let newAvailable = [...(groupData.availableSplits || [])];
         if (newAvailable.length > 0) {
           const nextSplit = newAvailable.shift();
           mySplit = typeof nextSplit === 'number' ? nextSplit : (nextSplit?.split || 0);
         } else {
-          // Fallback
-          let currentSplitSum = 0;
-          if (groupData.defaultSplit) {
-             currentSplitSum = Object.values(groupData.defaultSplit).reduce((a, b) => a + b, 0);
-          }
+          const currentSplitSum = Object.values(groupData.defaultSplit || {}).reduce((a, b) => a + b, 0);
+          const membersLeft = capacity - (groupData.members?.length || 0);
           mySplit = membersLeft > 0 ? (100 - currentSplitSum) / membersLeft : 0;
         }
 
-        const { arrayUnion } = await import('firebase/firestore');
-        // Add member
-        await updateDoc(groupDoc.ref, {
-          members: arrayUnion(currentUser),
-          memberIds: arrayUnion(currentUser.uid),
+        tx.update(groupRef, {
+          members: [...(groupData.members || []), currentUser],
+          memberIds: [...(groupData.memberIds || []), currentUser.uid],
           availableSplits: newAvailable,
-          [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10)
+          [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10),
         });
-      }
-      
+        return snap.id;
+      });
+
       // Update user doc
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
-        groupId: groupDoc.id,
+        groupId: joinedGroupId,
         name: currentUser.name || 'Friend',
         email: hashedEmail
       }, { merge: true });
 
-      onComplete(groupDoc.id);
+      onComplete(joinedGroupId);
 
     } catch (err: any) {
       setError(err.message);
