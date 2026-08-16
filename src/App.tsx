@@ -2,17 +2,19 @@ import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
-import React, { useState, useEffect, useCallback } from 'react';
-import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
+import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
-import { auth, db, authHeader } from './firebase';
-import { Expense, Group } from './types';
+import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
+import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
 import SettleUpModal from './components/SettleUpModal';
 import ExpenseList from './components/ExpenseList';
 import AuthScreen from './components/AuthScreen';
+import LandingPage from './components/LandingPage';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
@@ -22,7 +24,7 @@ import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown } from 'lucide-react';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -85,6 +87,7 @@ function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
 }
 
 export default function App() {
+  const [showAuth, setShowAuth] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const activeUser = currentUser?.uid;
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -276,56 +279,106 @@ export default function App() {
     }
   }, [activeUser, group?.id]);
 
+  // Shared encrypted group snapshot provides historical ledger backfill
+  // when a new member/device joins an existing active group.
+  useGroupLedgerSnapshot({
+    activeUser,
+    groupId: group?.id,
+    expenses,
+    setExpenses,
+  });
+
   // Sync Queue Listener
   useEffect(() => {
     if (!activeUser || !group) return;
-    const groupId = group.id;
-    const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const newExps: Expense[] = [];
-      const deletedIds: string[] = [];
-      for (const change of snapshot.docChanges()) {
-        if (change.type !== 'added') continue;
-        const data = change.doc.data();
-        // Ignore (but don't delete) messages for a different group — e.g. leftover
-        // items from a group the user has since left.
-        if (data.groupId && data.groupId !== groupId) continue;
-        try {
-          const decrypted = await decryptData(data.payload, groupId);
-          // Decrypt failed: leave the message queued so it can be retried later,
-          // instead of silently and permanently dropping the update.
-          if (!decrypted) continue;
-          if (data.action === 'DELETE') deletedIds.push(decrypted.id);
-          else newExps.push(decrypted);
-          // Only remove the message once we've successfully decrypted it.
-          deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
-        } catch (e) {
-          console.error(e);
-        }
-      }
 
-      if (newExps.length === 0 && deletedIds.length === 0) return;
-      setExpenses(prev => {
-        let updated = prev.filter(e => !deletedIds.includes(e.id));
-        for (const exp of newExps) {
-          const idx = updated.findIndex(e => e.id === exp.id);
-          if (idx >= 0) updated[idx] = mergeExpense(updated[idx], exp);
-          else updated.push(exp);
+    const groupId = group.id;
+    const q = query(
+      collection(db, 'transfer_queue'),
+      where('to', '==', activeUser)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        const newExps: Expense[] = [];
+        const deletedIds: string[] = [];
+
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== 'added') continue;
+
+          const data = change.doc.data();
+
+          // Messages from another group may be leftovers from a group the
+          // user previously belonged to. Leave them untouched.
+          if (data.groupId && data.groupId !== groupId) continue;
+
+          try {
+            const decrypted = await decryptData(data.payload, groupId);
+
+            // Never destroy a queue item we could not decrypt.
+            if (!decrypted) continue;
+
+            if (data.action === 'DELETE') {
+              deletedIds.push(decrypted.id);
+            } else {
+              newExps.push(decrypted as Expense);
+            }
+
+            // Delete only after successful decryption/processing.
+            deleteDoc(
+              doc(db, 'transfer_queue', change.doc.id)
+            ).catch(console.error);
+          } catch (e) {
+            console.error('Transfer queue decrypt failed', e);
+          }
         }
-        updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        try {
-          localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
-        } catch (e) {
-          console.error('Failed to persist expenses to localStorage', e);
-        }
-        return updated;
-      });
-    }, (error) => {
-      console.error('transfer_queue listener error:', error);
-    });
+
+        if (newExps.length === 0 && deletedIds.length === 0) return;
+
+        setExpenses(prev => {
+          let updated = prev.filter(
+            expense => !deletedIds.includes(expense.id)
+          );
+
+          for (const incoming of newExps) {
+            const idx = updated.findIndex(
+              expense => expense.id === incoming.id
+            );
+
+            if (idx >= 0) {
+              updated[idx] = mergeExpense(updated[idx], incoming);
+            } else {
+              updated.push(incoming);
+            }
+          }
+
+          updated.sort(
+            (a, b) =>
+              new Date(b.date).getTime() -
+              new Date(a.date).getTime()
+          );
+
+          try {
+            localStorage.setItem(
+              `expenses_${groupId}`,
+              JSON.stringify(updated)
+            );
+          } catch (e) {
+            console.error('Failed to persist synced ledger', e);
+          }
+
+          return updated;
+        });
+      },
+      error => {
+        console.error('transfer_queue listener error:', error);
+      }
+    );
+
     return () => unsubscribe();
   }, [activeUser, group?.id]);
-  
+
 
   // Weekly cherry greeting: generate once per week (per group size) and cache it
   // on the user doc so we don't call the AI on every load.
@@ -371,7 +424,11 @@ export default function App() {
   }, [expenses]);
 
   if (!currentUser) {
-    return <div className="animate-in fade-in duration-300"><AuthScreen /></div>;
+    if (showAuth) {
+      return <AuthScreen />;
+    }
+
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
   }
 
   if (isLoading) {
@@ -724,13 +781,18 @@ export default function App() {
     }
   };
 
-  // Encrypt `payloadObj` and enqueue it for every other group member. Uses
-  // allSettled so one member's failed write doesn't abort delivery to the rest,
-  // and guards the optional memberIds so a malformed group can't crash the app.
-  const broadcastToMembers = async (action: 'UPSERT' | 'DELETE', payloadObj: any) => {
+  const broadcastToMembers = async (
+    action: 'UPSERT' | 'DELETE',
+    payloadObject: unknown
+  ) => {
     if (!group) return;
-    const encrypted = await encryptData(payloadObj, group.id);
-    const otherMembers = (group.memberIds || []).filter(id => id !== activeUser);
+
+    const encrypted = await encryptData(payloadObject, group.id);
+
+    const otherMembers = (group.memberIds || []).filter(
+      id => id !== activeUser
+    );
+
     const results = await Promise.allSettled(
       otherMembers.map(memberId =>
         setDoc(doc(collection(db, 'transfer_queue')), {
@@ -743,8 +805,16 @@ export default function App() {
         })
       )
     );
-    const failed = results.filter(r => r.status === 'rejected').length;
-    if (failed > 0) console.error(`broadcastToMembers: ${failed}/${otherMembers.length} member writes failed`);
+
+    const failed = results.filter(
+      result => result.status === 'rejected'
+    ).length;
+
+    if (failed > 0) {
+      console.error(
+        `broadcastToMembers: ${failed}/${otherMembers.length} writes failed`
+      );
+    }
   };
 
   const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
@@ -817,7 +887,7 @@ export default function App() {
         setShowForm(false);
       }
 
-      // Sync to cloud queue
+      // Sync to every other group member.
       await broadcastToMembers('UPSERT', finalExpense);
     } catch (e) {
       console.error(e);

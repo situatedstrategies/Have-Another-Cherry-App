@@ -1,9 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// App Check must be initialized before any Firestore/Auth traffic so requests carry an attestation token.
+if (import.meta.env.DEV) (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+if (firebaseConfig.recaptchaSiteKey) initializeAppCheck(app, { provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey), isTokenAutoRefreshEnabled: true });
 
 // Initialize Firestore with the custom database ID as the third argument
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
