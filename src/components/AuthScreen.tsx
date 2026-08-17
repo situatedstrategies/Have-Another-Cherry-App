@@ -3,6 +3,12 @@ import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, si
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
+import {
+  PASSWORD_POLICY_MESSAGE,
+  PASSWORD_REQUIREMENTS,
+  checkPassword,
+  isPasswordValid,
+} from '../lib/password';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -30,14 +36,10 @@ export default function AuthScreen() {
     if (next !== 'reset') setIsLogin(next === 'login');
   };
 
-  // Password policy for new accounts: at least 8 chars, a letter, a number, and a special character.
-  const passwordChecks = {
-    length: password.length >= 8,
-    letter: /[A-Za-z]/.test(password),
-    number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password),
-  };
-  const passwordValid = Object.values(passwordChecks).every(Boolean);
+  // Password policy for new accounts, shared with the reset form in
+  // AuthActionHandler so the two cannot drift apart.
+  const passwordChecks = checkPassword(password);
+  const passwordValid = isPasswordValid(password);
 
   
   // Mobile integration placeholders
@@ -95,7 +97,7 @@ export default function AuthScreen() {
 
     if (!isLogin) {
       if (!passwordValid) {
-        setError('Password must be at least 8 characters and include a letter, a number, and a special character.');
+        setError(PASSWORD_POLICY_MESSAGE);
         return;
       }
       if (!agreeTerms) {
@@ -211,14 +213,9 @@ export default function AuthScreen() {
                 <div className="mt-2">
                   <p className="text-xs font-semibold text-natural-text mb-1">Create a password with:</p>
                   <ul className="space-y-1">
-                    {[
-                      { ok: passwordChecks.length, label: 'At least 8 characters' },
-                      { ok: passwordChecks.letter, label: 'A letter (a–z or A–Z)' },
-                      { ok: passwordChecks.number, label: 'A number (0–9)' },
-                      { ok: passwordChecks.special, label: 'A special character (e.g. ! ? @ # $ %)' },
-                    ].map((req) => (
-                      <li key={req.label} className={`flex items-center gap-1.5 text-xs ${req.ok ? 'text-green-600' : 'text-natural-muted'}`}>
-                        <span>{req.ok ? '✓' : '○'}</span> {req.label}
+                    {PASSWORD_REQUIREMENTS.map((req) => (
+                      <li key={req.key} className={`flex items-center gap-1.5 text-xs ${passwordChecks[req.key] ? 'text-green-600' : 'text-natural-muted'}`}>
+                        <span>{passwordChecks[req.key] ? '✓' : '○'}</span> {req.label}
                       </li>
                     ))}
                   </ul>
