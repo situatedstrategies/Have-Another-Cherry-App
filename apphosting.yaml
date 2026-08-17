@@ -1,5 +1,7 @@
 # Firebase App Hosting configuration
 # https://firebase.google.com/docs/app-hosting/configure
+#
+# Beta-only variables live in apphosting.beta.yaml.
 
 env:
   - variable: RESEND_API_KEY

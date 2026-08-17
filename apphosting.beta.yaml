@@ -1,0 +1,9 @@
+# Firebase App Hosting configuration overrides for the "beta" environment.
+# Merged on top of apphosting.yaml when the backend's environment name is "beta".
+# https://firebase.google.com/docs/app-hosting/configure
+
+env:
+  - variable: BETA_RESEND_API
+    secret: BETA_RESEND_API
+    availability:
+      - RUNTIME
