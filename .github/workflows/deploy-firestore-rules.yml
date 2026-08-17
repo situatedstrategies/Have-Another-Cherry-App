@@ -1,9 +1,7 @@
-# Firebase App Hosting builds and serves the app but never reads firestore.rules,
-# so rule changes would otherwise sit committed but unapplied.
-#
-# This workflow deploys firestore.rules to the BETA Firebase project only.
-# Production rules are deliberately left untouched by this repo.
-
+# Deploys ONLY the beta project's Firestore rules.
+# Production (gen-lang-client-0987674990) rules are deliberately never touched here.
+# Authentication uses Workload Identity Federation, so there is no service account
+# JSON key anywhere in this repo or in GitHub secrets.
 name: Deploy Firestore Rules (beta)
 
 on:
@@ -11,48 +9,56 @@ on:
     branches:
       - development/web-production
     paths:
-      - 'firestore.rules'
-      - 'firebase.json'
-      - '.github/workflows/deploy-firestore-rules.yml'
+      - firestore.rules
+      - firebase.json
+      - .github/workflows/deploy-firestore-rules.yml
   workflow_dispatch:
 
 concurrency:
   group: firestore-rules-beta-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy-beta:
+    name: Deploy rules to have-another-cherry-beta
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Check target is configured
+        id: guard
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER_BETA }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT_BETA }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "::warning::GCP_WIF_PROVIDER_BETA and/or GCP_SERVICE_ACCOUNT_BETA are not set. Skipping the beta rules deploy."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        if: steps.guard.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: steps.guard.outputs.configured == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Check target is configured
-        id: creds
-        env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BETA }}
-        run: |
-          if [ -z "$SA" ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::FIREBASE_SERVICE_ACCOUNT_BETA is not set - skipping. The beta project's Firestore rules are NOT being deployed from this repo."
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Authenticate to Google Cloud
+        if: steps.guard.outputs.configured == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_BETA }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_BETA }}
 
-      # The service account JSON is written to a workspace file because the
-      # firebase CLI authenticates via GOOGLE_APPLICATION_CREDENTIALS, which must
-      # point at a file path rather than hold the key inline.
-      - name: Deploy firestore.rules to beta
-        if: steps.creds.outputs.ready == 'true'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BETA }}
+      - name: Deploy Firestore rules to beta
+        if: steps.guard.outputs.configured == 'true'
         run: |
-          printf '%s' "$SA" > "$GITHUB_WORKSPACE/sa.json"
-          trap 'rm -f "$GITHUB_WORKSPACE/sa.json"' EXIT
           npx --yes firebase-tools@14 deploy \
             --only firestore:rules \
             --project have-another-cherry-beta \
