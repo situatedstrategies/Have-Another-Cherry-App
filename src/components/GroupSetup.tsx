@@ -213,11 +213,36 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         if (!snap.exists()) throw new Error("Invalid invite code");
         const groupData = snap.data() as Group;
 
-        // Already a member — nothing to change.
-        if (groupData.members?.find(m => m.uid === currentUser.uid)) return snap.id;
+        const existingMembers = Array.isArray(groupData.members) ? groupData.members : [];
+        const existingMemberIds = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
+
+        const inMembers = existingMembers.some(m => m?.uid === currentUser.uid);
+        const inMemberIds = existingMemberIds.includes(currentUser.uid);
+
+        // Already fully a member — nothing to change.
+        if (inMembers && inMemberIds) return snap.id;
+
+        // Repair path: the two member lists have drifted apart, so the user is
+        // half-in the group. Every other Firestore rule keys off `memberIds`, so
+        // someone present in `members` but missing from `memberIds` can read the
+        // group and then be denied on everything else. Heal the drift instead of
+        // re-adding them, which would duplicate an entry and trip the join rule.
+        if (inMembers !== inMemberIds) {
+          tx.update(groupRef, {
+            members: inMembers ? existingMembers : [...existingMembers, currentUser],
+            memberIds: inMemberIds ? existingMemberIds : [...existingMemberIds, currentUser.uid],
+          });
+          return snap.id;
+        }
 
         const capacity = groupData.targetNumPeople || 5;
-        if ((groupData.members?.length || 0) >= capacity) {
+        // Count joined people by unique uid so a stale duplicate can't make a
+        // group with a free seat look full.
+        const joinedCount = new Set([
+          ...existingMemberIds,
+          ...existingMembers.map(m => m?.uid).filter(Boolean),
+        ]).size;
+        if (joinedCount >= capacity) {
           throw new Error(`This group is already full (${capacity} members).`);
         }
 
@@ -228,14 +253,17 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
           const nextSplit = newAvailable.shift();
           mySplit = typeof nextSplit === 'number' ? nextSplit : (nextSplit?.split || 0);
         } else {
-          const currentSplitSum = Object.values(groupData.defaultSplit || {}).reduce((a, b) => a + b, 0);
-          const membersLeft = capacity - (groupData.members?.length || 0);
+          const currentSplitSum = Object.values(groupData.defaultSplit || {})
+            .reduce((a: number, b) => a + (Number(b) || 0), 0);
+          const membersLeft = capacity - joinedCount;
           mySplit = membersLeft > 0 ? (100 - currentSplitSum) / membersLeft : 0;
         }
+        // A malformed split map must not write NaN into the group document.
+        if (!Number.isFinite(mySplit)) mySplit = 0;
 
         tx.update(groupRef, {
-          members: [...(groupData.members || []), currentUser],
-          memberIds: [...(groupData.memberIds || []), currentUser.uid],
+          members: [...existingMembers, currentUser],
+          memberIds: [...existingMemberIds, currentUser.uid],
           availableSplits: newAvailable,
           [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10),
         });
