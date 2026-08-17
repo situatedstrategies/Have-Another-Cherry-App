@@ -18,25 +18,52 @@ service cloud.firestore {
     function isGroupMember(groupId) {
       return signedIn()
         && groupExists(groupId)
-        && request.auth.uid in get(groupPath(groupId)).data.memberIds;
+        && request.auth.uid in get(groupPath(groupId)).data.get('memberIds', []);
+    }
+
+    // Member lists read defensively. Reading `resource.data.memberIds` directly
+    // does not evaluate to false when the field is absent — it raises an
+    // evaluation error, and an errored rule denies. A group document written
+    // before these fields existed, or one whose two member lists have drifted
+    // apart, therefore locks its own members out with "Missing or insufficient
+    // permissions" and no way to recover, including on the invite-code path.
+    function currentMemberIds() {
+      return resource.data.get('memberIds', []);
+    }
+
+    function incomingMemberIds() {
+      return request.resource.data.get('memberIds', []);
+    }
+
+    function currentMembers() {
+      return resource.data.get('members', []);
+    }
+
+    function incomingMembers() {
+      return request.resource.data.get('members', []);
     }
 
     function isExistingGroupMember() {
       return signedIn()
-        && request.auth.uid in resource.data.memberIds;
+        && request.auth.uid in currentMemberIds();
     }
 
-    // Allows a signed-in user to add only themselves through the
-    // invite-code join flow. Existing group members may update normal
-    // group settings.
+    // Allows a signed-in user to add only themselves through the invite-code
+    // join flow, and to repair a half-joined state (listed in `members` but
+    // missing from `memberIds`, which locks them out of every other rule since
+    // they all key off `memberIds`). Expressed as a set difference rather than
+    // size arithmetic so it also holds when the stored lists contain a legacy
+    // duplicate: the only id that may appear that wasn't there before is the
+    // caller's own, and no existing member may be dropped.
     function isValidSelfJoin() {
       return signedIn()
-        && !(request.auth.uid in resource.data.memberIds)
-        && request.auth.uid in request.resource.data.memberIds
-        && request.resource.data.memberIds.size()
-             == resource.data.memberIds.size() + 1
-        && request.resource.data.members.size()
-             == resource.data.members.size() + 1
+        && !(request.auth.uid in currentMemberIds())
+        && request.auth.uid in incomingMemberIds()
+        && incomingMemberIds().toSet().difference(currentMemberIds().toSet())
+           == [request.auth.uid].toSet()
+        && currentMemberIds().toSet().difference(incomingMemberIds().toSet()).size() == 0
+        && incomingMembers().size() >= currentMembers().size()
+        && incomingMembers().size() <= currentMembers().size() + 1
         && request.resource.data.diff(resource.data)
              .affectedKeys()
              .hasOnly([
@@ -60,7 +87,7 @@ service cloud.firestore {
       // General group listing is restricted to existing members.
       allow list:
         if signedIn()
-        && request.auth.uid in resource.data.memberIds;
+        && request.auth.uid in currentMemberIds();
 
       allow create:
         if signedIn()
@@ -101,7 +128,7 @@ service cloud.firestore {
         && request.resource.data.payload is string
         && isGroupMember(request.resource.data.groupId)
         && request.resource.data.to
-             in get(groupPath(request.resource.data.groupId)).data.memberIds;
+             in get(groupPath(request.resource.data.groupId)).data.get('memberIds', []);
 
       allow read, delete:
         if signedIn()

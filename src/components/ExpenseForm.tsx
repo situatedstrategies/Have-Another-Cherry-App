@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { authHeader } from '../firebase';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles } from 'lucide-react';
@@ -381,7 +382,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   const btn = document.getElementById('scan-receipt-btn');
                   if (btn) btn.innerHTML = 'Scanning...';
                   
-                  const response = await fetch('/api/scan-receipt', { method: 'POST' });
+                  const response = await fetch('/api/scan-receipt', {
+                    method: 'POST',
+                    headers: {
+                      ...(await authHeader()),
+                    },
+                  });
                   const result = await response.json();
                   
                   if (result.success) {
