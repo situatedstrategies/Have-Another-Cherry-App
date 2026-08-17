@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
+import { db, authHeader } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 interface ProfileSetupProps {
@@ -28,7 +28,10 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     try {
       const res = await fetch('/api/generate-profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await authHeader()),
+        },
         body: JSON.stringify({ answers })
       });
       const result = await res.json();

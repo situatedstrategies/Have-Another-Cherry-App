@@ -9,6 +9,19 @@ const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
+export async function authHeader(): Promise<Record<string, string>> {
+  const user = auth.currentUser;
+  if (!user) return {};
+
+  try {
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  } catch (error) {
+    console.error('Failed to get Firebase ID token', error);
+    return {};
+  }
+}
+
 // Mobile integration placeholders
 // export const appleProvider = new OAuthProvider('apple.com');
 

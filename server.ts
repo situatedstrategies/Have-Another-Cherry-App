@@ -40,8 +40,95 @@ async function startServer() {
     next();
   };
 
+  const ensureAdminApp = async () => {
+    const { getApps, initializeApp, applicationDefault } =
+      await import("firebase-admin/app");
+
+    if (!getApps().length) {
+      initializeApp({
+        credential: applicationDefault(),
+        projectId:
+          process.env.GOOGLE_CLOUD_PROJECT ||
+          "gen-lang-client-0987674990",
+      });
+    }
+  };
+
+  const requireAuth = async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const authorization = req.header("Authorization") || "";
+
+    if (!authorization.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const token = authorization.slice("Bearer ".length).trim();
+
+    if (!token) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    try {
+      await ensureAdminApp();
+
+      const { getAuth } = await import("firebase-admin/auth");
+      const decoded = await getAuth().verifyIdToken(token);
+
+      (req as any).firebaseUser = decoded;
+      next();
+    } catch (error) {
+      console.error("API authentication failed");
+      return res.status(401).json({ error: "Invalid authentication" });
+    }
+  };
+
+  // Separate lightweight limiter for authenticated AI/action endpoints.
+  // This is beta protection; managed/distributed limiting can replace it later.
+  const apiBuckets = new Map<
+    string,
+    { count: number; resetAt: number }
+  >();
+
+  const apiRateLimit = (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const uid =
+      (req as any).firebaseUser?.uid ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      "unknown";
+
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const maxRequests = 60;
+
+    const bucket = apiBuckets.get(uid);
+
+    if (!bucket || now >= bucket.resetAt) {
+      apiBuckets.set(uid, {
+        count: 1,
+        resetAt: now + windowMs,
+      });
+      return next();
+    }
+
+    if (bucket.count >= maxRequests) {
+      return res.status(429).json({
+        error: "Too many requests. Please wait before trying again.",
+      });
+    }
+
+    bucket.count += 1;
+    next();
+  };
+
   // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
-  app.post("/api/scan-receipt", async (req, res) => {
+  app.post("/api/scan-receipt", requireAuth, apiRateLimit, async (req, res) => {
     try {
       const { GoogleGenAI, Type } = await import("@google/genai");
       const ai = new GoogleGenAI({
@@ -101,7 +188,7 @@ async function startServer() {
   });
 
   // 6. Resend Invite Endpoint
-  app.post("/api/send-invite", emailRateLimit, async (req, res) => {
+  app.post("/api/send-invite", requireAuth, emailRateLimit, async (req, res) => {
     try {
       const { email, groupName, inviteCode, recipientName, fromName, split } = req.body;
 
@@ -124,15 +211,8 @@ async function startServer() {
     }
 
     try {
-      const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
+      await ensureAdminApp();
       const { getAuth } = await import("firebase-admin/auth");
-
-      if (!getApps().length) {
-        initializeApp({
-          credential: applicationDefault(),
-          projectId: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        });
-      }
 
       let resetLink: string;
       try {
@@ -154,7 +234,7 @@ async function startServer() {
   });
 
   // 7. Firebase Cloud Messaging (FCM) API Infrastructure
-  app.post("/api/send-notification", async (req, res) => {
+  app.post("/api/send-notification", requireAuth, apiRateLimit, async (req, res) => {
     try {
       const { token, title, body, data } = req.body;
       if (!token || !title || !body) {
@@ -173,7 +253,7 @@ async function startServer() {
   });
 
   // 8. Financial Profile Generation API
-  app.post("/api/generate-profile", async (req, res) => {
+  app.post("/api/generate-profile", requireAuth, apiRateLimit, async (req, res) => {
     try {
       const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
       const { GoogleGenAI, Type } = await import("@google/genai");

@@ -6,7 +6,7 @@ import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider } from 'firebase/auth';
-import { auth, db, OperationType, handleFirestoreError } from './firebase';
+import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
@@ -1069,12 +1069,15 @@ export default function App() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
                                   <button 
-                                    onClick={() => {
+                                    onClick={async () => {
                                       const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
                                       if (email) {
                                         fetch('/api/send-invite', {
                                           method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            ...(await authHeader()),
+                                          },
                                           body: JSON.stringify({
                                             email,
                                             groupName: group.name,
