@@ -48,18 +48,6 @@ service cloud.firestore {
         && request.auth.uid in currentMemberIds();
     }
 
-<<<<<<< ours
-    // Allows a signed-in user to add only themselves through the
-    // invite-code join flow. Existing group members may update normal
-    // group settings.
-=======
-    // The set of groups the requesting user belongs to (multi-group support).
-    // Defaults to an empty list for accounts not yet migrated to `groupIds`.
-    function myGroupIds() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid))
-        .data.get('groupIds', []);
-    }
-
     // Allows a signed-in user to add only themselves through the invite-code
     // join flow, and to repair a half-joined state (listed in `members` but
     // missing from `memberIds`, which locks them out of every other rule since
@@ -67,7 +55,6 @@ service cloud.firestore {
     // size arithmetic so it also holds when the stored lists contain a legacy
     // duplicate: the only id that may appear that wasn't there before is the
     // caller's own, and no existing member may be dropped.
->>>>>>> theirs
     function isValidSelfJoin() {
       return signedIn()
         && !(request.auth.uid in currentMemberIds())
