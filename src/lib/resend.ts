@@ -82,6 +82,52 @@ export async function sendInviteEmail(
   return data;
 }
 
+// Send an email-verification link via Resend from verify@haveanothercherry.com.
+// The verifyLink is generated server-side by the Firebase Admin SDK, so Firebase
+// never sends its own copy - this is the only verification email a user gets.
+export async function sendVerificationEmail(
+  email: string,
+  verifyLink: string,
+  recipientName?: string
+) {
+  // Verification uses its own Resend key when one is configured, falling back to
+  // the shared key so the flow works before a dedicated key exists.
+  const apiKey = process.env.VERIFY_RESEND_API || process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("No Resend API key configured for verification emails");
+  }
+
+  const resend = new Resend(apiKey);
+
+  const templatePath = path.join(process.cwd(), "src/templates/verifyEmail.html");
+  let htmlTemplate = "";
+  try {
+    htmlTemplate = await fs.readFile(templatePath, "utf-8");
+  } catch (error) {
+    console.error("Failed to load verification email template:", error);
+    throw new Error("Could not load verification email template.");
+  }
+
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
+
+  const htmlContent = htmlTemplate
+    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
+    .split("{{verifyLink}}").join(escapeHtml(verifyLink));
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <verify@haveanothercherry.com>",
+    to: [email],
+    subject: "Confirm your email for Have Another Cherry",
+    html: htmlContent,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 // Send a password reset email via Resend from reset@haveanothercherry.com.
 // The resetLink is generated server-side by the Firebase Admin SDK.
 export async function sendResetEmail(

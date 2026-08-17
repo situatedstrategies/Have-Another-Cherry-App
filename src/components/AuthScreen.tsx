@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -86,6 +86,22 @@ export default function AuthScreen() {
     }
   };
 
+  // Ask the server to mail a confirmation link. Failures are logged and dropped:
+  // the account is already created by this point, and the user can be sent
+  // another link later. Never surface this as a signup error.
+  const sendVerificationEmail = async (user: FirebaseUser, displayName: string) => {
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(displayName ? { name: displayName } : {}),
+      });
+    } catch (err) {
+      console.error('Could not send the verification email', err);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -115,6 +131,16 @@ export default function AuthScreen() {
         if (name.trim()) {
           await updateProfile(userCred.user, { displayName: name.trim() });
         }
+
+        // Confirm the address for password signups. Google accounts skip this:
+        // Google has already verified the address, and Firebase marks them
+        // verified on creation, so the endpoint would no-op anyway.
+        //
+        // Deliberately not awaited into the UI. The auth listener swaps this
+        // screen out the moment the account exists, so there is nothing left to
+        // show a result on, and a slow or failed email must never be what stops
+        // someone getting into the app they just signed up for.
+        void sendVerificationEmail(userCred.user, name.trim());
       }
     } catch (err: any) {
       setError(err.message);
