@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail, sendResetEmail } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail, sendVerificationEmail } from "./src/lib/resend";
 
 async function startServer() {
   const app = express();
@@ -230,6 +230,44 @@ async function startServer() {
     } catch (err: any) {
       console.error("Password Reset Error:", err?.message || err);
       return res.status(500).json({ error: "Unable to send reset email. Please try again later." });
+    }
+  });
+
+  // 6c. Email Verification Endpoint (Resend + Firebase Admin SDK)
+  // Generates a Firebase verification link server-side and delivers it via Resend
+  // from verify@haveanothercherry.com, so Firebase never sends its own copy.
+  //
+  // Authenticated on purpose, and the address comes from the caller's own ID
+  // token rather than the request body. Taking it from the body would turn this
+  // into an open relay for mailing arbitrary strangers a Have Another Cherry
+  // email. Password reset can be anonymous because it only ever mails an address
+  // that already has an account; this one cannot.
+  app.post("/api/send-verification", requireAuth, emailRateLimit, async (req, res) => {
+    try {
+      const decoded = (req as any).firebaseUser;
+      const email = decoded?.email;
+
+      if (!email) {
+        return res.status(400).json({ error: "This account has no email address to confirm." });
+      }
+
+      // Nothing to do for Google accounts, or anyone who already confirmed.
+      if (decoded?.email_verified) {
+        return res.status(200).json({ success: true, alreadyVerified: true });
+      }
+
+      const { getAuth } = await import("firebase-admin/auth");
+      const verifyLink = await getAuth().generateEmailVerificationLink(email);
+
+      const name = typeof req.body?.name === "string" ? req.body.name : undefined;
+      await sendVerificationEmail(email, verifyLink, name);
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Verification Email Error:", err?.message || err);
+      return res
+        .status(500)
+        .json({ error: "Unable to send verification email. Please try again later." });
     }
   });
 
