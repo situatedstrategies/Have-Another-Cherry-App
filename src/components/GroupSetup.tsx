@@ -35,6 +35,13 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
   const [recMessage, setRecMessage] = useState('');
   const [inviteName, setInviteName] = useState('');
 
+  // The split has to add up to 100% before a group can be created, so this
+  // total gates the submit button. Derived once here rather than recomputed
+  // inline, so the number shown, the warning, and the disabled state can never
+  // disagree with each other.
+  const splitTotal = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
+  const splitBalanced = Math.abs(splitTotal - 100) <= 0.01;
+
   // Pre-fill the creator's income from their saved profile (from the quiz), if available.
   useEffect(() => {
     const loadIncome = async () => {
@@ -591,15 +598,23 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                 </div>
                 <div className="flex justify-between items-center mt-3 px-1">
                   <span className="text-xs font-medium text-natural-muted">Total:</span>
-                  <span className={`text-sm font-bold font-mono ${Math.abs(splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0) - 100) > 0.01 ? 'text-natural-primary' : 'text-natural-primary'}`}>
-                    {splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0).toFixed(1)}%
+                  <span className={`text-sm font-bold font-mono ${splitBalanced ? 'text-green-600' : 'text-natural-primary'}`}>
+                    {splitTotal.toFixed(1)}%
                   </span>
                 </div>
+                {!splitBalanced && (
+                  <p className="mt-2 px-1 text-xs font-medium text-natural-primary">
+                    Percentages need to add up to 100% before you can create the group
+                    {splitTotal > 100
+                      ? ` — that's ${(splitTotal - 100).toFixed(1)}% too much.`
+                      : ` — ${(100 - splitTotal).toFixed(1)}% still to assign.`}
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading || Math.abs(splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0) - 100) > 0.01}
+                disabled={loading || !splitBalanced}
                 className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Creating...' : `Create & Get Invite Code${numPeople > 2 ? 's' : ''}`}
