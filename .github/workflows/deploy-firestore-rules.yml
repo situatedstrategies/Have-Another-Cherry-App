@@ -1,0 +1,59 @@
+# Firebase App Hosting builds and serves the app but never reads firestore.rules,
+# so rule changes would otherwise sit committed but unapplied.
+#
+# This workflow deploys firestore.rules to the BETA Firebase project only.
+# Production rules are deliberately left untouched by this repo.
+
+name: Deploy Firestore Rules (beta)
+
+on:
+  push:
+    branches:
+      - development/web-production
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firestore-rules.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: firestore-rules-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check target is configured
+        id: creds
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BETA }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_BETA is not set - skipping. The beta project's Firestore rules are NOT being deployed from this repo."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The service account JSON is written to a workspace file because the
+      # firebase CLI authenticates via GOOGLE_APPLICATION_CREDENTIALS, which must
+      # point at a file path rather than hold the key inline.
+      - name: Deploy firestore.rules to beta
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BETA }}
+        run: |
+          printf '%s' "$SA" > "$GITHUB_WORKSPACE/sa.json"
+          trap 'rm -f "$GITHUB_WORKSPACE/sa.json"' EXIT
+          npx --yes firebase-tools@14 deploy \
+            --only firestore:rules \
+            --project have-another-cherry-beta \
+            --non-interactive
