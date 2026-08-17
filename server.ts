@@ -4,6 +4,7 @@ import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail } from "./src/lib/resend";
+import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 
 async function startServer() {
   const app = express();
@@ -45,12 +46,28 @@ async function startServer() {
       await import("firebase-admin/app");
 
     if (!getApps().length) {
+      // No hardcoded project fallback. This used to default to the production
+      // project, so a beta backend that does not set GOOGLE_CLOUD_PROJECT would
+      // look beta users up in production, find nothing, and - because the reset
+      // endpoint deliberately hides whether an account exists - report success
+      // while sending no email at all.
+      //
+      // With projectId omitted, ADC resolves the project the service is actually
+      // running in, which is always the correct one.
+      const projectId =
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.GCLOUD_PROJECT ||
+        undefined;
+
       initializeApp({
         credential: applicationDefault(),
-        projectId:
-          process.env.GOOGLE_CLOUD_PROJECT ||
-          "gen-lang-client-0987674990",
+        ...(projectId ? { projectId } : {}),
       });
+
+      console.log(
+        "Firebase Admin initialized for project:",
+        projectId || "(resolved from application default credentials)"
+      );
     }
   };
 
@@ -216,7 +233,10 @@ async function startServer() {
 
       let resetLink: string;
       try {
-        resetLink = await getAuth().generatePasswordResetLink(email);
+        resetLink = retargetActionLink(
+          await getAuth().generatePasswordResetLink(email),
+          actionHandlerBase(req.headers, process.env.AUTH_ACTION_URL)
+        );
       } catch (linkErr: any) {
         // Don't reveal whether the account exists.
         if (linkErr?.code === "auth/user-not-found" || linkErr?.code === "auth/email-not-found") {
@@ -257,7 +277,10 @@ async function startServer() {
       }
 
       const { getAuth } = await import("firebase-admin/auth");
-      const verifyLink = await getAuth().generateEmailVerificationLink(email);
+      const verifyLink = retargetActionLink(
+        await getAuth().generateEmailVerificationLink(email),
+        actionHandlerBase(req.headers, process.env.AUTH_ACTION_URL)
+      );
 
       const name = typeof req.body?.name === "string" ? req.body.name : undefined;
       await sendVerificationEmail(email, verifyLink, name);
