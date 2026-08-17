@@ -2,6 +2,8 @@
 # Production (gen-lang-client-0987674990) rules are deliberately never touched here.
 # Authentication uses Workload Identity Federation, so there is no service account
 # JSON key anywhere in this repo or in GitHub secrets.
+# Note: the Run workflow button is unavailable while this file lives only on
+# development/web-production, so pushes are the trigger.
 name: Deploy Firestore Rules (beta)
 
 on:
