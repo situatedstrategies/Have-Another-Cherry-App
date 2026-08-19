@@ -38,11 +38,10 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <h3 className="text-xl font-display font-bold text-natural-text">Still ripening.</h3>
+          <h3 className="text-xl font-display font-bold text-natural-text">This cherry tree is still growing.</h3>
           <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-            Cherry + is our premium bowl — deeper budgeting tools, more ways to keep money
-            conversations sweet, and features we're not quite ready to pick yet. We'd rather
-            hand you something perfectly ripe than rush it.
+            Cherry + will bring deeper budgeting tools and more ways to keep money
+            conversations kind. Keep in touch — and always stay sweet.
           </p>
         </div>
 
