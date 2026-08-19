@@ -465,6 +465,86 @@ async function startServer() {
     }
   });
 
+  // 10. Financial-Alignment Conversation Starter — a short, warm opener for the
+  //     "your reported income and your partner's estimate disagree" check-in,
+  //     tuned to how large the gap is and to each person's money-talk style.
+  app.post("/api/generate-conversation-starter", requireAuth, rateLimit("starter", 30), async (req, res) => {
+    const { severityPct: rawSeverity, styles: rawStyles } = req.body || {};
+
+    // Sanitize user-influenced fields before they enter the prompt.
+    const severityPct = Math.min(500, Math.max(0, Math.round(Number(rawSeverity) || 0)));
+    const styles = (Array.isArray(rawStyles) ? rawStyles : [])
+      .slice(0, 5)
+      .map((s: any) => ({
+        name: typeof s?.name === "string" ? s.name.slice(0, 40) : "A member",
+        type: typeof s?.type === "string" ? s.type.slice(0, 60) : "",
+        communicationStyle: typeof s?.communicationStyle === "string" ? s.communicationStyle.slice(0, 200) : "",
+      }));
+
+    // Curated fallbacks by severity, used if the AI call fails.
+    const fallback =
+      severityPct >= 50
+        ? "It looks like the numbers you each had in mind are pretty far apart — that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
+        : severityPct >= 25
+        ? "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers — want to swap real ones so our split feels fair to both of us?\""
+        : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in — want to make sure our split still matches reality?\"";
+
+    try {
+      const { GoogleGenAI, Type } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+      });
+
+      const severityBand =
+        severityPct >= 50 ? "large (over 50% apart) — be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation"
+        : severityPct >= 25 ? "moderate (25-50% apart) — warm and direct, normalize the mismatch, invite swapping real numbers"
+        : "small (10-25% apart) — light and easy, frame it as a quick sync-up";
+
+      const styleLines = styles
+        .map(s => `- ${s.name}: money style "${s.type || "unknown"}"${s.communicationStyle ? `; prefers to talk about money like this: ${s.communicationStyle}` : ""}`)
+        .join("\n");
+
+      const prompt =
+        "You write conversation starters for \"Have Another Cherry\", a warm, non-judgmental household " +
+        "expense-splitting app. A household's members reported their own incomes and estimated each " +
+        "other's, and the numbers disagree.\n\n" +
+        `Gap severity: ${severityPct}% — ${severityBand}.\n\n` +
+        "The people, and how they each prefer to talk about money:\n" + (styleLines || "- (no profiles available)") + "\n\n" +
+        "Write ONE conversation starter (2-4 sentences) they could actually say to each other to open a " +
+        "kind, blame-free talk about getting their real numbers in sync so their expense split feels fair. " +
+        "Adapt the tone to the severity band and bridge their communication styles. Include one concrete " +
+        "opening line in quotes they can borrow. Never scold, never assume anyone lied, never mention " +
+        "specific dollar amounts, and don't use the word \"discrepancy\".\n\n" +
+        "Return JSON with a single field: starter.";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.9,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: { starter: { type: Type.STRING } },
+            required: ["starter"]
+          }
+        }
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text.trim());
+        const starter = (parsed.starter || "").trim();
+        if (starter) return res.status(200).json({ success: true, starter });
+      }
+      throw new Error("Empty starter");
+    } catch (err: any) {
+      console.error("Conversation Starter Gen Error:", err?.message || err);
+      return res.status(200).json({ success: true, starter: fallback });
+    }
+  });
+
   // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
 

@@ -23,6 +23,7 @@ import LegalModal, { LegalDoc } from './components/LegalModal';
 import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
+import FinancialAlignmentModal from './components/FinancialAlignmentModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown } from 'lucide-react';
 
@@ -121,6 +122,7 @@ export default function App() {
     }
   }, [activeUser]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -460,22 +462,31 @@ export default function App() {
     id => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
   );
 
-  // Active User is current user
+  // Compare what each member reported as their own income against what the
+  // others estimated for them. Track the worst relative gap so the alignment
+  // modal can tune its conversation starter to how far apart the numbers are.
   let hasIncomeDiscrepancy = false;
+  let incomeDiscrepancyPct = 0;
   if (groupUsers && Object.keys(groupUsers).length >= 2) {
     const userIds = Object.keys(groupUsers);
     for (let i = 0; i < userIds.length; i++) {
       for (let j = i + 1; j < userIds.length; j++) {
         const u1 = groupUsers[userIds[i]];
         const u2 = groupUsers[userIds[j]];
-        
+
         const u1Income = Number(u1.income);
         const u1PartnerEst = Number(u1.partnerIncome);
         const u2Income = Number(u2.income);
         const u2PartnerEst = Number(u2.partnerIncome);
-        
-        if (u1Income && u2PartnerEst && Math.abs(u1Income - u2PartnerEst) > u1Income * 0.1) hasIncomeDiscrepancy = true;
-        if (u2Income && u1PartnerEst && Math.abs(u2Income - u1PartnerEst) > u2Income * 0.1) hasIncomeDiscrepancy = true;
+
+        if (u1Income && u2PartnerEst && Math.abs(u1Income - u2PartnerEst) > u1Income * 0.1) {
+          hasIncomeDiscrepancy = true;
+          incomeDiscrepancyPct = Math.max(incomeDiscrepancyPct, (Math.abs(u1Income - u2PartnerEst) / u1Income) * 100);
+        }
+        if (u2Income && u1PartnerEst && Math.abs(u2Income - u1PartnerEst) > u2Income * 0.1) {
+          hasIncomeDiscrepancy = true;
+          incomeDiscrepancyPct = Math.max(incomeDiscrepancyPct, (Math.abs(u2Income - u1PartnerEst) / u2Income) * 100);
+        }
       }
     }
   }
@@ -1115,9 +1126,12 @@ export default function App() {
                   It looks like there's a discrepancy between what you reported as your income and what your partner estimated (or vice versa).
                   Money conversations can be tough, but clarity is the first step to fairness!
                 </p>
-                <div className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline">
+                <button
+                  onClick={() => setShowAlignmentModal(true)}
+                  className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline"
+                >
                   Review Financial Profiles
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -1345,6 +1359,21 @@ export default function App() {
           onOpenLegal={(d) => setLegalDoc(d)}
           onExportData={handleExportData}
           onDeleteAccount={handleDeleteAccount}
+        />
+      )}
+
+      {showAlignmentModal && (
+        <FinancialAlignmentModal
+          onClose={() => setShowAlignmentModal(false)}
+          activeUser={activeUser}
+          severityPct={incomeDiscrepancyPct}
+          members={Object.entries(groupUsers).map(([uid, u]) => ({
+            uid,
+            name: u?.name || '',
+            income: u?.income,
+            partnerIncome: u?.partnerIncome,
+            financialProfile: u?.financialProfile,
+          }))}
         />
       )}
 
