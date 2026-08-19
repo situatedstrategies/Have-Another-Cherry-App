@@ -734,7 +734,7 @@ async function startServer() {
   });
 
   // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
-  //     poolside@haveanothercherry.com to a group member who still owes the
+  //     tartcherry@haveanothercherry.com to a group member who still owes the
   //     caller money. Server-enforced: the caller must hold the Cherry +
   //     entitlement and both parties must be members of the same group. The
   //     amount and item titles come from the caller's own (E2E-encrypted)

@@ -67,7 +67,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 ## Email (Resend) - important
 - `RESEND_API_KEY` lives in **Cloud Secret Manager**, referenced in `apphosting.yaml` (env var backed by `secret:`), not as a plaintext env var.
 - The App Hosting compute SA has both `Secret Manager Secret Accessor` and `Secret Manager Viewer` on that secret (Viewer is needed so the build can resolve the `latest` version).
-- Senders (hard rule): `poolside@haveanothercherry.com` for everything human-flavored (invites, reminders, waitlist). Automated account emails use `reset@haveanothercherry.com` (password resets) and `verify@haveanothercherry.com` (email verification). `help@haveanothercherry.com` reaches a real person: it is the support/unsubscribe contact, never a sender. Never send from notifications@ or tartcherry@ - those don't exist.
+- Senders (hard rule, all verified on Resend): `poolside@haveanothercherry.com` for human-flavored email (invites, waitlist replies). `tartcherry@haveanothercherry.com` for payment reminders. `notifications@haveanothercherry.com` for system notifications (e.g. waitlist signups forwarded to the poolside inbox). `reset@haveanothercherry.com` for password resets and `verify@haveanothercherry.com` for email verification. `help@haveanothercherry.com` reaches a real person: it is the support/unsubscribe contact, never a sender.
 - Template `src/templates/inviteEmail.html` uses placeholders `{{recipientName}}`, `{{fromName}}`, `{{groupName}}`, `{{inviteCode}}`, `{{splitRows}}`. `src/lib/resend.ts` builds the split rows and fills the placeholders, then sends.
 - Invite flow: `GroupSetup.tsx` (collects recipient name + email, computes fromName and split) -> `POST /api/send-invite` -> `sendInviteEmail(...)`.
 

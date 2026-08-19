@@ -214,7 +214,7 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
   const resend = new Resend(apiKey);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <poolside@haveanothercherry.com>",
+    from: "Have Another Cherry <notifications@haveanothercherry.com>",
     to: "poolside@haveanothercherry.com",
     subject: "Cherry + waitlist signup",
     text:
@@ -230,7 +230,7 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
 }
 
 // Cherry + payment reminder, sent on a member's behalf from
-// poolside@haveanothercherry.com. Deliberately warm and no-pressure: the
+// tartcherry@haveanothercherry.com. Deliberately warm and no-pressure: the
 // point of the feature is that nobody has to send the awkward text.
 // PRIVACY: this email deliberately contains NO amounts, item names, or any
 // financial detail. Everything sent through Resend is visible in the Resend
@@ -272,7 +272,7 @@ export async function sendReminderEmail(
   </div>`;
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <poolside@haveanothercherry.com>",
+    from: "Have Another Cherry <tartcherry@haveanothercherry.com>",
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
     html: withComplianceFooter(html),

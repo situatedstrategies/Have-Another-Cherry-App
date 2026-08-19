@@ -173,7 +173,7 @@ export default function OwedBreakdownModal({
 
         {mode === 'owed_to_you' && byPerson.length > 0 && (
           <p className="text-[11px] text-natural-muted">
-            Reminders arrive as a kind, no-pressure email from poolside@haveanothercherry.com. For privacy, the email never includes amounts or expense names: it just says an open balance is waiting in the app.
+            Reminders arrive as a kind, no-pressure email from tartcherry@haveanothercherry.com. For privacy, the email never includes amounts or expense names: it just says an open balance is waiting in the app.
           </p>
         )}
       </div>
