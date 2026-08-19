@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createHash } from "crypto";
 import express from "express";
 import path from "path";
 import cors from "cors";
@@ -31,6 +32,106 @@ async function startServer() {
 
   // Receipt images are sent as base64, so allow a generous body size.
   app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: false }));
+
+  // ---- Production view gate ------------------------------------------------
+  // app.haveanothercherry.com is not publicly viewable: every request must
+  // carry the gate cookie, set by entering the site password. Only the
+  // password's SHA-256 hash lives here (never the password itself). Beta and
+  // local dev are not gated, and the RevenueCat webhook is exempt because it
+  // arrives without cookies. Override the hash with SITE_GATE_PASSWORD_HASH,
+  // or set SITE_GATE_DISABLED=1 to drop the wall without a code change.
+  const GATE_COOKIE = "hac_gate";
+  const gateHash =
+    process.env.SITE_GATE_PASSWORD_HASH ||
+    "7d93884ca2bb3700085c9ba2892bd9fce9c119ac7a9d7555f4e44230137d6c38";
+  const GATE_HOSTS = new Set([
+    "app.haveanothercherry.com",
+    "have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app",
+  ]);
+  const GATE_EXEMPT_PATHS = new Set([
+    "/api/revenuecat-webhook",
+    "/cherry2transparent.png",
+    "/icon.svg",
+    "/favicon.ico",
+  ]);
+  const sha256Hex = (value: string) => createHash("sha256").update(value).digest("hex");
+
+  const gatePage = (wrongPassword: boolean) => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Have Another Cherry</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #F4F4F5; color: #18181B; font-family: Inter, Helvetica, Arial, sans-serif; padding: 24px; }
+  .card { background: #FFFFFF; border: 1px solid #D4D4D8; border-radius: 22px; padding: 40px 36px;
+    max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 30px -12px rgba(24,24,27,.18); }
+  img { width: 64px; height: 64px; object-fit: contain; margin: 0 auto 16px; display: block; }
+  h1 { font-family: Lora, Georgia, serif; font-size: 24px; margin-bottom: 8px; }
+  p { color: #52525B; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+  input { width: 100%; padding: 12px 14px; border: 1px solid #D4D4D8; border-radius: 12px;
+    font-size: 15px; font-family: inherit; outline: none; margin-bottom: 12px; }
+  input:focus { border-color: #C41200; }
+  button { width: 100%; padding: 12px; background: #C41200; color: #FFFFFF; border: 0;
+    border-radius: 999px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  button:hover { background: #A00E00; }
+  .err { color: #C41200; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .foot { margin-top: 18px; font-size: 12px; color: #A1A1AA; }
+  .foot a { color: #C41200; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="/cherry2transparent.png" alt="Have Another Cherry">
+    <h1>Members only, for now</h1>
+    <p>This is the Have Another Cherry production app. Enter the site password to continue.</p>
+    ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ""}
+    <form method="POST" action="/gate/unlock">
+      <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">
+      <button type="submit">Enter</button>
+    </form>
+    <p class="foot">Looking for the beta? <a href="https://beta.haveanothercherry.com">beta.haveanothercherry.com</a> or <a href="https://www.haveanothercherry.com/beta">request an invite</a>.</p>
+  </div>
+</body>
+</html>`;
+
+  app.use((req, res, next) => {
+    if (process.env.SITE_GATE_DISABLED === "1") return next();
+    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    if (!GATE_HOSTS.has(host)) return next();
+    if (GATE_EXEMPT_PATHS.has(req.path)) return next();
+
+    const cookieHeader = req.headers.cookie || "";
+    const cookie = cookieHeader
+      .split(";")
+      .map(part => part.trim())
+      .find(part => part.startsWith(`${GATE_COOKIE}=`));
+    const cookieValue = cookie ? decodeURIComponent(cookie.slice(GATE_COOKIE.length + 1)) : "";
+    if (cookieValue === gateHash) return next();
+
+    if (req.method === "POST" && req.path === "/gate/unlock") {
+      const password = String((req.body as any)?.password ?? "");
+      if (password && sha256Hex(password) === gateHash) {
+        res.setHeader(
+          "Set-Cookie",
+          `${GATE_COOKIE}=${gateHash}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`
+        );
+        return res.redirect(303, "/");
+      }
+      return res.status(401).send(gatePage(true));
+    }
+
+    return res.status(401).send(gatePage(false));
+  });
+  // ---- end production view gate -------------------------------------------
+
 
   // Lightweight Alpha Lite abuse protection for public email endpoints.
   // App Hosting instances may have separate memory, so production launch
