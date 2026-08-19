@@ -4,6 +4,7 @@ import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '.
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles, EyeOff } from 'lucide-react';
 import Modal from './Modal';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
+import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 
 interface ExpenseFormProps {
@@ -43,6 +44,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [blindMin, setBlindMin] = useState(editingExpense?.blindMin?.toString() || '');
   const [blindMax, setBlindMax] = useState(editingExpense?.blindMax?.toString() || '');
   const [showDarkIntro, setShowDarkIntro] = useState(false);
+  const [showCherryPlus, setShowCherryPlus] = useState(false);
 
   // Line items from the receipt scan, assignable to members ('shared' = split
   // by the household default) to build an itemized custom-amount split.
@@ -905,7 +907,14 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   <div>
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
                       Dark Cherry
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">Plus</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCherryPlus(true); }}
+                        className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
+                        title="About Cherry +"
+                      >
+                        Cherry +
+                      </button>
                     </span>
                     <span className="block text-xs text-natural-muted">
                       Blind split — others contribute what they can, no numbers shown.{' '}
@@ -1218,6 +1227,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           }}
         />
       )}
+
+      {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
     </Modal>
   );
 }

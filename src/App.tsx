@@ -27,6 +27,7 @@ import FinancialAlignmentModal from './components/FinancialAlignmentModal';
 import PlanPurchase from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
+import CherryPlusModal from './components/CherryPlusModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
 
@@ -152,6 +153,7 @@ export default function App() {
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
   const [showVault, setShowVault] = useState(false);
+  const [showCherryPlus, setShowCherryPlus] = useState(false);
   // Settings inputs for the spending threshold and direct-payment handles.
   const [thresholdInput, setThresholdInput] = useState('');
   const [venmoInput, setVenmoInput] = useState('');
@@ -1602,7 +1604,16 @@ export default function App() {
           onSignOut={() => { setShowSettings(false); handleSignOut(); }}
           extraSection={
             <div>
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Budget & Payments</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider">Budget & Payments</h3>
+                <button
+                  onClick={() => setShowCherryPlus(true)}
+                  className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
+                  title="About Cherry +"
+                >
+                  Cherry +
+                </button>
+              </div>
               <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1">Spending threshold</label>
@@ -1661,6 +1672,8 @@ export default function App() {
           onDeleteAccount={handleDeleteAccount}
         />
       )}
+
+      {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
 
       {showPlanPurchase && (
         <PlanPurchase

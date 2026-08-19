@@ -172,3 +172,32 @@ export async function sendResetEmail(
 
   return data;
 }
+
+// Cherry + waitlist: forward each signup to the poolside@ inbox so the list
+// lives wherever that mailbox forwards (and can be imported into Mailchimp or
+// similar later). If MAILCHIMP_API_KEY / MAILCHIMP_SERVER_PREFIX /
+// MAILCHIMP_AUDIENCE_ID are ever configured, the server endpoint subscribes
+// the address there too — this email is the always-works baseline.
+export async function sendWaitlistNotification(subscriberEmail: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const resend = new Resend(apiKey);
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <notifications@haveanothercherry.com>",
+    to: "poolside@haveanothercherry.com",
+    subject: "Cherry + waitlist signup",
+    text:
+      `New Cherry + waitlist signup:\n\n${subscriberEmail}\n\n` +
+      `Signed up ${new Date().toISOString()} from the in-app coming-soon page.`,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}

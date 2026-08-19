@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail, sendResetEmail, sendVerificationEmail } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 
 async function startServer() {
@@ -564,6 +564,56 @@ async function startServer() {
     } catch (err: any) {
       console.error("Conversation Starter Gen Error:", err?.message || err);
       return res.status(200).json({ success: true, starter: fallback });
+    }
+  });
+
+  // 11. Cherry + Waitlist — signups from the coming-soon page. Every signup is
+  //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
+  //     env vars are configured, the address is also subscribed to that
+  //     audience directly.
+  app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "A valid email address is required." });
+    }
+
+    let subscribed = false;
+    // Optional Mailchimp subscribe (set MAILCHIMP_API_KEY, MAILCHIMP_SERVER_PREFIX
+    // e.g. "us21", and MAILCHIMP_AUDIENCE_ID in Secret Manager / apphosting.yaml).
+    const mcKey = process.env.MAILCHIMP_API_KEY;
+    const mcServer = process.env.MAILCHIMP_SERVER_PREFIX;
+    const mcAudience = process.env.MAILCHIMP_AUDIENCE_ID;
+    if (mcKey && mcServer && mcAudience) {
+      try {
+        const mcRes = await fetch(
+          `https://${mcServer}.api.mailchimp.com/3.0/lists/${mcAudience}/members`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${mcKey}`,
+            },
+            body: JSON.stringify({ email_address: email, status: "pending", tags: ["cherry-plus-waitlist"] }),
+          }
+        );
+        // "Member Exists" (400) still counts as on the list.
+        subscribed = mcRes.ok || mcRes.status === 400;
+        if (!mcRes.ok && mcRes.status !== 400) {
+          console.error("Mailchimp subscribe failed:", mcRes.status, await mcRes.text().catch(() => ""));
+        }
+      } catch (e: any) {
+        console.error("Mailchimp subscribe error:", e?.message || e);
+      }
+    }
+
+    try {
+      await sendWaitlistNotification(email);
+      return res.status(200).json({ success: true, subscribed });
+    } catch (err: any) {
+      console.error("Waitlist Error:", err?.message || err);
+      // If Mailchimp got them, the signup still succeeded.
+      if (subscribed) return res.status(200).json({ success: true, subscribed });
+      return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
   });
 
