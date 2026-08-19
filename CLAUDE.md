@@ -91,6 +91,17 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   fallback: `npm run rules:deploy` (needs `npx firebase-tools login` once). If rules and
   app ever disagree, users hit "Missing or insufficient permissions".
 
+## Email privacy (hard rule)
+- Everything sent through Resend is stored in the Resend dashboard and visible to
+  the account operator. The operator must NOT be able to read users' financial
+  data, so transactional emails must never contain amounts, balances, expense
+  names, or any ledger detail. Say that something exists and link into the app;
+  the details stay behind the E2E-encrypted ledger.
+- Known residual content in Resend logs today: invite emails include the group's
+  split percentages (a designed onboarding feature), and verification/reset
+  emails necessarily contain their auth action links. Mitigate operator
+  visibility by minimizing Resend's data retention in the dashboard settings.
+
 ## Writing style (hard rule)
 - **NO EM DASHES. EVER.** No em dash and no en dash anywhere in this codebase or its
   output: not in UI copy, error messages, emails, comments, commit messages, AI

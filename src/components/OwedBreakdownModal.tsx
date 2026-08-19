@@ -67,7 +67,7 @@ export default function OwedBreakdownModal({
 
   const grandTotal = byPerson.reduce((s, p) => s + p.total, 0);
 
-  const sendReminder = async (debtorUid: string, total: number, items: { expense: Expense; amount: number }[]) => {
+  const sendReminder = async (debtorUid: string) => {
     if (!isPlus) {
       onCherryPlus();
       return;
@@ -77,12 +77,9 @@ export default function OwedBreakdownModal({
       const res = await fetch('/api/send-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-        body: JSON.stringify({
-          debtorUid,
-          groupId: group.id,
-          amount: Math.round(total * 100) / 100,
-          items: items.slice(0, 10).map(i => ({ title: i.expense.title, amount: Math.round(i.amount * 100) / 100 })),
-        }),
+        // Privacy: only who and which group. Amounts and item names never
+        // leave the device; the email just says an open balance exists.
+        body: JSON.stringify({ debtorUid, groupId: group.id }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
@@ -139,7 +136,7 @@ export default function OwedBreakdownModal({
                     </span>
                   ) : (
                     <button
-                      onClick={() => sendReminder(person.uid, person.total, person.items)}
+                      onClick={() => sendReminder(person.uid)}
                       disabled={sendingTo === person.uid}
                       className="shrink-0 text-[11px] font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
@@ -176,7 +173,7 @@ export default function OwedBreakdownModal({
 
         {mode === 'owed_to_you' && byPerson.length > 0 && (
           <p className="text-[11px] text-natural-muted">
-            Reminders arrive as a kind, no-pressure email from tartcherry@haveanothercherry.com. One tap, no awkward text message.
+            Reminders arrive as a kind, no-pressure email from tartcherry@haveanothercherry.com. For privacy, the email never includes amounts or expense names: it just says an open balance is waiting in the app.
           </p>
         )}
       </div>

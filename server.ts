@@ -634,7 +634,7 @@ async function startServer() {
   app.post("/api/send-reminder", requireAuth, rateLimit("remind", 10), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
-      const { debtorUid, groupId, amount, items } = req.body || {};
+      const { debtorUid, groupId } = req.body || {};
 
       if (!debtorUid || typeof debtorUid !== "string" || !groupId || typeof groupId !== "string") {
         return res.status(400).json({ error: "Missing debtor or group." });
@@ -642,14 +642,6 @@ async function startServer() {
       if (debtorUid === callerUid) {
         return res.status(400).json({ error: "You can't remind yourself." });
       }
-      const normalizedAmount = Math.max(0, Math.round((Number(amount) || 0) * 100) / 100);
-      const safeItems = (Array.isArray(items) ? items : [])
-        .slice(0, 10)
-        .map((i: any) => ({
-          title: String(i?.title || "Shared expense").slice(0, 80),
-          amount: Math.max(0, Math.round((Number(i?.amount) || 0) * 100) / 100),
-        }));
-
       await ensureAdminApp();
       const { getFirestore } = await import("firebase-admin/firestore");
       const { getAuth } = await import("firebase-admin/auth");
@@ -681,13 +673,14 @@ async function startServer() {
       const nameOf = (uid: string) =>
         (Array.isArray(groupData.members) ? groupData.members : []).find((m: any) => m?.uid === uid)?.name || "A member";
 
+      // PRIVACY: no amounts or item details are accepted or emailed. The
+      // ledger is E2E-encrypted and Resend's logs are operator-visible, so
+      // the reminder only says an open balance exists.
       await sendReminderEmail(
         debtorAuth.email,
         nameOf(debtorUid),
         nameOf(callerUid),
-        groupData.name || "your group",
-        normalizedAmount,
-        safeItems
+        groupData.name || "your group"
       );
 
       return res.status(200).json({ success: true });
