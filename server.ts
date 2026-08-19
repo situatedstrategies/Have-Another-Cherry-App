@@ -102,7 +102,7 @@ async function startServer() {
       <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">
       <button type="submit">Come on in</button>
     </form>
-    <p class="foot">Don't have a password yet? We'd love to have you: <a href="https://www.haveanothercherry.com/beta">join our beta</a>. Already invited? The beta lives at <a href="https://beta.haveanothercherry.com">beta.haveanothercherry.com</a>.</p>
+    <p class="foot">Don't have a password yet? We'd love to have you: <a href="https://www.haveanothercherry.com/beta">join our beta</a>.</p>
   </div>
 </body>
 </html>`;
