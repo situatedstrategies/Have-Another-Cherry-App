@@ -1,6 +1,6 @@
 import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth, authHeader } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
@@ -14,7 +14,7 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
 
 const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 
-export default function GroupSetup({ onComplete }: { onComplete: (groupId: string) => void }) {
+export default function GroupSetup({ onComplete, onCancel }: { onComplete: (groupId: string) => void; onCancel?: () => void }) {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [inviteCode, setInviteCode] = useState('');
@@ -182,6 +182,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
         groupId: groupId,
+        groupIds: arrayUnion(groupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
       }, { merge: true });
@@ -284,6 +285,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
         groupId: joinedGroupId,
+        groupIds: arrayUnion(joinedGroupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
       }, { merge: true });
@@ -377,8 +379,8 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative">
           
           <div className="p-8">
-            <button 
-              onClick={() => signOut(auth)}
+            <button
+              onClick={() => (onCancel ? onCancel() : signOut(auth))}
               className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
             >
               <ArrowLeft size={16} /> Back
