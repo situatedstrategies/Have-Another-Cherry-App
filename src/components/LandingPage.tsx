@@ -287,7 +287,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   <a href={`${SITE}/about`} className="hover:text-[#C41200] transition-colors">About</a>
                   <button onClick={() => setLegalDoc('privacy')} className="text-left hover:text-[#C41200] transition-colors cursor-pointer">Privacy Policy</button>
                   <button onClick={() => setLegalDoc('terms')} className="text-left hover:text-[#C41200] transition-colors cursor-pointer">Terms of Service</button>
-                  <a href="mailto:help@haveanothercherry.com" className="hover:text-[#C41200] transition-colors">Support</a>
+                  <a href="mailto:poolside@haveanothercherry.com" className="hover:text-[#C41200] transition-colors">Support</a>
                 </div>
               </div>
             </div>

@@ -15,11 +15,11 @@ const EMAIL_COMPLIANCE_FOOTER = `
     </p>
     <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
       Don't want emails from us?
-      <a href="mailto:help@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
+      <a href="mailto:poolside@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
       and we'll stop, aside from essential account emails like password resets you request.
     </p>
     <p style="margin:0;font-size:11px;color:#71717A;line-height:1.6;">
-      To make sure our emails reach you, add our @haveanothercherry.com senders to your contacts or safe senders list.
+      To make sure our emails reach you, add poolside@haveanothercherry.com to your contacts or safe senders list.
     </p>
   </td></tr>
 </table>`;
@@ -96,7 +96,7 @@ export async function sendInviteEmail(
     .split("{{splitRows}}").join(splitRows);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <notifications@haveanothercherry.com>",
+    from: "Have Another Cherry <poolside@haveanothercherry.com>",
     to: [email],
     subject: safeFrom + " invited you to " + groupName + " on Have Another Cherry",
     html: withComplianceFooter(htmlContent),
@@ -109,7 +109,7 @@ export async function sendInviteEmail(
   return data;
 }
 
-// Send an email-verification link via Resend from verify@haveanothercherry.com.
+// Send an email-verification link via Resend from poolside@haveanothercherry.com.
 // The verifyLink is generated server-side by the Firebase Admin SDK, so Firebase
 // never sends its own copy - this is the only verification email a user gets.
 export async function sendVerificationEmail(
@@ -142,7 +142,7 @@ export async function sendVerificationEmail(
     .split("{{verifyLink}}").join(escapeHtml(verifyLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <verify@haveanothercherry.com>",
+    from: "Have Another Cherry <poolside@haveanothercherry.com>",
     to: [email],
     subject: "Confirm your email for Have Another Cherry",
     html: withComplianceFooter(htmlContent),
@@ -155,7 +155,7 @@ export async function sendVerificationEmail(
   return data;
 }
 
-// Send a password reset email via Resend from reset@haveanothercherry.com.
+// Send a password reset email via Resend from poolside@haveanothercherry.com.
 // The resetLink is generated server-side by the Firebase Admin SDK.
 export async function sendResetEmail(
   email: string,
@@ -187,7 +187,7 @@ export async function sendResetEmail(
     .split("{{resetLink}}").join(escapeHtml(resetLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <reset@haveanothercherry.com>",
+    from: "Have Another Cherry <poolside@haveanothercherry.com>",
     to: [email],
     subject: "Reset your Have Another Cherry password",
     html: withComplianceFooter(htmlContent),
@@ -214,7 +214,7 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
   const resend = new Resend(apiKey);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <notifications@haveanothercherry.com>",
+    from: "Have Another Cherry <poolside@haveanothercherry.com>",
     to: "poolside@haveanothercherry.com",
     subject: "Cherry + waitlist signup",
     text:
@@ -230,7 +230,7 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
 }
 
 // Cherry + payment reminder, sent on a member's behalf from
-// tartcherry@haveanothercherry.com. Deliberately warm and no-pressure: the
+// poolside@haveanothercherry.com. Deliberately warm and no-pressure: the
 // point of the feature is that nobody has to send the awkward text.
 // PRIVACY: this email deliberately contains NO amounts, item names, or any
 // financial detail. Everything sent through Resend is visible in the Resend
@@ -272,7 +272,7 @@ export async function sendReminderEmail(
   </div>`;
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <tartcherry@haveanothercherry.com>",
+    from: "Have Another Cherry <poolside@haveanothercherry.com>",
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
     html: withComplianceFooter(html),

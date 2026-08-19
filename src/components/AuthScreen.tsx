@@ -106,7 +106,7 @@ export default function AuthScreen() {
   };
 
   // Request a password reset email. This hits our server endpoint, which mints a
-  // Firebase reset link and delivers it via Resend from reset@haveanothercherry.com.
+  // Firebase reset link and delivers it via Resend from poolside@haveanothercherry.com.
   // Uses a generic confirmation so we don't reveal whether an email is registered.
   const handleResetPassword = async () => {
     setError('');

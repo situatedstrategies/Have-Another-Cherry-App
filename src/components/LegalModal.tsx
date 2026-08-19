@@ -5,7 +5,7 @@ import Modal from './Modal';
 export type LegalDoc = 'terms' | 'privacy';
 
 const EFFECTIVE_DATE = 'August 19, 2026';
-const CONTACT_EMAIL = 'help@haveanothercherry.com';
+const CONTACT_EMAIL = 'poolside@haveanothercherry.com';
 const PRIVACY_CONTACT = 'olivia@situatedstrategies.org';
 const SITE = 'https://www.haveanothercherry.com';
 

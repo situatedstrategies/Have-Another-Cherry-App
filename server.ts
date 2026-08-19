@@ -369,7 +369,7 @@ async function startServer() {
 
   // 6b. Password Reset Endpoint (Resend + Firebase Admin SDK)
   // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
-  // delivers it via Resend from reset@haveanothercherry.com. Responds generically
+  // delivers it via Resend from poolside@haveanothercherry.com. Responds generically
   // so we never reveal whether an email is registered.
   app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
     const { email } = req.body || {};
@@ -405,7 +405,7 @@ async function startServer() {
 
   // 6c. Email Verification Endpoint (Resend + Firebase Admin SDK)
   // Generates a Firebase verification link server-side and delivers it via Resend
-  // from verify@haveanothercherry.com, so Firebase never sends its own copy.
+  // from poolside@haveanothercherry.com, so Firebase never sends its own copy.
   //
   // Authenticated on purpose, and the address comes from the caller's own ID
   // token rather than the request body. Taking it from the body would turn this
@@ -734,7 +734,7 @@ async function startServer() {
   });
 
   // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
-  //     tartcherry@haveanothercherry.com to a group member who still owes the
+  //     poolside@haveanothercherry.com to a group member who still owes the
   //     caller money. Server-enforced: the caller must hold the Cherry +
   //     entitlement and both parties must be members of the same group. The
   //     amount and item titles come from the caller's own (E2E-encrypted)

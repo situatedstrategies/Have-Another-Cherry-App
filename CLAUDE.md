@@ -67,7 +67,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 ## Email (Resend) - important
 - `RESEND_API_KEY` lives in **Cloud Secret Manager**, referenced in `apphosting.yaml` (env var backed by `secret:`), not as a plaintext env var.
 - The App Hosting compute SA has both `Secret Manager Secret Accessor` and `Secret Manager Viewer` on that secret (Viewer is needed so the build can resolve the `latest` version).
-- Sends from `notifications@haveanothercherry.com` (verified Resend domain).
+- ALL email sends from `poolside@haveanothercherry.com` (verified Resend domain). It is the only mailbox that exists: never send from notifications@, verify@, reset@, tartcherry@, help@, or any other address.
 - Template `src/templates/inviteEmail.html` uses placeholders `{{recipientName}}`, `{{fromName}}`, `{{groupName}}`, `{{inviteCode}}`, `{{splitRows}}`. `src/lib/resend.ts` builds the split rows and fills the placeholders, then sends.
 - Invite flow: `GroupSetup.tsx` (collects recipient name + email, computes fromName and split) -> `POST /api/send-invite` -> `sendInviteEmail(...)`.
 
