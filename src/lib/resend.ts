@@ -15,11 +15,11 @@ const EMAIL_COMPLIANCE_FOOTER = `
     </p>
     <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
       Don't want emails from us?
-      <a href="mailto:poolside@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
+      <a href="mailto:help@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
       and we'll stop, aside from essential account emails like password resets you request.
     </p>
     <p style="margin:0;font-size:11px;color:#71717A;line-height:1.6;">
-      To make sure our emails reach you, add poolside@haveanothercherry.com to your contacts or safe senders list.
+      To make sure our emails reach you, add our @haveanothercherry.com senders to your contacts or safe senders list.
     </p>
   </td></tr>
 </table>`;
@@ -109,7 +109,7 @@ export async function sendInviteEmail(
   return data;
 }
 
-// Send an email-verification link via Resend from poolside@haveanothercherry.com.
+// Send an email-verification link via Resend from verify@haveanothercherry.com.
 // The verifyLink is generated server-side by the Firebase Admin SDK, so Firebase
 // never sends its own copy - this is the only verification email a user gets.
 export async function sendVerificationEmail(
@@ -142,7 +142,7 @@ export async function sendVerificationEmail(
     .split("{{verifyLink}}").join(escapeHtml(verifyLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <poolside@haveanothercherry.com>",
+    from: "Have Another Cherry <verify@haveanothercherry.com>",
     to: [email],
     subject: "Confirm your email for Have Another Cherry",
     html: withComplianceFooter(htmlContent),
@@ -155,7 +155,7 @@ export async function sendVerificationEmail(
   return data;
 }
 
-// Send a password reset email via Resend from poolside@haveanothercherry.com.
+// Send a password reset email via Resend from reset@haveanothercherry.com.
 // The resetLink is generated server-side by the Firebase Admin SDK.
 export async function sendResetEmail(
   email: string,
@@ -187,7 +187,7 @@ export async function sendResetEmail(
     .split("{{resetLink}}").join(escapeHtml(resetLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <poolside@haveanothercherry.com>",
+    from: "Have Another Cherry <reset@haveanothercherry.com>",
     to: [email],
     subject: "Reset your Have Another Cherry password",
     html: withComplianceFooter(htmlContent),
