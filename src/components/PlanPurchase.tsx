@@ -34,7 +34,7 @@ type Juice = { level: string; cherries: number; recommended: boolean; blurb: str
 
 // Turn a 0-100 score into a "juiciness" verdict.
 function juiceFor(score: number): Juice {
-  if (score >= 75) return { level: 'Extra juicy', cherries: 2, recommended: true, color: 'text-natural-primary', blurb: 'Great time to bring this up — the balance is in your favor.' };
+  if (score >= 75) return { level: 'Extra juicy', cherries: 2, recommended: true, color: 'text-natural-primary', blurb: 'Great time to bring this up - the balance is in your favor.' };
   if (score >= 55) return { level: 'Juicy', cherries: 1, recommended: true, color: 'text-natural-primary', blurb: 'This looks reasonable to propose right now.' };
   if (score >= 35) return { level: 'A little juice', cherries: 1, recommended: false, color: 'text-amber-600', blurb: 'Doable, but worth a gentle, considerate conversation first.' };
   return { level: 'No juice', cherries: 0, recommended: false, color: 'text-natural-muted', blurb: 'Maybe hold off, or plan to cover more of it yourself for now.' };
@@ -42,17 +42,17 @@ function juiceFor(score: number): Juice {
 
 const STARTERS: Record<string, string[]> = {
   good: [
-    "Hey, I've been eyeing {item} for us — want to split it {theirPct}%/{yourPct}%? Your part would be about ${theirShare}.",
-    "I think {item} would be a great add for the place. Fair split puts you around ${theirShare} — how does that sit with you?",
-    "Been thinking about {item}. Given how things have balanced out, splitting it feels fair — you'd be at ~${theirShare}. Thoughts?",
+    "Hey, I've been eyeing {item} for us - want to split it {theirPct}%/{yourPct}%? Your part would be about ${theirShare}.",
+    "I think {item} would be a great add for the place. Fair split puts you around ${theirShare} - how does that sit with you?",
+    "Been thinking about {item}. Given how things have balanced out, splitting it feels fair - you'd be at ~${theirShare}. Thoughts?",
   ],
   careful: [
     "No pressure at all, but I've been considering {item} (~${theirShare} for your share). Is now an okay time, or should we plan for later?",
-    "I'd love to get {item} eventually. Your share would be about ${theirShare} — want to talk through timing so it's comfortable for both of us?",
+    "I'd love to get {item} eventually. Your share would be about ${theirShare} - want to talk through timing so it's comfortable for both of us?",
   ],
   hold: [
-    "I've been wanting {item}, but I know things are a bit tight — no rush. Maybe we revisit it next month?",
-    "Thinking ahead to {item} (~${theirShare} each side). Totally fine to wait — want to set a target date together instead?",
+    "I've been wanting {item}, but I know things are a bit tight - no rush. Maybe we revisit it next month?",
+    "Thinking ahead to {item} (~${theirShare} each side). Totally fine to wait - want to set a target date together instead?",
   ],
 };
 
@@ -125,7 +125,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
 
         <div className="p-6 space-y-4 overflow-y-auto">
           <p className="text-xs text-natural-muted">
-            Thinking about a big shared purchase? See if it's a good moment to bring it up — based on your real balances.
+            Thinking about a big shared purchase? See if it's a good moment to bring it up - based on your real balances.
           </p>
 
           <div>

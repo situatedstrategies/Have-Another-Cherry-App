@@ -177,7 +177,7 @@ export async function sendResetEmail(
 // lives wherever that mailbox forwards (and can be imported into Mailchimp or
 // similar later). If MAILCHIMP_API_KEY / MAILCHIMP_SERVER_PREFIX /
 // MAILCHIMP_AUDIENCE_ID are ever configured, the server endpoint subscribes
-// the address there too — this email is the always-works baseline.
+// the address there too - this email is the always-works baseline.
 export async function sendWaitlistNotification(subscriberEmail: string) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {

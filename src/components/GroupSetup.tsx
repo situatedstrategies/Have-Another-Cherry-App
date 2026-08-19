@@ -136,7 +136,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
       }
 
       // Use the invite code as the document ID, but make sure we don't reuse an
-      // existing group's code — setDoc would overwrite (and destroy) that group.
+      // existing group's code - setDoc would overwrite (and destroy) that group.
       let newInviteCode = generateInviteCode();
       let groupId = newInviteCode;
       for (let attempt = 0; attempt < 6; attempt++) {
@@ -229,7 +229,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
         const inMembers = existingMembers.some(m => m?.uid === currentUser.uid);
         const inMemberIds = existingMemberIds.includes(currentUser.uid);
 
-        // Already fully a member — nothing to change.
+        // Already fully a member - nothing to change.
         if (inMembers && inMemberIds) return snap.id;
 
         // Repair path: the two member lists have drifted apart, so the user is
@@ -609,8 +609,8 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                   <p className="mt-2 px-1 text-xs font-medium text-natural-primary">
                     Percentages need to add up to 100% before you can create the group
                     {splitTotal > 100
-                      ? ` — that's ${(splitTotal - 100).toFixed(1)}% too much.`
-                      : ` — ${(100 - splitTotal).toFixed(1)}% still to assign.`}
+                      ? ` - that's ${(splitTotal - 100).toFixed(1)}% too much.`
+                      : ` - ${(100 - splitTotal).toFixed(1)}% still to assign.`}
                   </p>
                 )}
               </div>

@@ -12,7 +12,7 @@
 //   3. RevenueCat calls our webhook (POST /api/revenuecat-webhook, see
 //      server.ts) which writes the entitlement to users/{uid}:
 //        { isPlus: true, plusEntitlement: { source, productId, expiresAt, updatedAt } }
-//   4. Every client — web included — reads it off the profile through
+//   4. Every client - web included - reads it off the profile through
 //      hasPlus() below. Flipping isPlus is the ONLY thing the webhook has to
 //      do for the whole app to unlock.
 //

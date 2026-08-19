@@ -18,7 +18,7 @@ export function checkPassword(password: string): PasswordChecks {
     length: password.length >= 8 && password.length <= 128,
     letter: /[A-Za-z]/.test(password),
     number: /[0-9]/.test(password),
-    // A defined special-character set — whitespace doesn't count.
+    // A defined special-character set - whitespace doesn't count.
     special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password),
   };
 }
@@ -30,8 +30,8 @@ export function isPasswordValid(password: string): boolean {
 // Rendered as the live checklist under the password input.
 export const PASSWORD_REQUIREMENTS: { key: keyof PasswordChecks; label: string }[] = [
   { key: 'length', label: 'At least 8 characters' },
-  { key: 'letter', label: 'A letter (a–z or A–Z)' },
-  { key: 'number', label: 'A number (0–9)' },
+  { key: 'letter', label: 'A letter (a-z or A-Z)' },
+  { key: 'number', label: 'A number (0-9)' },
   { key: 'special', label: 'A special character (e.g. ! ? @ # $ %)' },
 ];
 

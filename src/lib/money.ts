@@ -3,7 +3,7 @@ import { Expense } from '../types';
 export const roundCurrency = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
 
-// Dark Cherry: the blind split. No per-person shares — everyone contributes
+// Dark Cherry: the blind split. No per-person shares - everyone contributes
 // what they can (within the per-payment bounds) until the pot reaches the
 // expense amount. Participants never see the total or the remainder.
 export const isDarkCherry = (expense: Expense): boolean =>

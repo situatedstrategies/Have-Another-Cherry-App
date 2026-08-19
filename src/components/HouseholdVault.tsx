@@ -138,7 +138,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     if (!file) return;
     setError('');
     if (file.size > MAX_FILE_BYTES) {
-      setError(`That file is ${(file.size / 1024).toFixed(0)}KB — the vault currently holds files up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB. Larger storage is coming.`);
+      setError(`That file is ${(file.size / 1024).toFixed(0)}KB - the vault currently holds files up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB. Larger storage is coming.`);
       return;
     }
     setBusy(true);
@@ -411,7 +411,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               <Lock className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-text leading-relaxed">
                 Documents are end-to-end encrypted with your group's key before they leave this
-                device — the lease, the wifi password, insurance cards. Only group members can open them.
+                device - the lease, the wifi password, insurance cards. Only group members can open them.
               </p>
             </div>
 

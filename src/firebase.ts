@@ -6,7 +6,7 @@ import prodConfig from '../firebase-applet-config.json';
 import betaConfig from '../firebase-applet-config.beta.json';
 
 // Which Firebase project this build talks to. Beta runs in a separate project so
-// testers get their own Firestore and their own Auth user pool — a beta account
+// testers get their own Firestore and their own Auth user pool - a beta account
 // is never a production account, and a beta bug can never touch a real ledger.
 //
 // Selected two ways, because the two deploy paths differ. `VITE_APP_ENV=beta` is

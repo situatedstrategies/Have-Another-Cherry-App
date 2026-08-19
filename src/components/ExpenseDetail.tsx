@@ -171,11 +171,11 @@ export default function ExpenseDetail({
             </div>
           )}
 
-          {/* Dark Cherry: no cost breakdown — the pot is the whole point. */}
+          {/* Dark Cherry: no cost breakdown - the pot is the whole point. */}
           {isDark ? (
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
-                <EyeOff className="h-3.5 w-3.5" /> Dark Cherry — Blind Split
+                <EyeOff className="h-3.5 w-3.5" /> Dark Cherry - Blind Split
               </h3>
               {isPayerActive ? (
                 <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4 space-y-2">
@@ -201,7 +201,7 @@ export default function ExpenseDetail({
                 <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4">
                   <p className="text-sm text-natural-text leading-relaxed">
                     This is a blind split: chip in what you can, when you can. The total and
-                    the pot stay hidden — when it's covered, the cherry closes on its own.
+                    the pot stay hidden - when it's covered, the cherry closes on its own.
                   </p>
                   <button
                     type="button"
@@ -305,7 +305,7 @@ export default function ExpenseDetail({
                     <div className="mt-2 bg-natural-sidebar/40 border border-natural-border/60 rounded-lg p-3 text-xs space-y-1.5">
                       <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">{maskNumbers && s.paidBy !== activeUser ? <span className="inline-flex items-center gap-1"><Cherry className="h-3.5 w-3.5 text-natural-primary" /> •••</span> : `$${s.amount.toFixed(2)}`}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Method</span><span className="font-semibold text-natural-text">{s.instrumentType}</span></div>
-                      <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : ' - '}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Logged</span><span className="font-semibold text-natural-text">{formatDateTime(s.timestamp)}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Status</span><span className={`font-bold ${s.status === 'confirmed' ? 'text-natural-primary' : 'text-natural-text'}`}>{s.status === 'confirmed' ? 'Confirmed' : 'Pending confirmation'}</span></div>
                       <div className="pt-1.5 border-t border-natural-border/50">
@@ -367,7 +367,7 @@ export default function ExpenseDetail({
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0" id="detail-footer">
           <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
             {/* A Dark Cherry belongs to its creator: nobody else can edit or
-                delete it — the edit form would reveal the hidden numbers. */}
+                delete it - the edit form would reveal the hidden numbers. */}
             {!maskNumbers && (
             <>
             <button
@@ -399,7 +399,7 @@ export default function ExpenseDetail({
           <div className="flex flex-col sm:flex-row justify-end gap-2 order-1 sm:order-2 w-full sm:w-auto">
             {!isExpenseFullySettled(expense) && isDebtorActive && (() => {
               if (isDark) {
-                // No numbers on the button — that's the whole point.
+                // No numbers on the button - that's the whole point.
                 return (
                   <button
                     onClick={onSettleClick}

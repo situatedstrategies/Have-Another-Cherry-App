@@ -86,7 +86,7 @@ export default function AuthScreen() {
   // const handleGoogleAuthMobile = async () => { ... }
 
   const handleGoogleAuth = async () => {
-    // New (sign-up) accounts must accept the terms first — matches the email flow.
+    // New (sign-up) accounts must accept the terms first - matches the email flow.
     if (!isLogin && !agreeTerms) {
       setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
       return;

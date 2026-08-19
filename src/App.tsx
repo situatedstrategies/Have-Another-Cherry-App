@@ -105,7 +105,7 @@ function mergeExpense(local: Expense, incoming: Expense): Expense {
   return merged;
 }
 
-// Consistent, branded loading screen — same background as every other screen so
+// Consistent, branded loading screen - same background as every other screen so
 // switching between them never flashes white or a stale page.
 function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -264,7 +264,7 @@ export default function App() {
 
   // Cache the names of every group this user belongs to, for the header switcher.
   // The rules allow any signed-in user to `get` a group by id, so a light read
-  // per group is enough — no schema bloat on the user doc.
+  // per group is enough - no schema bloat on the user doc.
   useEffect(() => {
     if (!groupIds.length) { setGroupSummaries({}); return; }
     let cancelled = false;
@@ -290,7 +290,7 @@ export default function App() {
       snap.forEach(d => { users[d.id] = d.data(); });
       setGroupUsers(users);
     }, (error) => {
-      // Surface (don't swallow) a permission/query failure — otherwise the
+      // Surface (don't swallow) a permission/query failure - otherwise the
       // member roster silently stays empty and every feature built on it
       // (names, income recalc, discrepancy banner) quietly does nothing.
       console.error('group members listener error:', error);
@@ -301,7 +301,7 @@ export default function App() {
   
   
   
-  // Load the cached ledger when the active user or group *id* changes — not on
+  // Load the cached ledger when the active user or group *id* changes - not on
   // every unrelated group field update (which reloaded and could flicker state).
   useEffect(() => {
     if (!activeUser || !group) return;
@@ -595,7 +595,7 @@ export default function App() {
     }} /></div>;
   }
 
-  // The user belongs to a group but its data hasn't arrived yet — show a loading
+  // The user belongs to a group but its data hasn't arrived yet - show a loading
   // screen, NOT the create/join screen, so we never flash the wrong page.
   if (activeGroupId && !group) {
     return <LoadingScreen label="Loading your group…" />;
@@ -606,14 +606,14 @@ export default function App() {
   }
 
   // Non-blocking: members who are in the group but haven't finished their quiz yet.
-  // We no longer lock the whole app on this — the ledger is usable right away and we
+  // We no longer lock the whole app on this - the ledger is usable right away and we
   // surface a gentle, dismissible banner instead (see below).
   const missingProfiles = (group.memberIds || []).filter(
     id => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
   );
 
   // Dark Cherry amounts stay hidden from everyone but their creator, so keep
-  // them out of the aggregate stats and charts too — a group total that
+  // them out of the aggregate stats and charts too - a group total that
   // includes a hidden pot would let members back the number out.
   const statsVisibleExpenses = expenses.filter(
     e => !isDarkCherry(e) || e.paidBy === activeUser
@@ -668,7 +668,7 @@ export default function App() {
   const handleSignOut = () => {
     // Just sign out and let the auth listener reset state. Clearing userProfile
     // synchronously here briefly renders ProfileSetup (no financialProfile) for a
-    // frame before currentUser clears — so we don't.
+    // frame before currentUser clears - so we don't.
     auth.signOut();
   };
 
@@ -764,7 +764,7 @@ export default function App() {
         csv += rowFor(expense, paidByName, expense.thirdPersonName || 'Third Person', 'Guest', expense.thirdPersonShare, 0, expense.thirdPersonShare);
       }
 
-      // Per-transaction cherries (guests) — only present when hasExtras is true.
+      // Per-transaction cherries (guests) - only present when hasExtras is true.
       (expense.extraParticipants || []).forEach(g => {
         csv += rowFor(expense, paidByName, g.name, 'Guest', g.share, 0, g.share);
       });
@@ -800,7 +800,7 @@ export default function App() {
     const newMembers = (g.members || []).filter(m => m.uid !== activeUser);
     const newMemberIds = (g.memberIds || []).filter(id => id !== activeUser);
 
-    // Last member out — delete the whole group rather than leaving a dead,
+    // Last member out - delete the whole group rather than leaving a dead,
     // empty group that still occupies its invite code.
     if (newMemberIds.length === 0) {
       await deleteDoc(groupRef);
@@ -948,7 +948,7 @@ export default function App() {
       // 4. Clear local cached ledger data.
       clearLocalData();
 
-      // 5. Delete the Firebase Authentication account (last — it revokes the
+      // 5. Delete the Firebase Authentication account (last - it revokes the
       //    auth needed for the steps above).
       await deleteUser(auth.currentUser!);
       // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
@@ -1017,7 +1017,7 @@ export default function App() {
       let finalExpense: Expense;
       if (editingExpense) {
         finalExpense = { ...editingExpense, ...cleanForm };
-        // Shares/amount may have changed — re-derive status from the new shares
+        // Shares/amount may have changed - re-derive status from the new shares
         // vs. the existing settlements so a previously-"settled" expense doesn't
         // keep hiding newly-created debt (or stay open after a reduction).
         finalExpense.status = getNormalizedExpenseStatus(finalExpense);
@@ -1178,7 +1178,7 @@ export default function App() {
     const settlements = [...(selectedExpense.settlements || []), newSettlement];
 
     // Status is derived per-debtor from the actual shares vs. settlements
-    // (getNormalizedExpenseStatus), not an aggregate sum — so one overpaid
+    // (getNormalizedExpenseStatus), not an aggregate sum - so one overpaid
     // debtor can't mask another's shortfall and mark the whole expense closed.
     const updatedExp: Expense = { ...selectedExpense, settlements };
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
@@ -1362,15 +1362,13 @@ export default function App() {
 
         {/* Top bar */}
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8" id="app-header">
-          <div className="flex items-start gap-4 relative">
+          <div className="flex items-center gap-4 relative">
             <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
               <CherryLogo className="h-14 w-14" />
             </div>
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-natural-text mt-1">
-                Have Another Cherry
-              </h1>
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-natural-text leading-tight">
+              Have Another Cherry
+            </h1>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap" id="header-controls">

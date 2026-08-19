@@ -4,7 +4,7 @@ import { isExpenseFullySettled } from '../lib/money';
 import { HeartHandshake, Cherry, Sparkles } from 'lucide-react';
 
 // Anniversary / rhythm awareness: quiet pattern-spotting worth celebrating.
-// Everything is derived locally from the ledger — no extra syncing.
+// Everything is derived locally from the ledger - no extra syncing.
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
@@ -75,13 +75,13 @@ export function computeRhythm(expenses: Expense[]): Rhythm | null {
   let celebration: string | null = null;
   if (monthsTogether > 0 && monthsTogether % 12 === 0) {
     const years = monthsTogether / 12;
-    celebration = `Ledger anniversary — ${years} ${years === 1 ? 'year' : 'years'} of sharing. Have another cherry on us.`;
+    celebration = `Ledger anniversary - ${years} ${years === 1 ? 'year' : 'years'} of sharing. Have another cherry on us.`;
   } else if (monthsTogether > 0 && monthsTogether % 6 === 0) {
     celebration = `${monthsTogether} months of sharing this ledger together.`;
   } else if (streakMonths >= 3) {
     celebration = `${streakMonths} straight months with everything settled. You two are in rhythm.`;
   } else if ([25, 50, 100, 250, 500].includes(settled.length)) {
-    celebration = `${settled.length} expenses settled together — sweet milestone.`;
+    celebration = `${settled.length} expenses settled together - sweet milestone.`;
   }
 
   return { monthsTogether, settledCount: settled.length, settledPct, medianSettleDays, streakMonths, celebration };
@@ -119,7 +119,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
           ))}
         </div>
         <p className="text-[11px] text-natural-muted flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 shrink-0" /> Settle streaks, anniversaries, and milestones — with Cherry +.
+          <Sparkles className="h-3 w-3 shrink-0" /> Settle streaks, anniversaries, and milestones - with Cherry +.
         </p>
       </button>
     );
@@ -147,7 +147,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
           <span className="block text-lg font-display font-bold text-natural-text">
-            {rhythm.medianSettleDays == null ? '—' : rhythm.medianSettleDays < 1 ? '<1' : Math.round(rhythm.medianSettleDays)}
+            {rhythm.medianSettleDays == null ? ' - ' : rhythm.medianSettleDays < 1 ? '<1' : Math.round(rhythm.medianSettleDays)}
           </span>
           <span className="block text-[10px] font-semibold text-natural-muted uppercase">Days to settle</span>
         </div>

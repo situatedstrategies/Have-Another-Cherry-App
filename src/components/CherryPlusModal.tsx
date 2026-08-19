@@ -38,16 +38,16 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <h3 className="text-xl font-display font-bold text-natural-text">This cherry tree is still growing.</h3>
+          <h3 className="text-xl font-display font-bold text-natural-text">This tree is still growing.</h3>
           <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
             Cherry + will bring deeper budgeting tools and more ways to keep money
-            conversations kind. Keep in touch — and always stay sweet.
+            conversations kind. Keep in touch - and always stay sweet.
           </p>
         </div>
 
         {status === 'done' ? (
           <div className="bg-natural-sage/40 border border-natural-primary/20 rounded-xl p-4 flex items-center justify-center gap-2 text-sm font-bold text-natural-primary">
-            <Check className="h-4 w-4" /> You're on the list — we'll write when it's ready.
+            <Check className="h-4 w-4" /> You're on the list - we'll write when it's ready.
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="max-w-sm mx-auto space-y-2">
@@ -73,10 +73,10 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
               </button>
             </div>
             {status === 'error' && (
-              <p className="text-xs text-red-500 font-medium">Couldn't save that — please try again.</p>
+              <p className="text-xs text-red-500 font-medium">Couldn't save that - please try again.</p>
             )}
             <p className="text-[10px] text-natural-muted">
-              Just launch news — no spam, and never your ledger.
+              Just launch news - no spam, and never your ledger.
             </p>
           </form>
         )}

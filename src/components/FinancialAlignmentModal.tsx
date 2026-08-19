@@ -18,15 +18,15 @@ const currency = (value: unknown): string | null => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 };
 
-// Reasonable openers if the AI call fails — picked by how large the gap is.
+// Reasonable openers if the AI call fails - picked by how large the gap is.
 const fallbackStarter = (severityPct: number) => {
   if (severityPct >= 50) {
-    return "It looks like the numbers you each had in mind are pretty far apart — that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\"";
+    return "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\"";
   }
   if (severityPct >= 25) {
-    return "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers — want to swap real ones so our split feels fair to both of us?\"";
+    return "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers - want to swap real ones so our split feels fair to both of us?\"";
   }
-  return "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in — want to make sure our split still matches reality?\"";
+  return "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 };
 
 /**
@@ -75,7 +75,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
     >
       <div className="space-y-6">
 
-        {/* Narrative profiles only — no scores, no quiz answers. */}
+        {/* Narrative profiles only - no scores, no quiz answers. */}
         <section>
           <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Your Financial Styles</h3>
           <div className="space-y-3">
@@ -129,7 +129,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
               );
             })}
             <p className="text-[11px] text-natural-muted pt-1">
-              These differ by up to <span className="font-mono font-bold">{Math.round(severityPct)}%</span> — that gap is what triggered this check-in.
+              These differ by up to <span className="font-mono font-bold">{Math.round(severityPct)}%</span> - that gap is what triggered this check-in.
             </p>
           </div>
         </section>

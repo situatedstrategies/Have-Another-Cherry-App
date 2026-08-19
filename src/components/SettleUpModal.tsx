@@ -10,7 +10,7 @@ interface SettleUpModalProps {
   expense: Expense;
   group: Group;
   activeUser: string;
-  /** Live member profiles — used for the recipient's Venmo/Zelle handles. */
+  /** Live member profiles - used for the recipient's Venmo/Zelle handles. */
   groupUsers?: Record<string, any>;
   onClose: () => void;
   onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
@@ -50,7 +50,7 @@ export default function SettleUpModal({ expense, group, activeUser, groupUsers, 
       ? getDarkCherryRemaining(expense, true)
       : getRemainingSettlementAmount(expense, uid, true);
 
-  // Default to empty ($0) — the user enters how much they're settling.
+  // Default to empty ($0) - the user enters how much they're settling.
   const [amountToPay, setAmountToPay] = useState('');
 
   const handleDebtorChange = (uid: string) => {
@@ -76,7 +76,7 @@ export default function SettleUpModal({ expense, group, activeUser, groupUsers, 
     }
 
     if (blindContributor) {
-      // Only the creator's chosen range is enforced — never the (hidden) pot.
+      // Only the creator's chosen range is enforced - never the (hidden) pot.
       const min = expense.blindMin || 0.01;
       const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
       if (amount < min || amount > max) {
@@ -238,7 +238,7 @@ export default function SettleUpModal({ expense, group, activeUser, groupUsers, 
               <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
                 <p className="text-[11px] text-natural-muted">
                   {venmo
-                    ? <>Pay <span className="font-bold text-natural-text">{venmo.handle}</span> in Venmo — amount and note come prefilled.</>
+                    ? <>Pay <span className="font-bold text-natural-text">{venmo.handle}</span> in Venmo - amount and note come prefilled.</>
                     : <>They haven't added a Venmo handle yet, but you can head to Venmo and pay them there.</>}
                 </p>
                 <a
@@ -266,7 +266,7 @@ export default function SettleUpModal({ expense, group, activeUser, groupUsers, 
                   </div>
                 ) : (
                   <p className="text-[11px] text-natural-muted">
-                    They haven't added a Zelle handle yet. Zelle lives inside your banking app — open it there, or start from Zelle's site.
+                    They haven't added a Zelle handle yet. Zelle lives inside your banking app - open it there, or start from Zelle's site.
                   </p>
                 )}
                 <a

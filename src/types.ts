@@ -10,7 +10,7 @@ export interface User {
   activeGroupId?: string;
   groupId?: string;
   // Cherry + entitlement, written ONLY by the RevenueCat webhook (or a manual
-  // promo grant). Read through lib/entitlements.hasPlus — never directly.
+  // promo grant). Read through lib/entitlements.hasPlus - never directly.
   isPlus?: boolean;
   plusEntitlement?: {
     source: 'revenuecat_ios' | 'revenuecat_android' | 'promo';
@@ -136,7 +136,7 @@ export interface Expense {
   thirdPersonName?: string;
   thirdPersonEmail?: string;
   thirdPersonShare?: number;
-  // Per-transaction "cherries" — extra people added to a single expense's split
+  // Per-transaction "cherries" - extra people added to a single expense's split
   // (not permanent group members). Each gets a dollar share of this expense only.
   extraParticipants?: { name: string; share: number }[];
   // Dark Cherry (blind split) only: bounds for a single logged payment. The pot

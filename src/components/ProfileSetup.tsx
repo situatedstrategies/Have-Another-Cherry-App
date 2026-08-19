@@ -32,9 +32,9 @@ const STEPS: Step[] = [
         type: 'select',
         label: 'Which sounds most like you?',
         options: [
-          { value: 'saver', label: 'A saver — I hold on tight' },
-          { value: 'spender', label: 'A spender — I enjoy today' },
-          { value: 'balanced', label: 'Balanced — a bit of both' },
+          { value: 'saver', label: 'A saver - I hold on tight' },
+          { value: 'spender', label: 'A spender - I enjoy today' },
+          { value: 'balanced', label: 'Balanced - a bit of both' },
           { value: 'depends', label: 'It depends on the month' },
         ],
       },
@@ -84,9 +84,9 @@ const STEPS: Step[] = [
         type: 'select',
         label: 'For shared purchases, what do you prefer?',
         options: [
-          { value: 'credit_points', label: 'Credit — I like the points/rewards' },
-          { value: 'debit', label: 'Debit — straight from the account' },
-          { value: 'cash', label: 'Cash — it feels more real' },
+          { value: 'credit_points', label: 'Credit - I like the points/rewards' },
+          { value: 'debit', label: 'Debit - straight from the account' },
+          { value: 'cash', label: 'Cash - it feels more real' },
           { value: 'whatever', label: "Whatever's easiest in the moment" },
         ],
       },
@@ -143,7 +143,7 @@ const STEPS: Step[] = [
           { value: 'freedom', label: 'Freedom & options' },
           { value: 'stress', label: 'Stress & pressure' },
           { value: 'status', label: 'Achievement & status' },
-          { value: 'tool', label: 'Just a tool — nothing emotional' },
+          { value: 'tool', label: 'Just a tool - nothing emotional' },
         ],
       },
       {
@@ -151,7 +151,7 @@ const STEPS: Step[] = [
         type: 'select',
         label: 'How do you feel about talking about money?',
         options: [
-          { value: 'love', label: 'I love it — bring it on' },
+          { value: 'love', label: 'I love it - bring it on' },
           { value: 'comfortable', label: "I'm comfortable when it comes up" },
           { value: 'awkward', label: 'It feels a little awkward' },
           { value: 'avoid', label: 'I tend to avoid it' },
@@ -233,7 +233,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     const fallbackProfile = {
       type: 'The Pragmatic Planner',
       description: 'You prefer stable financial boundaries and clear, kind communication.',
-      quote: '"Do not save what is left after spending, but spend what is left after saving." — Warren Buffett',
+      quote: '"Do not save what is left after spending, but spend what is left after saving." - Warren Buffett',
       greetingTone: 'harmonious',
     };
     try {
@@ -246,7 +246,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       const financialProfile = result.data || fallbackProfile;
 
       // Append genuinely AI-generated profiles to the standalone profile_log
-      // collection (record + fallback catalog). Anonymous — timestamp only, no
+      // collection (record + fallback catalog). Anonymous - timestamp only, no
       // user or group reference.
       if (result.source === 'ai' && result.data) {
         addDoc(collection(db, 'profile_log'), {

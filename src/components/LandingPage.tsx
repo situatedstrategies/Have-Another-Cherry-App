@@ -10,9 +10,9 @@ interface LandingPageProps {
 const SITE = 'https://have-another-cherry-marketing.pages.dev';
 
 // ---------------------------------------------------------------------------
-// This page deliberately mirrors the marketing site's index.html — same warm
+// This page deliberately mirrors the marketing site's index.html - same warm
 // cream palette, same section order (hero → why/compare → essentials → how it
-// works → CTA band → footer), same type scale — so app.haveanothercherry.com
+// works → CTA band → footer), same type scale - so app.haveanothercherry.com
 // and the marketing site read as one product. If the site's design changes,
 // change this with it. Palette from the site's styles.css:
 const C = {
@@ -115,7 +115,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 share money every single week, you probably don't earn the same income, and "even" is
                 not the same thing as "fair." Have Another Cherry is built for people who want to
                 account for differences, be honest about financial boundaries, and keep the little
-                details straight — with gentle help for the conversations that can feel impossible.
+                details straight - with gentle help for the conversations that can feel impossible.
               </p>
             </div>
 
@@ -145,9 +145,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <div className="text-sm font-bold uppercase tracking-wider mb-5" style={{ color: C.primary }}>Have Another Cherry</div>
                 <ul className="space-y-4">
                   {[
-                    ['Fair percentages, set once', "65/35, 72/28, 90/10 — whatever matches your income or shared arrangement. Every expense divides that way automatically. Adjust any time."],
+                    ['Fair percentages, set once', "65/35, 72/28, 90/10 - whatever matches your income or shared arrangement. Every expense divides that way automatically. Adjust any time."],
                     ['Built for people who share life', 'A standing household ledger for the rent, the bills and the running balance between you.'],
-                    ['Receipt scanning, free for everyone', 'Snap the receipt and it fills in merchant, total, date, category — and the line items. No daily limit, no upgrade prompt.'],
+                    ['Receipt scanning, free for everyone', 'Snap the receipt and it fills in merchant, total, date, category - and the line items. No daily limit, no upgrade prompt.'],
                     ['Made for the relationship, not just the receipts', 'Financial-style profiles, conversation starters, and blind splits for the moments when exact numbers feel loaded.'],
                   ].map(([title, body]) => (
                     <li key={title} className="flex gap-3">
@@ -183,9 +183,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               </div>
               <div className="grid md:grid-cols-3 gap-5 mt-11">
                 {[
-                  ['Splits that match income', "Set any percentage between members. 50/50, 65/35, 90/10 — you decide what's fair. Every expense divides automatically, no calculator required.",
+                  ['Splits that match income', "Set any percentage between members. 50/50, 65/35, 90/10 - you decide what's fair. Every expense divides automatically, no calculator required.",
                     <path key="p" d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />],
-                  ['Snap a receipt, done', 'Point your camera at a receipt and log the merchant, total, category — and every line item, so you can split who-had-what.',
+                  ['Snap a receipt, done', 'Point your camera at a receipt and log the merchant, total, category - and every line item, so you can split who-had-what.',
                     <g key="g"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 9h18M8 14h4" /></g>],
                   ['Settle without the spreadsheet', 'See who owes who at any moment. Jump into Venmo or Zelle, record the payment, confirm it, and the balance zeroes out cleanly.',
                     <g key="g2"><path d="M12 1v22M5 8h9a3 3 0 0 1 0 6H8M5 16h11" /></g>],

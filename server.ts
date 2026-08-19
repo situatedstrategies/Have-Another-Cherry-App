@@ -16,7 +16,7 @@ async function startServer() {
   app.set("trust proxy", true);
 
   // Restrict cross-origin browser access to our own app origins (the SPA is
-  // same-origin, so this doesn't affect it — it just blocks other sites).
+  // same-origin, so this doesn't affect it - it just blocks other sites).
   const allowedOrigins = (
     process.env.ALLOWED_ORIGINS ||
     "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000"
@@ -36,6 +36,11 @@ async function startServer() {
   // App Hosting instances may have separate memory, so production launch
   // should eventually use managed rate limiting.
   const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+  // House style: no em dashes anywhere, including AI-generated copy. The
+  // prompts also forbid them, but the model slips sometimes, so every parsed
+  // response is scrubbed before it reaches a client.
+  const stripEmDashes = (value: string): string => value.replace(/\s*[\u2014\u2013]\s*/g, " - ");
   let lastSweep = 0;
 
   // Drop expired buckets occasionally so the map can't grow without bound.
@@ -210,7 +215,7 @@ async function startServer() {
         });
 
         if (response.text) {
-          const parsed = JSON.parse(response.text.trim());
+          const parsed = JSON.parse(stripEmDashes(response.text.trim()));
           const items = (Array.isArray(parsed.items) ? parsed.items : [])
             .map((it: any) => ({
               name: String(it?.name || "Item").slice(0, 80),
@@ -331,7 +336,7 @@ async function startServer() {
     }
   });
 
-  // 8. Financial Profile Generation API — generates a UNIQUE, bespoke profile
+  // 8. Financial Profile Generation API - generates a UNIQUE, bespoke profile
   //    from the quiz answers, analyzed holistically/interconnected.
   app.post("/api/generate-profile", requireAuth, rateLimit("profile", 30), async (req, res) => {
     const { answers } = req.body || {};
@@ -363,7 +368,7 @@ async function startServer() {
       const prompt =
         "You are a behavioral-economics-informed relationship finance analyst for \"Have Another Cherry\", " +
         "a warm, non-judgmental household expense-splitting app.\n\n" +
-        "Analyze these quiz answers HOLISTICALLY and as an INTERCONNECTED whole — for example, how the person's " +
+        "Analyze these quiz answers HOLISTICALLY and as an INTERCONNECTED whole - for example, how the person's " +
         "credit-card and cash habits relate to how they feel about money, and to how they prefer to talk about it. " +
         "Look for tension or harmony between answers (e.g., a spender who avoids money talk, or a saver who loves it).\n\n" +
         "Quiz answers (JSON):\n" + JSON.stringify(answers, null, 2) + "\n\n" +
@@ -373,12 +378,13 @@ async function startServer() {
         "Return JSON with fields: " +
         "type (2-4 word name), " +
         "description (2-3 sentences, second person), " +
-        "quote (a real, correctly-attributed quote about money, sharing, or relationships, formatted as: \"<quote>\" — <Author>), " +
+        "quote (a real, correctly-attributed quote about money, sharing, or relationships, formatted as: \"<quote>\" - <Author>), " +
         "traits (an array of 3-5 short descriptive phrases), " +
         "strengths (one encouraging sentence), " +
         "watchouts (one gentle, constructive sentence), " +
         "communicationStyle (one sentence about how this person likely prefers to discuss money with a partner/housemate), " +
-        "greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous).";
+        "greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous). " +
+        "Never use em dashes in any field; use commas, periods, or hyphens instead.";
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -404,7 +410,7 @@ async function startServer() {
       });
 
       if (response.text) {
-        const parsed = JSON.parse(response.text.trim());
+        const parsed = JSON.parse(stripEmDashes(response.text.trim()));
         return res.status(200).json({ success: true, source: "ai", data: parsed });
       }
 
@@ -418,7 +424,7 @@ async function startServer() {
     }
   });
 
-  // 9. Weekly Dashboard Greeting — a short, warm, cherry-themed, relationship-
+  // 9. Weekly Dashboard Greeting - a short, warm, cherry-themed, relationship-
   //    focused line tailored to group size and the user's profile tone.
   app.post("/api/generate-greeting", requireAuth, rateLimit("greeting", 60), async (req, res) => {
     const { memberCount, profileType: rawProfileType, greetingTone: rawTone } = req.body || {};
@@ -430,9 +436,9 @@ async function startServer() {
 
     // Curated fallback lines (used if the AI call fails).
     const fallbackBySize: Record<string, string> = {
-      solo: "A cherry's sweeter shared — but savoring your own bowl today is just as ripe. 🍒",
+      solo: "A cherry's sweeter shared - but savoring your own bowl today is just as ripe. 🍒",
       pair: "Two cherries on one stem: share the sweet, split the pits, and keep it fair. 🍒",
-      group: "A bowl of cherries is best passed around — here's to sharing every sweet bite together. 🍒",
+      group: "A bowl of cherries is best passed around - here's to sharing every sweet bite together. 🍒",
     };
     const sizeKey = count <= 1 ? "solo" : count === 2 ? "pair" : "group";
 
@@ -459,6 +465,7 @@ async function startServer() {
         `- Match this tone: ${greetingTone || "harmonious"}.\n` +
         (profileType ? `- Subtly fit someone whose money style is "${profileType}".\n` : "") +
         "- At most one 🍒 emoji. No hashtags, no surrounding quotes.\n" +
+        "- Never use an em dash; use commas, periods, or hyphens instead.\n" +
         "Output ONLY the greeting text.";
 
       const response = await ai.models.generateContent({
@@ -476,7 +483,7 @@ async function startServer() {
       });
 
       if (response.text) {
-        const parsed = JSON.parse(response.text.trim());
+        const parsed = JSON.parse(stripEmDashes(response.text.trim()));
         const greeting = (parsed.greeting || "").trim();
         if (greeting) return res.status(200).json({ success: true, greeting });
       }
@@ -487,7 +494,7 @@ async function startServer() {
     }
   });
 
-  // 10. Financial-Alignment Conversation Starter — a short, warm opener for the
+  // 10. Financial-Alignment Conversation Starter - a short, warm opener for the
   //     "your reported income and your partner's estimate disagree" check-in,
   //     tuned to how large the gap is and to each person's money-talk style.
   app.post("/api/generate-conversation-starter", requireAuth, rateLimit("starter", 30), async (req, res) => {
@@ -506,10 +513,10 @@ async function startServer() {
     // Curated fallbacks by severity, used if the AI call fails.
     const fallback =
       severityPct >= 50
-        ? "It looks like the numbers you each had in mind are pretty far apart — that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
+        ? "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
         : severityPct >= 25
-        ? "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers — want to swap real ones so our split feels fair to both of us?\""
-        : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in — want to make sure our split still matches reality?\"";
+        ? "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers - want to swap real ones so our split feels fair to both of us?\""
+        : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 
     try {
       const { GoogleGenAI, Type } = await import("@google/genai");
@@ -520,9 +527,9 @@ async function startServer() {
       });
 
       const severityBand =
-        severityPct >= 50 ? "large (over 50% apart) — be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation"
-        : severityPct >= 25 ? "moderate (25-50% apart) — warm and direct, normalize the mismatch, invite swapping real numbers"
-        : "small (10-25% apart) — light and easy, frame it as a quick sync-up";
+        severityPct >= 50 ? "large (over 50% apart) - be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation"
+        : severityPct >= 25 ? "moderate (25-50% apart) - warm and direct, normalize the mismatch, invite swapping real numbers"
+        : "small (10-25% apart) - light and easy, frame it as a quick sync-up";
 
       const styleLines = styles
         .map(s => `- ${s.name}: money style "${s.type || "unknown"}"${s.communicationStyle ? `; prefers to talk about money like this: ${s.communicationStyle}` : ""}`)
@@ -532,13 +539,14 @@ async function startServer() {
         "You write conversation starters for \"Have Another Cherry\", a warm, non-judgmental household " +
         "expense-splitting app. A household's members reported their own incomes and estimated each " +
         "other's, and the numbers disagree.\n\n" +
-        `Gap severity: ${severityPct}% — ${severityBand}.\n\n` +
+        `Gap severity: ${severityPct}% - ${severityBand}.\n\n` +
         "The people, and how they each prefer to talk about money:\n" + (styleLines || "- (no profiles available)") + "\n\n" +
         "Write ONE conversation starter (2-4 sentences) they could actually say to each other to open a " +
         "kind, blame-free talk about getting their real numbers in sync so their expense split feels fair. " +
         "Adapt the tone to the severity band and bridge their communication styles. Include one concrete " +
         "opening line in quotes they can borrow. Never scold, never assume anyone lied, never mention " +
         "specific dollar amounts, and don't use the word \"discrepancy\".\n\n" +
+        "Never use em dashes; use commas, periods, or hyphens instead. " +
         "Return JSON with a single field: starter.";
 
       const response = await ai.models.generateContent({
@@ -556,7 +564,7 @@ async function startServer() {
       });
 
       if (response.text) {
-        const parsed = JSON.parse(response.text.trim());
+        const parsed = JSON.parse(stripEmDashes(response.text.trim()));
         const starter = (parsed.starter || "").trim();
         if (starter) return res.status(200).json({ success: true, starter });
       }
@@ -567,7 +575,7 @@ async function startServer() {
     }
   });
 
-  // 11. Cherry + Waitlist — signups from the coming-soon page. Every signup is
+  // 11. Cherry + Waitlist - signups from the coming-soon page. Every signup is
   //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
   //     env vars are configured, the address is also subscribed to that
   //     audience directly.
@@ -617,7 +625,7 @@ async function startServer() {
     }
   });
 
-  // 12. Cherry + entitlement webhook (RevenueCat) — THE activation point for
+  // 12. Cherry + entitlement webhook (RevenueCat) - THE activation point for
   //     paid subscriptions. The iOS/Android apps (not yet built) will sell the
   //     "plus" entitlement through RevenueCat with appUserID = Firebase uid;
   //     RevenueCat then calls this endpoint on every subscription event and we

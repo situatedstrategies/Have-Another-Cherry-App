@@ -7,8 +7,8 @@ interface StatsSectionProps {
   group: Group;
   activeUser: string;
   /**
-   * 'band'  – full-width row of three cards (default).
-   * 'rail'  – full-width band on phone/tablet-portrait, but a single stacked
+   * 'band' - full-width row of three cards (default).
+   * 'rail' - full-width band on phone/tablet-portrait, but a single stacked
    *           column once there's room for a side rail (lg+).
    */
   orientation?: 'band' | 'rail';

@@ -217,13 +217,13 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       });
       setCustomPct(initPct);
     }
-    // Seed only when the form opens or switches to a different expense — NOT on
+    // Seed only when the form opens or switches to a different expense - NOT on
     // every group snapshot, which would wipe the user's in-progress input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingExpense?.id]);
 
   // Suggest a category/split from the title, but only while the user hasn't
-  // chosen a category yet (and never when editing) — so we don't override them.
+  // chosen a category yet (and never when editing) - so we don't override them.
   useEffect(() => {
     if (editingExpense || category) return;
     const lowerTitle = title.toLowerCase();
@@ -327,7 +327,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
     const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-    // Dark Cherry: no per-person shares — just the pot target and payment bounds.
+    // Dark Cherry: no per-person shares - just the pot target and payment bounds.
     const blindMinNum = round2(parseFloat(blindMin) || 0);
     const blindMaxNum = round2(parseFloat(blindMax) || 0);
     if (splitType === 'dark_cherry') {
@@ -583,7 +583,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               </div>
               <p className="text-[11px] text-natural-muted leading-relaxed">
                 We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the receipt. Assign
-                each one, leave it shared, then apply — tax and tip get shared automatically.
+                each one, leave it shared, then apply - tax and tip get shared automatically.
               </p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {scannedItems.map((it, i) => (
@@ -900,7 +900,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 </label>
               )}
 
-              {/* Dark Cherry (blind split) option — Plus feature */}
+              {/* Dark Cherry (blind split) option - Plus feature */}
               <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
                 splitType === 'dark_cherry' ? 'border-natural-primary bg-natural-primary/5 font-medium' : 'border-natural-border'
               }`}>
@@ -926,7 +926,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                       </button>
                     </span>
                     <span className="block text-xs text-natural-muted">
-                      Blind split — others contribute what they can, no numbers shown.{' '}
+                      Blind split - others contribute what they can, no numbers shown.{' '}
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); setShowDarkIntro(true); }}
@@ -950,7 +950,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               </span>
               <p className="text-xs text-natural-muted leading-relaxed">
                 The amount above is what settles this cherry. Group members will only see the
-                payment range you set here — never the total, the remainder, or who paid what.
+                payment range you set here - never the total, the remainder, or who paid what.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1164,7 +1164,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             </div>
           )}
 
-          {/* Split Detail Preview Box (not for Dark Cherry — there are no shares) */}
+          {/* Split Detail Preview Box (not for Dark Cherry - there are no shares) */}
           {numericAmount > 0 && splitType !== 'dark_cherry' && (
             <div className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2" id="split-preview">
               <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1">
@@ -1207,7 +1207,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               <span>
                 <span className="block text-sm font-bold text-natural-text">Already settled</span>
                 <span className="block text-xs text-natural-muted mt-0.5">
-                  Everyone's paid up on this one — log it as fully settled (no balances owed). Great for recording a
+                  Everyone's paid up on this one - log it as fully settled (no balances owed). Great for recording a
                   past expense that's already been paid back.
                 </span>
               </span>

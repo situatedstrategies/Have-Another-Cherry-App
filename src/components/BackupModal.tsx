@@ -24,7 +24,7 @@ const WORDS = [
 ];
 
 // Normalize a key the same way for hashing AND encryption so a "matching" key
-// always decrypts. (hashString also lowercases/trims — keep them consistent.)
+// always decrypts. (hashString also lowercases/trims - keep them consistent.)
 const normalizeKey = (k: string) => k.trim().toLowerCase();
 
 function generateKey(): string {
@@ -90,7 +90,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       localStorage.setItem(`group_secret_${activeUser}`, key);
       const h = await hashString(key);
       await updateDoc(doc(db, 'groups', groupId), { keyHash: h });
-      show('Group key saved — stored hashed in the cloud so it can be verified and reset. Share the exact phrase with your group.', 'success');
+      show('Group key saved - stored hashed in the cloud so it can be verified and reset. Share the exact phrase with your group.', 'success');
     } catch (e) {
       console.error(e);
       show('Could not save the key. Please check your connection and try again.', 'error');
@@ -129,7 +129,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       const date = new Date().toISOString();
       await updateDoc(doc(db, 'users', activeUser), { backup: encrypted, backupDate: date });
       setLastBackup(date);
-      show(`Ledger backed up to the cloud — ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'}, encrypted with your group key.`, 'success');
+      show(`Ledger backed up to the cloud - ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'}, encrypted with your group key.`, 'success');
     } catch (e) {
       console.error(e);
       show('Backup failed. Check your connection and try again.', 'error');
@@ -150,12 +150,12 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       if (!encrypted) { show('No cloud backup found for this account yet.', 'error'); setLoading(false); return; }
       const bytes = CryptoJS.AES.decrypt(encrypted, key);
       const str = bytes.toString(CryptoJS.enc.Utf8);
-      if (!str) { show('Could not decrypt the backup — is the group key correct?', 'error'); setLoading(false); return; }
+      if (!str) { show('Could not decrypt the backup - is the group key correct?', 'error'); setLoading(false); return; }
       const parsed = JSON.parse(str);
       if (!Array.isArray(parsed)) { show('The backup looks corrupted, so restore was cancelled to protect your ledger.', 'error'); setLoading(false); return; }
       setLocalExpenses(parsed);
       localStorage.setItem(`expenses_${groupId}`, JSON.stringify(parsed));
-      show(`Ledger restored — ${parsed.length} item${parsed.length === 1 ? '' : 's'} loaded from your backup.`, 'success');
+      show(`Ledger restored - ${parsed.length} item${parsed.length === 1 ? '' : 's'} loaded from your backup.`, 'success');
     } catch (e) {
       console.error(e);
       show('Restore failed. Double-check your group key and try again.', 'error');
@@ -184,7 +184,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
               <Key className="h-4 w-4 text-natural-primary" /> Secret Group Key
             </h3>
             <p className="text-xs text-natural-muted">
-              Your ledger is encrypted with this key before it ever leaves your device. Save it, share the exact phrase with your group, and keep it somewhere safe — it's the only way to restore a backup.
+              Your ledger is encrypted with this key before it ever leaves your device. Save it, share the exact phrase with your group, and keep it somewhere safe - it's the only way to restore a backup.
             </p>
 
             <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
               <Cloud className="h-4 w-4 text-natural-primary" /> Encrypted Cloud Backup
             </h3>
             <p className="text-xs text-natural-muted">
-              Back up your local ledger to the cloud, encrypted with your group key. Only someone with the key can read it — not other members, not us.
+              Back up your local ledger to the cloud, encrypted with your group key. Only someone with the key can read it - not other members, not us.
             </p>
             <div className="flex items-center justify-between text-xs bg-natural-bg/50 border border-natural-border rounded-lg px-3 py-2">
               <span className="text-natural-muted">Last backup</span>
@@ -243,7 +243,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
             </div>
             <p className="text-[11px] text-natural-muted flex items-start gap-1.5">
               <Shield className="h-3.5 w-3.5 text-natural-primary shrink-0 mt-0.5" />
-              Restoring replaces your current ledger — you'll be asked to confirm first.
+              Restoring replaces your current ledger - you'll be asked to confirm first.
             </p>
           </div>
         </div>
