@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
-import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
+import { SplitType, Expense, Group, PaymentInstrument } from '../types';
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles, EyeOff } from 'lucide-react';
 import Modal from './Modal';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
@@ -15,9 +15,11 @@ interface ExpenseFormProps {
   editingExpense?: Expense | null;
   /** Each member's spending threshold, for over-threshold heads-ups. */
   memberThresholds?: Record<string, number>;
+  /** Cherry + entitlement; gates creating Dark Cherry splits. */
+  isPlus?: boolean;
 }
 
-export default function ExpenseForm({ group, activeUser, onClose, onSubmit, editingExpense, memberThresholds }: ExpenseFormProps) {
+export default function ExpenseForm({ group, activeUser, onClose, onSubmit, editingExpense, memberThresholds, isPlus }: ExpenseFormProps) {
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   
@@ -81,6 +83,13 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   };
 
   const selectDarkCherry = () => {
+    // Dark Cherry is a Cherry + feature. Editing an existing one is
+    // grandfathered (the edit effect sets the split type directly), but
+    // creating a new one without the entitlement opens the coming-soon page.
+    if (!isPlus) {
+      setShowCherryPlus(true);
+      return;
+    }
     setSplitType('dark_cherry');
     if (!hasSeenDarkCherryIntro(activeUser)) {
       setShowDarkIntro(true);

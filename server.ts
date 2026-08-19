@@ -617,6 +617,75 @@ async function startServer() {
     }
   });
 
+  // 12. Cherry + entitlement webhook (RevenueCat) — THE activation point for
+  //     paid subscriptions. The iOS/Android apps (not yet built) will sell the
+  //     "plus" entitlement through RevenueCat with appUserID = Firebase uid;
+  //     RevenueCat then calls this endpoint on every subscription event and we
+  //     mirror the entitlement onto users/{uid}, which every client reads via
+  //     lib/entitlements.hasPlus().
+  //
+  //     Dormant until REVENUECAT_WEBHOOK_AUTH is set (Secret Manager +
+  //     apphosting.yaml, same pattern as RESEND_API_KEY). Configure the same
+  //     value under Authorization in RevenueCat's webhook settings.
+  app.post("/api/revenuecat-webhook", async (req, res) => {
+    const expectedAuth = process.env.REVENUECAT_WEBHOOK_AUTH;
+    if (!expectedAuth) {
+      return res.status(503).json({ error: "Cherry + billing is not configured yet." });
+    }
+    if ((req.headers.authorization || "") !== expectedAuth) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const event = req.body?.event;
+      const uid = event?.app_user_id;
+      if (!uid || typeof uid !== "string" || uid.startsWith("$RCAnonymousID")) {
+        // Anonymous purchasers can't be mapped to an account; RevenueCat will
+        // resend once the app aliases the user. Acknowledge so it doesn't retry forever.
+        return res.status(200).json({ received: true, ignored: "no mappable app_user_id" });
+      }
+
+      const type = String(event?.type || "");
+      const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"];
+      const DEACTIVATING = ["EXPIRATION"];
+      if (!ACTIVATING.includes(type) && !DEACTIVATING.includes(type)) {
+        // CANCELLATION etc. leave the entitlement active until EXPIRATION fires.
+        return res.status(200).json({ received: true, ignored: type });
+      }
+
+      await ensureAdminApp();
+      const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+      const userRef = getFirestore().collection("users").doc(uid);
+
+      if (DEACTIVATING.includes(type)) {
+        await userRef.set(
+          { isPlus: false, plusEntitlement: FieldValue.delete() },
+          { merge: true }
+        );
+      } else {
+        await userRef.set(
+          {
+            isPlus: true,
+            plusEntitlement: {
+              source: event?.store === "PLAY_STORE" ? "revenuecat_android" : "revenuecat_ios",
+              productId: event?.product_id || "",
+              ...(event?.expiration_at_ms
+                ? { expiresAt: new Date(Number(event.expiration_at_ms)).toISOString() }
+                : {}),
+              updatedAt: new Date().toISOString(),
+            },
+          },
+          { merge: true }
+        );
+      }
+
+      return res.status(200).json({ received: true });
+    } catch (err: any) {
+      console.error("RevenueCat webhook error:", err?.message || err);
+      return res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
   // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
 

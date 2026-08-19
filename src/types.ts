@@ -9,8 +9,17 @@ export interface User {
   groupIds?: string[];
   activeGroupId?: string;
   groupId?: string;
-  // The most this user wants to owe on a single shared expense; both sides get
-  // a heads-up when a split goes over it. 0/absent = off.
+  // Cherry + entitlement, written ONLY by the RevenueCat webhook (or a manual
+  // promo grant). Read through lib/entitlements.hasPlus — never directly.
+  isPlus?: boolean;
+  plusEntitlement?: {
+    source: 'revenuecat_ios' | 'revenuecat_android' | 'promo';
+    productId?: string;
+    expiresAt?: string;
+    updatedAt: string;
+  };
+  // Cherry +: the most this user wants to owe on a single shared expense; both
+  // sides get a heads-up when a split goes over it. 0/absent = off.
   recurringThreshold?: number;
   // Payment handles other members use to pay this user directly.
   paymentHandles?: {

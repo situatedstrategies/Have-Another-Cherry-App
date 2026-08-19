@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { getFullMembers, getFullDefaultSplit } from '../lib/members';
-import { Expense, Group, SplitType } from '../types';
+import { getFullMembers } from '../lib/members';
+import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
-import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
 
 // Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
 // bare date parses as UTC midnight, showing the prior day in negative-UTC zones).

@@ -1,13 +1,13 @@
-import { getFullMembers, getFullDefaultSplit } from './lib/members';
+import { getFullMembers } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
+import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
-import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
-import { Expense, Group, SettleDetails, User as AppUser } from './types';
+import { auth, db, authHeader } from './firebase';
+import { Expense, Group } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -28,8 +28,9 @@ import PlanPurchase from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
 import CherryPlusModal from './components/CherryPlusModal';
+import { hasPlus } from './lib/entitlements';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
+import { Plus, Cloud, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -617,6 +618,11 @@ export default function App() {
   const statsVisibleExpenses = expenses.filter(
     e => !isDarkCherry(e) || e.paidBy === activeUser
   );
+
+  // Cherry + entitlement (set by the mobile-subscription webhook; false for
+  // everyone until the iOS/Android apps exist). Gates vault, thresholds,
+  // rhythm, and Dark Cherry creation.
+  const isPlus = hasPlus(userProfile);
 
   // Spending thresholds: each member's limit (from their synced profile), and
   // any of the current user's shares that exceed their own.
@@ -1369,11 +1375,12 @@ export default function App() {
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap" id="header-controls">
             <button
-              onClick={() => setShowVault(true)}
+              onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
               className="bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs px-4 py-2.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
               title="Household Vault"
             >
               <VaultIcon className="h-4 w-4" /> Vault
+              {!isPlus && <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
             </button>
             <button
               onClick={() => setShowPlanPurchase(true)}
@@ -1558,7 +1565,7 @@ export default function App() {
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
               <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" />
-              <RhythmCard expenses={expenses} />
+              <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
             </div>
           </div>
         </div>
@@ -1616,22 +1623,34 @@ export default function App() {
               </div>
               <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1">Spending threshold</label>
+                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-2">
+                    Spending threshold
+                    {!isPlus && <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+                  </label>
                   <p className="text-[11px] text-natural-muted mb-2">The most you want to owe on a single shared expense. Both sides get a heads-up when a split goes over it.</p>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={thresholdInput}
-                        onChange={(e) => setThresholdInput(e.target.value)}
-                        placeholder="e.g. 60 (0 = off)"
-                        className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-                      />
+                  {isPlus ? (
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={thresholdInput}
+                          onChange={(e) => setThresholdInput(e.target.value)}
+                          placeholder="e.g. 60 (0 = off)"
+                          className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                        />
+                      </div>
+                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg shrink-0">Save</button>
                     </div>
-                    <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg shrink-0">Save</button>
-                  </div>
+                  ) : (
+                    <button
+                      onClick={() => { setShowSettings(false); setShowCherryPlus(true); }}
+                      className="w-full py-2 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 rounded-lg transition-colors"
+                    >
+                      Unlock with Cherry +
+                    </button>
+                  )}
                 </div>
 
                 <div className="border-t border-natural-primary/10 pt-3">
@@ -1685,7 +1704,7 @@ export default function App() {
         />
       )}
 
-      {showVault && (
+      {showVault && isPlus && (
         <HouseholdVault
           groupId={group.id}
           activeUser={activeUser}
@@ -1721,6 +1740,7 @@ export default function App() {
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
           memberThresholds={memberThresholds}
+          isPlus={isPlus}
         />
       )}
 

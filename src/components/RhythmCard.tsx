@@ -87,8 +87,44 @@ export function computeRhythm(expenses: Expense[]): Rhythm | null {
   return { monthsTogether, settledCount: settled.length, settledPct, medianSettleDays, streakMonths, celebration };
 }
 
-export default function RhythmCard({ expenses }: { expenses: Expense[] }) {
-  const rhythm = useMemo(() => computeRhythm(expenses), [expenses]);
+interface RhythmCardProps {
+  expenses: Expense[];
+  /** Cherry + gate: render a teaser that opens the coming-soon page. */
+  locked?: boolean;
+  onUnlock?: () => void;
+}
+
+export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardProps) {
+  const rhythm = useMemo(() => (locked ? null : computeRhythm(expenses)), [expenses, locked]);
+
+  if (locked) {
+    return (
+      <button
+        onClick={onUnlock}
+        className="w-full text-left bg-white border border-natural-border rounded-3xl p-5 shadow-sm space-y-3 hover:border-natural-primary/40 transition-colors cursor-pointer"
+        id="rhythm-card-locked"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+            <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> Your Rhythm
+          </h3>
+          <span className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">Cherry +</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center" aria-hidden="true">
+          {['Settled', 'Days to settle', 'Month streak'].map(label => (
+            <div key={label} className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
+              <span className="block text-lg font-display font-bold text-natural-border select-none">···</span>
+              <span className="block text-[10px] font-semibold text-natural-muted uppercase">{label}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-natural-muted flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3 shrink-0" /> Settle streaks, anniversaries, and milestones — with Cherry +.
+        </p>
+      </button>
+    );
+  }
+
   if (!rhythm) return null;
 
   return (
