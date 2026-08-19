@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
-import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles } from 'lucide-react';
+import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles, EyeOff } from 'lucide-react';
 import Modal from './Modal';
+import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 import { authHeader } from '../firebase';
 
 interface ExpenseFormProps {
@@ -35,6 +36,18 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     editingExpense?.contributions?.[0]?.label || ''
   );
   const [splitType, setSplitType] = useState<SplitType>(editingExpense?.splitType || 'household_default');
+
+  // Dark Cherry (blind split): per-payment bounds + the first-use explainer.
+  const [blindMin, setBlindMin] = useState(editingExpense?.blindMin?.toString() || '');
+  const [blindMax, setBlindMax] = useState(editingExpense?.blindMax?.toString() || '');
+  const [showDarkIntro, setShowDarkIntro] = useState(false);
+
+  const selectDarkCherry = () => {
+    setSplitType('dark_cherry');
+    if (!hasSeenDarkCherryIntro(activeUser)) {
+      setShowDarkIntro(true);
+    }
+  };
 
   // Shares: member uid -> value (either percentage or amount)
   const [customPct, setCustomPct] = useState<Record<string, string>>({});
@@ -109,6 +122,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       setNotes(editingExpense.notes || '');
       setIsRecurring(editingExpense.isRecurring || false);
       setRecurringInterval(editingExpense.recurringInterval || 'monthly');
+      setBlindMin(editingExpense.blindMin?.toString() || '');
+      setBlindMax(editingExpense.blindMax?.toString() || '');
 
       if (editingExpense.splitType === 'custom_percentage') {
         const total = editingExpense.amount;
@@ -244,6 +259,24 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     let finalThirdPersonShare: number | undefined = undefined;
     let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
     const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+
+    // Dark Cherry: no per-person shares — just the pot target and payment bounds.
+    const blindMinNum = round2(parseFloat(blindMin) || 0);
+    const blindMaxNum = round2(parseFloat(blindMax) || 0);
+    if (splitType === 'dark_cherry') {
+      if (blindMinNum <= 0) {
+        setError('Set a minimum per payment greater than zero.');
+        return;
+      }
+      if (blindMaxNum < blindMinNum) {
+        setError('The maximum per payment must be at least the minimum.');
+        return;
+      }
+      if (blindMinNum > numericAmount) {
+        setError('The minimum per payment cannot exceed the total amount.');
+        return;
+      }
+    }
 
     if (splitType === 'household_default' || splitType === 'equal') {
       let runningTotal = 0;
@@ -388,7 +421,9 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         ...(instrumentLabel.trim() ? { label: instrumentLabel.trim() } : {})
       }],
       splitType,
-      shares: finalShares,
+      shares: splitType === 'dark_cherry' ? {} : finalShares,
+      blindMin: splitType === 'dark_cherry' ? blindMinNum : null,
+      blindMax: splitType === 'dark_cherry' ? blindMaxNum : null,
       thirdPersonName: splitType === 'third_party' ? (thirdPersonName.trim() || null) : null,
       thirdPersonEmail: splitType === 'third_party' ? (thirdPersonEmail.trim() || null) : null,
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
@@ -743,8 +778,86 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center"><Plus className="w-4 h-4" /></span>
                 </label>
               )}
+
+              {/* Dark Cherry (blind split) option — Plus feature */}
+              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'dark_cherry' ? 'border-natural-primary bg-natural-primary/5 font-medium' : 'border-natural-border'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'dark_cherry'}
+                    onChange={selectDarkCherry}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-dark-cherry"
+                  />
+                  <div>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
+                      Dark Cherry
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">Plus</span>
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      Blind split — others contribute what they can, no numbers shown.{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setShowDarkIntro(true); }}
+                        className="text-natural-primary font-semibold hover:underline"
+                      >
+                        What's this?
+                      </button>
+                    </span>
+                  </div>
+                </div>
+                <span className="w-8 h-8 text-natural-text bg-natural-dark/90 text-white rounded-lg flex items-center justify-center"><EyeOff className="w-4 h-4" /></span>
+              </label>
             </div>
           </div>
+
+          {/* Dark Cherry bounds (Conditional) */}
+          {splitType === 'dark_cherry' && (
+            <div className="bg-natural-dark/5 p-4 rounded-2xl border border-natural-dark/20 space-y-3 animate-in slide-in-from-top-2 duration-150" id="dark-cherry-inputs">
+              <span className="block text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
+                <EyeOff className="h-3.5 w-3.5" /> Blind Split Settings
+              </span>
+              <p className="text-xs text-natural-muted leading-relaxed">
+                The amount above is what settles this cherry. Group members will only see the
+                payment range you set here — never the total, the remainder, or who paid what.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-natural-muted mb-1">Minimum per payment</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={blindMin}
+                      onChange={(e) => setBlindMin(e.target.value)}
+                      placeholder="e.g. 5"
+                      className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-natural-muted mb-1">Maximum per payment</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={blindMax}
+                      onChange={(e) => setBlindMax(e.target.value)}
+                      placeholder="e.g. 50"
+                      className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Custom Percentage Inputs (Conditional) */}
           {splitType === 'custom_percentage' && (() => {
@@ -923,8 +1036,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             </div>
           )}
 
-          {/* Split Detail Preview Box */}
-          {numericAmount > 0 && (
+          {/* Split Detail Preview Box (not for Dark Cherry — there are no shares) */}
+          {numericAmount > 0 && splitType !== 'dark_cherry' && (
             <div className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2" id="split-preview">
               <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1">
                 <Calculator className="h-3 w-3" /> Split Breakdown
@@ -986,6 +1099,15 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             />
           </div>
         </form>
+
+      {showDarkIntro && (
+        <DarkCherryInfoModal
+          onClose={() => {
+            markDarkCherryIntroSeen(activeUser);
+            setShowDarkIntro(false);
+          }}
+        />
+      )}
     </Modal>
   );
 }

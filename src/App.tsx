@@ -1,6 +1,6 @@
 import { getFullMembers, getFullDefaultSplit } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
-import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
+import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -460,6 +460,13 @@ export default function App() {
   // surface a gentle, dismissible banner instead (see below).
   const missingProfiles = (group.memberIds || []).filter(
     id => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
+  );
+
+  // Dark Cherry amounts stay hidden from everyone but their creator, so keep
+  // them out of the aggregate stats and charts too — a group total that
+  // includes a hidden pot would let members back the number out.
+  const statsVisibleExpenses = expenses.filter(
+    e => !isDarkCherry(e) || e.paidBy === activeUser
   );
 
   // Compare what each member reported as their own income against what the
@@ -950,20 +957,40 @@ export default function App() {
     if (!selectedExpense || !group) return;
 
     const normalizedAmount = roundCurrency(amount);
-    const remainingAmount = getRemainingSettlementAmount(selectedExpense, debtorId, true);
+    const baseValid =
+      group.memberIds.includes(debtorId) &&
+      Number.isFinite(normalizedAmount) &&
+      normalizedAmount > 0;
 
-    if (
-      !group.memberIds.includes(debtorId) ||
-      !Number.isFinite(normalizedAmount) ||
-      normalizedAmount <= 0 ||
-      normalizedAmount > remainingAmount
-    ) {
-      addToast(
-        'Invalid Payment',
-        `Payment must be between $0.01 and $${remainingAmount.toFixed(2)}.`,
-        'info'
-      );
-      return;
+    if (isDarkCherry(selectedExpense)) {
+      // Dark Cherry: contributors are bound only by the creator's per-payment
+      // range (the pot is hidden from them); the creator logging a received
+      // payment is bound by what's actually left in the pot.
+      const isCreatorLogging = selectedExpense.paidBy === activeUser;
+      if (isCreatorLogging) {
+        const potRemaining = getDarkCherryRemaining(selectedExpense, true);
+        if (!baseValid || normalizedAmount > potRemaining) {
+          addToast('Invalid Payment', `Payment must be between $0.01 and $${potRemaining.toFixed(2)}.`, 'info');
+          return;
+        }
+      } else {
+        const min = selectedExpense.blindMin || 0.01;
+        const max = selectedExpense.blindMax || Number.MAX_SAFE_INTEGER;
+        if (!baseValid || normalizedAmount < min || normalizedAmount > max) {
+          addToast('Invalid Payment', `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`, 'info');
+          return;
+        }
+      }
+    } else {
+      const remainingAmount = getRemainingSettlementAmount(selectedExpense, debtorId, true);
+      if (!baseValid || normalizedAmount > remainingAmount) {
+        addToast(
+          'Invalid Payment',
+          `Payment must be between $0.01 and $${remainingAmount.toFixed(2)}.`,
+          'info'
+        );
+        return;
+      }
     }
     
     const isCreditor = selectedExpense.paidBy === activeUser;
@@ -1302,11 +1329,11 @@ export default function App() {
                   onExpenseClick={(exp) => setSelectedExpense(exp)}
                 />
               </div>
-              <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
+              <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
             </div>
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6">
-              <StatsSection expenses={expenses} group={group} activeUser={activeUser} orientation="rail" />
+              <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { Expense, Group, SplitType } from '../types';
-import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus } from '../lib/money';
+import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
 import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
 
 // Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
@@ -29,6 +29,11 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // The ledger shows at most PAGE_SIZE rows at a time; "Show more" reveals the
+  // next batch so old unsettled items stay reachable without flooding the page.
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Sort and Filter logic
   const filteredExpenses = expenses
@@ -197,13 +202,16 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             )}
           </div>
         ) : (
-          filteredExpenses.map((exp) => {
+          filteredExpenses.slice(0, visibleCount).map((exp) => {
             const payerMember = members.find(m => m.uid === exp.paidBy);
             const payerName = payerMember?.name || 'Unknown';
             const isPayerActive = exp.paidBy === activeUser;
             const isFullySettled = isExpenseFullySettled(exp);
             const myRemainingBalance = getRemainingSettlementAmount(exp, activeUser, false);
             const totalRemainingToPayer = getTotalRemainingOwedToPayer(exp, false);
+            // Dark Cherry: only its creator ever sees numbers.
+            const isDark = isDarkCherry(exp);
+            const maskNumbers = isDark && !isPayerActive;
 
             let balanceText = '';
             let balanceStyle = '';
@@ -211,6 +219,14 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             if (isFullySettled) {
               balanceText = 'Fully Settled';
               balanceStyle = 'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
+            } else if (isDark) {
+              if (isPayerActive) {
+                balanceText = `Pot: $${getDarkCherryRemaining(exp, false).toFixed(2)} to go`;
+                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
+              } else {
+                balanceText = 'Chip in when you can';
+                balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
+              }
             } else if (isPayerActive) {
               if (totalRemainingToPayer > 0.01) {
                 balanceText = `Others owe you $${totalRemainingToPayer.toFixed(2)}`;
@@ -273,8 +289,10 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
                       <span className="font-mono text-[11px]">
-                        Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
-                        {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}
+                        {isDark
+                          ? 'Dark Cherry · blind split 🍒'
+                          : <>Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
+                            {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}</>}
                       </span>
                     </div>
                   </div>
@@ -284,7 +302,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
                   <div className="sm:text-right">
                     <span className="block text-base font-display font-bold text-natural-text">
-                      {formatCurrency(exp.amount)}
+                      {maskNumbers ? '🍒 •••' : formatCurrency(exp.amount)}
                     </span>
                     <span className={`inline-block text-[10px] px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
                       {balanceText}
@@ -298,10 +316,23 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
         )}
       </div>
 
+      {/* Show more (list is capped at PAGE_SIZE rows at a time) */}
+      {filteredExpenses.length > visibleCount && (
+        <div className="p-3 border-t border-natural-border text-center">
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="text-xs font-bold text-natural-primary hover:text-natural-dark bg-natural-sage/30 hover:bg-natural-sage/50 border border-natural-primary/20 px-5 py-2 rounded-full transition-all cursor-pointer"
+            id="show-more-expenses-btn"
+          >
+            Show more ({filteredExpenses.length - visibleCount} more)
+          </button>
+        </div>
+      )}
+
       {/* Stats Counter Footer */}
       {filteredExpenses.length > 0 && (
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl" id="list-footer-stats">
-          <span className="font-medium font-mono">Showing {filteredExpenses.length} of {expenses.length} expense items</span>
+          <span className="font-medium font-mono">Showing {Math.min(visibleCount, filteredExpenses.length)} of {expenses.length} expense items</span>
           {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button 
               onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}

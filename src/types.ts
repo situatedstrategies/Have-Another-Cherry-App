@@ -43,7 +43,10 @@ export interface Group {
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)
 }
 
-export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party';
+// 'dark_cherry' is the blind split (a Plus feature): the creator sets the pot
+// target (the expense amount) plus a min/max per logged payment; everyone else
+// only ever sees the allowed payment range, never the total or what remains.
+export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party' | 'dark_cherry';
 
 export type PaymentInstrument = 'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'OTHER';
 
@@ -117,6 +120,10 @@ export interface Expense {
   // Per-transaction "cherries" — extra people added to a single expense's split
   // (not permanent group members). Each gets a dollar share of this expense only.
   extraParticipants?: { name: string; share: number }[];
+  // Dark Cherry (blind split) only: bounds for a single logged payment. The pot
+  // target is `amount`; participants see only these bounds.
+  blindMin?: number;
+  blindMax?: number;
   isRecurring?: boolean;
   recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
   nextRecurringDate?: string;

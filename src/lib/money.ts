@@ -3,6 +3,31 @@ import { Expense } from '../types';
 export const roundCurrency = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
 
+// Dark Cherry: the blind split. No per-person shares — everyone contributes
+// what they can (within the per-payment bounds) until the pot reaches the
+// expense amount. Participants never see the total or the remainder.
+export const isDarkCherry = (expense: Expense): boolean =>
+  expense.splitType === 'dark_cherry';
+
+export const getDarkCherryPotTotal = (
+  expense: Expense,
+  includePending = true
+): number =>
+  roundCurrency(
+    (expense.settlements || [])
+      .filter(s => includePending || s.status === 'confirmed')
+      .reduce((total, s) => total + s.amount, 0)
+  );
+
+export const getDarkCherryRemaining = (
+  expense: Expense,
+  includePending = true
+): number =>
+  Math.max(
+    0,
+    roundCurrency(expense.amount - getDarkCherryPotTotal(expense, includePending))
+  );
+
 export const getSettlementTotal = (
   expense: Expense,
   userId: string,
@@ -30,6 +55,11 @@ export const getRemainingSettlementAmount = (
 };
 
 export const isExpenseFullySettled = (expense: Expense): boolean => {
+  // Dark Cherry: settled when confirmed contributions cover the pot target.
+  if (isDarkCherry(expense)) {
+    return getDarkCherryRemaining(expense, false) <= 0.01;
+  }
+
   const debtors = Object.keys(expense.shares || {}).filter(
     userId => userId !== expense.paidBy
   );

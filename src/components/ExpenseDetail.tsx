@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
-import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel } from '../lib/money';
-import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send } from 'lucide-react';
+import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
+import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff } from 'lucide-react';
+import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -61,8 +62,18 @@ export default function ExpenseDetail({
   const isPayerActive = expense.paidBy === activeUser;
   
   const myShare = expense.shares?.[activeUser] || 0;
-  const isDebtorActive = !isPayerActive && myShare > 0;
+  const isDark = isDarkCherry(expense);
+  // Dark Cherry: only its creator sees numbers; everyone else just contributes.
+  const maskNumbers = isDark && !isPayerActive;
+  const isDebtorActive = (!isPayerActive && myShare > 0) || (isDark && !isPayerActive);
   const isCreditorActive = isPayerActive;
+
+  const [showDarkIntro, setShowDarkIntro] = useState(false);
+  useEffect(() => {
+    if (maskNumbers && !hasSeenDarkCherryIntro(activeUser)) {
+      setShowDarkIntro(true);
+    }
+  }, [maskNumbers, activeUser]);
 
   return (
     <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200" id="detail-overlay">
@@ -112,7 +123,7 @@ export default function ExpenseDetail({
             </div>
             <div className="text-right shrink-0">
               <span className="block text-3xl font-display font-bold text-natural-text">
-                ${expense.amount.toFixed(2)}
+                {maskNumbers ? '🍒 •••' : `$${expense.amount.toFixed(2)}`}
               </span>
               <span className="block text-xs font-semibold text-natural-muted mt-1">
                 Paid by <span className="capitalize text-natural-text">{payerName}</span>
@@ -158,7 +169,49 @@ export default function ExpenseDetail({
             </div>
           )}
 
-          {/* Split Details */}
+          {/* Dark Cherry: no cost breakdown — the pot is the whole point. */}
+          {isDark ? (
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+                <EyeOff className="h-3.5 w-3.5" /> Dark Cherry — Blind Split
+              </h3>
+              {isPayerActive ? (
+                <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-natural-muted">Pot target</span>
+                    <span className="font-bold font-mono text-natural-text">${expense.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-natural-muted">Collected (confirmed)</span>
+                    <span className="font-bold font-mono text-natural-primary">${getDarkCherryPotTotal(expense, false).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-natural-muted">Still to go</span>
+                    <span className="font-bold font-mono text-natural-text">${getDarkCherryRemaining(expense, false).toFixed(2)}</span>
+                  </div>
+                  <p className="text-[11px] text-natural-muted pt-2 border-t border-natural-border/50">
+                    Members can log between <span className="font-mono font-semibold">${(expense.blindMin || 0).toFixed(2)}</span> and{' '}
+                    <span className="font-mono font-semibold">${(expense.blindMax || 0).toFixed(2)}</span> per payment.
+                    Only you can see these numbers.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4">
+                  <p className="text-sm text-natural-text leading-relaxed">
+                    This is a blind split: chip in what you can, when you can. The total and
+                    the pot stay hidden — when it's covered, the cherry closes on its own.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDarkIntro(true)}
+                    className="mt-2 text-xs font-bold text-natural-primary hover:underline"
+                  >
+                    What's a Dark Cherry?
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Cost Breakdown</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -194,6 +247,7 @@ export default function ExpenseDetail({
               ))}
             </div>
           </div>
+          )}
 
           {/* Audit Trail Section */}
           <div className="space-y-4 pt-4 border-t border-natural-border">
@@ -234,7 +288,11 @@ export default function ExpenseDetail({
                       <span className="text-[10px] font-normal text-natural-primary group-hover:underline">{isExpanded ? 'Hide' : 'Details'}</span>
                     </span>
                     <p className="text-xs text-natural-muted mt-0.5">
-                      <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid <strong>${s.amount.toFixed(2)}</strong> to <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
+                      <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid{' '}
+                      {maskNumbers && s.paidBy !== activeUser
+                        ? <strong>a contribution</strong>
+                        : <strong>${s.amount.toFixed(2)}</strong>}{' '}
+                      to <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
                     </p>
                     <span className="text-[10px] text-natural-muted font-mono mt-1 block">
                       {formatDateTime(s.timestamp)}
@@ -243,7 +301,7 @@ export default function ExpenseDetail({
 
                   {isExpanded && (
                     <div className="mt-2 bg-natural-sidebar/40 border border-natural-border/60 rounded-lg p-3 text-xs space-y-1.5">
-                      <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">{maskNumbers && s.paidBy !== activeUser ? '🍒 •••' : `$${s.amount.toFixed(2)}`}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Method</span><span className="font-semibold text-natural-text">{s.instrumentType}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : '—'}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Logged</span><span className="font-semibold text-natural-text">{formatDateTime(s.timestamp)}</span></div>
@@ -306,13 +364,17 @@ export default function ExpenseDetail({
         {/* Footer (Quick Actions) */}
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0" id="detail-footer">
           <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
+            {/* A Dark Cherry belongs to its creator: nobody else can edit or
+                delete it — the edit form would reveal the hidden numbers. */}
+            {!maskNumbers && (
+            <>
             <button
               onClick={onEdit}
               className="px-3 py-2 text-xs font-semibold text-natural-text hover:bg-natural-sidebar border border-transparent hover:border-natural-border rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Edit2 className="h-3.5 w-3.5" /> Edit
             </button>
-            
+
             {isDeleting ? (
               <div className="flex items-center gap-2 border border-rose-200 bg-rose-50 px-3 py-1.5 rounded-xl">
                 <span className="text-[10px] font-bold text-rose-600 uppercase">Confirm Delete?</span>
@@ -327,11 +389,25 @@ export default function ExpenseDetail({
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </button>
             )}
+            </>
+            )}
           </div>
           
           {/* State changes (Pay/Confirm) */}
           <div className="flex flex-col sm:flex-row justify-end gap-2 order-1 sm:order-2 w-full sm:w-auto">
             {!isExpenseFullySettled(expense) && isDebtorActive && (() => {
+              if (isDark) {
+                // No numbers on the button — that's the whole point.
+                return (
+                  <button
+                    onClick={onSettleClick}
+                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <CreditCard className="h-4 w-4" /> Chip Into the Pot 🍒
+                  </button>
+                );
+              }
+
               const leftToPay = getRemainingSettlementAmount(expense, activeUser, true);
 
               return leftToPay > 0.01 ? (
@@ -361,6 +437,15 @@ export default function ExpenseDetail({
           </div>
         </div>
       </div>
+
+      {showDarkIntro && (
+        <DarkCherryInfoModal
+          onClose={() => {
+            markDarkCherryIntroSeen(activeUser);
+            setShowDarkIntro(false);
+          }}
+        />
+      )}
     </div>
   );
 }

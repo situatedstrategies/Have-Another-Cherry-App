@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Expense, Group, PaymentInstrument } from '../types';
 import { Check } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
-import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
+import { getRemainingSettlementAmount, roundCurrency, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
 import Modal from './Modal';
 
 interface SettleUpModalProps {
@@ -27,17 +27,25 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   const [error, setError] = useState('');
   
   const isCreditor = expense.paidBy === activeUser;
-  
-  // Find out who owes money on this expense
+  const isDark = isDarkCherry(expense);
+  // Contributors to a Dark Cherry only ever see the allowed payment range.
+  const blindContributor = isDark && !isCreditor;
+
+  // Find out who owes money on this expense. On a Dark Cherry every other
+  // member may contribute (there are no per-person shares).
   const members = getFullMembers(group);
-  const debtors = Object.keys(expense.shares || {}).filter(uid => uid !== expense.paidBy && (expense.shares?.[uid] || 0) > 0);
-  
+  const debtors = isDark
+    ? members.map(m => m.uid).filter(uid => uid !== expense.paidBy)
+    : Object.keys(expense.shares || {}).filter(uid => uid !== expense.paidBy && (expense.shares?.[uid] || 0) > 0);
+
   const [selectedDebtor, setSelectedDebtor] = useState(isCreditor ? (debtors[0] || '') : activeUser);
-  
+
   // Pending payments reserve part of the balance so the same debt
   // cannot be submitted repeatedly while awaiting confirmation.
   const getRemainingAmount = (uid: string) =>
-    getRemainingSettlementAmount(expense, uid, true);
+    isDark
+      ? getDarkCherryRemaining(expense, true)
+      : getRemainingSettlementAmount(expense, uid, true);
 
   // Default to empty ($0) — the user enters how much they're settling.
   const [amountToPay, setAmountToPay] = useState('');
@@ -64,14 +72,24 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
       return;
     }
 
-    if (remaining <= 0) {
-      setError('This person has no remaining balance on this transaction.');
-      return;
-    }
+    if (blindContributor) {
+      // Only the creator's chosen range is enforced — never the (hidden) pot.
+      const min = expense.blindMin || 0.01;
+      const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
+      if (amount < min || amount > max) {
+        setError(`Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`);
+        return;
+      }
+    } else {
+      if (remaining <= 0) {
+        setError('This person has no remaining balance on this transaction.');
+        return;
+      }
 
-    if (amount > remaining) {
-      setError(`Payment cannot exceed the remaining balance of $${remaining.toFixed(2)}.`);
-      return;
+      if (amount > remaining) {
+        setError(`Payment cannot exceed the remaining balance of $${remaining.toFixed(2)}.`);
+        return;
+      }
     }
 
     onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor, paymentDate);
@@ -86,7 +104,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   ];
 
   return (
-    <Modal onClose={onClose} title={isCreditor ? 'Log Received Payment' : 'Settle Expense Share'} bodyClassName="">
+    <Modal onClose={onClose} title={isCreditor ? 'Log Received Payment' : (blindContributor ? 'Chip Into the Pot 🍒' : 'Settle Expense Share')} bodyClassName="">
         <form onSubmit={handleSettleSubmit} className="p-6 space-y-5">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
@@ -121,32 +139,41 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
           </div>
 
           <div className="flex flex-col items-center justify-center py-4 bg-natural-sage/20 rounded-2xl border border-dashed border-natural-primary/50">
-            <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">Settle Amount</span>
+            <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">
+              {blindContributor ? 'Chip Into the Pot' : 'Settle Amount'}
+            </span>
             <div className="flex items-center text-4xl font-display font-bold text-natural-text mt-1">
               $
               <input
                 type="number"
                 step="0.01"
-                min="0"
-                max={getRemainingAmount(selectedDebtor)}
+                min={blindContributor ? (expense.blindMin || 0) : 0}
+                max={blindContributor ? (expense.blindMax || undefined) : getRemainingAmount(selectedDebtor)}
                 value={amountToPay}
                 onChange={(e) => setAmountToPay(e.target.value)}
                 placeholder="0.00"
                 className="bg-transparent border-none outline-none w-32 text-center placeholder-natural-muted/40"
               />
             </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] font-medium text-natural-muted">
-                Remaining owed: <span className="font-bold text-natural-text">${getRemainingAmount(selectedDebtor).toFixed(2)}</span>
+            {blindContributor ? (
+              <span className="text-[11px] font-medium text-natural-muted mt-1">
+                Anything between <span className="font-bold text-natural-text">${(expense.blindMin || 0).toFixed(2)}</span> and{' '}
+                <span className="font-bold text-natural-text">${(expense.blindMax || 0).toFixed(2)}</span> 🍒
               </span>
-              <button
-                type="button"
-                onClick={() => setAmountToPay(getRemainingAmount(selectedDebtor).toFixed(2))}
-                className="text-[11px] font-bold text-natural-primary hover:underline"
-              >
-                Settle full
-              </button>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] font-medium text-natural-muted">
+                  Remaining owed: <span className="font-bold text-natural-text">${getRemainingAmount(selectedDebtor).toFixed(2)}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAmountToPay(getRemainingAmount(selectedDebtor).toFixed(2))}
+                  className="text-[11px] font-bold text-natural-primary hover:underline"
+                >
+                  Settle full
+                </button>
+              </div>
+            )}
           </div>
 
           <div>
@@ -195,7 +222,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
             <button type="button" onClick={onClose} className="w-full py-2.5 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
               Cancel
             </button>
-            <button type="submit" disabled={!selectedDebtor || getRemainingAmount(selectedDebtor) <= 0} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
               <Check className="h-4 w-4" /> Log Payment
             </button>
           </div>
