@@ -51,9 +51,11 @@ bug can never reach a real ledger.
   can serve either backend. `APP_ENV` is exported if code ever needs to branch.
 - Beta needs its **own reCAPTCHA v3 site key** (App Check is bound to a domain), its
   **own OAuth client**, and its domain added to Auth -> Settings -> Authorized domains.
-- `firestore.rules` auto-deploys to the **beta** project only, via
-  `.github/workflows/deploy-firestore-rules.yml` (Workload Identity Federation — no
-  service-account keys in the repo). Production rules are deployed manually.
+- `firestore.rules` auto-deploys to **both projects** via
+  `.github/workflows/deploy-firestore-rules.yml`: beta through Workload Identity
+  Federation, production through WIF (`GCP_WIF_PROVIDER_PROD` + `GCP_SERVICE_ACCOUNT_PROD`
+  repo variables) or the `FIREBASE_SERVICE_ACCOUNT` secret as a fallback. A project
+  whose credentials are missing is skipped with a warning.
 
 ## AI (Gemini via Vertex) — important
 This project's Google Cloud org blocks standalone Gemini API keys (they must be service-account-bound and don't work with the Developer API). So the app uses **Vertex AI + ADC** and needs **no API key**.
@@ -83,9 +85,10 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
 - **Firestore rules deploy separately from the app.** App Hosting never reads
   `firestore.rules`. `.github/workflows/deploy-firestore-rules.yml` publishes them to
-  the **beta** project (via Workload Identity Federation) on any push to
-  `development/web-production` that touches the file. **Production** rules are deployed
-  by hand: `npm run rules:deploy` (needs `npx firebase-tools login` once). If rules and
+  **production and beta** on any push to `development/web-production` that touches the
+  file (see the Beta section for the credentials each leg needs; an unconfigured leg is
+  skipped with a warning, so check the Actions run after changing rules). Manual
+  fallback: `npm run rules:deploy` (needs `npx firebase-tools login` once). If rules and
   app ever disagree, users hit "Missing or insufficient permissions".
 
 ## Conventions / gotchas
