@@ -291,7 +291,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto"></div>
-          <h2 className="text-xl font-display font-bold text-natural-text">Crafting your financial style…</h2>
+          <h2 className="text-xl font-display font-semibold text-natural-text">Crafting your financial style…</h2>
           <p className="text-sm text-natural-muted">Reading between the lines of your answers.</p>
         </div>
       </div>
@@ -302,7 +302,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
       <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-display font-bold text-natural-text mb-1">Financial Profile Quiz</h1>
+          <h1 className="text-2xl font-display font-semibold text-natural-text mb-1">Financial Profile Quiz</h1>
           <p className="text-sm text-natural-muted">{currentStep.subtitle || "Let's tailor the app to your habits."}</p>
           {/* Progress */}
           <div className="flex gap-1.5 mt-4">
@@ -370,7 +370,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               <button
                 onClick={handleSubmit}
                 disabled={!isStepComplete}
-                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-dark transition-colors disabled:opacity-50`}
+                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-[#A00E00] transition-colors disabled:opacity-50`}
               >
                 Generate Profile
               </button>

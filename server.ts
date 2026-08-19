@@ -66,7 +66,7 @@ async function startServer() {
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -84,8 +84,10 @@ async function startServer() {
   input { width: 100%; padding: 12px 14px; border: 1px solid #D4D4D8; border-radius: 12px;
     font-size: 15px; font-family: inherit; outline: none; margin-bottom: 12px; }
   input:focus { border-color: #C41200; }
-  button { width: 100%; padding: 12px; background: #C41200; color: #FFFFFF; border: 0;
-    border-radius: 999px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  button { width: 100%; padding: 12px 22px; background: #C41200; color: #FFFFFF; border: 0;
+    border-radius: 999px; font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+    font-family: 'JetBrains Mono', ui-monospace, monospace; cursor: pointer;
+    box-shadow: 0 6px 16px -8px rgba(196,18,0,.7); }
   button:hover { background: #A00E00; }
   .err { color: #C41200; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
   .foot { margin-top: 18px; font-size: 12px; color: #A1A1AA; }

@@ -168,7 +168,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
             <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">
               {blindContributor ? 'Dark Cherry Chip In' : 'Settle Amount'}
             </span>
-            <div className="flex items-center text-4xl font-display font-bold text-natural-text mt-1">
+            <div className="flex items-center text-4xl font-display font-semibold text-natural-text mt-1">
               $
               <input
                 type="number"
@@ -296,7 +296,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
             <button type="button" onClick={onClose} className="w-full py-2.5 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
               Cancel
             </button>
-            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
               <Check className="h-4 w-4" /> Log Payment
             </button>
           </div>

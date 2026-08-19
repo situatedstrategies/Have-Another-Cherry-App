@@ -100,7 +100,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       {/* Controls Header */}
       <div className="p-5 border-b border-natural-border space-y-4" id="list-controls-header">
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <h2 className="text-xl font-display font-bold text-natural-text">Itemized Transactions</h2>
+          <h2 className="text-xl font-display font-semibold text-natural-text">Itemized Transactions</h2>
           
           {/* Quick Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0" id="status-filters">
@@ -301,7 +301,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 {/* Right (desktop) / bottom (mobile): amount + share balance */}
                 <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
                   <div className="sm:text-right">
-                    <span className="block text-base font-display font-bold text-natural-text">
+                    <span className="block text-base font-display font-semibold text-natural-text">
                       {maskNumbers
                         ? <span className="inline-flex items-center gap-1"><Cherry className="h-4 w-4 text-natural-primary" /> •••</span>
                         : formatCurrency(exp.amount)}

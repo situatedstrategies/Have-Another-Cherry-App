@@ -115,7 +115,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
     <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border">
-          <h2 className="text-lg font-display font-bold text-natural-text flex items-center gap-2">
+          <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-natural-primary" /> Plan a Purchase
           </h2>
           <button onClick={onClose} className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors">
@@ -184,7 +184,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">{otherName}'s share ({theirPct}%)</span>
-                <span className="text-lg font-display font-bold text-natural-text">${theirShare.toFixed(2)}</span>
+                <span className="text-lg font-display font-semibold text-natural-text">${theirShare.toFixed(2)}</span>
               </div>
               <div className="text-center py-1">
                 <span className="inline-flex items-center justify-center gap-1">
@@ -194,7 +194,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
                       ))
                     : <Cherry className="h-6 w-6 text-natural-border" />}
                 </span>
-                <p className={`text-lg font-display font-bold ${result.juice.color}`}>{result.juice.level}</p>
+                <p className={`text-lg font-display font-semibold ${result.juice.color}`}>{result.juice.level}</p>
                 <p className="text-xs text-natural-muted mt-1">{result.juice.blurb}</p>
                 {otherThreshold > 0 && theirShare > otherThreshold && (
                   <p className="text-[11px] text-amber-600 mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>

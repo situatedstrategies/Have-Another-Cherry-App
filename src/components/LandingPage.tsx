@@ -37,10 +37,12 @@ const CrossMark = () => (
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
+  // Mirrors the site's .btn / .btn-lg spec exactly: JetBrains Mono 500,
+  // 15px/30px padding at hero size, pill radius, red glow on primary.
   const btnPrimary =
-    'inline-flex items-center justify-center gap-2 font-semibold text-[15px] px-6 py-3 rounded-full text-white shadow-md hover:shadow-lg transition-all cursor-pointer';
+    'inline-flex items-center justify-center gap-2 font-mono font-medium text-[15px] tracking-[-0.01em] px-[30px] py-[15px] rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] hover:shadow-[0_10px_24px_-10px_rgba(196,18,0,0.8)] hover:bg-[#A00E00] transition-all cursor-pointer';
   const btnGhost =
-    'inline-flex items-center justify-center gap-2 font-semibold text-[15px] px-6 py-3 rounded-full transition-all cursor-pointer';
+    'inline-flex items-center justify-center gap-2 font-mono font-medium text-[15px] tracking-[-0.01em] px-[30px] py-[15px] rounded-full transition-all cursor-pointer hover:border-[#18181B]';
 
   return (
     <>
@@ -69,10 +71,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <a href={`${SITE}/privacy`} className="hover:text-[#C41200] transition-colors">Privacy &amp; Security</a>
             </nav>
             <div className="flex items-center gap-2.5">
-              <a href={`${SITE}/features#pricing`} className="hidden sm:inline-flex text-sm font-semibold px-4 py-2 rounded-full border transition-colors hover:border-[#C41200]" style={{ borderColor: C.border, background: C.surface }}>
+              <a href={`${SITE}/features#pricing`} className="hidden sm:inline-flex font-mono font-medium text-sm tracking-[-0.01em] px-[22px] py-3 rounded-full border transition-colors hover:border-[#18181B]" style={{ borderColor: C.border, background: C.surface }}>
                 Pricing
               </a>
-              <button onClick={onGetStarted} className="text-sm font-semibold px-5 py-2 rounded-full text-white transition-opacity hover:opacity-90" style={{ background: C.primary }}>
+              <button onClick={onGetStarted} className="font-mono font-medium text-sm tracking-[-0.01em] px-[22px] py-3 rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] transition-colors hover:bg-[#A00E00]" style={{ background: C.primary }}>
                 Log in
               </button>
             </div>
@@ -87,7 +89,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               The sweeter expense sharing application for everybody. Go ahead. Have another cherry.
             </span>
 
-            <h1 className="font-display font-semibold tracking-tight mt-6 mx-auto max-w-3xl text-[clamp(38px,6vw,64px)] leading-[1.08]">
+            <h1 className="font-display font-semibold tracking-[-0.01em] mt-6 mx-auto max-w-3xl text-[clamp(38px,6vw,64px)] leading-[1.08]">
               Share the bills. <span style={{ color: C.primary }}>Skip the awkward math.</span>
             </h1>
             <p className="mt-5 mx-auto max-w-2xl text-[17px] leading-relaxed" style={{ color: C.muted }}>

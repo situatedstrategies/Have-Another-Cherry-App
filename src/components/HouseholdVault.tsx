@@ -297,7 +297,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
             <div className="flex items-center justify-between">
               <button onClick={() => shiftMonth(-1)} className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"><ChevronLeft size={16} /></button>
               <div className="text-center">
-                <span className="text-sm font-display font-bold text-natural-text">{MONTH_NAMES[viewMonth]} {viewYear}</span>
+                <span className="text-sm font-display font-semibold text-natural-text">{MONTH_NAMES[viewMonth]} {viewYear}</span>
                 {monthTotal > 0 && (
                   <span className="block text-[10px] font-mono text-natural-muted">~${monthTotal.toFixed(2)} in recurring costs</span>
                 )}
@@ -373,7 +373,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-xl transition-colors">
+              <button type="submit" className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl transition-colors">
                 Add to Vault
               </button>
             </form>

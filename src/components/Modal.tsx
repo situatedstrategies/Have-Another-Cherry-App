@@ -24,7 +24,7 @@ export default function Modal({ onClose, title, icon, size = 'md', footer, child
       <div className={`bg-white w-full h-full sm:h-auto sm:max-h-[90vh] ${maxW} rounded-none sm:rounded-3xl sm:border border-natural-border shadow-xl flex flex-col overflow-hidden sm:animate-in sm:zoom-in-95 sm:duration-200`}>
         {title !== undefined && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border shrink-0">
-            <h2 className="text-lg font-display font-bold text-natural-text flex items-center gap-2 min-w-0">
+            <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2 min-w-0">
               {icon}
               <span className="truncate">{title}</span>
             </h2>

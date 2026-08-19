@@ -38,7 +38,7 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <h3 className="text-xl font-display font-bold text-natural-text">This tree is still growing.</h3>
+          <h3 className="text-xl font-display font-semibold text-natural-text">This tree is still growing.</h3>
           <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
             Cherry + will bring deeper budgeting tools and more ways to keep money
             conversations kind. Keep in touch - and always stay sweet.
@@ -66,7 +66,7 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="bg-natural-primary hover:bg-natural-dark text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                className="bg-natural-primary hover:bg-[#A00E00] text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
                 aria-label="Sign up for updates"
               >
                 {status === 'sending' ? <span className="animate-spin inline-block text-xs">◌</span> : <Send size={16} />}

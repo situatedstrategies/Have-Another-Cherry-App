@@ -1452,7 +1452,7 @@ export default function App() {
                 setEditingExpense(null);
                 setShowForm(true);
               }}
-              className="bg-natural-primary hover:bg-natural-dark text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-natural-primary hover:bg-[#A00E00] text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Log Expense
             </button>
@@ -1548,7 +1548,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setSelectedExpense(pendingToConfirm[0])}
-                className="shrink-0 bg-natural-primary hover:bg-natural-dark text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
+                className="shrink-0 bg-natural-primary hover:bg-[#A00E00] text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
               >
                 Review
               </button>
@@ -1699,7 +1699,7 @@ export default function App() {
                           className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                         />
                       </div>
-                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg shrink-0">Save</button>
+                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] px-4 py-2 rounded-lg shrink-0">Save</button>
                     </div>
                   ) : (
                     <button
@@ -1732,7 +1732,7 @@ export default function App() {
                       placeholder="Zelle email or phone"
                       className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                     />
-                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg">Save Payment Info</button>
+                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] px-4 py-2 rounded-lg">Save Payment Info</button>
                   </div>
                 </div>
               </div>

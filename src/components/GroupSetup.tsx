@@ -316,7 +316,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
                 <Users className="h-12 w-12 text-natural-primary" />
               </div>
-              <h1 className="text-3xl font-bold font-display text-natural-text mb-2 tracking-tight">
+              <h1 className="text-3xl font-semibold font-display text-natural-text mb-2 tracking-tight">
                 Group Created!
               </h1>
               <p className="text-natural-muted font-medium">
@@ -353,7 +353,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 <button 
                   type="submit" 
                   disabled={inviteStatus === 'sending'}
-                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-dark transition-colors disabled:opacity-50"
+                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-[#A00E00] transition-colors disabled:opacity-50"
                 >
                   {inviteStatus === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
                 </button>
@@ -364,7 +364,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
 
             <button
               onClick={() => onComplete(createdGroupInfo.groupId)}
-              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm"
+              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm"
             >
               Done, go to Dashboard
             </button>
@@ -390,7 +390,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
                 <CherryLogo className="h-12 w-12" />
               </div>
-              <h1 className="text-3xl font-bold font-display text-natural-text mb-1 tracking-tight">
+              <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 Welcome!
               </h1>
               <p className="text-natural-accent font-medium text-sm uppercase tracking-widest">
@@ -454,7 +454,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           </button>
 
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold font-display text-natural-text">
+            <h2 className="text-2xl font-semibold font-display text-natural-text">
               {mode === 'create' ? 'Create a Group' : 'Join a Group'}
             </h2>
           </div>
@@ -618,7 +618,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <button
                 type="submit"
                 disabled={loading || !splitBalanced}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Creating...' : `Create & Get Invite Code${numPeople > 2 ? 's' : ''}`}
               </button>
@@ -648,7 +648,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Joining...' : 'Join Group'}
               </button>

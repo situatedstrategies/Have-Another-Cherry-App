@@ -526,7 +526,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           <button
             type="submit"
             form="expense-form"
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
+            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             {editingExpense ? 'Update Expense' : 'Save Expense'}
           </button>
@@ -607,7 +607,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 type="button"
                 onClick={applyItemAssignments}
                 disabled={numericAmount <= 0}
-                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-xl transition-colors disabled:opacity-50"
+                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl transition-colors disabled:opacity-50"
               >
                 Apply Items to Split
               </button>
@@ -1174,7 +1174,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 {members.map(m => (
                   <div key={`preview-${m.uid}`} className="flex flex-col">
                     <span className="text-xs text-natural-muted font-semibold">{m.name}'s Share ({Math.round(((previewShares[m.uid] || 0) / numericAmount) * 100) || 0}%)</span>
-                    <span className="text-lg font-display font-bold text-natural-text">
+                    <span className="text-lg font-display font-semibold text-natural-text">
                       ${(previewShares[m.uid] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-[10px] text-natural-text font-medium">
@@ -1185,7 +1185,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 {splitType === 'custom_percentage' && guests.filter(g => g.name.trim() || g.pct).map(g => (
                   <div key={`preview-${g.id}`} className="flex flex-col">
                     <span className="text-xs text-natural-muted font-semibold">{g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)</span>
-                    <span className="text-lg font-display font-bold text-natural-text">
+                    <span className="text-lg font-display font-semibold text-natural-text">
                       ${((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-[10px] text-natural-text font-medium">Guest (this expense)</span>

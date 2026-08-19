@@ -108,7 +108,7 @@ export default function ExpenseDetail({
           {/* Main Info */}
           <div className="flex items-start justify-between">
             <div className="pr-4">
-              <h2 className="text-2xl font-display font-bold text-natural-text mb-2">
+              <h2 className="text-2xl font-display font-semibold text-natural-text mb-2">
                 {expense.title}
               </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-natural-muted">
@@ -122,7 +122,7 @@ export default function ExpenseDetail({
               </div>
             </div>
             <div className="text-right shrink-0">
-              <span className="block text-3xl font-display font-bold text-natural-text">
+              <span className="block text-3xl font-display font-semibold text-natural-text">
                 {maskNumbers
                   ? <span className="inline-flex items-center gap-1.5"><Cherry className="h-7 w-7 text-natural-primary" /> •••</span>
                   : `$${expense.amount.toFixed(2)}`}
@@ -154,7 +154,7 @@ export default function ExpenseDetail({
                   </div>
                   <button
                     onClick={() => onConfirmReceipt(s.id)}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ShieldCheck className="h-4 w-4" /> Confirm Receipt
                   </button>
@@ -225,7 +225,7 @@ export default function ExpenseDetail({
                     <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">
                       {isMe ? 'My Share' : (m?.name || 'Unknown')}
                     </span>
-                    <span className={`text-lg font-bold font-display mt-1 block ${isMe ? 'text-natural-primary' : 'text-natural-text'}`}>
+                    <span className={`text-lg font-semibold font-display mt-1 block ${isMe ? 'text-natural-primary' : 'text-natural-text'}`}>
                       ${shareAmt.toFixed(2)}
                     </span>
                   </div>
@@ -234,7 +234,7 @@ export default function ExpenseDetail({
               {expense.splitType === 'third_party' && (
                 <div className="p-3 rounded-xl border bg-transparent border-natural-border/50 text-center">
                   <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">{expense.thirdPersonName}'s Share</span>
-                  <span className="text-lg font-bold font-display text-natural-text mt-1 block">
+                  <span className="text-lg font-semibold font-display text-natural-text mt-1 block">
                     ${expense.thirdPersonShare?.toFixed(2)}
                   </span>
                 </div>
@@ -242,7 +242,7 @@ export default function ExpenseDetail({
               {expense.extraParticipants?.map((g, i) => (
                 <div key={`extra-${i}`} className="p-3 rounded-xl border bg-transparent border-natural-border/50">
                   <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">{g.name} (guest)</span>
-                  <span className="text-lg font-bold font-display text-natural-text mt-1 block">
+                  <span className="text-lg font-semibold font-display text-natural-text mt-1 block">
                     ${g.share.toFixed(2)}
                   </span>
                 </div>
@@ -403,7 +403,7 @@ export default function ExpenseDetail({
                 return (
                   <button
                     onClick={onSettleClick}
-                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Cherry className="h-4 w-4" /> Dark Cherry Chip In
                   </button>
@@ -415,7 +415,7 @@ export default function ExpenseDetail({
               return leftToPay > 0.01 ? (
                 <button
                   onClick={onSettleClick}
-                  className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <CreditCard className="h-4 w-4" /> Settle My Share (${leftToPay.toFixed(2)})
                 </button>

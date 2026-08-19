@@ -87,7 +87,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           </div>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-display font-bold text-natural-text">
+          <span className="text-3xl font-display font-semibold text-natural-text">
             ${youOweAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
@@ -116,7 +116,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           </div>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-display font-bold text-natural-text">
+          <span className="text-3xl font-display font-semibold text-natural-text">
             ${othersOweYouAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
@@ -139,7 +139,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           </div>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-display font-bold text-natural-primary">
+          <span className="text-3xl font-display font-semibold text-natural-primary">
             {settledCount}
           </span>
           <span className="text-sm text-natural-muted font-medium">items</span>

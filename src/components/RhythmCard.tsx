@@ -113,7 +113,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
         <div className="grid grid-cols-3 gap-2 text-center" aria-hidden="true">
           {['Settled', 'Days to settle', 'Month streak'].map(label => (
             <div key={label} className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
-              <span className="block text-lg font-display font-bold text-natural-border select-none">···</span>
+              <span className="block text-lg font-display font-semibold text-natural-border select-none">···</span>
               <span className="block text-[10px] font-semibold text-natural-muted uppercase">{label}</span>
             </div>
           ))}
@@ -142,17 +142,17 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
 
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
-          <span className="block text-lg font-display font-bold text-natural-text">{rhythm.settledPct}%</span>
+          <span className="block text-lg font-display font-semibold text-natural-text">{rhythm.settledPct}%</span>
           <span className="block text-[10px] font-semibold text-natural-muted uppercase">Settled</span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
-          <span className="block text-lg font-display font-bold text-natural-text">
+          <span className="block text-lg font-display font-semibold text-natural-text">
             {rhythm.medianSettleDays == null ? ' - ' : rhythm.medianSettleDays < 1 ? '<1' : Math.round(rhythm.medianSettleDays)}
           </span>
           <span className="block text-[10px] font-semibold text-natural-muted uppercase">Days to settle</span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
-          <span className="block text-lg font-display font-bold text-natural-text">{rhythm.streakMonths}</span>
+          <span className="block text-lg font-display font-semibold text-natural-text">{rhythm.streakMonths}</span>
           <span className="block text-[10px] font-semibold text-natural-muted uppercase">Month streak</span>
         </div>
       </div>

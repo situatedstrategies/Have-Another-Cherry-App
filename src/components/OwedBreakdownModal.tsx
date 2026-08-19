@@ -110,7 +110,7 @@ export default function OwedBreakdownModal({
           <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
             {mode === 'you_owe' ? 'Total you owe' : 'Total owed to you'}
           </span>
-          <span className="text-2xl font-display font-bold text-natural-text">{fmt(grandTotal)}</span>
+          <span className="text-2xl font-display font-semibold text-natural-text">{fmt(grandTotal)}</span>
         </div>
 
         {byPerson.length === 0 ? (

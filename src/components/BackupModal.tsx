@@ -242,7 +242,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
               <button onClick={handleGenerate} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
                 <Sparkles className="h-4 w-4 text-natural-primary" /> Generate
               </button>
-              <button onClick={handleSaveKey} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-natural-dark rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={handleSaveKey} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-[#A00E00] rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
                 <Check className="h-4 w-4" /> Save Key
               </button>
             </div>
