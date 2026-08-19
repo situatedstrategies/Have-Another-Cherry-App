@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
-import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff } from 'lucide-react';
+import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 
 interface ExpenseDetailProps {
@@ -123,7 +123,9 @@ export default function ExpenseDetail({
             </div>
             <div className="text-right shrink-0">
               <span className="block text-3xl font-display font-bold text-natural-text">
-                {maskNumbers ? '🍒 •••' : `$${expense.amount.toFixed(2)}`}
+                {maskNumbers
+                  ? <span className="inline-flex items-center gap-1.5"><Cherry className="h-7 w-7 text-natural-primary" /> •••</span>
+                  : `$${expense.amount.toFixed(2)}`}
               </span>
               <span className="block text-xs font-semibold text-natural-muted mt-1">
                 Paid by <span className="capitalize text-natural-text">{payerName}</span>
@@ -301,7 +303,7 @@ export default function ExpenseDetail({
 
                   {isExpanded && (
                     <div className="mt-2 bg-natural-sidebar/40 border border-natural-border/60 rounded-lg p-3 text-xs space-y-1.5">
-                      <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">{maskNumbers && s.paidBy !== activeUser ? '🍒 •••' : `$${s.amount.toFixed(2)}`}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Amount</span><span className="font-bold text-natural-text">{maskNumbers && s.paidBy !== activeUser ? <span className="inline-flex items-center gap-1"><Cherry className="h-3.5 w-3.5 text-natural-primary" /> •••</span> : `$${s.amount.toFixed(2)}`}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Method</span><span className="font-semibold text-natural-text">{s.instrumentType}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : '—'}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Logged</span><span className="font-semibold text-natural-text">{formatDateTime(s.timestamp)}</span></div>
@@ -403,7 +405,7 @@ export default function ExpenseDetail({
                     onClick={onSettleClick}
                     className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
-                    <CreditCard className="h-4 w-4" /> Chip Into the Pot 🍒
+                    <Cherry className="h-4 w-4" /> Dark Cherry Chip In
                   </button>
                 );
               }

@@ -48,7 +48,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <section className="max-w-7xl mx-auto px-6 pt-16 pb-24 grid lg:grid-cols-2 gap-14 items-center">
           <div>
             <div className="inline-flex items-center gap-2 bg-natural-sage/40 border border-natural-primary/20 rounded-full px-3 py-1.5 text-xs font-semibold text-natural-primary mb-6">
-              🍒 Better money conversations start with better details
+              <img src="/cherry2transparent.png" alt="" className="h-4 w-4 object-contain" />
+              Better money conversations start with better details
             </div>
 
             <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.02] tracking-tight">
@@ -109,7 +110,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     Weekend Groceries
                   </h3>
                 </div>
-                <span className="text-3xl">🍒</span>
+                <img src="/cherry2transparent.png" alt="" className="h-9 w-9 object-contain" />
               </div>
 
               <div className="text-4xl font-display font-bold">$86.42</div>
@@ -207,7 +208,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         </section>
 
         <section className="max-w-5xl mx-auto px-6 py-24 text-center">
-          <span className="text-5xl">🍒</span>
+          <img src="/cherry2transparent.png" alt="" className="h-14 mx-auto object-contain" />
           <h2 className="font-display text-4xl md:text-5xl font-bold mt-5">
             Keep sharing. Keep it clear.
           </h2>

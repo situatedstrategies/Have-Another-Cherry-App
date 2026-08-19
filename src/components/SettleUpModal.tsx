@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Expense, Group, PaymentInstrument } from '../types';
-import { Check } from 'lucide-react';
+import { Check, Cherry } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
 import { getRemainingSettlementAmount, roundCurrency, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
 import Modal from './Modal';
@@ -104,7 +104,12 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   ];
 
   return (
-    <Modal onClose={onClose} title={isCreditor ? 'Log Received Payment' : (blindContributor ? 'Chip Into the Pot 🍒' : 'Settle Expense Share')} bodyClassName="">
+    <Modal
+      onClose={onClose}
+      title={isCreditor ? 'Log Received Payment' : (blindContributor ? 'Dark Cherry Chip In' : 'Settle Expense Share')}
+      icon={blindContributor ? <Cherry className="h-5 w-5 text-natural-primary" /> : undefined}
+      bodyClassName=""
+    >
         <form onSubmit={handleSettleSubmit} className="p-6 space-y-5">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
@@ -140,7 +145,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
 
           <div className="flex flex-col items-center justify-center py-4 bg-natural-sage/20 rounded-2xl border border-dashed border-natural-primary/50">
             <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">
-              {blindContributor ? 'Chip Into the Pot' : 'Settle Amount'}
+              {blindContributor ? 'Dark Cherry Chip In' : 'Settle Amount'}
             </span>
             <div className="flex items-center text-4xl font-display font-bold text-natural-text mt-1">
               $
@@ -158,7 +163,7 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
             {blindContributor ? (
               <span className="text-[11px] font-medium text-natural-muted mt-1">
                 Anything between <span className="font-bold text-natural-text">${(expense.blindMin || 0).toFixed(2)}</span> and{' '}
-                <span className="font-bold text-natural-text">${(expense.blindMax || 0).toFixed(2)}</span> 🍒
+                <span className="font-bold text-natural-text">${(expense.blindMax || 0).toFixed(2)}</span>
               </span>
             ) : (
               <div className="flex items-center gap-2 mt-1">

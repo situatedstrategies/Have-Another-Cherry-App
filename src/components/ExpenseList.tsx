@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { Expense, Group, SplitType } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
-import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
 
 // Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
 // bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
@@ -290,7 +290,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       <span className="text-natural-border">•</span>
                       <span className="font-mono text-[11px]">
                         {isDark
-                          ? 'Dark Cherry · blind split 🍒'
+                          ? 'Dark Cherry · blind split'
                           : <>Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
                             {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}</>}
                       </span>
@@ -302,7 +302,9 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
                   <div className="sm:text-right">
                     <span className="block text-base font-display font-bold text-natural-text">
-                      {maskNumbers ? '🍒 •••' : formatCurrency(exp.amount)}
+                      {maskNumbers
+                        ? <span className="inline-flex items-center gap-1"><Cherry className="h-4 w-4 text-natural-primary" /> •••</span>
+                        : formatCurrency(exp.amount)}
                     </span>
                     <span className={`inline-block text-[10px] px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
                       {balanceText}

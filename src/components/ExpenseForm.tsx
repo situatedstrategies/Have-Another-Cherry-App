@@ -897,7 +897,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                         type="text"
                         value={g.name}
                         onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
-                        placeholder="Name (e.g. 🍒 guest)"
+                        placeholder="Name (e.g. weekend guest)"
                         className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
                       />
                       <div className="relative w-24 shrink-0">

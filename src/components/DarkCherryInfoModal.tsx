@@ -1,5 +1,5 @@
 import React from 'react';
-import { EyeOff, HandCoins, ShieldCheck } from 'lucide-react';
+import { EyeOff, HandCoins, ShieldCheck, Cherry } from 'lucide-react';
 import Modal from './Modal';
 
 // First-use explainer for the Dark Cherry blind split. The "seen" flag is
@@ -26,7 +26,8 @@ export default function DarkCherryInfoModal({ onClose }: { onClose: () => void }
   return (
     <Modal
       onClose={onClose}
-      title={<span>🍒 What's a Dark Cherry?</span>}
+      title="What's a Dark Cherry?"
+      icon={<Cherry className="h-5 w-5 text-natural-primary" />}
       footer={
         <button
           onClick={onClose}

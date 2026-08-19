@@ -131,7 +131,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
 
       for (let i = 1; i < numPeople; i++) {
         if (!memberNames[i] || !memberNames[i].trim()) {
-          throw new Error(`Please enter a name for 🍒 ${NUMBER_WORDS[i] || i + 1}`);
+          throw new Error(`Please enter a name for Cherry ${NUMBER_WORDS[i] || i + 1}`);
         }
       }
 
@@ -157,7 +157,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
       };
       
       const availableSplits = splits.slice(1).map((s, idx) => ({
-        name: memberNames[idx + 1] || `🍒 ${NUMBER_WORDS[idx + 1] || idx + 2}`,
+        name: memberNames[idx + 1] || `Cherry ${NUMBER_WORDS[idx + 1] || idx + 2}`,
         split: parseFloat(s) || 0
       }));
 
@@ -576,7 +576,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                             newNames[idx] = e.target.value;
                             setMemberNames(newNames);
                           }}
-                          placeholder={`🍒 ${NUMBER_WORDS[idx] || idx + 1}`}
+                          placeholder={`Cherry ${NUMBER_WORDS[idx] || idx + 1}`}
                           className="w-24 shrink-0 text-sm font-medium text-natural-text bg-transparent border-b border-dashed border-natural-border focus:border-natural-primary outline-none"
                         />
                       )}
