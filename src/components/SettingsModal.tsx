@@ -18,6 +18,8 @@ interface SettingsModalProps {
   onOpenBackup: () => void;
   onOpenPrivacy: () => void;
   onSignOut: () => void;
+  /** Optional extra block (thresholds, payment handles, …) rendered up top. */
+  extraSection?: React.ReactNode;
 }
 
 const RESERVED_NAMES = ['Anonymous', 'Unknown'];
@@ -26,6 +28,7 @@ export default function SettingsModal({
   onClose, userProfile, currentUser, group, groupUsers,
   onSaveName, onRetakeQuiz, onRecalculateSplit, onResendInvite,
   onLeaveGroup, onOpenBackup, onOpenPrivacy, onSignOut,
+  extraSection,
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -55,6 +58,8 @@ export default function SettingsModal({
         </button>
       }
     >
+      {extraSection}
+
       {/* User profile */}
       <div>
         <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>

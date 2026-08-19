@@ -135,6 +135,19 @@ service cloud.firestore {
         if isGroupMember(groupId);
     }
 
+    // Household Vault: an encrypted per-group store (catalogued recurring
+    // bills, document metadata) plus one encrypted doc per uploaded file.
+    // Payloads are E2E-encrypted client-side; members-only either way.
+    match /group_vault/{groupId} {
+      allow read, create, update, delete:
+        if isGroupMember(groupId);
+
+      match /files/{fileId} {
+        allow read, create, update, delete:
+          if isGroupMember(groupId);
+      }
+    }
+
     match /group_mismatches/{groupId}/events/{eventId} {
       allow read, create, update, delete:
         if isGroupMember(groupId);

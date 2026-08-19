@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { Expense, Group, PaymentInstrument } from '../types';
-import { Check, Cherry } from 'lucide-react';
+import { Check, Cherry, ExternalLink, Copy } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
 import { getRemainingSettlementAmount, roundCurrency, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
+import { venmoTarget, zelleTarget } from '../lib/paymentLinks';
 import Modal from './Modal';
 
 interface SettleUpModalProps {
   expense: Expense;
   group: Group;
   activeUser: string;
+  /** Live member profiles — used for the recipient's Venmo/Zelle handles. */
+  groupUsers?: Record<string, any>;
   onClose: () => void;
   onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
 }
@@ -20,7 +23,7 @@ const todayLocal = () => {
   return new Date(d.getTime() - tz).toISOString().split('T')[0];
 };
 
-export default function SettleUpModal({ expense, group, activeUser, onClose, onSubmit }: SettleUpModalProps) {
+export default function SettleUpModal({ expense, group, activeUser, groupUsers, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
   const [notes, setNotes] = useState('');
   const [paymentDate, setPaymentDate] = useState(todayLocal());
@@ -99,9 +102,28 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
     { label: 'Cash', value: 'CASH' },
     { label: 'Credit Card', value: 'CREDIT' },
     { label: 'Debit Card', value: 'DEBIT' },
-    { label: 'Bank / Venmo', value: 'TRANSFER' },
+    { label: 'Bank Transfer', value: 'TRANSFER' },
+    { label: 'Venmo', value: 'VENMO' },
+    { label: 'Zelle', value: 'ZELLE' },
     { label: 'Other', value: 'OTHER' }
   ];
+
+  // Deep-link-lite: hand the payer straight into Venmo/Zelle. With a stored
+  // handle, Venmo opens prefilled; otherwise the button still gets them there.
+  const recipientProfile = groupUsers?.[expense.paidBy];
+  const recipientHandles = recipientProfile?.paymentHandles || {};
+  const payAmount = roundCurrency(Number(amountToPay) || 0);
+  const payNote = `Have Another Cherry: ${expense.title}`.slice(0, 140);
+  const venmo = recipientHandles.venmo ? venmoTarget(recipientHandles.venmo, payAmount, payNote) : null;
+  const zelle = recipientHandles.zelle ? zelleTarget(recipientHandles.zelle) : null;
+  const [copiedZelle, setCopiedZelle] = useState(false);
+
+  const copyZelleHandle = () => {
+    if (!zelle) return;
+    navigator.clipboard.writeText(zelle.copyText || zelle.handle).catch(() => {});
+    setCopiedZelle(true);
+    setTimeout(() => setCopiedZelle(false), 2000);
+  };
 
   return (
     <Modal
@@ -210,6 +232,54 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
                 </button>
               ))}
             </div>
+
+            {/* Deep-link-lite: jump out of the app into Venmo/Zelle. */}
+            {!isCreditor && paymentMethod === 'VENMO' && (
+              <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
+                <p className="text-[11px] text-natural-muted">
+                  {venmo
+                    ? <>Pay <span className="font-bold text-natural-text">{venmo.handle}</span> in Venmo — amount and note come prefilled.</>
+                    : <>They haven't added a Venmo handle yet, but you can head to Venmo and pay them there.</>}
+                </p>
+                <a
+                  href={venmo?.url || 'https://venmo.com/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 text-xs font-bold text-white bg-[#008CFF] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
+                >
+                  <ExternalLink size={14} /> Open Venmo
+                </a>
+                <p className="text-[10px] text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
+              </div>
+            )}
+
+            {!isCreditor && paymentMethod === 'ZELLE' && (
+              <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
+                {zelle ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-natural-muted min-w-0">
+                      Their Zelle: <span className="font-bold text-natural-text break-all">{zelle.handle}</span>
+                    </p>
+                    <button type="button" onClick={copyZelleHandle} className="shrink-0 text-[11px] font-bold text-natural-primary flex items-center gap-1 hover:underline">
+                      <Copy size={12} /> {copiedZelle ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-natural-muted">
+                    They haven't added a Zelle handle yet. Zelle lives inside your banking app — open it there, or start from Zelle's site.
+                  </p>
+                )}
+                <a
+                  href="https://www.zellepay.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 text-xs font-bold text-white bg-[#6D1ED4] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
+                >
+                  <ExternalLink size={14} /> Open Zelle
+                </a>
+                <p className="text-[10px] text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
+              </div>
+            )}
           </div>
 
           <div>

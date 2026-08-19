@@ -24,8 +24,11 @@ import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import FinancialAlignmentModal from './components/FinancialAlignmentModal';
+import PlanPurchase from './components/PlanPurchase';
+import HouseholdVault from './components/HouseholdVault';
+import RhythmCard from './components/RhythmCard';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown } from 'lucide-react';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -66,6 +69,30 @@ function mergeById<T extends { id: string }>(local: T[] = [], incoming: T[] = []
 // Merge a remote expense onto the local copy: scalar fields take the incoming
 // version, but settlements/comments are unioned by id so concurrent edits from
 // two members don't erase each other. Status is re-derived from the result.
+// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
+const todayLocal = () => {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().split('T')[0];
+};
+
+// Step a recurring date forward by its interval (local, date-only).
+function advanceRecurringDate(dateStr: string, interval?: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  switch (interval) {
+    case 'weekly': d.setDate(d.getDate() + 7); break;
+    case 'biweekly': d.setDate(d.getDate() + 14); break;
+    case '2_months': d.setMonth(d.getMonth() + 2); break;
+    case '3_months': d.setMonth(d.getMonth() + 3); break;
+    case '6_months': d.setMonth(d.getMonth() + 6); break;
+    case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
+    case 'monthly':
+    default: d.setMonth(d.getMonth() + 1); break;
+  }
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().split('T')[0];
+}
+
 function mergeExpense(local: Expense, incoming: Expense): Expense {
   const merged: Expense = {
     ...incoming,
@@ -123,6 +150,12 @@ export default function App() {
   }, [activeUser]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
+  const [showPlanPurchase, setShowPlanPurchase] = useState(false);
+  const [showVault, setShowVault] = useState(false);
+  // Settings inputs for the spending threshold and direct-payment handles.
+  const [thresholdInput, setThresholdInput] = useState('');
+  const [venmoInput, setVenmoInput] = useState('');
+  const [zelleInput, setZelleInput] = useState('');
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -381,6 +414,120 @@ export default function App() {
     return () => unsubscribe();
   }, [activeUser, group?.id]);
 
+  // Recurring autopilot: when a recurring expense's next date arrives, log the
+  // new instance automatically and advance the schedule. Only the payer's own
+  // account spawns instances (so two members can't double-log), and spawned
+  // copies carry recurringSourceId + date as a duplicate guard. Runs at most
+  // once per group per day per session.
+  const recurringAutopilotRef = useRef('');
+  useEffect(() => {
+    if (!activeUser || !group || expenses.length === 0) return;
+    const groupId = group.id;
+    const memberIds = group.memberIds || [];
+    const runKey = `${groupId}:${todayLocal()}`;
+    if (recurringAutopilotRef.current === runKey) return;
+
+    const today = todayLocal();
+    const spawned: Expense[] = [];
+    const sourceUpdates = new Map<string, string>(); // source id -> new nextRecurringDate
+
+    for (const exp of expenses) {
+      if (!exp.isRecurring || !exp.nextRecurringDate || exp.paidBy !== activeUser) continue;
+      let next: string = exp.nextRecurringDate;
+      let guard = 0;
+      while (next && next <= today && guard < 24) {
+        guard++;
+        const dueDate = next;
+        const dupe =
+          expenses.some(x => x.recurringSourceId === exp.id && x.date === dueDate) ||
+          spawned.some(x => x.recurringSourceId === exp.id && x.date === dueDate);
+        if (!dupe) {
+          spawned.push({
+            ...exp,
+            id: crypto.randomUUID(),
+            date: dueDate,
+            createdAt: new Date().toISOString(),
+            status: 'OPEN',
+            settlements: [],
+            comments: [],
+            isRecurring: false,
+            recurringInterval: undefined,
+            nextRecurringDate: undefined,
+            recurringSourceId: exp.id,
+          });
+        }
+        next = advanceRecurringDate(dueDate, exp.recurringInterval);
+      }
+      if (next !== exp.nextRecurringDate) sourceUpdates.set(exp.id, next);
+    }
+
+    recurringAutopilotRef.current = runKey;
+    if (spawned.length === 0 && sourceUpdates.size === 0) return;
+
+    setExpenses(prev => {
+      const updated = prev.map(e =>
+        sourceUpdates.has(e.id) ? { ...e, nextRecurringDate: sourceUpdates.get(e.id)! } : e
+      );
+      const merged = [...spawned, ...updated].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      try {
+        localStorage.setItem('expenses_' + groupId, JSON.stringify(merged));
+      } catch (e) {
+        console.error('Failed to persist autopilot ledger', e);
+      }
+      return merged;
+    });
+
+    // Sync through the same encrypted queue the rest of the ledger uses.
+    (async () => {
+      try {
+        const others = memberIds.filter(id => id !== activeUser);
+        const toSend: Expense[] = [
+          ...spawned,
+          ...expenses
+            .filter(e => sourceUpdates.has(e.id))
+            .map(e => ({ ...e, nextRecurringDate: sourceUpdates.get(e.id)! })),
+        ];
+        for (const expensePayload of toSend) {
+          const encrypted = await encryptData(expensePayload, groupId);
+          await Promise.allSettled(
+            others.map(memberId =>
+              setDoc(doc(collection(db, 'transfer_queue')), {
+                to: memberId,
+                from: activeUser,
+                groupId,
+                action: 'UPSERT',
+                payload: encrypted,
+                createdAt: new Date().toISOString(),
+              })
+            )
+          );
+        }
+      } catch (e) {
+        console.error('Recurring autopilot sync failed', e);
+      }
+    })();
+
+    if (spawned.length > 0) {
+      addToast(
+        'Recurring Logged',
+        spawned.length === 1
+          ? `"${spawned[0].title}" was auto-logged from your recurring schedule.`
+          : `${spawned.length} recurring expenses were auto-logged.`,
+        'success'
+      );
+    }
+  }, [activeUser, group?.id, expenses]);
+
+  // Keep settings inputs synced with the saved profile values.
+  useEffect(() => {
+    setThresholdInput(
+      userProfile?.recurringThreshold > 0 ? String(userProfile.recurringThreshold) : ''
+    );
+    setVenmoInput(userProfile?.paymentHandles?.venmo || '');
+    setZelleInput(userProfile?.paymentHandles?.zelle || '');
+  }, [userProfile?.recurringThreshold, userProfile?.paymentHandles?.venmo, userProfile?.paymentHandles?.zelle]);
 
   // Weekly cherry greeting: generate once per week (per group size) and cache it
   // on the user doc so we don't call the AI on every load.
@@ -468,6 +615,17 @@ export default function App() {
   const statsVisibleExpenses = expenses.filter(
     e => !isDarkCherry(e) || e.paidBy === activeUser
   );
+
+  // Spending thresholds: each member's limit (from their synced profile), and
+  // any of the current user's shares that exceed their own.
+  const memberThresholds: Record<string, number> = {};
+  Object.entries(groupUsers).forEach(([uid, u]: any) => {
+    memberThresholds[uid] = Number(u?.recurringThreshold) || 0;
+  });
+  const myThreshold = Number(userProfile?.recurringThreshold) || 0;
+  const overThresholdExpenses = myThreshold > 0
+    ? expenses.filter(e => e.paidBy !== activeUser && (e.shares?.[activeUser] || 0) > myThreshold && !isDarkCherry(e))
+    : [];
 
   // Compare what each member reported as their own income against what the
   // others estimated for them. Track the worst relative gap so the alignment
@@ -1079,6 +1237,36 @@ export default function App() {
     }
   };
 
+  // Spending threshold: the most this user wants to owe on a single shared
+  // expense. Synced to their profile so other members' forms can warn early.
+  const handleSaveThreshold = async () => {
+    const val = Math.max(0, Number(thresholdInput) || 0);
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { recurringThreshold: val });
+      setUserProfile((prev: any) => ({ ...(prev || {}), recurringThreshold: val }));
+      addToast('Threshold Saved', val > 0 ? `We'll flag shared expenses over $${val}.` : 'Threshold cleared.', 'success');
+    } catch (e) {
+      console.error('Failed to save threshold', e);
+      addToast('Error', 'Could not save your threshold. Please try again.', 'error');
+    }
+  };
+
+  // Direct-payment handles (Venmo/Zelle) other members use to pay this user.
+  const handleSavePaymentHandles = async () => {
+    const handles = {
+      venmo: venmoInput.trim().replace(/^@/, ''),
+      zelle: zelleInput.trim(),
+    };
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { paymentHandles: handles });
+      setUserProfile((prev: any) => ({ ...(prev || {}), paymentHandles: handles }));
+      addToast('Payment Info Saved', 'Group members can now pay you directly through Venmo or Zelle.', 'success');
+    } catch (e) {
+      console.error('Failed to save payment handles', e);
+      addToast('Error', 'Could not save your payment info. Please try again.', 'error');
+    }
+  };
+
   const handleRetakeQuiz = async () => {
     try {
       await updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
@@ -1177,7 +1365,21 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3" id="header-controls">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap" id="header-controls">
+            <button
+              onClick={() => setShowVault(true)}
+              className="bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs px-4 py-2.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Household Vault"
+            >
+              <VaultIcon className="h-4 w-4" /> Vault
+            </button>
+            <button
+              onClick={() => setShowPlanPurchase(true)}
+              className="bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs px-4 py-2.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Plan a shared purchase"
+            >
+              <TrendingUp className="h-4 w-4" /> Plan a Purchase
+            </button>
             <button
               onClick={() => {
                 setEditingExpense(null);
@@ -1286,6 +1488,26 @@ export default function App() {
             </div>
           )}
 
+          {overThresholdExpenses.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-natural-text">
+                  {overThresholdExpenses.length === 1 ? 'A shared expense is over your threshold' : `${overThresholdExpenses.length} shared expenses are over your threshold`}
+                </h3>
+                <p className="text-xs text-natural-muted mt-1">
+                  Your share {overThresholdExpenses.length === 1 ? 'here exceeds' : 'on these exceeds'} your spending threshold of ${myThreshold.toFixed(0)}. Worth a look, and a conversation if the timing's tight.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedExpense(overThresholdExpenses[0])}
+                className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
+              >
+                Review
+              </button>
+            </div>
+          )}
+
           {missingProfiles.length > 0 && !dismissedWaiting && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
@@ -1332,8 +1554,9 @@ export default function App() {
               <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
             </div>
 
-            <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6">
+            <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
               <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" />
+              <RhythmCard expenses={expenses} />
             </div>
           </div>
         </div>
@@ -1377,6 +1600,56 @@ export default function App() {
           onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
           onSignOut={() => { setShowSettings(false); handleSignOut(); }}
+          extraSection={
+            <div>
+              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Budget & Payments</h3>
+              <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1">Spending threshold</label>
+                  <p className="text-[11px] text-natural-muted mb-2">The most you want to owe on a single shared expense. Both sides get a heads-up when a split goes over it.</p>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={thresholdInput}
+                        onChange={(e) => setThresholdInput(e.target.value)}
+                        placeholder="e.g. 60 (0 = off)"
+                        className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                      />
+                    </div>
+                    <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg shrink-0">Save</button>
+                  </div>
+                </div>
+
+                <div className="border-t border-natural-primary/10 pt-3">
+                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-1.5"><Wallet size={12} /> How people pay you</label>
+                  <p className="text-[11px] text-natural-muted mb-2">Add your handles and group members get a one-tap way into Venmo or Zelle when they settle up with you.</p>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">@</span>
+                      <input
+                        type="text"
+                        value={venmoInput}
+                        onChange={(e) => setVenmoInput(e.target.value)}
+                        placeholder="Venmo username"
+                        className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={zelleInput}
+                      onChange={(e) => setZelleInput(e.target.value)}
+                      placeholder="Zelle email or phone"
+                      className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                    />
+                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark px-4 py-2 rounded-lg">Save Payment Info</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
         />
       )}
 
@@ -1386,6 +1659,26 @@ export default function App() {
           onOpenLegal={(d) => setLegalDoc(d)}
           onExportData={handleExportData}
           onDeleteAccount={handleDeleteAccount}
+        />
+      )}
+
+      {showPlanPurchase && (
+        <PlanPurchase
+          group={group}
+          activeUser={activeUser}
+          groupUsers={groupUsers}
+          expenses={expenses}
+          onClose={() => setShowPlanPurchase(false)}
+        />
+      )}
+
+      {showVault && (
+        <HouseholdVault
+          groupId={group.id}
+          activeUser={activeUser}
+          expenses={expenses}
+          memberNames={Object.fromEntries(getFullMembers(group).map(m => [m.uid, m.name]))}
+          onClose={() => setShowVault(false)}
         />
       )}
 
@@ -1414,6 +1707,7 @@ export default function App() {
           }}
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
+          memberThresholds={memberThresholds}
         />
       )}
 
@@ -1440,6 +1734,7 @@ export default function App() {
           expense={selectedExpense}
           group={group}
           activeUser={activeUser}
+          groupUsers={groupUsers}
           onClose={() => setShowSettleModal(false)}
           onSubmit={handleSettleUpProposal}
         />

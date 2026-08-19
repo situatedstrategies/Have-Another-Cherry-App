@@ -12,9 +12,11 @@ interface ExpenseFormProps {
   onClose: () => void;
   onSubmit: (expenseData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => void;
   editingExpense?: Expense | null;
+  /** Each member's spending threshold, for over-threshold heads-ups. */
+  memberThresholds?: Record<string, number>;
 }
 
-export default function ExpenseForm({ group, activeUser, onClose, onSubmit, editingExpense }: ExpenseFormProps) {
+export default function ExpenseForm({ group, activeUser, onClose, onSubmit, editingExpense, memberThresholds }: ExpenseFormProps) {
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   
@@ -41,6 +43,40 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [blindMin, setBlindMin] = useState(editingExpense?.blindMin?.toString() || '');
   const [blindMax, setBlindMax] = useState(editingExpense?.blindMax?.toString() || '');
   const [showDarkIntro, setShowDarkIntro] = useState(false);
+
+  // Line items from the receipt scan, assignable to members ('shared' = split
+  // by the household default) to build an itemized custom-amount split.
+  const [scannedItems, setScannedItems] = useState<{ name: string; price: number }[]>([]);
+  const [itemAssign, setItemAssign] = useState<Record<number, string>>({});
+
+  const applyItemAssignments = () => {
+    const defaultSplit = getFullDefaultSplit(group);
+    const totals: Record<string, number> = {};
+    members.forEach(m => { totals[m.uid] = 0; });
+
+    const itemsSum = scannedItems.reduce((s, it) => s + it.price, 0);
+    // Tax/tip/fees = whatever the receipt total exceeds the item lines by.
+    const overhead = Math.max(0, numericAmount - itemsSum);
+
+    const addShared = (value: number) => {
+      members.forEach(m => {
+        const pct = defaultSplit[m.uid] ?? (100 / members.length);
+        totals[m.uid] += (value * pct) / 100;
+      });
+    };
+
+    scannedItems.forEach((it, i) => {
+      const owner = itemAssign[i] || 'shared';
+      if (owner === 'shared' || totals[owner] === undefined) addShared(it.price);
+      else totals[owner] += it.price;
+    });
+    addShared(overhead);
+
+    const next: Record<string, string> = {};
+    members.forEach(m => { next[m.uid] = (Math.round(totals[m.uid] * 100) / 100).toFixed(2); });
+    setCustomAmt(next);
+    setSplitType('custom_amount');
+  };
 
   const selectDarkCherry = () => {
     setSplitType('dark_cherry');
@@ -99,6 +135,10 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         const amt = Number(result.data.amount);
         if (Number.isFinite(amt) && amt > 0) { setAmount(amt.toFixed(2)); setCustomAmt({}); }
         if (result.data.date) setDate(String(result.data.date));
+        // Line items, for the who-had-what itemized split below.
+        const items = Array.isArray(result.data.items) ? result.data.items : [];
+        setScannedItems(items.map((it: any) => ({ name: String(it.name || 'Item'), price: Number(it.price) || 0 })));
+        setItemAssign({});
       } else {
         setError('Could not read that receipt. Try a clearer photo, or enter the details manually.');
       }
@@ -229,6 +269,13 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     });
   }
 
+  // Debtors whose share on this expense exceeds their spending threshold.
+  const thresholdWarnings = members.filter(m =>
+    m.uid !== paidBy &&
+    (memberThresholds?.[m.uid] || 0) > 0 &&
+    (previewShares[m.uid] || 0) > (memberThresholds?.[m.uid] || 0)
+  );
+
   const handleCustomPctChange = (uid: string, val: string) => {
     setCustomPct(prev => ({ ...prev, [uid]: val }));
   };
@@ -253,6 +300,15 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
       setError('Please enter a valid amount greater than zero.');
       return;
+    }
+
+    // Heads-up if a debtor's share exceeds their spending threshold.
+    if (thresholdWarnings.length > 0) {
+      const names = thresholdWarnings.map(m => m.name).join(', ');
+      const ok = window.confirm(
+        `Heads up: this split exceeds ${names}'s spending threshold. They'll see a notification on their side. Log it anyway?`
+      );
+      if (!ok) return;
     }
 
     let finalShares: Record<string, number> = {};
@@ -501,7 +557,61 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             </button>
           </div>
 
+          {/* Itemized split: assign scanned line items to people */}
+          {scannedItems.length > 0 && (
+            <div className="bg-natural-sidebar/40 border border-natural-border rounded-2xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-150" id="itemized-split">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-natural-text uppercase tracking-wider">Who Had What?</span>
+                <button
+                  type="button"
+                  onClick={() => { setScannedItems([]); setItemAssign({}); }}
+                  className="text-[11px] font-semibold text-natural-muted hover:text-natural-text"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <p className="text-[11px] text-natural-muted leading-relaxed">
+                We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the receipt. Assign
+                each one, leave it shared, then apply — tax and tip get shared automatically.
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {scannedItems.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 bg-white border border-natural-border/60 rounded-xl px-3 py-1.5">
+                    <span className="text-xs font-medium text-natural-text truncate flex-1">{it.name}</span>
+                    <span className="text-xs font-mono font-semibold text-natural-text shrink-0">${it.price.toFixed(2)}</span>
+                    <select
+                      value={itemAssign[i] || 'shared'}
+                      onChange={(e) => setItemAssign(prev => ({ ...prev, [i]: e.target.value }))}
+                      className="text-[11px] bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
+                    >
+                      <option value="shared">Shared</option>
+                      {members.map(m => (
+                        <option key={m.uid} value={m.uid}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={applyItemAssignments}
+                disabled={numericAmount <= 0}
+                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-dark rounded-xl transition-colors disabled:opacity-50"
+              >
+                Apply Items to Split
+              </button>
+            </div>
+          )}
 
+          {/* Spending threshold heads-up */}
+          {thresholdWarnings.length > 0 && numericAmount > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="text-amber-500 shrink-0 font-bold">!</span>
+              <p className="text-xs text-natural-text leading-relaxed">
+                {thresholdWarnings.map(m => `${m.name}'s share ($${(previewShares[m.uid] || 0).toFixed(2)}) is over their spending threshold of $${(memberThresholds?.[m.uid] || 0).toFixed(0)}`).join('; ')}. They'll get a heads-up on their side.
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div>
@@ -591,7 +701,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Transaction Payment Type</label>
               <div className="flex flex-wrap gap-1.5">
-                {(['CASH', 'CREDIT', 'DEBIT', 'TRANSFER', 'OTHER'] as PaymentInstrument[]).map(inst => (
+                {(['CASH', 'CREDIT', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE', 'OTHER'] as PaymentInstrument[]).map(inst => (
                   <button
                     key={inst}
                     type="button"
@@ -602,7 +712,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                         : 'bg-white border-natural-border text-natural-muted hover:bg-natural-sidebar'
                     }`}
                   >
-                    {inst === 'TRANSFER' ? 'BANK/VENMO' : inst}
+                    {inst === 'TRANSFER' ? 'BANK' : inst}
                   </button>
                 ))}
               </div>

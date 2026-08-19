@@ -179,7 +179,9 @@ async function startServer() {
           model: "gemini-2.5-flash",
           contents: [
             { inlineData: { data: base64Data, mimeType } },
-            "Extract the total amount, date, and description from this receipt. Return ONLY valid JSON."
+            "Extract the total amount, date, description, and the individual line items from this receipt. " +
+            "Line items are the purchased products/services with their prices (exclude tax, tip, subtotal, and total rows). " +
+            "Return ONLY valid JSON."
           ],
           config: {
             responseMimeType: "application/json",
@@ -188,7 +190,19 @@ async function startServer() {
               properties: {
                 amount: { type: Type.NUMBER, description: "Total amount on the receipt" },
                 description: { type: Type.STRING, description: "Short descriptive name of the merchant/store" },
-                date: { type: Type.STRING, description: "Date in YYYY-MM-DD format if available" }
+                date: { type: Type.STRING, description: "Date in YYYY-MM-DD format if available" },
+                items: {
+                  type: Type.ARRAY,
+                  description: "Individual purchased line items (no tax/tip/subtotal/total rows)",
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      price: { type: Type.NUMBER }
+                    },
+                    required: ["name", "price"]
+                  }
+                }
               },
               required: ["amount", "description"]
             }
@@ -197,12 +211,20 @@ async function startServer() {
 
         if (response.text) {
           const parsed = JSON.parse(response.text.trim());
+          const items = (Array.isArray(parsed.items) ? parsed.items : [])
+            .map((it: any) => ({
+              name: String(it?.name || "Item").slice(0, 80),
+              price: Math.max(0, Number(it?.price) || 0),
+            }))
+            .filter((it: any) => it.price > 0)
+            .slice(0, 60);
           return res.status(200).json({
             success: true,
             data: {
               amount: Math.max(0, Number(parsed.amount) || 0),
               description: parsed.description || "Receipt Scan",
-              date: parsed.date || new Date().toISOString().split('T')[0]
+              date: parsed.date || new Date().toISOString().split('T')[0],
+              items
             }
           });
         }

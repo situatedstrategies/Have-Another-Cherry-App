@@ -9,6 +9,14 @@ export interface User {
   groupIds?: string[];
   activeGroupId?: string;
   groupId?: string;
+  // The most this user wants to owe on a single shared expense; both sides get
+  // a heads-up when a split goes over it. 0/absent = off.
+  recurringThreshold?: number;
+  // Payment handles other members use to pay this user directly.
+  paymentHandles?: {
+    venmo?: string; // Venmo username, without the @
+    zelle?: string; // email or US phone number enrolled with Zelle
+  };
   income?: string;
   partnerIncome?: string;
   financialProfile?: {
@@ -48,7 +56,9 @@ export interface Group {
 // only ever sees the allowed payment range, never the total or what remains.
 export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party' | 'dark_cherry';
 
-export type PaymentInstrument = 'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'OTHER';
+// 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
+// their own instruments so the settle flow can hand the payer into those apps.
+export type PaymentInstrument = 'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER';
 
 export type MismatchType = 
   | 'NO_MISMATCH'
@@ -124,6 +134,9 @@ export interface Expense {
   // target is `amount`; participants see only these bounds.
   blindMin?: number;
   blindMax?: number;
+  // Set on instances auto-logged by the recurring autopilot: the id of the
+  // recurring expense that spawned this one (used to prevent duplicates).
+  recurringSourceId?: string;
   isRecurring?: boolean;
   recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
   nextRecurringDate?: string;
@@ -133,6 +146,34 @@ export interface Expense {
   comments?: Comment[];
   createdAt: string;
   notes?: string;
+}
+
+// ---- Household Vault ----
+// A recurring bill catalogued in the vault (not necessarily in the ledger):
+// name + which day of the month it's due, so the vault calendar can show it.
+export interface VaultBill {
+  id: string;
+  name: string;
+  amount?: number;
+  dueDay: number; // 1-31, clamped to the month's length when rendered
+  category?: string;
+  notes?: string;
+}
+
+// Metadata for an encrypted document stored in the vault. The file body lives
+// in its own Firestore doc (group_vault/{groupId}/files/{id}), E2E-encrypted.
+export interface VaultDocMeta {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number; // original byte size
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface VaultData {
+  bills: VaultBill[];
+  docs: VaultDocMeta[];
 }
 
 export const DEFAULT_CATEGORIES = [
