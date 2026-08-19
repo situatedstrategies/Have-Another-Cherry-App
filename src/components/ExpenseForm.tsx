@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { authHeader } from '../firebase';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, User as AppUser, PaymentInstrument } from '../types';
 import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles } from 'lucide-react';
+import Modal from './Modal';
+import { authHeader } from '../firebase';
 
 interface ExpenseFormProps {
   group: Group;
@@ -18,40 +19,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   
   const [title, setTitle] = useState(editingExpense?.title || '');
   const [amount, setAmount] = useState(editingExpense?.amount?.toString() || '');
-  const [category, setCategory] = useState<string>(editingExpense?.category || categories[0] || 'Rent');
-  const prevCategory = useRef(category);
+  // Start empty so the placeholder shows and nothing "sticks" in the field.
+  const [category, setCategory] = useState<string>(editingExpense?.category || '');
   const categoryInputRef = useRef<HTMLInputElement>(null);
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Check if the user is deleting by comparing lengths (or if selection is involved, it might be tricky, but length is a good proxy)
-    // Actually, if the current input value length is less than previous, it's deleting.
-    // However, if there was selected text and they typed a character, length might be less.
-    // Let's just use the native input event if possible, but React's onChange is fine for basic check.
-    const isDeleting = e.nativeEvent && (e.nativeEvent as any).inputType === 'deleteContentBackward';
-    
-    let nextVal = val;
-    let matchFound = false;
-    let selectionStart = val.length;
-
-    if (!isDeleting && val.length > 0) {
-      const match = categories.find(c => c.toLowerCase().startsWith(val.toLowerCase()));
-      if (match) {
-        nextVal = val + match.slice(val.length);
-        matchFound = true;
-      }
-    }
-    
-    setCategory(nextVal);
-    prevCategory.current = nextVal;
-    
-    if (matchFound) {
-      setTimeout(() => {
-        if (categoryInputRef.current) {
-          categoryInputRef.current.setSelectionRange(selectionStart, nextVal.length);
-        }
-      }, 0);
-    }
+    setCategory(e.target.value);
   };
     const [date, setDate] = useState(editingExpense?.date || new Date().toISOString().split('T')[0]);
   const [paidBy, setPaidBy] = useState<string>(editingExpense?.paidBy || activeUser);
@@ -72,10 +45,57 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   
   const [thirdPartyPct, setThirdPartyPct] = useState<Record<string, string>>({});
 
+  // Per-transaction "cherries": extra people added only to this expense's split.
+  const [guests, setGuests] = useState<{ id: string; name: string; pct: string }[]>([]);
+  const addGuest = () => setGuests(prev => [...prev, { id: crypto.randomUUID(), name: '', pct: '' }]);
+  const updateGuest = (id: string, field: 'name' | 'pct', val: string) =>
+    setGuests(prev => prev.map(g => (g.id === id ? { ...g, [field]: val } : g)));
+  const removeGuest = (id: string) => setGuests(prev => prev.filter(g => g.id !== id));
+
   const [notes, setNotes] = useState(editingExpense?.notes || '');
   const [isRecurring, setIsRecurring] = useState(editingExpense?.isRecurring || false);
   const [recurringInterval, setRecurringInterval] = useState<any>(editingExpense?.recurringInterval || 'monthly');
+  const [alreadySettled, setAlreadySettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
+  // Read the chosen receipt photo, send it to the AI scan endpoint, and prefill
+  // the form from the result. Replaces the old mock that always returned $84.50.
+  const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    setScanning(true);
+    setError(null);
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch('/api/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ image: dataUrl, mimeType: file.type || 'image/jpeg' }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success && result.data) {
+        if (result.data.description) setTitle(String(result.data.description));
+        const amt = Number(result.data.amount);
+        if (Number.isFinite(amt) && amt > 0) { setAmount(amt.toFixed(2)); setCustomAmt({}); }
+        if (result.data.date) setDate(String(result.data.date));
+      } else {
+        setError('Could not read that receipt. Try a clearer photo, or enter the details manually.');
+      }
+    } catch (err) {
+      console.error('Scan failed', err);
+      setError('Receipt scan failed. Please enter the details manually.');
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // Load editing values if present
   useEffect(() => {
@@ -97,6 +117,14 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           pcts[uid] = Math.round((editingExpense.shares[uid] / total) * 100).toString();
         }
         setCustomPct(pcts);
+        // Restore any per-transaction guests as percentage lines.
+        if (editingExpense.extraParticipants?.length) {
+          setGuests(editingExpense.extraParticipants.map(g => ({
+            id: crypto.randomUUID(),
+            name: g.name,
+            pct: total ? ((g.share / total) * 100).toFixed(2) : '0'
+          })));
+        }
       } else if (editingExpense.splitType === 'custom_amount') {
         const amts: Record<string, string> = {};
         for (const uid in editingExpense.shares) {
@@ -123,30 +151,33 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       });
       setCustomPct(initPct);
     }
-  }, [editingExpense, members, group]);
+    // Seed only when the form opens or switches to a different expense — NOT on
+    // every group snapshot, which would wipe the user's in-progress input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingExpense?.id]);
 
-  // Adjust categories automatically on title or type change to be helpful
+  // Suggest a category/split from the title, but only while the user hasn't
+  // chosen a category yet (and never when editing) — so we don't override them.
   useEffect(() => {
-    if (!editingExpense) {
-      const lowerTitle = title.toLowerCase();
-      if (lowerTitle.includes('rent')) {
-        setCategory('Rent');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
-        setCategory('Internet');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('power') || lowerTitle.includes('water') || lowerTitle.includes('utility') || lowerTitle.includes('gas') || lowerTitle.includes('electric')) {
-        setCategory('Utilities');
-        setSplitType('household_default');
-      } else if (lowerTitle.includes('grocery') || lowerTitle.includes('groceries') || lowerTitle.includes('food')) {
-        setCategory('Groceries');
-        setSplitType('equal');
-      } else if (lowerTitle.includes('dinner') || lowerTitle.includes('restaurant') || lowerTitle.includes('lunch') || lowerTitle.includes('cafe')) {
-        setCategory('Dining Out');
-        setSplitType('equal');
-      }
+    if (editingExpense || category) return;
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('rent')) {
+      setCategory('Rent');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
+      setCategory('Internet');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('power') || lowerTitle.includes('water') || lowerTitle.includes('utility') || lowerTitle.includes('gas') || lowerTitle.includes('electric')) {
+      setCategory('Utilities');
+      setSplitType('household_default');
+    } else if (lowerTitle.includes('grocery') || lowerTitle.includes('groceries') || lowerTitle.includes('food')) {
+      setCategory('Groceries');
+      setSplitType('equal');
+    } else if (lowerTitle.includes('dinner') || lowerTitle.includes('restaurant') || lowerTitle.includes('lunch') || lowerTitle.includes('cafe')) {
+      setCategory('Dining Out');
+      setSplitType('equal');
     }
-  }, [title]);
+  }, [title, category, editingExpense]);
 
   const numericAmount = parseFloat(amount) || 0;
 
@@ -211,46 +242,79 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
     let finalShares: Record<string, number> = {};
     let finalThirdPersonShare: number | undefined = undefined;
+    let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-    if (splitType === 'household_default' || splitType === 'equal' || splitType === 'custom_percentage') {
-      if (splitType === 'custom_percentage') {
-        let totalPct = 0;
-        members.forEach(m => totalPct += (parseFloat(customPct[m.uid]) || 0));
-        if (Math.abs(totalPct - 100) > 0.01) {
-          setError('Custom percentages must add up to 100%.');
-          return;
-        }
-      }
-
+    if (splitType === 'household_default' || splitType === 'equal') {
       let runningTotal = 0;
       members.forEach((m, index) => {
-        let pct = 0;
-        if (splitType === 'household_default') {
-          pct = getFullDefaultSplit(group)[m.uid] || 0;
-        } else if (splitType === 'equal') {
-          pct = 100 / members.length;
-        } else {
-          pct = parseFloat(customPct[m.uid]) || 0;
-        }
-        
-        const share = Math.round((numericAmount * pct) / 100 * 100) / 100;
-        
+        const pct = splitType === 'household_default'
+          ? (getFullDefaultSplit(group)[m.uid] || 0)
+          : (100 / members.length);
+        const share = round2((numericAmount * pct) / 100);
         // Adjust the last member's share to account for rounding errors
         if (index === members.length - 1) {
-          finalShares[m.uid] = Math.round((numericAmount - runningTotal) * 100) / 100;
+          finalShares[m.uid] = round2(numericAmount - runningTotal);
         } else {
           finalShares[m.uid] = share;
           runningTotal += share;
         }
       });
-    } else if (splitType === 'custom_amount') {
-      let totalAmt = 0;
-      members.forEach(m => totalAmt += (parseFloat(customAmt[m.uid]) || 0));
-      if (Math.abs(totalAmt - numericAmount) > 0.02) {
-        setError(`Individual shares ($${totalAmt}) must equal the total amount ($${numericAmount}).`);
+    } else if (splitType === 'custom_percentage') {
+      const guestEntries = guests.map(g => ({ name: g.name.trim(), pct: parseFloat(g.pct) || 0 }));
+      if (guestEntries.some(g => !g.name)) {
+        setError('Please enter a name for each added cherry.');
         return;
       }
-      members.forEach(m => finalShares[m.uid] = parseFloat(customAmt[m.uid]) || 0);
+      let totalPct = 0;
+      members.forEach(m => (totalPct += parseFloat(customPct[m.uid]) || 0));
+      guestEntries.forEach(g => (totalPct += g.pct));
+      if (Math.abs(totalPct - 100) > 0.01) {
+        setError('Percentages (members + added cherries) must add up to 100%.');
+        return;
+      }
+      // Round each share, then absorb any leftover cent into the last line
+      // so the parts sum exactly to the total.
+      let running = 0;
+      members.forEach(m => {
+        const share = round2((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
+        finalShares[m.uid] = share;
+        running += share;
+      });
+      const guestShares = guestEntries.map(g => {
+        const share = round2((numericAmount * g.pct) / 100);
+        running += share;
+        return { name: g.name, share };
+      });
+      const diff = round2(numericAmount - running);
+      if (Math.abs(diff) >= 0.01) {
+        if (guestShares.length) {
+          guestShares[guestShares.length - 1].share = round2(guestShares[guestShares.length - 1].share + diff);
+        } else if (members.length) {
+          const lastUid = members[members.length - 1].uid;
+          finalShares[lastUid] = round2(finalShares[lastUid] + diff);
+        }
+      }
+      if (guestShares.length) finalExtraParticipants = guestShares;
+    } else if (splitType === 'custom_amount') {
+      const amts = members.map(m => parseFloat(customAmt[m.uid]) || 0);
+      if (amts.some(a => a < 0)) {
+        setError('Individual shares cannot be negative.');
+        return;
+      }
+      const totalAmt = amts.reduce((a, b) => a + b, 0);
+      if (Math.abs(totalAmt - numericAmount) > 0.02) {
+        setError(`Individual shares ($${totalAmt.toFixed(2)}) must equal the total amount ($${numericAmount.toFixed(2)}).`);
+        return;
+      }
+      members.forEach((m, i) => finalShares[m.uid] = amts[i]);
+      // Absorb any sub-cent rounding into the last member so shares sum EXACTLY
+      // to the expense amount (otherwise balances won't reconcile to the total).
+      const lastUid = members[members.length - 1]?.uid;
+      if (lastUid !== undefined) {
+        const others = members.slice(0, -1).reduce((s, m) => s + (finalShares[m.uid] || 0), 0);
+        finalShares[lastUid] = Math.round((numericAmount - others) * 100) / 100;
+      }
     } else if (splitType === 'third_party') {
       if (!thirdPersonName.trim()) {
         setError('Please enter the third person\'s name.');
@@ -328,9 +392,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       thirdPersonName: splitType === 'third_party' ? (thirdPersonName.trim() || null) : null,
       thirdPersonEmail: splitType === 'third_party' ? (thirdPersonEmail.trim() || null) : null,
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
+      extraParticipants: splitType === 'custom_percentage' ? (finalExtraParticipants || null) : null,
       notes: notes.trim() || null,
       isRecurring,
-      ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null })
+      ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null }),
+      // Quick settle: only meaningful when creating a new expense.
+      quickSettle: !editingExpense && alreadySettled,
     };
 
     // Remove any strictly undefined values just in case, though we used null
@@ -340,25 +407,32 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   };
 
   return (
-    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" id="form-overlay">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150" id="form-container">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border" id="form-header">
-          <h2 className="text-xl font-display font-bold text-natural-text">
-            {editingExpense ? 'Edit Expense' : 'Log New Expense'}
-          </h2>
-          <button 
+    <Modal
+      onClose={onClose}
+      size="lg"
+      title={editingExpense ? 'Edit Expense' : 'Log New Expense'}
+      bodyClassName=""
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
             onClick={onClose}
-            className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer"
-            id="close-form-btn"
+            className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="expense-form"
+            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            {editingExpense ? 'Update Expense' : 'Save Expense'}
           </button>
         </div>
-
-        
+      }
+    >
         {/* Form Body */}
-        <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-6 space-y-5" id="expense-form">
+        <form onSubmit={handleFormSubmit} className="p-6 space-y-5" id="expense-form">
           {error && (
             <div className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold" id="form-error">
               {error}
@@ -374,39 +448,21 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               </h3>
               <p className="text-xs text-natural-muted mt-1">Auto-fill details by scanning a receipt.</p>
             </div>
-            <button 
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleScanFile}
+            />
+            <button
               type="button"
-              onClick={async () => {
-                try {
-                  // MOCK CLIENT-SIDE INTEGRATION
-                  const btn = document.getElementById('scan-receipt-btn');
-                  if (btn) btn.innerHTML = 'Scanning...';
-                  
-                  const response = await fetch('/api/scan-receipt', {
-                    method: 'POST',
-                    headers: {
-                      ...(await authHeader()),
-                    },
-                  });
-                  const result = await response.json();
-                  
-                  if (result.success) {
-                    setTitle(result.data.description);
-                    setAmount(result.data.amount.toString());
-                    setCustomAmt({});
-                  }
-                  
-                  if (btn) btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg> Scan Receipt';
-                } catch (e) {
-                  console.error("Scan failed", e);
-                  const btn = document.getElementById('scan-receipt-btn');
-                  if (btn) btn.innerHTML = 'Scan Failed';
-                }
-              }}
-              id="scan-receipt-btn"
-              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors"
+              onClick={() => scanInputRef.current?.click()}
+              disabled={scanning}
+              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
             >
-              <Camera size={16} /> Scan Receipt
+              <Camera size={16} /> {scanning ? 'Scanning…' : 'Scan Receipt'}
             </button>
           </div>
 
@@ -541,11 +597,17 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   type="text"
                   value={category}
                   onChange={handleCategoryChange}
-                  placeholder="Type to search"
+                  placeholder="Type or pick a category"
+                  list="category-options"
                   className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
                   id="expense-category-input"
                   autoComplete="off"
                 />
+                <datalist id="category-options">
+                  {categories.map((c, i) => (
+                    <option key={`${c}-${i}`} value={c} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -685,7 +747,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           </div>
 
           {/* Custom Percentage Inputs (Conditional) */}
-          {splitType === 'custom_percentage' && (
+          {splitType === 'custom_percentage' && (() => {
+            const memberPctTotal = members.reduce((s, m) => s + (parseFloat(customPct[m.uid]) || 0), 0);
+            const guestPctTotal = guests.reduce((s, g) => s + (parseFloat(g.pct) || 0), 0);
+            const pctTotal = memberPctTotal + guestPctTotal;
+            const balanced = Math.abs(pctTotal - 100) <= 0.01;
+            return (
             <div className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150" id="custom-pct-inputs">
               <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">Set Split Percentages</span>
               <div className="grid grid-cols-2 gap-4">
@@ -706,8 +773,55 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   </div>
                 ))}
               </div>
+
+              {/* Per-transaction guests ("cherries") */}
+              {guests.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-natural-border/60">
+                  <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider">Added for this expense only</span>
+                  {guests.map(g => (
+                    <div key={g.id} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={g.name}
+                        onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
+                        placeholder="Name (e.g. 🍒 guest)"
+                        className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
+                      />
+                      <div className="relative w-24 shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={g.pct}
+                          onChange={(e) => updateGuest(g.id, 'pct', e.target.value)}
+                          placeholder="0"
+                          className="w-full pr-7 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
+                      </div>
+                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-red-500 p-1.5 shrink-0" title="Remove">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={addGuest}
+                  className="flex items-center gap-1.5 text-xs font-bold text-natural-primary hover:text-natural-dark"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add a cherry
+                </button>
+                <span className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}>
+                  Total: {pctTotal.toFixed(1)}%{balanced ? ' ✓' : ' / 100%'}
+                </span>
+              </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Custom Amount Inputs (Conditional) */}
           {splitType === 'custom_amount' && (
@@ -827,8 +941,36 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     </span>
                   </div>
                 ))}
+                {splitType === 'custom_percentage' && guests.filter(g => g.name.trim() || g.pct).map(g => (
+                  <div key={`preview-${g.id}`} className="flex flex-col">
+                    <span className="text-xs text-natural-muted font-semibold">{g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)</span>
+                    <span className="text-lg font-display font-bold text-natural-text">
+                      ${((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-natural-text font-medium">Guest (this expense)</span>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
+
+          {/* Quick settle (new expenses only) */}
+          {!editingExpense && (
+            <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
+              <input
+                type="checkbox"
+                checked={alreadySettled}
+                onChange={(e) => setAlreadySettled(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
+              />
+              <span>
+                <span className="block text-sm font-bold text-natural-text">Already settled</span>
+                <span className="block text-xs text-natural-muted mt-0.5">
+                  Everyone's paid up on this one — log it as fully settled (no balances owed). Great for recording a
+                  past expense that's already been paid back.
+                </span>
+              </span>
+            </label>
           )}
 
           {/* Notes */}
@@ -844,27 +986,6 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             />
           </div>
         </form>
-
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-natural-border flex items-center justify-end gap-3" id="form-actions">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
-            id="cancel-btn"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="expense-form"
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-dark rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
-            id="save-expense-btn"
-          >
-            {editingExpense ? 'Update Expense' : 'Save Expense'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

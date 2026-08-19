@@ -30,20 +30,22 @@ export const getRemainingSettlementAmount = (
 };
 
 export const isExpenseFullySettled = (expense: Expense): boolean => {
-  if (expense.status === 'settled' || expense.status === 'CLOSED') {
-    return true;
-  }
-
   const debtors = Object.keys(expense.shares || {}).filter(
     userId => userId !== expense.paidBy
   );
 
-  return (
-    debtors.length > 0 &&
-    debtors.every(
+  // Modern records: the share/settlement math is the single source of truth.
+  // We deliberately do NOT trust a stored 'settled'/'CLOSED' flag here, because
+  // an edit that changes the shares can leave that flag stale and hide real debt.
+  if (debtors.length > 0) {
+    return debtors.every(
       userId => getRemainingSettlementAmount(expense, userId, false) <= 0.01
-    )
-  );
+    );
+  }
+
+  // Legacy / no-debtor records (old settleDetails-only rows, or an expense with
+  // only the payer and nothing owed): fall back to the stored status flag.
+  return expense.status === 'settled' || expense.status === 'CLOSED';
 };
 
 export const getTotalRemainingOwedToPayer = (

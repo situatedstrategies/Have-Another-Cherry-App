@@ -48,6 +48,13 @@ service cloud.firestore {
         && request.auth.uid in currentMemberIds();
     }
 
+    // The set of groups the requesting user belongs to (multi-group support).
+    // Defaults to an empty list for accounts not yet migrated to `groupIds`.
+    function myGroupIds() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid))
+        .data.get('groupIds', []);
+    }
+
     // Allows a signed-in user to add only themselves through the invite-code
     // join flow, and to repair a half-joined state (listed in `members` but
     // missing from `memberIds`, which locks them out of every other rule since
@@ -75,8 +82,23 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow create, read, update, delete:
+      allow create, update, delete:
         if signedIn() && request.auth.uid == userId;
+
+      // A user can read their own doc, or the doc of someone with whom they share
+      // at least one group (the app loads member names, incomes, and profile
+      // state for the roster). Supports users who belong to several groups; the
+      // legacy single-`groupId` branch keeps un-migrated members readable.
+      allow read:
+        if signedIn()
+        && (
+          request.auth.uid == userId
+          || resource.data.get('groupIds', []).hasAny(myGroupIds())
+          || (
+            resource.data.get('groupId', null) != null
+            && isGroupMember(resource.data.get('groupId', null))
+          )
+        );
     }
 
     match /groups/{groupId} {
@@ -141,6 +163,15 @@ service cloud.firestore {
     // not through unrestricted client-side Firestore writes.
     match /mail/{mailId} {
       allow read, write: if false;
+    }
+
+    // Append-only log of AI-generated financial profiles. Standalone (not tied
+    // to a user/group doc); used as a growing record and future fixed fallback
+    // catalog. Signed-in users may append; the log is curated via the console,
+    // so it is not client-readable/editable.
+    match /profile_log/{docId} {
+      allow create: if signedIn();
+      allow read, update, delete: if false;
     }
 
     match /{document=**} {

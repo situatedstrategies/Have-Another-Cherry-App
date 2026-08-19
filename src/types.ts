@@ -2,11 +2,30 @@ export interface User {
   uid: string;
   name: string;
   email: string;
+  // A user account can belong to several groups at once and switch between them.
+  // `groupIds` is the full membership set; `activeGroupId` is the one currently
+  // being viewed. `groupId` is the legacy single-group field, kept mirrored to
+  // `activeGroupId` for backward compatibility.
+  groupIds?: string[];
+  activeGroupId?: string;
+  groupId?: string;
   income?: string;
+  partnerIncome?: string;
   financialProfile?: {
     type: string;
     description: string;
     quote?: string;
+    traits?: string[];
+    strengths?: string;
+    watchouts?: string;
+    communicationStyle?: string;
+    greetingTone?: string; // guides the weekly dashboard greeting
+  };
+  // Cached AI-generated weekly greeting. `key` is `${isoWeek}-${memberCount}` so
+  // it refreshes weekly and when the group size changes.
+  weeklyGreeting?: {
+    text: string;
+    key: string;
   };
 }
 
@@ -21,7 +40,7 @@ export interface Group {
   availableSplits?: { name: string; split: number }[] | number[];
   categories: string[];
   memberIncomes?: Record<string, string>;
-  keyHash?: string; // SHA-256 of the backup/recovery group key
+  keyHash?: string; // SHA-256 of the group backup key (never the key itself)
 }
 
 export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party';
@@ -95,6 +114,9 @@ export interface Expense {
   thirdPersonName?: string;
   thirdPersonEmail?: string;
   thirdPersonShare?: number;
+  // Per-transaction "cherries" — extra people added to a single expense's split
+  // (not permanent group members). Each gets a dollar share of this expense only.
+  extraParticipants?: { name: string; share: number }[];
   isRecurring?: boolean;
   recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
   nextRecurringDate?: string;
@@ -104,7 +126,6 @@ export interface Expense {
   comments?: Comment[];
   createdAt: string;
   notes?: string;
-  encryptedData?: string;
 }
 
 export const DEFAULT_CATEGORIES = [

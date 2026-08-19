@@ -19,7 +19,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `src/lib/*.ts` — helpers (resend, crypto, members, profiles, accounting, mismatch).
 - `src/types.ts` — data model (Group, User, Expense, Settlement, etc.).
 - `src/templates/inviteEmail.html` — Resend invite email template.
-- `src/firebase.ts` — Firebase init; reads `firebase-applet-config.json`.
+- `src/firebase.ts` — Firebase init; picks `firebase-applet-config.json` or `...beta.json`.
 - `server.ts` — Express API + static serving.
 - `public/` — static assets served at site root (e.g. `/cherry2transparent.png`).
 - `apphosting.yaml` — Firebase App Hosting runtime config (secrets).
@@ -37,6 +37,23 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - App Hosting backend: `have-another-cherry`, region `us-east4`.
 - Live URL: https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/
 - Custom domain (finishing DNS): app.haveanothercherry.com. Marketing site: haveanothercherry.com (Squarespace).
+
+## Beta environment
+Beta runs in a **separate Firebase project** so testers get their own Firestore and
+their own Auth user pool — a beta account is never a production account, and a beta
+bug can never reach a real ledger.
+- Client config lives in `firebase-applet-config.beta.json` (public identifiers, not
+  secrets), filled in from the `have-another-cherry-beta` Firebase project.
+  `src/firebase.ts` throws on startup if a beta build still has `REPLACE_ME_*`
+  placeholders, rather than falling back to production.
+- The environment is picked in `src/firebase.ts`: `VITE_APP_ENV=beta` is the explicit
+  switch, and a `beta.`/`beta-` hostname prefix is the fallback, so one build artifact
+  can serve either backend. `APP_ENV` is exported if code ever needs to branch.
+- Beta needs its **own reCAPTCHA v3 site key** (App Check is bound to a domain), its
+  **own OAuth client**, and its domain added to Auth -> Settings -> Authorized domains.
+- `firestore.rules` auto-deploys to the **beta** project only, via
+  `.github/workflows/deploy-firestore-rules.yml` (Workload Identity Federation — no
+  service-account keys in the repo). Production rules are deployed manually.
 
 ## AI (Gemini via Vertex) — important
 This project's Google Cloud org blocks standalone Gemini API keys (they must be service-account-bound and don't work with the Developer API). So the app uses **Vertex AI + ADC** and needs **no API key**.
@@ -64,6 +81,12 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Push to `development/web-production` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
+- **Firestore rules deploy separately from the app.** App Hosting never reads
+  `firestore.rules`. `.github/workflows/deploy-firestore-rules.yml` publishes them to
+  the **beta** project (via Workload Identity Federation) on any push to
+  `development/web-production` that touches the file. **Production** rules are deployed
+  by hand: `npm run rules:deploy` (needs `npx firebase-tools login` once). If rules and
+  app ever disagree, users hit "Missing or insufficient permissions".
 
 ## Conventions / gotchas
 - Source of truth is GitHub `development/web-production` — that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.

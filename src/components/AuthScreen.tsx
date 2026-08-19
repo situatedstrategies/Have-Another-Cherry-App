@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, type User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
 import {
@@ -9,6 +10,44 @@ import {
   checkPassword,
   isPasswordValid,
 } from '../lib/password';
+
+const TERMS_VERSION = '2026-08-08';
+
+// Turn Firebase's internal auth error codes into friendly, non-enumerating text.
+function friendlyAuthError(err: any): string {
+  switch (err?.code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return "That email or password doesn't match. Please try again.";
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/email-already-in-use':
+      return 'An account already exists for this email. Try logging in instead.';
+    case 'auth/weak-password':
+      return 'Please choose a stronger password.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in was cancelled.';
+    case 'auth/account-exists-with-different-credential':
+      return 'You already have an account with this email using a different sign-in method. Try that one.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/network-request-failed':
+      return 'Network error. Check your connection and try again.';
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+// Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
+async function recordTermsAcceptance(uid: string) {
+  try {
+    await setDoc(doc(db, 'users', uid), { termsAcceptedAt: new Date().toISOString(), termsVersion: TERMS_VERSION }, { merge: true });
+  } catch (e) {
+    console.error('Failed to record terms acceptance', e);
+  }
+}
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -47,12 +86,21 @@ export default function AuthScreen() {
   // const handleGoogleAuthMobile = async () => { ... }
 
   const handleGoogleAuth = async () => {
+    // New (sign-up) accounts must accept the terms first — matches the email flow.
+    if (!isLogin && !agreeTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+      return;
+    }
     try {
       setLoading(true);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // Record consent for brand-new accounts (Google already verifies the email).
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        await recordTermsAcceptance(result.user.uid);
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };
@@ -131,6 +179,7 @@ export default function AuthScreen() {
         if (name.trim()) {
           await updateProfile(userCred.user, { displayName: name.trim() });
         }
+        await recordTermsAcceptance(userCred.user.uid);
 
         // Confirm the address for password signups. Google accounts skip this:
         // Google has already verified the address, and Firebase marks them
@@ -143,7 +192,7 @@ export default function AuthScreen() {
         void sendVerificationEmail(userCred.user, name.trim());
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };

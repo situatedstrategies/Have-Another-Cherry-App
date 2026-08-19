@@ -86,10 +86,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await authHeader()),
-        },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           email: inviteEmail,
           groupName: createdGroupInfo.groupName,
@@ -178,10 +175,12 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
 
       await setDoc(doc(db, 'groups', groupId), newGroup);
       
-      // Update user doc with their groupId
+      // Add this group to the user's membership set and make it active. Uses
+      // arrayUnion so creating an additional group never drops the existing ones.
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
         groupId: groupId,
+        activeGroupId: groupId,
         groupIds: arrayUnion(groupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
@@ -281,10 +280,12 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
         return snap.id;
       });
 
-      // Update user doc
+      // Add this group to the user's membership set and make it active, so
+      // joining a second group keeps the first rather than replacing it.
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
         groupId: joinedGroupId,
+        activeGroupId: joinedGroupId,
         groupIds: arrayUnion(joinedGroupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
@@ -380,10 +381,10 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           
           <div className="p-8">
             <button
-              onClick={() => (onCancel ? onCancel() : signOut(auth))}
+              onClick={() => onCancel ? onCancel() : signOut(auth)}
               className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
             >
-              <ArrowLeft size={16} /> Back
+              <ArrowLeft size={16} /> {onCancel ? 'Cancel' : 'Back'}
             </button>
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">

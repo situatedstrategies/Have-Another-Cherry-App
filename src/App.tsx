@@ -3,9 +3,9 @@ import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
-import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, where, deleteField } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider } from 'firebase/auth';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
+import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, OperationType, handleFirestoreError } from './firebase';
 import { Expense, Group, SettleDetails, User as AppUser } from './types';
 import StatsSection from './components/StatsSection';
@@ -20,8 +20,11 @@ import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
+import Modal from './components/Modal';
+import SettingsModal from './components/SettingsModal';
+import PrivacyModal from './components/PrivacyModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Cloud, User, Sparkles, CheckSquare, RefreshCcw, LogOut, Settings, Copy, RefreshCw, X, Download, Trash2, Shield, Lock, FileText, AlertCircle, Check, ChevronDown } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
@@ -29,63 +32,58 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   );
 }
 
+// A key that changes weekly (ISO week) and when the group size changes, so the
+// cached greeting refreshes at most once per week (or when membership changes).
+function getGreetingKey(memberCount: number): string {
+  const d = new Date();
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
+}
 
-function mergeById<T extends { id: string }>(
-  local: T[] = [],
-  incoming: T[] = []
-): T[] {
+// Union two lists of {id,...} without losing either side's entries. Used to
+// merge an incoming (remote) expense onto our local copy so a concurrently-added
+// settlement and comment don't clobber each other. A settlement that is
+// 'confirmed' on either side stays confirmed (status only moves forward).
+function mergeById<T extends { id: string }>(local: T[] = [], incoming: T[] = []): T[] {
   const byId = new Map<string, T>();
-
   for (const item of local) byId.set(item.id, item);
-
   for (const item of incoming) {
     const existing = byId.get(item.id) as any;
-
-    if (
-      existing &&
-      (existing.status === 'confirmed' || (item as any).status === 'confirmed')
-    ) {
-      byId.set(item.id, {
-        ...existing,
-        ...item,
-        status: 'confirmed',
-      });
+    if (existing && (existing.status === 'confirmed' || (item as any).status === 'confirmed')) {
+      byId.set(item.id, { ...existing, ...item, status: 'confirmed' });
     } else {
       byId.set(item.id, existing ? { ...existing, ...item } : item);
     }
   }
-
   return Array.from(byId.values());
 }
 
-// Users can belong to several groups. `groupId` on the profile is the active
-// group; `groupIds` is every group they're a member of. Older profiles only
-// have `groupId`, so fold it into `groupIds` when loading.
-function normalizeProfile(profile: any) {
-  const groupIds: string[] = Array.isArray(profile?.groupIds)
-    ? profile.groupIds.filter((id: any) => typeof id === 'string' && id)
-    : [];
-  if (profile?.groupId && !groupIds.includes(profile.groupId)) {
-    groupIds.push(profile.groupId);
-  }
-  return { ...profile, groupIds };
-}
-
+// Merge a remote expense onto the local copy: scalar fields take the incoming
+// version, but settlements/comments are unioned by id so concurrent edits from
+// two members don't erase each other. Status is re-derived from the result.
 function mergeExpense(local: Expense, incoming: Expense): Expense {
   const merged: Expense = {
     ...incoming,
-    settlements: mergeById(
-      local.settlements || [],
-      incoming.settlements || []
-    ),
-    comments: mergeById(
-      local.comments || [],
-      incoming.comments || []
-    ),
+    settlements: mergeById(local.settlements, incoming.settlements),
+    comments: mergeById(local.comments, incoming.comments),
   };
-
   merged.status = getNormalizedExpenseStatus(merged);
   return merged;
+}
+
+// Consistent, branded loading screen — same background as every other screen so
+// switching between them never flashes white or a stale page.
+function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center animate-in fade-in duration-300">
+      <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
+      <p className="text-natural-muted text-xs font-mono">{label}</p>
+    </div>
+  );
 }
 
 export default function App() {
@@ -95,16 +93,27 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [group, setGroup] = useState<Group | null>(null);
   const [groupUsers, setGroupUsers] = useState<Record<string, any>>({});
-  
+
+  // A user can belong to several groups. `activeGroupId` is the one being viewed;
+  // `groupIds` is the full set. Both fall back to the legacy single `groupId`
+  // field for accounts created before multi-group support.
+  const activeGroupId: string | null = userProfile?.activeGroupId || userProfile?.groupId || null;
+  const groupIds: string[] = Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
+    ? userProfile.groupIds
+    : (userProfile?.groupId ? [userProfile.groupId] : []);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modal / Form States
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showGroupSetup, setShowGroupSetup] = useState(false);
-  const [myGroups, setMyGroups] = useState<{ id: string; name: string }[]>([]);
   const [showBackup, setShowBackup] = useState(false);
+  // Multi-group UI state: the header switcher menu, the "add another group"
+  // overlay, and cached names for the groups this user belongs to.
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [groupSummaries, setGroupSummaries] = useState<Record<string, { name?: string }>>({});
   const [groupSecret, setGroupSecret] = useState('');
   useEffect(() => {
     if (activeUser) {
@@ -119,15 +128,37 @@ export default function App() {
   const [showSettleModal, setShowSettleModal] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const isInitialLoadRef = useRef(true);
-  
-  const addToast = (title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
+  // Stable identities so Toast's auto-dismiss timer isn't reset on every re-render.
+  const addToast = useCallback((title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToasts(prev => [...prev, { id: Date.now().toString() + Math.random().toString(), title, message, type }]);
-  };
-  
-  const removeToast = (id: string) => {
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
+
+  // Called after the user creates or joins a group (initial setup or "add another
+  // group"). The group doc + user membership were already written by GroupSetup;
+  // here we make the new group active locally and clear the previous group's
+  // transient view state so nothing from the old group bleeds through.
+  const applyJoinedGroup = useCallback((gid: string) => {
+    setUserProfile((prev: any) => {
+      const prevIds: string[] = Array.isArray(prev?.groupIds) && prev.groupIds.length
+        ? prev.groupIds
+        : (prev?.groupId ? [prev.groupId] : []);
+      const gids = Array.from(new Set([...prevIds, gid]));
+      return { ...(prev || {}), groupId: gid, activeGroupId: gid, groupIds: gids };
+    });
+    setSelectedExpense(null);
+    setEditingExpense(null);
+    setExpenses([]);
+    setGroup(null);
+    setGroupUsers({});
+    setShowAddGroup(false);
+    setShowSettings(false);
+    setShowGroupMenu(false);
+    setDismissedWaiting(false);
+  }, []);
 
   // 1. Auth Listener
   useEffect(() => {
@@ -149,9 +180,26 @@ export default function App() {
       try {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
-          setUserProfile(normalizeProfile(userDoc.data()));
+          const profile = userDoc.data() as any;
+          // Backfill a missing/legacy name from the account's sign-in display name
+          // (covers both Google and email/password accounts).
+          if ((!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') && currentUser.displayName) {
+            profile.name = currentUser.displayName;
+            updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(() => {});
+          }
+          // Migrate legacy single-group accounts to the multi-group shape so the
+          // group switcher and security rules have the fields they expect.
+          if (profile.groupId && (!Array.isArray(profile.groupIds) || profile.groupIds.length === 0 || !profile.activeGroupId)) {
+            profile.groupIds = Array.isArray(profile.groupIds) && profile.groupIds.length ? profile.groupIds : [profile.groupId];
+            profile.activeGroupId = profile.activeGroupId || profile.groupId;
+            updateDoc(doc(db, 'users', currentUser.uid), {
+              groupIds: profile.groupIds,
+              activeGroupId: profile.activeGroupId,
+            }).catch(() => {});
+          }
+          setUserProfile(profile);
         } else {
-          setUserProfile(normalizeProfile({})); // Setup required
+          setUserProfile({}); // Setup required
         }
       } catch (error) {
         console.error("Error fetching profile", error);
@@ -165,54 +213,36 @@ export default function App() {
 
   // 2b. Listen to the active Group
   useEffect(() => {
-    if (!currentUser || !userProfile?.groupId) return;
-    const activeGroupId = userProfile.groupId;
+    if (!activeGroupId) return;
     const groupUnsubscribe = onSnapshot(doc(db, 'groups', activeGroupId), (groupSnapshot) => {
       if (groupSnapshot.exists()) {
-        setGroup({ ...(groupSnapshot.data() as Group), id: groupSnapshot.id });
-      } else {
-        // The active group no longer exists. Drop it from the user's group
-        // list and fall back to another of their groups (or group setup).
-        const remaining = (userProfile.groupIds || []).filter((id: string) => id !== activeGroupId);
-        const nextActive = remaining[0] || null;
-        updateDoc(doc(db, 'users', currentUser.uid), {
-          groupIds: remaining,
-          groupId: nextActive ?? deleteField(),
-        }).catch(console.error);
-        setGroup(null);
-        setUserProfile((prev: any) => ({ ...prev, groupIds: remaining, groupId: nextActive }));
+        setGroup(groupSnapshot.data() as Group);
       }
     }, (error) => {
       console.error('groupUnsubscribe error:', error);
     });
     return () => groupUnsubscribe();
-  }, [userProfile?.groupId]);
+  }, [activeGroupId]);
 
-  // Names for the group switcher in settings. Any signed-in user may `get` a
-  // group doc by id, so this works for every group the user belongs to.
+  // Cache the names of every group this user belongs to, for the header switcher.
+  // The rules allow any signed-in user to `get` a group by id, so a light read
+  // per group is enough — no schema bloat on the user doc.
   useEffect(() => {
-    if (!showSettings || !userProfile?.groupIds?.length) return;
+    if (!groupIds.length) { setGroupSummaries({}); return; }
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(
-        (userProfile.groupIds as string[]).map(async (id: string) => {
-          if (id === group?.id) return { id, name: group?.name || 'Unnamed Group' };
-          try {
-            const snap = await getDoc(doc(db, 'groups', id));
-            if (!snap.exists()) return null;
-            return { id, name: (snap.data() as Group).name || 'Unnamed Group' };
-          } catch (e) {
-            console.error('Failed to load group for switcher', id, e);
-            return null;
-          }
-        })
-      );
-      if (!cancelled) {
-        setMyGroups(entries.filter((entry): entry is { id: string; name: string } => entry !== null));
-      }
+      const entries = await Promise.all(groupIds.map(async (gid) => {
+        try {
+          const snap = await getDoc(doc(db, 'groups', gid));
+          return [gid, { name: snap.exists() ? (snap.data() as any).name : undefined }] as const;
+        } catch {
+          return [gid, {}] as const;
+        }
+      }));
+      if (!cancelled) setGroupSummaries(Object.fromEntries(entries));
     })();
     return () => { cancelled = true; };
-  }, [showSettings, userProfile?.groupIds, group?.id]);
+  }, [groupIds.join(',')]);
 
   useEffect(() => {
     if (!group || !group.memberIds || group.memberIds.length === 0) return;
@@ -221,6 +251,11 @@ export default function App() {
       const users: Record<string, any> = {};
       snap.forEach(d => { users[d.id] = d.data(); });
       setGroupUsers(users);
+    }, (error) => {
+      // Surface (don't swallow) a permission/query failure — otherwise the
+      // member roster silently stays empty and every feature built on it
+      // (names, income recalc, discrepancy banner) quietly does nothing.
+      console.error('group members listener error:', error);
     });
     return () => unsub();
   }, [group?.memberIds]);
@@ -228,21 +263,21 @@ export default function App() {
   
   
   
-  // Local Storage for Expenses
+  // Load the cached ledger when the active user or group *id* changes — not on
+  // every unrelated group field update (which reloaded and could flicker state).
   useEffect(() => {
-    if (activeUser && group) {
-      const stored = localStorage.getItem('expenses_' + group.id);
-      if (stored) {
-        try {
-          setExpenses(JSON.parse(stored));
-        } catch(e) {
-          console.error(e);
-        }
-      } else {
-        setExpenses([]);
+    if (!activeUser || !group) return;
+    const stored = localStorage.getItem('expenses_' + group.id);
+    if (stored) {
+      try {
+        setExpenses(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to parse cached expenses', e);
       }
+    } else {
+      setExpenses([]);
     }
-  }, [activeUser, group]);
+  }, [activeUser, group?.id]);
 
   // Shared encrypted group snapshot provides historical ledger backfill
   // when a new member/device joins an existing active group.
@@ -345,6 +380,39 @@ export default function App() {
   }, [activeUser, group?.id]);
 
 
+  // Weekly cherry greeting: generate once per week (per group size) and cache it
+  // on the user doc so we don't call the AI on every load.
+  useEffect(() => {
+    if (!activeUser || !userProfile?.financialProfile || !group) return;
+    const memberCount = group.memberIds?.length || 1;
+    const key = getGreetingKey(memberCount);
+    if (userProfile.weeklyGreeting?.key === key && userProfile.weeklyGreeting?.text) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/generate-greeting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+          body: JSON.stringify({
+            memberCount,
+            profileType: userProfile.financialProfile?.type,
+            greetingTone: userProfile.financialProfile?.greetingTone,
+          }),
+        });
+        const data = await res.json();
+        const text = (data.greeting || '').trim();
+        if (!text || cancelled) return;
+        const weeklyGreeting = { text, key };
+        updateDoc(doc(db, 'users', activeUser), { weeklyGreeting }).catch(() => {});
+        setUserProfile((prev: any) => ({ ...(prev || {}), weeklyGreeting }));
+      } catch (e) {
+        console.error('Weekly greeting fetch failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeUser, group?.memberIds?.length, userProfile?.financialProfile?.type, userProfile?.weeklyGreeting?.key]);
+
   // Update selectedExpense ref if background data updates
   useEffect(() => {
     if (selectedExpense) {
@@ -364,48 +432,25 @@ export default function App() {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center">
-        <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
-        <p className="text-natural-muted text-xs font-mono">Loading data...</p>
-      </div>
-    );
+    return <LoadingScreen label="Loading your ledger…" />;
   }
 
   if (userProfile && !userProfile.financialProfile) {
-    return <ProfileSetup userId={activeUser} onComplete={() => {
-      import('firebase/firestore').then(({ getDoc, doc }) => {
-        import('./firebase').then(({ db }) => {
-          getDoc(doc(db, 'users', activeUser)).then(userDoc => {
-            if (userDoc.exists()) {
-              setUserProfile(normalizeProfile(userDoc.data()));
-            }
-          });
-        });
-      });
-    }} />;
+    return <div className="animate-in fade-in duration-300"><ProfileSetup userId={activeUser} onComplete={() => {
+      getDoc(doc(db, 'users', activeUser)).then(userDoc => {
+        if (userDoc.exists()) setUserProfile(userDoc.data() as any);
+      }).catch(e => console.error('Failed to reload profile', e));
+    }} /></div>;
   }
 
-  if (!userProfile?.groupId) {
-    return <GroupSetup onComplete={(groupId) => {
-      // The group snapshot listener picks the new group up from here.
-      setUserProfile((prev: any) => ({
-        ...prev,
-        groupId,
-        groupIds: Array.from(new Set([...(prev?.groupIds || []), groupId])),
-      }));
-    }} />;
+  // The user belongs to a group but its data hasn't arrived yet — show a loading
+  // screen, NOT the create/join screen, so we never flash the wrong page.
+  if (activeGroupId && !group) {
+    return <LoadingScreen label="Loading your group…" />;
   }
 
-  if (!group) {
-    // Active group is set but its snapshot hasn't arrived yet (first load or
-    // right after switching groups).
-    return (
-      <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center">
-        <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
-        <p className="text-natural-muted text-xs font-mono">Loading group...</p>
-      </div>
-    );
+  if (!activeGroupId) {
+    return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={applyJoinedGroup} /></div>;
   }
 
   // Non-blocking: members who are in the group but haven't finished their quiz yet.
@@ -436,24 +481,10 @@ export default function App() {
   }
   
 
-  // We need to modify all our handlers to use the new group data structure
-    const handleGenerateNewInviteCode = async () => {
-    if (!group) return;
-    try {
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const groupRef = doc(db, 'groups', group.id);
-      await updateDoc(groupRef, { inviteCode: newCode });
-      addToast('Invite Code Updated', 'A new invite code has been generated.', 'success');
-    } catch (e) {
-      console.error(e);
-      addToast('Error', 'Failed to generate new code.', 'info');
-    }
-  };
-
   const handleSignOut = () => {
-    setUserProfile({} as any);
-    setGroup(null);
-    setExpenses([]);
+    // Just sign out and let the auth listener reset state. Clearing userProfile
+    // synchronously here briefly renders ProfileSetup (no financialProfile) for a
+    // frame before currentUser clears — so we don't.
     auth.signOut();
   };
 
@@ -484,6 +515,11 @@ export default function App() {
       return `"${text.replace(/"/g, '""')}"`;
     };
 
+    // The CSV only gains the "Participant Type" column (and guest rows) once at
+    // least one expense includes an added cherry (extra participant). With no
+    // extras anywhere, the export format is unchanged.
+    const hasExtras = expenses.some(e => (e.extraParticipants || []).length > 0);
+
     let csv = [
       'Title',
       'Amount',
@@ -493,9 +529,34 @@ export default function App() {
       'Status',
       'Split Type',
       'Participant',
+      ...(hasExtras ? ['Participant Type'] : []),
       'Original Share',
       'Confirmed Paid',
       'Remaining Balance'
+    ].join(',') + '\n';
+
+    // Build a row, inserting the type column only when the extras format is active.
+    const rowFor = (
+      expense: Expense,
+      paidByName: string,
+      participant: string,
+      type: string,
+      originalShare: number,
+      confirmedPaid: number,
+      remaining: number
+    ) => [
+      escapeCsv(expense.title),
+      roundCurrency(expense.amount).toFixed(2),
+      escapeCsv(expense.date),
+      escapeCsv(expense.category),
+      escapeCsv(paidByName),
+      escapeCsv(getExpenseStatusLabel(expense)),
+      escapeCsv(expense.splitType),
+      escapeCsv(participant),
+      ...(hasExtras ? [escapeCsv(type)] : []),
+      roundCurrency(originalShare).toFixed(2),
+      roundCurrency(confirmedPaid).toFixed(2),
+      roundCurrency(remaining).toFixed(2)
     ].join(',') + '\n';
 
     expenses.forEach(expense => {
@@ -510,49 +571,19 @@ export default function App() {
           allMembers.find(member => member.uid === userId)?.name || userId;
 
         const confirmedPaid = getSettlementTotal(expense, userId, false);
-        const remainingBalance = getRemainingSettlementAmount(
-          expense,
-          userId,
-          false
-        );
+        const remainingBalance = getRemainingSettlementAmount(expense, userId, false);
 
-        const row = [
-          escapeCsv(expense.title),
-          roundCurrency(expense.amount).toFixed(2),
-          escapeCsv(expense.date),
-          escapeCsv(expense.category),
-          escapeCsv(paidByName),
-          escapeCsv(getExpenseStatusLabel(expense)),
-          escapeCsv(expense.splitType),
-          escapeCsv(participantName),
-          roundCurrency(originalShare).toFixed(2),
-          confirmedPaid.toFixed(2),
-          remainingBalance.toFixed(2)
-        ];
-
-        csv += row.join(',') + '\n';
+        csv += rowFor(expense, paidByName, participantName, 'Member', originalShare || 0, confirmedPaid, remainingBalance);
       });
 
-      if (
-        expense.splitType === 'third_party' &&
-        expense.thirdPersonShare
-      ) {
-        const row = [
-          escapeCsv(expense.title),
-          roundCurrency(expense.amount).toFixed(2),
-          escapeCsv(expense.date),
-          escapeCsv(expense.category),
-          escapeCsv(paidByName),
-          escapeCsv(getExpenseStatusLabel(expense)),
-          escapeCsv(expense.splitType),
-          escapeCsv(expense.thirdPersonName || 'Third Person'),
-          roundCurrency(expense.thirdPersonShare).toFixed(2),
-          '0.00',
-          roundCurrency(expense.thirdPersonShare).toFixed(2)
-        ];
-
-        csv += row.join(',') + '\n';
+      if (expense.splitType === 'third_party' && expense.thirdPersonShare) {
+        csv += rowFor(expense, paidByName, expense.thirdPersonName || 'Third Person', 'Guest', expense.thirdPersonShare, 0, expense.thirdPersonShare);
       }
+
+      // Per-transaction cherries (guests) — only present when hasExtras is true.
+      (expense.extraParticipants || []).forEach(g => {
+        csv += rowFor(expense, paidByName, g.name, 'Guest', g.share, 0, g.share);
+      });
     });
 
     const blob = new Blob([csv], {
@@ -571,64 +602,119 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Scrub the current user out of a group document (members list, memberIds,
-  // and their slot in the default split). Shared by "Leave Group" and "Delete Account".
-  const removeSelfFromGroupDoc = async (groupId: string) => {
-    const groupRef = doc(db, 'groups', groupId);
+  // Scrub the current user out of a specific group document. Shared by "Leave
+  // Group" and "Delete Account". Redistributes the leaver's split percentage
+  // across the remaining members so household-default expenses still bill 100%,
+  // and deletes the group entirely if the last member leaves (no orphaned dead
+  // group). Reads the group fresh so it works for any of the user's groups, not
+  // just the one currently loaded into view.
+  const removeSelfFromGroupById = async (gid: string) => {
+    const groupRef = doc(db, 'groups', gid);
     const snap = await getDoc(groupRef);
     if (!snap.exists()) return;
-    const groupData = snap.data() as Group;
+    const g = snap.data() as Group;
+    const newMembers = (g.members || []).filter(m => m.uid !== activeUser);
+    const newMemberIds = (g.memberIds || []).filter(id => id !== activeUser);
+
+    // Last member out — delete the whole group rather than leaving a dead,
+    // empty group that still occupies its invite code.
+    if (newMemberIds.length === 0) {
+      await deleteDoc(groupRef);
+      return;
+    }
+
+    // Redistribute the leaver's percentage across the remaining joined members
+    // (proportional to their current shares) so the default split still sums to
+    // 100. Pending ghost slots in availableSplits are left untouched.
+    const split = g.defaultSplit || {};
+    const leaverPct = Number(split[activeUser]) || 0;
+    const newDefault: Record<string, number> = {};
+    newMemberIds.forEach(uid => { newDefault[uid] = Number(split[uid]) || 0; });
+    const joinedSum = newMemberIds.reduce((sum, uid) => sum + (Number(split[uid]) || 0), 0);
+    if (leaverPct > 0) {
+      let acc = 0;
+      newMemberIds.forEach((uid, i) => {
+        const base = Number(split[uid]) || 0;
+        const add = i === newMemberIds.length - 1
+          ? leaverPct - acc
+          : Math.round(leaverPct * (joinedSum > 0 ? base / joinedSum : 1 / newMemberIds.length));
+        acc += add;
+        newDefault[uid] = base + add;
+      });
+    }
+
     await updateDoc(groupRef, {
-      members: (groupData.members || []).filter(m => m?.uid !== activeUser),
-      memberIds: (groupData.memberIds || []).filter(id => id !== activeUser),
-      [`defaultSplit.${activeUser}`]: deleteField()
+      members: newMembers,
+      memberIds: newMemberIds,
+      defaultSplit: newDefault,
     });
   };
 
-  // Clear the locally cached ledger for one group.
-  const clearLocalGroupData = (groupId: string) => {
-    localStorage.removeItem('expenses_' + groupId);
-  };
-
-  // Switch the active group without leaving the current one. Membership and
-  // the per-group local ledger cache are untouched, so switching back is cheap.
-  const handleSwitchGroup = async (targetGroupId: string) => {
-    if (!targetGroupId || targetGroupId === group?.id) return;
+  // Delete the queue messages addressed to this user (allowed by the rules for
+  // to == self). Best-effort cleanup during account deletion.
+  const deleteMyInboundQueue = async () => {
+    if (!activeUser) return;
     try {
-      await updateDoc(doc(db, 'users', activeUser), { groupId: targetGroupId });
-      setShowSettings(false);
-      setSelectedExpense(null);
-      setEditingExpense(null);
-      setGroup(null);
-      setGroupUsers({});
-      setExpenses([]);
-      setUserProfile((prev: any) => ({ ...prev, groupId: targetGroupId }));
-    } catch (err) {
-      console.error("Error switching groups", err);
-      addToast('Error', 'Failed to switch groups. Please try again.', 'error');
+      const snap = await getDocs(query(collection(db, 'transfer_queue'), where('to', '==', activeUser)));
+      await Promise.allSettled(snap.docs.map(d => deleteDoc(d.ref)));
+    } catch (e) {
+      console.error('Failed to clean up inbound queue', e);
     }
   };
 
-  const handleLeaveGroup = async () => {
-    if (!window.confirm("Leave this group? You'll be removed from the member list. If you belong to other groups you'll switch to one of them; otherwise you'll return to the group setup screen. Your account stays active.")) return;
+  // Clear any locally cached ledger data for this user across every group they
+  // belong to, plus their backup secret. Used during account deletion.
+  const clearLocalData = () => {
+    groupIds.forEach(gid => localStorage.removeItem('expenses_' + gid));
+    if (group) localStorage.removeItem('expenses_' + group.id);
+    if (activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
+  };
+
+  // Switch the active group. The ledger, roster and sync inbox all re-key off
+  // `activeGroupId`, so we just persist the choice and clear the previous group's
+  // transient view state.
+  const handleSwitchGroup = async (gid: string) => {
+    setShowGroupMenu(false);
+    if (!gid || gid === activeGroupId) return;
     try {
-      const leavingId = group!.id;
-      await removeSelfFromGroupDoc(leavingId);
-      const remaining = (userProfile?.groupIds || []).filter((id: string) => id !== leavingId);
-      const nextActive = remaining[0] || null;
+      await updateDoc(doc(db, 'users', activeUser), { activeGroupId: gid, groupId: gid });
+    } catch (e) {
+      console.error('Failed to switch group', e);
+    }
+    setUserProfile((prev: any) => ({ ...(prev || {}), activeGroupId: gid, groupId: gid }));
+    setGroup(null);
+    setGroupUsers({});
+    setExpenses([]);
+    setSelectedExpense(null);
+    setEditingExpense(null);
+    setDismissedWaiting(false);
+    setShowSettings(false);
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!activeGroupId) return;
+    const remaining = groupIds.filter(id => id !== activeGroupId);
+    const nextActive = remaining[0] || null;
+    const message = nextActive
+      ? "Leave this group? You'll be removed from its member list and switched to another of your groups. Your account and your other groups stay intact."
+      : "Leave this group? You'll be removed from the member list and returned to the group setup screen. Your account stays active and you can create or join another group.";
+    if (!window.confirm(message)) return;
+    try {
+      await removeSelfFromGroupById(activeGroupId);
       await updateDoc(doc(db, 'users', activeUser), {
-        groupIds: remaining,
+        groupIds: arrayRemove(activeGroupId),
+        activeGroupId: nextActive ?? deleteField(),
         groupId: nextActive ?? deleteField(),
       });
-      clearLocalGroupData(leavingId);
-      // The backup secret is per-user; only drop it once no groups remain.
-      if (!nextActive && activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
+      localStorage.removeItem('expenses_' + activeGroupId);
       setShowSettings(false);
       setShowPrivacyModal(false);
-      setUserProfile((prev: any) => ({ ...(prev || {}), groupIds: remaining, groupId: nextActive }));
+      setShowGroupMenu(false);
+      setUserProfile((prev: any) => ({ ...(prev || {}), groupIds: remaining, activeGroupId: nextActive, groupId: nextActive }));
       setGroup(null);
       setGroupUsers({});
       setExpenses([]);
+      setSelectedExpense(null);
     } catch (err) {
       console.error("Error leaving group", err);
       alert("Failed to leave the group. Please try again.");
@@ -660,24 +746,26 @@ export default function App() {
       // or failed reauthentication cannot leave the account half-deleted.
       await reauthenticate();
 
-      // 1. Remove from every group the user belongs to.
-      for (const groupId of (userProfile?.groupIds || [])) {
-        try {
-          await removeSelfFromGroupDoc(groupId);
-        } catch (e) {
-          console.error(`Failed to leave group ${groupId} during account deletion`, e);
-        }
+      // Firestore cleanup must happen while still authenticated (these writes
+      // need auth), so they precede the auth-account deletion.
+      // 1. Remove from every group the user belongs to (re-normalizes each split
+      //    / deletes any group they were the last member of).
+      for (const gid of groupIds) {
+        try { await removeSelfFromGroupById(gid); }
+        catch (e) { console.error('Failed to leave group during account deletion', gid, e); }
       }
 
-      // 2. Delete the Firestore profile.
+      // 2. Clean up the queue messages addressed to this user.
+      await deleteMyInboundQueue();
+
+      // 3. Delete the Firestore profile.
       await deleteDoc(doc(db, 'users', activeUser));
 
-      // 3. Clear local cached ledger data.
-      for (const groupId of (userProfile?.groupIds || [])) clearLocalGroupData(groupId);
-      if (group) clearLocalGroupData(group.id);
-      if (activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
+      // 4. Clear local cached ledger data.
+      clearLocalData();
 
-      // 4. Delete the Firebase Authentication account.
+      // 5. Delete the Firebase Authentication account (last — it revokes the
+      //    auth needed for the steps above).
       await deleteUser(auth.currentUser!);
       // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
       setShowSettings(false);
@@ -737,9 +825,18 @@ export default function App() {
         await updateDoc(groupRef, { categories: newCategories });
       }
 
+      // "Quick settle": when logging an expense that's already been paid back,
+      // mark every debtor's share as a confirmed settlement so it lands closed.
+      const quickSettle = (formData as any).quickSettle === true;
+      const { quickSettle: _omitQuickSettle, ...cleanForm } = formData as any;
+
       let finalExpense: Expense;
       if (editingExpense) {
-        finalExpense = { ...editingExpense, ...formData };
+        finalExpense = { ...editingExpense, ...cleanForm };
+        // Shares/amount may have changed — re-derive status from the new shares
+        // vs. the existing settlements so a previously-"settled" expense doesn't
+        // keep hiding newly-created debt (or stay open after a reduction).
+        finalExpense.status = getNormalizedExpenseStatus(finalExpense);
         setExpenses(prev => {
           const updated = prev.map(ex => ex.id === finalExpense.id ? finalExpense : ex);
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
@@ -749,11 +846,37 @@ export default function App() {
         setShowForm(false);
         setSelectedExpense(finalExpense);
       } else {
+        const newId = crypto.randomUUID();
+        let status: Expense['status'] = 'OPEN';
+        let settlements = cleanForm.settlements || [];
+
+        if (quickSettle) {
+          const debtors = Object.entries(cleanForm.shares || {}).filter(
+            ([uid, share]) => uid !== cleanForm.paidBy && Number(share) > 0
+          );
+          if (debtors.length > 0) {
+            settlements = debtors.map(([uid, share]) => ({
+              id: crypto.randomUUID(),
+              expenseId: newId,
+              paidBy: uid,
+              receivedBy: cleanForm.paidBy,
+              amount: roundCurrency(Number(share)),
+              instrumentType: cleanForm.contributions?.[0]?.instrumentType || 'OTHER',
+              label: 'Logged as already settled',
+              timestamp: new Date().toISOString(),
+              paymentDate: cleanForm.date,
+              status: 'confirmed' as const,
+            }));
+            status = 'CLOSED';
+          }
+        }
+
         finalExpense = {
-          ...formData,
-          id: crypto.randomUUID(),
+          ...cleanForm,
+          settlements,
+          id: newId,
           groupId: group.id,
-          status: 'OPEN',
+          status,
           createdAt: new Date().toISOString()
         };
         setExpenses(prev => {
@@ -773,30 +896,39 @@ export default function App() {
   };
 
   const handleDeleteExpense = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      try {
-        const expenseToDelete = expenses.find(e => e.id === id);
-        setExpenses(prev => {
-          const updated = prev.filter(e => e.id !== id);
-          localStorage.setItem('expenses_' + group?.id, JSON.stringify(updated));
-          return updated;
-        });
-        setSelectedExpense(null);
-        
-        if (expenseToDelete) {
-          await broadcastToMembers('DELETE', { id });
-        }
-      } catch (e: any) {
-        console.error("Delete error:", e);
-        alert("Failed to delete data locally.");
+    // ExpenseDetail already gates this behind an inline "Confirm Delete?" step,
+    // so no second native confirm here.
+    if (!group) return;
+    const groupId = group.id;
+    try {
+      const expenseToDelete = expenses.find(e => e.id === id);
+      setExpenses(prev => {
+        const updated = prev.filter(e => e.id !== id);
+        try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
+        catch (e) { console.error('Failed to persist expenses', e); }
+        return updated;
+      });
+      setSelectedExpense(null);
+
+      if (expenseToDelete) {
+        await broadcastToMembers('DELETE', { id });
       }
+    } catch (e: any) {
+      console.error("Delete error:", e);
+      alert("Failed to delete data locally.");
     }
   };
 
     const syncExpenseUpdate = async (updatedExpense: Expense) => {
+    if (!group) return;
+    const groupId = group.id;
     setExpenses(prev => {
       const updated = prev.map(e => e.id === updatedExpense.id ? updatedExpense : e);
-      localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
+      try {
+        localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to persist expenses to localStorage', e);
+      }
       return updated;
     });
     setSelectedExpense(updatedExpense);
@@ -840,21 +972,12 @@ export default function App() {
     };
 
     const settlements = [...(selectedExpense.settlements || []), newSettlement];
-    
-    // Check if fully settled
-    let allConfirmedTotal = 0;
-    let allOwedTotal = 0;
-    Object.entries(selectedExpense.shares || {}).forEach(([uid, share]) => {
-      if (uid !== selectedExpense.paidBy) allOwedTotal += share;
-    });
-    settlements.forEach(s => {
-      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
-    });
-    
-    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
 
-    const updatedExp: Expense = { ...selectedExpense, status: newStatus, settlements };
+    // Status is derived per-debtor from the actual shares vs. settlements
+    // (getNormalizedExpenseStatus), not an aggregate sum — so one overpaid
+    // debtor can't mask another's shortfall and mark the whole expense closed.
+    const updatedExp: Expense = { ...selectedExpense, settlements };
+    updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
@@ -884,30 +1007,85 @@ export default function App() {
     const expense = expenses.find(e => e.id === selectedExpense.id);
     if (!expense) return;
 
-    const settlements = (expense.settlements || []).map(s => 
+    const settlements = (expense.settlements || []).map(s =>
       s.id === settlementId ? { ...s, status: 'confirmed' as const } : s
     );
 
-    // Check if fully settled
-    let allConfirmedTotal = 0;
-    let allOwedTotal = 0;
-    Object.entries(expense.shares || {}).forEach(([uid, share]) => {
-      if (uid !== expense.paidBy) allOwedTotal += share;
-    });
-    settlements.forEach(s => {
-      if (s.status === 'confirmed') allConfirmedTotal += s.amount;
-    });
-
-    const isFullySettled = allConfirmedTotal >= allOwedTotal - 0.01;
-    const newStatus: Expense['status'] = isFullySettled ? 'CLOSED' : 'PARTIALLY_SETTLED';
-
-    const updatedExp = { 
-      ...expense, 
-      status: newStatus, 
-      settlements 
-    };
+    const updatedExp: Expense = { ...expense, settlements };
+    updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     await syncExpenseUpdate(updatedExp);
     addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+  };
+
+  // Let the user set/change their display name regardless of how they signed in.
+  const handleSaveName = async (newName: string) => {
+    if (!newName) {
+      addToast('Name Required', 'Please enter a name.', 'info');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { name: newName });
+      if (auth.currentUser) {
+        try { await updateProfile(auth.currentUser, { displayName: newName }); } catch (e) { console.error(e); }
+      }
+      // Keep the group's stored member list in sync so the name shows everywhere.
+      if (group && group.members?.some(m => m.uid === activeUser)) {
+        const newMembers = group.members.map(m => m.uid === activeUser ? { ...m, name: newName } : m);
+        await updateDoc(doc(db, 'groups', group.id), { members: newMembers });
+      }
+      setUserProfile((prev: any) => ({ ...(prev || {}), name: newName }));
+      addToast('Name Updated', 'Your name has been updated.', 'success');
+    } catch (e) {
+      console.error('Failed to update name', e);
+      addToast('Error', 'Could not update your name. Please try again.', 'error');
+    }
+  };
+
+  const handleRetakeQuiz = async () => {
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
+      setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
+    } catch (e) { console.error('Failed to reset profile', e); }
+  };
+
+  const handleResendInvite = async (memberName: string) => {
+    const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
+    if (!email || !group) return;
+    try {
+      const res = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
+      });
+      if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
+      else addToast('Error', 'Failed to send invite', 'error');
+    } catch {
+      addToast('Error', 'Failed to send invite', 'error');
+    }
+  };
+
+  const handleRecalculateSplit = async () => {
+    if (!group) return;
+    const uids = Object.keys(groupUsers);
+    const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
+    const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
+    if (inc1 <= 0 || inc2 <= 0) {
+      addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
+      return;
+    }
+    const total = inc1 + inc2;
+    const pct1 = Math.round((inc1 / total) * 100);
+    const pct2 = 100 - pct1;
+    try {
+      await updateDoc(doc(db, 'groups', group.id), {
+        [`defaultSplit.${uids[0]}`]: pct1,
+        [`defaultSplit.${uids[1]}`]: pct2,
+      });
+      addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
+    } catch (e) {
+      console.error('Failed to recalculate split', e);
+      addToast('Error', 'Could not update the split. Please try again.', 'error');
+    }
   };
 
   // Payments logged by others that are waiting for THIS user to confirm receipt.
@@ -920,12 +1098,12 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12" id="app-root">
+    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12 animate-in fade-in duration-300" id="app-root">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-slate-200 w-full" />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
+      <main className="max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
         
         {hasIncomeDiscrepancy && (
           <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
@@ -981,9 +1159,53 @@ export default function App() {
                 <h3 className="text-sm font-semibold text-natural-text">
                   Welcome back, <span className="capitalize">{userProfile?.name || currentUser?.displayName || 'Friend'}</span>!
                 </h3>
-                <p className="text-[11px] text-natural-muted mt-0.5">
-                  Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
-                </p>
+                {userProfile?.weeklyGreeting?.text && (
+                  <p className="text-xs text-natural-primary font-medium mt-1 italic leading-snug max-w-md">
+                    {userProfile.weeklyGreeting.text}
+                  </p>
+                )}
+                <div className="relative mt-0.5">
+                  <button
+                    onClick={() => setShowGroupMenu(v => !v)}
+                    className="text-[11px] text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
+                    title="Switch group"
+                  >
+                    Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
+                    <ChevronDown size={12} className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showGroupMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
+                      <div className="absolute left-0 mt-1 z-20 w-64 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
+                        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">Your Groups</p>
+                        {groupIds.map(gid => {
+                          const isActive = gid === activeGroupId;
+                          const name = gid === group.id
+                            ? (group.name || 'Unnamed Group')
+                            : (groupSummaries[gid]?.name || 'Unnamed Group');
+                          return (
+                            <button
+                              key={gid}
+                              onClick={() => handleSwitchGroup(gid)}
+                              disabled={isActive}
+                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${isActive ? 'font-bold text-natural-primary bg-natural-sage/20 cursor-default' : 'text-natural-text hover:bg-natural-bg'}`}
+                            >
+                              <span className="truncate">{name}</span>
+                              {isActive && <Check size={14} className="text-natural-primary shrink-0" />}
+                            </button>
+                          );
+                        })}
+                        <div className="border-t border-natural-border my-1" />
+                        <button
+                          onClick={() => { setShowGroupMenu(false); setShowAddGroup(true); }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
+                        >
+                          <Plus size={14} /> Join or create another group
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex justify-end">
@@ -1050,21 +1272,29 @@ export default function App() {
             </div>
           )}
 
-          <StatsSection expenses={expenses} group={group} activeUser={activeUser} />
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+          {/* Two-column on large screens: balances become a sticky right rail
+              beside the ledger; on phones/iPad-portrait they stay a full-width
+              band above the ledger so nothing gets cut off. */}
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+                </div>
+                <ExpenseList
+                  expenses={expenses}
+                  group={group}
+                  activeUser={activeUser}
+                  onExpenseClick={(exp) => setSelectedExpense(exp)}
+                />
+              </div>
+              <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
             </div>
-            <ExpenseList 
-              expenses={expenses} 
-              group={group}
-              activeUser={activeUser} 
-              onExpenseClick={(exp) => setSelectedExpense(exp)} 
-            />
-          </div>
 
-          <MonthlyComparisonChart expenses={expenses} members={getFullMembers(group)} />
+            <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6">
+              <StatsSection expenses={expenses} group={group} activeUser={activeUser} orientation="rail" />
+            </div>
+          </div>
         </div>
 
         <footer className="text-center text-[10px] text-natural-muted mt-12 space-y-1" id="app-footer">
@@ -1074,8 +1304,13 @@ export default function App() {
       </main>
 
       {/* MODALS */}
+      {showAddGroup && (
+        <div className="fixed inset-0 z-50 overflow-auto animate-in fade-in duration-200">
+          <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
+        </div>
+      )}
       {showBackup && (
-        <BackupModal 
+        <BackupModal
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
           groupId={group.id}
@@ -1086,344 +1321,31 @@ export default function App() {
           setGroupSecret={setGroupSecret}
         />
       )}
-      {showSettings && (
-        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-natural-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-5 border-b border-natural-border bg-natural-bg/30 shrink-0">
-              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
-                <Settings className="h-5 w-5 text-natural-primary" />
-                Account Settings
-              </h2>
-              <button onClick={() => setShowSettings(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6 overflow-y-auto">
-              <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">User Profile</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-natural-muted">Name</span>
-                    <span className="text-sm font-semibold text-natural-text capitalize">{userProfile?.name || 'Unknown'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-natural-muted">Annual Income</span>
-                    <span className="text-sm font-semibold text-natural-text">
-                      {userProfile?.income ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(userProfile.income)) : 'N/A'}
-                    </span>
-                  </div>
-                  {userProfile?.financialProfile && (
-                    <div className="pt-2 mt-2 border-t border-natural-border">
-                      <span className="text-xs text-natural-muted block mb-1">Financial Style</span>
-                      <span className="text-sm font-semibold text-natural-primary block">{userProfile.financialProfile.type}</span>
-                      <p className="text-xs text-natural-text mt-1 leading-relaxed">{userProfile.financialProfile.description}</p>
-                      {userProfile.financialProfile.quote && (
-                        <blockquote className="mt-3 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
-                          {userProfile.financialProfile.quote}
-                        </blockquote>
-                      )}
-                      <button 
-                        onClick={() => {
-                          import('firebase/firestore').then(({ updateDoc, doc }) => {
-                            import('./firebase').then(({ db }) => {
-                              updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
-                              setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
-                            });
-                          });
-                        }} 
-                        className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
-                      >
-                        Retake Profile Quiz
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Group Details</h3>
-                <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-natural-muted">Group Name</span>
-                    <span className="text-sm font-semibold text-natural-text">{group?.name || 'Unnamed Group'}</span>
-                  </div>
-
-                  {myGroups.filter(g => g.id !== group?.id).length > 0 && (
-                    <div className="border-t border-natural-border/50 pt-3">
-                      <span className="text-sm text-natural-muted block mb-2">Switch Group</span>
-                      <div className="space-y-2">
-                        {myGroups.filter(g => g.id !== group?.id).map(g => (
-                          <button
-                            key={g.id}
-                            onClick={() => handleSwitchGroup(g.id)}
-                            className="w-full flex items-center justify-between py-2 px-3 text-sm font-semibold text-natural-text bg-white border border-natural-border hover:border-natural-primary rounded-lg transition-colors shadow-sm"
-                          >
-                            <span>{g.name}</span>
-                            <RefreshCw size={14} className="text-natural-primary" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => { setShowSettings(false); setShowGroupSetup(true); }}
-                    className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
-                  >
-                    <Plus size={14} /> Join or Create Another Group
-                  </button>
-
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <span className="text-sm text-natural-muted block mb-2">Group Members</span>
-                    <div className="space-y-3">
-                      {group && Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
-                        const isGhost = uid.startsWith('ghost_');
-                        const memberName = isGhost 
-                          ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name || 'Unknown'
-                          : groupUsers[uid]?.name || 'Unknown';
-                        return (
-                          <div key={uid} className="flex justify-between items-center text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0">
-                            <div>
-                              <span className="text-natural-text font-semibold">{memberName}</span>
-                              <span className="ml-2 text-xs font-mono text-natural-muted">{Number(pct)}% split</span>
-                            </div>
-                            <div>
-                              {!isGhost ? (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Joined</span>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
-                                  <button 
-                                    onClick={async () => {
-                                      const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
-                                      if (email) {
-                                        fetch('/api/send-invite', {
-                                          method: 'POST',
-                                          headers: {
-                                            'Content-Type': 'application/json',
-                                            ...(await authHeader()),
-                                          },
-                                          body: JSON.stringify({
-                                            email,
-                                            groupName: group.name,
-                                            inviteCode: group.inviteCode
-                                          })
-                                        }).then(res => {
-                                          if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
-                                          else addToast('Error', 'Failed to send invite', 'error');
-                                        });
-                                      }
-                                    }}
-                                    className="text-[10px] uppercase font-bold text-natural-primary hover:underline"
-                                  >
-                                    Resend Invite
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {Object.keys(groupUsers).length === 2 && (
-                       <button
-                         className="mt-3 w-full text-xs font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
-                         onClick={async () => {
-                           const uids = Object.keys(groupUsers);
-                           const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
-                           const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
-                           if (inc1 > 0 && inc2 > 0) {
-                             const total = inc1 + inc2;
-                             const pct1 = Math.round((inc1 / total) * 100);
-                             const pct2 = 100 - pct1;
-                             
-                             import('firebase/firestore').then(({ updateDoc, doc }) => {
-                               import('./firebase').then(({ db }) => {
-                                 updateDoc(doc(db, 'groups', group!.id), {
-                                   [`defaultSplit.${uids[0]}`]: pct1,
-                                   [`defaultSplit.${uids[1]}`]: pct2,
-                                 });
-                                 addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
-                               });
-                             });
-                           } else {
-                             addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
-                           }
-                         }}
-                       >
-                         Recalculate Using Reported Incomes
-                       </button>
-                    )}
-                  </div>
-                  
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <span className="text-sm text-natural-muted block mb-2">Invite Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
-                        {group?.inviteCode}
-                      </div>
-                      <button 
-                        onClick={() => navigator.clipboard.writeText(group?.inviteCode || '')}
-                        className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
-                        title="Copy to clipboard"
-                      >
-                        <Copy size={18} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleGenerateNewInviteCode}
-                    className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-primary hover:text-natural-dark bg-white border border-natural-primary/30 rounded-lg transition-colors shadow-sm"
-                  >
-                    <RefreshCw size={14} /> Generate New Code{(group?.targetNumPeople || 0) > 2 ? 's' : ''}
-                  </button>
-
-                  <div className="border-t border-natural-border/50 pt-3">
-                    <button
-                      onClick={handleLeaveGroup}
-                      className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-red-500 bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
-                    >
-                      <LogOut size={14} /> Leave This Group
-                    </button>
-                    <p className="text-[11px] text-natural-muted mt-1.5 text-center">Removes you from this group but keeps your account.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div>
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Local Ledger</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3 mb-4">
-                  <button 
-                    onClick={() => { setShowSettings(false); setShowBackup(true); }}
-                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
-                  >
-                    <span className="flex items-center gap-2"><Cloud size={16} className="text-natural-primary" /> Backup & Sync Options</span>
-                  </button>
-                </div>
-              </div>
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Legal & Privacy</h3>
-                <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3">
-                  <button 
-                    onClick={() => setShowPrivacyModal(true)}
-                    className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
-                  >
-                    <span className="flex items-center gap-2"><Shield size={16} className="text-natural-primary" /> Data, Privacy & Security</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-5 border-t border-natural-border bg-natural-bg/30">
-              <button 
-                onClick={() => {
-                  setShowSettings(false);
-                  handleSignOut();
-                }}
-                className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
-              >
-                <LogOut size={16} /> Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
+      {showSettings && group && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          userProfile={userProfile}
+          currentUser={currentUser}
+          group={group}
+          groupUsers={groupUsers}
+          onSaveName={handleSaveName}
+          onRetakeQuiz={handleRetakeQuiz}
+          onRecalculateSplit={handleRecalculateSplit}
+          onResendInvite={handleResendInvite}
+          onLeaveGroup={handleLeaveGroup}
+          onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
+          onOpenPrivacy={() => setShowPrivacyModal(true)}
+          onSignOut={() => { setShowSettings(false); handleSignOut(); }}
+        />
       )}
 
       {showPrivacyModal && (
-        <div className="fixed inset-0 bg-natural-bg/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-3xl shadow-xl border border-natural-border w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-6 border-b border-natural-border bg-natural-bg/30 sticky top-0 z-10 backdrop-blur-md">
-              <h2 className="font-bold text-natural-text font-display flex items-center gap-2">
-                <Shield className="h-5 w-5 text-natural-primary" />
-                Data, Privacy & Security
-              </h2>
-              <button onClick={() => setShowPrivacyModal(false)} className="text-natural-muted hover:text-natural-text bg-white p-1 rounded-full border border-natural-border shadow-sm">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-8">
-              
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
-                  <Lock size={16} className="text-natural-muted" /> How Your Data Is Protected
-                </h3>
-                <div className="bg-natural-sage/20 p-5 rounded-2xl border border-natural-sage/30 text-sm text-natural-text leading-relaxed space-y-4">
-                  <p>
-                    Your privacy is our top priority. We have implemented robust technical controls to ensure your financial ledgers and personal information are completely confidential and unreadable by anyone outside your group, including our own developers.
-                  </p>
-                  <ul className="list-disc pl-5 space-y-2 text-natural-muted">
-                    <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
-                    <li><strong>Anonymized Profiles:</strong> We completely hash your email address (using SHA-256) before storing it in the database. We do not store raw emails alongside your data.</li>
-                    <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
-                    <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
-                  </ul>
-                  <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
-                    Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so money stays a detail, not a conversation.
-                  </div>
-                  <p className="text-xs text-natural-muted mt-2 border-t border-natural-border pt-3">
-                    <em>Google Cloud and Firebase are trademarks of Google LLC.</em>
-                  </p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3 flex items-center gap-2">
-                  <FileText size={16} className="text-natural-muted" /> Legal Documents
-                </h3>
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setLegalDoc('terms')}
-                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
-                  >
-                    <span className="flex flex-col gap-0.5">
-                      <span className="font-semibold text-natural-text text-sm">Terms of Service</span>
-                      <span className="text-xs text-natural-muted">Read our terms of service.</span>
-                    </span>
-                    <FileText size={16} className="text-natural-primary shrink-0" />
-                  </button>
-                  <button
-                    onClick={() => setLegalDoc('privacy')}
-                    className="w-full text-left p-4 rounded-xl border border-natural-border bg-natural-bg/50 hover:bg-white hover:border-natural-primary/40 transition-colors flex items-center justify-between gap-2"
-                  >
-                    <span className="flex flex-col gap-0.5">
-                      <span className="font-semibold text-natural-text text-sm">Privacy Policy</span>
-                      <span className="text-xs text-natural-muted">Read how we handle your data.</span>
-                    </span>
-                    <Shield size={16} className="text-natural-primary shrink-0" />
-                  </button>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-natural-text mb-3">Your Data Controls</h3>
-                <div className="bg-white p-4 rounded-2xl border border-natural-border space-y-3">
-                  <button 
-                    onClick={handleExportData}
-                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-natural-text hover:bg-natural-bg/50 border border-natural-border rounded-xl transition-all shadow-sm"
-                  >
-                    <span className="flex items-center gap-2"><Download size={18} className="text-natural-primary" /> Export Data (CSV)</span>
-                  </button>
-                  
-                  <div className="border-t border-natural-border/50"></div>
-                  
-                  <button
-                    onClick={handleDeleteAccount}
-                    className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
-                  >
-                    <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account &amp; All Data</span>
-                  </button>
-                  <p className="text-[11px] text-natural-muted px-1 leading-relaxed">
-                    Permanently deletes your profile, financial data, group membership, and your sign-in account. This cannot be undone.
-                  </p>
-                </div>
-              </section>
-
-            </div>
-          </div>
-        </div>
+        <PrivacyModal
+          onClose={() => setShowPrivacyModal(false)}
+          onOpenLegal={(d) => setLegalDoc(d)}
+          onExportData={handleExportData}
+          onDeleteAccount={handleDeleteAccount}
+        />
       )}
 
       {showForm && (
@@ -1465,27 +1387,6 @@ export default function App() {
           onClose={() => setShowSettleModal(false)}
           onSubmit={handleSettleUpProposal}
         />
-      )}
-
-      {showGroupSetup && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-natural-bg">
-          <GroupSetup
-            onCancel={() => setShowGroupSetup(false)}
-            onComplete={(groupId) => {
-              setShowGroupSetup(false);
-              setSelectedExpense(null);
-              setEditingExpense(null);
-              setGroup(null);
-              setGroupUsers({});
-              setExpenses([]);
-              setUserProfile((prev: any) => ({
-                ...prev,
-                groupId,
-                groupIds: Array.from(new Set([...(prev?.groupIds || []), groupId])),
-              }));
-            }}
-          />
-        </div>
       )}
 
       {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}

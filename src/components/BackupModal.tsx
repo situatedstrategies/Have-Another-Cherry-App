@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Cloud, Download, Shield, Key, RefreshCw, Check, Sparkles } from 'lucide-react';
+import { Cloud, Download, Shield, Key, RefreshCw, Check, Sparkles } from 'lucide-react';
 import { doc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
+import Modal from './Modal';
 import { hashString } from '../lib/crypto';
 import CryptoJS from 'crypto-js';
 
@@ -165,16 +166,8 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
   const hasKey = !!groupSecret && groupSecret.length >= 8;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-natural-text/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-natural-border shrink-0">
-          <h2 className="text-xl font-display font-bold text-natural-text">Backup &amp; Recovery</h2>
-          <button onClick={onClose} className="p-2 hover:bg-natural-sidebar rounded-full transition-colors">
-            <X className="h-5 w-5 text-natural-muted" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto space-y-6">
+    <Modal onClose={onClose} title="Backup & Recovery">
+        <div className="space-y-6">
           {msg && (
             <div className={`p-3 text-sm rounded-xl border ${
               msg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200'
@@ -254,7 +247,6 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
             </p>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

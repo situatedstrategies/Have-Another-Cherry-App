@@ -65,25 +65,26 @@ export default function ExpenseDetail({
   const isCreditorActive = isPayerActive;
 
   return (
-    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" id="detail-overlay">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150" id="detail-container">
+    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200" id="detail-overlay">
+      <div className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-lg shadow-2xl sm:border border-natural-border flex flex-col max-h-full sm:max-h-[90vh]" id="detail-container">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border shrink-0" id="detail-header">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Expense Details</span>
             <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
-              expense.status === 'settled' 
-                ? 'bg-natural-sage text-natural-primary border-natural-primary/20' 
-                : expense.status === 'pending_confirmation'
+              getNormalizedExpenseStatus(expense) === 'CLOSED'
+                ? 'bg-natural-sage text-natural-primary border-natural-primary/20'
+                : getNormalizedExpenseStatus(expense) === 'PARTIALLY_SETTLED'
                 ? 'bg-natural-sidebar text-natural-text border-natural-border/20'
                 : 'bg-natural-sidebar text-natural-muted border-natural-border'
             }`} id="detail-status-badge">
               {getExpenseStatusLabel(expense)}
             </span>
           </div>
-          <button 
+          <button
             onClick={onClose}
+            aria-label="Close"
             className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
@@ -100,7 +101,7 @@ export default function ExpenseDetail({
                 {expense.title}
               </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-natural-muted">
-                <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {new Date(expense.date).toLocaleDateString()}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {formatDate(expense.date)}</span>
                 <span className="flex items-center gap-1.5 uppercase tracking-wider"><Tag className="h-3.5 w-3.5" /> {expense.category}</span>
                 {expense.isRecurring && (
                   <span className="flex items-center gap-1 text-natural-primary bg-natural-primary/10 px-1.5 py-0.5 rounded-md border border-natural-primary/20">
@@ -183,6 +184,14 @@ export default function ExpenseDetail({
                   </span>
                 </div>
               )}
+              {expense.extraParticipants?.map((g, i) => (
+                <div key={`extra-${i}`} className="p-3 rounded-xl border bg-transparent border-natural-border/50">
+                  <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">{g.name} (guest)</span>
+                  <span className="text-lg font-bold font-display text-natural-text mt-1 block">
+                    ${g.share.toFixed(2)}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 

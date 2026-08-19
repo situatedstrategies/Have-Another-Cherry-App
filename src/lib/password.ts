@@ -15,10 +15,11 @@ export interface PasswordChecks {
 
 export function checkPassword(password: string): PasswordChecks {
   return {
-    length: password.length >= 8,
+    length: password.length >= 8 && password.length <= 128,
     letter: /[A-Za-z]/.test(password),
     number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password),
+    // A defined special-character set — whitespace doesn't count.
+    special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password),
   };
 }
 

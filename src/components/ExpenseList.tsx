@@ -4,6 +4,13 @@ import { Expense, Group, SplitType } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus } from '../lib/money';
 import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
 
+// Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
+// bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
+const fmtDate = (dateStr: string) => {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 interface ExpenseListProps {
   expenses: Expense[];
   group: Group;
@@ -180,6 +187,14 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             <AlertCircle className="h-10 w-10 text-natural-muted mx-auto mb-3" />
             <p className="text-natural-text font-semibold text-sm">No expenses found</p>
             <p className="text-natural-muted text-xs mt-1">Try relaxing your search terms or filters.</p>
+            {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
+              <button
+                onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
+                className="mt-3 text-natural-primary hover:underline text-xs font-bold inline-flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Clear filters
+              </button>
+            )}
           </div>
         ) : (
           filteredExpenses.map((exp) => {
@@ -216,12 +231,12 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
               <div
                 key={exp.id}
                 onClick={() => onExpenseClick(exp)}
-                className="p-4 sm:p-5 flex items-center justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
                 id={`expense-row-${exp.id}`}
               >
-                <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
                   {/* Status indicator ring */}
-                  <div className="mt-1" id={`status-ring-${exp.id}`}>
+                  <div className="mt-0.5 shrink-0" id={`status-ring-${exp.id}`}>
                     {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
                       <div className="p-2 bg-natural-sage text-natural-primary rounded-full border border-natural-primary/20">
                         <CheckCircle2 className="h-4 w-4" />
@@ -238,22 +253,22 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate max-w-full">
                         {exp.title}
                       </span>
                       <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}>
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
+                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
                           <Repeat size={10} />
                         </span>
                       )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-natural-muted">
-                      <span className="font-mono">{new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span className="font-mono">{fmtDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
@@ -265,9 +280,9 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                   </div>
                 </div>
 
-                {/* Right Area: Amount and Share Balance */}
-                <div className="flex items-center gap-4 pl-4 shrink-0" id={`expense-balance-${exp.id}`}>
-                  <div className="text-right">
+                {/* Right (desktop) / bottom (mobile): amount + share balance */}
+                <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
+                  <div className="sm:text-right">
                     <span className="block text-base font-display font-bold text-natural-text">
                       {formatCurrency(exp.amount)}
                     </span>
@@ -275,7 +290,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       {balanceText}
                     </span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="hidden sm:block h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </div>
             );
@@ -287,7 +302,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       {filteredExpenses.length > 0 && (
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl" id="list-footer-stats">
           <span className="font-medium font-mono">Showing {filteredExpenses.length} of {expenses.length} expense items</span>
-          {statusFilter !== 'all' && (
+          {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button 
               onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
               className="text-natural-text hover:text-[#c49363] font-bold flex items-center gap-1 cursor-pointer"

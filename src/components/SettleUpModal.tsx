@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Expense, Group, PaymentInstrument } from '../types';
-import { X, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
 import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
+import Modal from './Modal';
 
 interface SettleUpModalProps {
   expense: Expense;
@@ -85,18 +86,8 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
   ];
 
   return (
-    <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border">
-          <h2 className="text-lg font-display font-bold text-natural-text">
-            {isCreditor ? 'Log Received Payment' : 'Settle Expense Share'}
-          </h2>
-          <button onClick={onClose} className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSettleSubmit} className="p-6 space-y-5 overflow-y-auto">
+    <Modal onClose={onClose} title={isCreditor ? 'Log Received Payment' : 'Settle Expense Share'} bodyClassName="">
+        <form onSubmit={handleSettleSubmit} className="p-6 space-y-5">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
               {error}
@@ -209,7 +200,6 @@ export default function SettleUpModal({ expense, group, activeUser, onClose, onS
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
