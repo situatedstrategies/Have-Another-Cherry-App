@@ -11,7 +11,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - Data/auth: Firebase (Auth + Firestore, client SDK). `firebase-admin` is a dependency but the server currently uses ADC, not the Admin SDK.
 - AI: Google Gemini via **Vertex AI** (`@google/genai`), authenticated with Application Default Credentials (ADC) — no API key.
 - Email: Resend (`resend`), sending from a verified domain.
-- Deploy: Firebase App Hosting (Cloud Run under the hood), auto-deploys from GitHub `main`.
+- Deploy: Firebase App Hosting (Cloud Run under the hood), auto-deploys from GitHub `development/web-production` (NOT `main`).
 
 ## Repo layout
 - `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry).
@@ -61,13 +61,13 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Logo: `/cherry2transparent.png` (in `public/`). The old Squarespace logo URL is dead — do not use it.
 
 ## Deploy flow
-- Push to `main` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
+- Push to `development/web-production` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
 
 ## Conventions / gotchas
-- Source of truth is GitHub `main` — that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
+- Source of truth is GitHub `development/web-production` — that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.
 - Keep `PORT` as `Number(process.env.PORT) || 3000` in `server.ts`.
-- AI Studio's GitHub import is one-way (snapshot). Changes made in AI Studio must be pushed back to `main` to deploy.
+- AI Studio's GitHub import is one-way (snapshot). Changes made in AI Studio must be pushed back to `development/web-production` to deploy.
