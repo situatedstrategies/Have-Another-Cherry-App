@@ -70,11 +70,16 @@ async function startServer() {
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: #F4F4F5; color: #18181B; font-family: Inter, Helvetica, Arial, sans-serif; padding: 24px; }
+    background:
+      radial-gradient(60% 45% at 78% 0%, rgba(196,18,0,.08), transparent 60%),
+      radial-gradient(45% 35% at 2% 22%, rgba(196,18,0,.04), transparent 60%),
+      #F4F4F5;
+    background-repeat: no-repeat;
+    color: #18181B; font-family: Inter, Helvetica, Arial, sans-serif; padding: 24px; }
   .card { background: #FFFFFF; border: 1px solid #D4D4D8; border-radius: 22px; padding: 40px 36px;
     max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 30px -12px rgba(24,24,27,.18); }
   img { width: 64px; height: 64px; object-fit: contain; margin: 0 auto 16px; display: block; }
-  h1 { font-family: Lora, Georgia, serif; font-size: 24px; margin-bottom: 8px; }
+  h1 { font-family: Lora, Georgia, serif; font-weight: 600; font-size: 24px; margin-bottom: 8px; }
   p { color: #52525B; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
   input { width: 100%; padding: 12px 14px; border: 1px solid #D4D4D8; border-radius: 12px;
     font-size: 15px; font-family: inherit; outline: none; margin-bottom: 12px; }
@@ -90,14 +95,14 @@ async function startServer() {
 <body>
   <div class="card">
     <img src="/cherry2transparent.png" alt="Have Another Cherry">
-    <h1>Members only, for now</h1>
-    <p>This is the Have Another Cherry production app. Enter the site password to continue.</p>
+    <h1>You're early. Sweet.</h1>
+    <p>Have Another Cherry is growing in a private beta. If you have the site password, come on in.</p>
     ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ""}
     <form method="POST" action="/gate/unlock">
       <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">
-      <button type="submit">Enter</button>
+      <button type="submit">Come on in</button>
     </form>
-    <p class="foot">Looking for the beta? <a href="https://beta.haveanothercherry.com">beta.haveanothercherry.com</a> or <a href="https://www.haveanothercherry.com/beta">request an invite</a>.</p>
+    <p class="foot">Don't have a password yet? We'd love to have you: <a href="https://www.haveanothercherry.com/beta">join our beta</a>. Already invited? The beta lives at <a href="https://beta.haveanothercherry.com">beta.haveanothercherry.com</a>.</p>
   </div>
 </body>
 </html>`;

@@ -1384,7 +1384,15 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12 animate-in fade-in duration-300" id="app-root">
+    <div
+      className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12 animate-in fade-in duration-300"
+      style={{
+        background:
+          'radial-gradient(60% 40% at 78% 0%, rgba(196,18,0,.05), transparent 60%), #F4F4F5',
+        backgroundRepeat: 'no-repeat',
+      }}
+      id="app-root"
+    >
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-slate-200 w-full" />
@@ -1418,7 +1426,7 @@ export default function App() {
             <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
               <CherryLogo className="h-14 w-14" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-natural-text leading-tight">
+            <h1 className="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-natural-text leading-tight">
               Have Another Cherry
             </h1>
           </div>

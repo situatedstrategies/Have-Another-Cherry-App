@@ -44,7 +44,17 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   return (
     <>
-      <div className="min-h-screen" style={{ background: C.bg, color: C.text }}>
+      <div
+        className="min-h-screen"
+        style={{
+          background:
+            'radial-gradient(60% 45% at 78% 0%, rgba(196,18,0,.07), transparent 60%), ' +
+            'radial-gradient(45% 35% at 2% 22%, rgba(196,18,0,.04), transparent 60%), ' +
+            C.bg,
+          backgroundRepeat: 'no-repeat',
+          color: C.text,
+        }}
+      >
         {/* ============ HEADER ============ */}
         <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ borderColor: C.border, background: 'rgba(244,244,245,0.9)' }}>
           <div className="max-w-[1120px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -52,7 +62,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <img src="/cherry2transparent.png" alt="Have Another Cherry logo" className="h-8 w-8 object-contain" />
               <span>Have Another Cherry</span>
             </a>
-            <nav className="hidden md:flex items-center gap-7 text-sm font-medium" style={{ color: C.muted }}>
+            <nav className="hidden md:flex items-center gap-7 font-mono text-[13px]" style={{ color: C.muted }}>
               <a href={SITE} className="hover:text-[#C41200] transition-colors">Home</a>
               <a href={`${SITE}/features`} className="hover:text-[#C41200] transition-colors">Features</a>
               <a href={`${SITE}/about`} className="hover:text-[#C41200] transition-colors">About</a>
