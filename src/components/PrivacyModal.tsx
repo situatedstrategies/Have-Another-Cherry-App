@@ -34,7 +34,7 @@ export default function PrivacyModal({ onClose, onOpenLegal, onExportData, onDel
             <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
           </ul>
           <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
-            Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so money stays a detail, not a conversation.
+            Have Another Cherry was made to make sharing expenses sweet (or sweeter). We built the boring parts well so the conversation can be the good part: talking about money with the people you share life with can be the start of something sweet.
           </div>
           <p className="text-xs text-natural-muted mt-2 border-t border-natural-border pt-3">
             <em>Google Cloud and Firebase are trademarks of Google LLC.</em>
