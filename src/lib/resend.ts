@@ -2,6 +2,33 @@ import { Resend } from "resend";
 import fs from "fs/promises";
 import path from "path";
 
+// Compliance footer appended to every user-facing email: why you got this,
+// what we keep (your email address, nothing more), how to unsubscribe, and a
+// deliverability nudge. Injected right before </body> on template emails and
+// appended to code-built ones.
+const EMAIL_COMPLIANCE_FOOTER = `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
+  <tr><td align="center" style="padding:18px 24px 30px 24px;font-family:'Inter',Helvetica,Arial,sans-serif;">
+    <p style="margin:0 0 6px 0;font-size:11px;color:#8C857A;line-height:1.6;">
+      You're receiving this because you use Have Another Cherry, or someone invited you.
+      We save your email address to service your account and nothing more: we never sell it or share it.
+    </p>
+    <p style="margin:0 0 6px 0;font-size:11px;color:#8C857A;line-height:1.6;">
+      Don't want emails from us?
+      <a href="mailto:help@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
+      and we'll stop, aside from essential account emails like password resets you request.
+    </p>
+    <p style="margin:0;font-size:11px;color:#8C857A;line-height:1.6;">
+      To make sure our emails reach you, add our @haveanothercherry.com senders to your contacts or safe senders list.
+    </p>
+  </td></tr>
+</table>`;
+
+const withComplianceFooter = (html: string): string =>
+  html.includes("</body>")
+    ? html.replace("</body>", `${EMAIL_COMPLIANCE_FOOTER}</body>`)
+    : html + EMAIL_COMPLIANCE_FOOTER;
+
 const EMAIL_INVITES_ACTIVE = true;
 
 function escapeHtml(input: string): string {
@@ -72,7 +99,7 @@ export async function sendInviteEmail(
     from: "Have Another Cherry <notifications@haveanothercherry.com>",
     to: [email],
     subject: safeFrom + " invited you to " + groupName + " on Have Another Cherry",
-    html: htmlContent,
+    html: withComplianceFooter(htmlContent),
   });
 
   if (error) {
@@ -118,7 +145,7 @@ export async function sendVerificationEmail(
     from: "Have Another Cherry <verify@haveanothercherry.com>",
     to: [email],
     subject: "Confirm your email for Have Another Cherry",
-    html: htmlContent,
+    html: withComplianceFooter(htmlContent),
   });
 
   if (error) {
@@ -163,7 +190,7 @@ export async function sendResetEmail(
     from: "Have Another Cherry <reset@haveanothercherry.com>",
     to: [email],
     subject: "Reset your Have Another Cherry password",
-    html: htmlContent,
+    html: withComplianceFooter(htmlContent),
   });
 
   if (error) {
@@ -248,7 +275,7 @@ export async function sendReminderEmail(
     from: "Have Another Cherry <tartcherry@haveanothercherry.com>",
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
-    html,
+    html: withComplianceFooter(html),
   });
 
   if (error) {

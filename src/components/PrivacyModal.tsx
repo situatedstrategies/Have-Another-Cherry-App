@@ -29,7 +29,7 @@ export default function PrivacyModal({ onClose, onOpenLegal, onExportData, onDel
           </p>
           <ul className="list-disc pl-5 space-y-2 text-natural-muted">
             <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
-            <li><strong>Anonymized Profiles:</strong> We completely hash your email address (using SHA-256) before storing it in the database. We do not store raw emails alongside your data.</li>
+            <li><strong>Minimal contact data:</strong> We save your email address to sign you in and send you service emails - it's the only contact information we keep, and we never sell it or share it. Only a hashed (SHA-256) version sits alongside your ledger data, and our emails never contain your amounts or expense details.</li>
             <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
             <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
           </ul>

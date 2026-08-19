@@ -4,8 +4,10 @@ import Modal from './Modal';
 
 export type LegalDoc = 'terms' | 'privacy';
 
-const EFFECTIVE_DATE = 'August 8, 2026';
-const CONTACT_EMAIL = 'support@haveanothercherry.com';
+const EFFECTIVE_DATE = 'August 19, 2026';
+const CONTACT_EMAIL = 'help@haveanothercherry.com';
+const PRIVACY_CONTACT = 'olivia@situatedstrategies.org';
+const SITE = 'https://have-another-cherry-marketing.pages.dev';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -23,15 +25,17 @@ function PrivacyPolicy() {
 
       <Section title="Overview">
         <p>
-          Have Another Cherry ("we", "us") is a household expense-splitting app. This Privacy Policy explains what
-          information we collect, how we use it, and the choices you have. We built the app to keep your financial
-          details private by default.
+          Have Another Cherry is provided by Situated Strategies LLC ("we", "us"). This is a plain-language summary
+          of our Privacy Policy: what we collect, how we use it, and the choices you have. The complete policy,
+          including GDPR and US state privacy rights, lives at{' '}
+          <a href={`${SITE}/privacy`} target="_blank" rel="noopener noreferrer" className="font-semibold text-natural-primary hover:underline">{SITE.replace('https://', '')}/privacy</a>{' '}
+          and is the authoritative version. We built the app to keep your financial details private by default.
         </p>
       </Section>
 
       <Section title="Information We Collect">
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Account information:</strong> your name and email address. Your email is hashed (SHA-256) before it is stored alongside your data.</li>
+          <li><strong>Account information:</strong> your name and email address. We save your email: it is how you sign in and how we reach you. It is the only contact information we keep, and only a hashed (SHA-256) version sits alongside your ledger data.</li>
           <li><strong>Financial profile:</strong> your responses to the profile quiz and the income figures you enter, used to tailor split recommendations and insights.</li>
           <li><strong>Expense &amp; ledger data:</strong> the expenses, settlements, and comments you log. These are end-to-end encrypted on your device before being sent to our database.</li>
           <li><strong>Receipt images</strong> you choose to scan, which are processed to extract expense details.</li>
@@ -50,10 +54,20 @@ function PrivacyPolicy() {
         <p>To provide and operate the app: creating your group, splitting expenses, generating your financial profile and split recommendations, sending invite emails you request, and scanning receipts you submit. We do not sell your personal information.</p>
       </Section>
 
+      <Section title="Email">
+        <p>
+          We save your email address and use it to service you: signing in, verification, password resets,
+          invites, payment reminders a group member chooses to send, and product updates only if you opt in.
+          We never sell it or share it beyond the providers that deliver the service. Our emails are written
+          so they never contain your amounts, balances, or expense details, and every email includes a way
+          to unsubscribe. Essential account emails, like a password reset you request, are the only exception.
+        </p>
+      </Section>
+
       <Section title="Service Providers">
         <p>
           We rely on trusted providers to run the app, including Google Firebase (authentication and database),
-          Google Cloud / Vertex AI (receipt scanning and profile generation), and Resend (sending invite emails).
+          Google Cloud / Vertex AI (receipt scanning and profile generation), and Resend (delivering our emails; our messages are written so its delivery logs never contain your ledger details).
           These providers process data on our behalf under their own terms.
         </p>
       </Section>
@@ -79,7 +93,7 @@ function PrivacyPolicy() {
       </Section>
 
       <Section title="Contact">
-        <p>Questions about privacy? Contact us at <span className="font-semibold text-natural-text">{CONTACT_EMAIL}</span>.</p>
+        <p>Support: <span className="font-semibold text-natural-text">{CONTACT_EMAIL}</span>. Privacy questions or rights requests: <span className="font-semibold text-natural-text">{PRIVACY_CONTACT}</span>.</p>
       </Section>
     </div>
   );
@@ -91,7 +105,12 @@ function TermsOfService() {
       <p className="text-xs text-natural-muted">Effective {EFFECTIVE_DATE}</p>
 
       <Section title="Acceptance of Terms">
-        <p>By creating an account or using Have Another Cherry (the "Service"), you agree to these Terms of Service. If you do not agree, please do not use the Service.</p>
+        <p>
+          By creating an account or using Have Another Cherry (the "Service", provided by Situated Strategies LLC),
+          you agree to these Terms of Service. This is a plain-language summary; the complete Terms live at{' '}
+          <a href={`${SITE}/terms`} target="_blank" rel="noopener noreferrer" className="font-semibold text-natural-primary hover:underline">{SITE.replace('https://', '')}/terms</a>{' '}
+          and are the authoritative version. If you do not agree, please do not use the Service.
+        </p>
       </Section>
 
       <Section title="The Service">
@@ -112,6 +131,23 @@ function TermsOfService() {
 
       <Section title="AI Features">
         <p>Receipt scanning and profile generation use automated AI systems and may be inaccurate or incomplete. Always review scanned amounts and details before relying on them.</p>
+      </Section>
+
+      <Section title="Communications">
+        <p>
+          By creating an account you agree to receive essential service emails: verification, password resets you
+          request, invitations, and payment reminders a member of your group chooses to send. Optional product
+          updates are sent only if you opt in. Every email includes a way to unsubscribe, and none of our emails
+          ever contain your amounts, balances, or expense details.
+        </p>
+      </Section>
+
+      <Section title="Plans & Billing">
+        <p>
+          The free plan is genuinely free: unlimited expenses, no ads, no daily limits. Cherry + is our optional
+          premium tier; it will be billed per user through the App Store and Google Play when our mobile apps
+          launch, under those stores' terms.
+        </p>
       </Section>
 
       <Section title="Acceptable Use">
@@ -135,7 +171,7 @@ function TermsOfService() {
       </Section>
 
       <Section title="Contact">
-        <p>Questions about these Terms? Contact us at <span className="font-semibold text-natural-text">{CONTACT_EMAIL}</span>.</p>
+        <p>Questions about these Terms? Contact Situated Strategies LLC at <span className="font-semibold text-natural-text">{PRIVACY_CONTACT}</span>. Support: <span className="font-semibold text-natural-text">{CONTACT_EMAIL}</span>.</p>
       </Section>
     </div>
   );
