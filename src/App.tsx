@@ -28,6 +28,7 @@ import PlanPurchase from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
 import CherryPlusModal from './components/CherryPlusModal';
+import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { hasPlus } from './lib/entitlements';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
@@ -155,6 +156,7 @@ export default function App() {
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
+  const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
   // Settings inputs for the spending threshold and direct-payment handles.
   const [thresholdInput, setThresholdInput] = useState('');
   const [venmoInput, setVenmoInput] = useState('');
@@ -523,14 +525,56 @@ export default function App() {
     }
   }, [activeUser, group?.id, expenses]);
 
-  // Keep settings inputs synced with the saved profile values.
+  // Keep settings inputs synced with the saved profile values. Handles are
+  // stored encrypted (paymentHandlesEnc, keyed by the owner's uid), so decrypt
+  // for display; legacy plaintext paymentHandles is the fallback.
   useEffect(() => {
     setThresholdInput(
       userProfile?.recurringThreshold > 0 ? String(userProfile.recurringThreshold) : ''
     );
-    setVenmoInput(userProfile?.paymentHandles?.venmo || '');
-    setZelleInput(userProfile?.paymentHandles?.zelle || '');
-  }, [userProfile?.recurringThreshold, userProfile?.paymentHandles?.venmo, userProfile?.paymentHandles?.zelle]);
+    let cancelled = false;
+    (async () => {
+      let handles = userProfile?.paymentHandles || null;
+      if (userProfile?.paymentHandlesEnc && activeUser) {
+        try {
+          handles = await decryptData(userProfile.paymentHandlesEnc, activeUser);
+        } catch (e) {
+          console.error('Could not decrypt own payment handles', e);
+        }
+      }
+      if (!cancelled) {
+        setVenmoInput(handles?.venmo || '');
+        setZelleInput(handles?.zelle || '');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userProfile?.recurringThreshold, userProfile?.paymentHandlesEnc, userProfile?.paymentHandles, activeUser]);
+
+  // Decrypted payment handles for every group member, for the settle screen's
+  // Venmo/Zelle handoff. Each member's handles are encrypted with their own
+  // uid, which every group member knows, so the ciphertext is opaque in
+  // Firestore but readable in-app.
+  const [paymentHandlesByUid, setPaymentHandlesByUid] = useState<Record<string, { venmo?: string; zelle?: string }>>({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, { venmo?: string; zelle?: string }> = {};
+      for (const [uid, u] of Object.entries(groupUsers) as [string, any][]) {
+        if (u?.paymentHandlesEnc) {
+          try {
+            const dec = await decryptData(u.paymentHandlesEnc, uid);
+            if (dec && (dec.venmo || dec.zelle)) next[uid] = dec;
+          } catch (e) {
+            console.error('Could not decrypt payment handles for member', uid, e);
+          }
+        } else if (u?.paymentHandles && (u.paymentHandles.venmo || u.paymentHandles.zelle)) {
+          next[uid] = u.paymentHandles; // legacy plaintext
+        }
+      }
+      if (!cancelled) setPaymentHandlesByUid(next);
+    })();
+    return () => { cancelled = true; };
+  }, [groupUsers]);
 
   // Weekly cherry greeting: generate once per week (per group size) and cache it
   // on the user doc so we don't call the AI on every load.
@@ -1260,15 +1304,23 @@ export default function App() {
   };
 
   // Direct-payment handles (Venmo/Zelle) other members use to pay this user.
+  // Written to Firestore ONLY encrypted (keyed by the owner's uid); any legacy
+  // plaintext copy is deleted on save. Handles never enter cloud backups
+  // either: backups contain only the expense ledger.
   const handleSavePaymentHandles = async () => {
     const handles = {
       venmo: venmoInput.trim().replace(/^@/, ''),
       zelle: zelleInput.trim(),
     };
     try {
-      await updateDoc(doc(db, 'users', activeUser), { paymentHandles: handles });
-      setUserProfile((prev: any) => ({ ...(prev || {}), paymentHandles: handles }));
-      addToast('Payment Info Saved', 'Group members can now pay you directly through Venmo or Zelle.', 'success');
+      const enc = await encryptData(handles, activeUser);
+      await updateDoc(doc(db, 'users', activeUser), {
+        paymentHandlesEnc: enc,
+        paymentHandles: deleteField(),
+      });
+      setUserProfile((prev: any) => ({ ...(prev || {}), paymentHandlesEnc: enc, paymentHandles: undefined }));
+      setPaymentHandlesByUid(prev => ({ ...prev, [activeUser]: handles }));
+      addToast('Payment Info Saved', 'Encrypted and saved. Group members can now pay you directly through Venmo or Zelle.', 'success');
     } catch (e) {
       console.error('Failed to save payment handles', e);
       addToast('Error', 'Could not save your payment info. Please try again.', 'error');
@@ -1562,7 +1614,7 @@ export default function App() {
             </div>
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
-              <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" />
+              <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
               <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
             </div>
           </div>
@@ -1690,6 +1742,20 @@ export default function App() {
         />
       )}
 
+      {owedModal && (
+        <OwedBreakdownModal
+          mode={owedModal}
+          expenses={statsVisibleExpenses}
+          group={group}
+          activeUser={activeUser}
+          isPlus={isPlus}
+          onSelectExpense={(exp) => setSelectedExpense(exp)}
+          onCherryPlus={() => setShowCherryPlus(true)}
+          onToast={addToast}
+          onClose={() => setOwedModal(null)}
+        />
+      )}
+
       {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
 
       {showPlanPurchase && (
@@ -1765,7 +1831,7 @@ export default function App() {
           expense={selectedExpense}
           group={group}
           activeUser={activeUser}
-          groupUsers={groupUsers}
+          paymentHandlesByUid={paymentHandlesByUid}
           onClose={() => setShowSettleModal(false)}
           onSubmit={handleSettleUpProposal}
         />

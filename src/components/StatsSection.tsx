@@ -12,9 +12,11 @@ interface StatsSectionProps {
    *           column once there's room for a side rail (lg+).
    */
   orientation?: 'band' | 'rail';
+  /** Opens the owed-transactions breakdown for the clicked card. */
+  onCardClick?: (card: 'you_owe' | 'owed_to_you') => void;
 }
 
-export default function StatsSection({ expenses, group, activeUser, orientation = 'band' }: StatsSectionProps) {
+export default function StatsSection({ expenses, group, activeUser, orientation = 'band', onCardClick }: StatsSectionProps) {
   let youOweAmount = 0;
   let othersOweYouAmount = 0;
   let youOweCount = 0;
@@ -71,7 +73,13 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
       }
     >
       {/* You owe */}
-      <div className="bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200" id="stat-card-you-owe">
+      <button
+        type="button"
+        onClick={() => onCardClick?.('you_owe')}
+        className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
+        id="stat-card-you-owe"
+        title="See what you still owe"
+      >
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">You Owe</span>
           <div className="p-2.5 bg-natural-sidebar text-natural-text rounded-2xl">
@@ -91,10 +99,16 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
             ${youOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} awaiting confirmation
           </p>
         )}
-      </div>
+      </button>
 
       {/* Others owe you */}
-      <div className="bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200" id="stat-card-others-owe">
+      <button
+        type="button"
+        onClick={() => onCardClick?.('owed_to_you')}
+        className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
+        id="stat-card-others-owe"
+        title="See who still owes you"
+      >
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">Others Owe You</span>
           <div className="p-2.5 bg-natural-sage text-natural-primary rounded-2xl">
@@ -114,7 +128,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
             ${othersOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending your confirmation
           </p>
         )}
-      </div>
+      </button>
 
       {/* Settled Audit Summary */}
       <div className="bg-natural-sidebar rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200" id="stat-card-settled">

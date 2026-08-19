@@ -21,11 +21,15 @@ export interface User {
   // Cherry +: the most this user wants to owe on a single shared expense; both
   // sides get a heads-up when a split goes over it. 0/absent = off.
   recurringThreshold?: number;
-  // Payment handles other members use to pay this user directly.
+  // Payment handles other members use to pay this user directly. Stored ONLY
+  // as paymentHandlesEnc (encrypted client-side with the owner's uid via
+  // lib/crypto, like the ledger). The plaintext shape below is the in-memory /
+  // legacy form; saving always writes the encrypted field and deletes this one.
   paymentHandles?: {
     venmo?: string; // Venmo username, without the @
     zelle?: string; // email or US phone number enrolled with Zelle
   };
+  paymentHandlesEnc?: string;
   income?: string;
   partnerIncome?: string;
   financialProfile?: {

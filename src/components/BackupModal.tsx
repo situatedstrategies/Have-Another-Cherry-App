@@ -126,10 +126,40 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
     setLoading(true);
     try {
       const encrypted = CryptoJS.AES.encrypt(JSON.stringify(localExpenses), key).toString();
+
+      // Firestore caps a document at ~1MB and the backup shares the user doc,
+      // so refuse clearly instead of failing with an opaque write error.
+      if (encrypted.length > 900_000) {
+        show(`This ledger is too large for a cloud backup (${Math.round(encrypted.length / 1024)}KB encrypted, limit ~900KB). Export a CSV from Privacy & Security as a fallback and let us know - larger backups are on the roadmap.`, 'error');
+        setLoading(false);
+        return;
+      }
+
       const date = new Date().toISOString();
       await updateDoc(doc(db, 'users', activeUser), { backup: encrypted, backupDate: date });
+
+      // Trust, then verify: read the document back from the server and prove
+      // the backup is there and decrypts to the same number of items.
+      const verifySnap = await getDoc(doc(db, 'users', activeUser));
+      const stored = verifySnap.exists() ? verifySnap.data().backup : null;
+      let verified = false;
+      if (stored) {
+        try {
+          const roundTrip = JSON.parse(CryptoJS.AES.decrypt(stored, key).toString(CryptoJS.enc.Utf8));
+          verified = Array.isArray(roundTrip) && roundTrip.length === localExpenses.length;
+        } catch {
+          verified = false;
+        }
+      }
+
+      if (!verified) {
+        show('The backup was written but could not be verified. Please try again - do not rely on this backup.', 'error');
+        setLoading(false);
+        return;
+      }
+
       setLastBackup(date);
-      show(`Ledger backed up to the cloud - ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'}, encrypted with your group key.`, 'success');
+      show(`Backed up and verified: ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'} in the cloud (${Math.round(encrypted.length / 1024)}KB, encrypted with your group key). We read it back from Firestore to confirm.`, 'success');
     } catch (e) {
       console.error(e);
       show('Backup failed. Check your connection and try again.', 'error');

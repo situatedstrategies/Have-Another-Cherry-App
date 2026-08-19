@@ -10,8 +10,8 @@ interface SettleUpModalProps {
   expense: Expense;
   group: Group;
   activeUser: string;
-  /** Live member profiles - used for the recipient's Venmo/Zelle handles. */
-  groupUsers?: Record<string, any>;
+  /** Decrypted Venmo/Zelle handles per member uid (decrypted in App). */
+  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
   onClose: () => void;
   onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
 }
@@ -23,7 +23,7 @@ const todayLocal = () => {
   return new Date(d.getTime() - tz).toISOString().split('T')[0];
 };
 
-export default function SettleUpModal({ expense, group, activeUser, groupUsers, onClose, onSubmit }: SettleUpModalProps) {
+export default function SettleUpModal({ expense, group, activeUser, paymentHandlesByUid, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
   const [notes, setNotes] = useState('');
   const [paymentDate, setPaymentDate] = useState(todayLocal());
@@ -110,8 +110,7 @@ export default function SettleUpModal({ expense, group, activeUser, groupUsers, 
 
   // Deep-link-lite: hand the payer straight into Venmo/Zelle. With a stored
   // handle, Venmo opens prefilled; otherwise the button still gets them there.
-  const recipientProfile = groupUsers?.[expense.paidBy];
-  const recipientHandles = recipientProfile?.paymentHandles || {};
+  const recipientHandles = paymentHandlesByUid?.[expense.paidBy] || {};
   const payAmount = roundCurrency(Number(amountToPay) || 0);
   const payNote = `Have Another Cherry: ${expense.title}`.slice(0, 140);
   const venmo = recipientHandles.venmo ? venmoTarget(recipientHandles.venmo, payAmount, payNote) : null;

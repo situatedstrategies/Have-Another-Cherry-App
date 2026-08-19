@@ -201,3 +201,65 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
 
   return data;
 }
+
+// Cherry + payment reminder, sent on a member's behalf from
+// tartcherry@haveanothercherry.com. Deliberately warm and no-pressure: the
+// point of the feature is that nobody has to send the awkward text.
+export async function sendReminderEmail(
+  toEmail: string,
+  toName: string,
+  fromName: string,
+  groupName: string,
+  amount: number,
+  items: { title: string; amount: number }[]
+) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const resend = new Resend(apiKey);
+
+  const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const rows = items
+    .map(
+      (i) =>
+        `<tr><td style="padding:6px 12px 6px 0; color:#3A3733; font-size:14px;">${i.title}</td>` +
+        `<td style="padding:6px 0; color:#3A3733; font-size:14px; text-align:right; font-family:monospace;">${fmt(i.amount)}</td></tr>`
+    )
+    .join("");
+
+  const html = `
+  <div style="font-family: Inter, Helvetica, Arial, sans-serif; background:#F5F0E6; padding:32px 16px;">
+    <div style="max-width:520px; margin:0 auto; background:#FFFDF9; border:1px solid #E4DCCB; border-radius:16px; padding:32px;">
+      <h1 style="font-family: Georgia, serif; font-size:22px; color:#3A3733; margin:0 0 16px;">A gentle nudge from ${groupName}</h1>
+      <p style="color:#6B6459; font-size:14.5px; line-height:1.6; margin:0 0 16px;">
+        Hi ${toName || "there"}, ${fromName} sent a friendly reminder from Have Another Cherry.
+        No rush and no pressure: this is just the app doing the asking so nobody has to.
+      </p>
+      <div style="background:#F7E9E2; border:1px solid #E4DCCB; border-radius:12px; padding:16px 20px; margin:0 0 16px;">
+        <p style="color:#6B6459; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin:0 0 4px;">Still open</p>
+        <p style="color:#C41200; font-size:28px; font-weight:bold; margin:0; font-family:monospace;">${fmt(amount)}</p>
+      </div>
+      ${rows ? `<table style="width:100%; border-collapse:collapse; margin:0 0 20px;">${rows}</table>` : ""}
+      <a href="https://app.haveanothercherry.com" style="display:inline-block; background:#C41200; color:#ffffff; font-size:14px; font-weight:bold; padding:12px 24px; border-radius:999px; text-decoration:none;">Open Have Another Cherry</a>
+      <p style="color:#8C857A; font-size:11.5px; line-height:1.6; margin:20px 0 0;">
+        Pay what you can, when you can. If you've already settled this, you can ignore this note: balances update as soon as payments are confirmed.
+      </p>
+    </div>
+    <p style="text-align:center; color:#8C857A; font-size:11px; margin:16px 0 0;">Have Another Cherry. Split fairly. Settle easily.</p>
+  </div>`;
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <tartcherry@haveanothercherry.com>",
+    to: toEmail,
+    subject: `A gentle reminder from ${fromName} (${groupName})`,
+    html,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}

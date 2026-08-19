@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 
 async function startServer() {
@@ -622,6 +622,78 @@ async function startServer() {
       // If Mailchimp got them, the signup still succeeded.
       if (subscribed) return res.status(200).json({ success: true, subscribed });
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
+    }
+  });
+
+  // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
+  //     tartcherry@haveanothercherry.com to a group member who still owes the
+  //     caller money. Server-enforced: the caller must hold the Cherry +
+  //     entitlement and both parties must be members of the same group. The
+  //     amount and item titles come from the caller's own (E2E-encrypted)
+  //     ledger: sending them in a reminder is the sender's deliberate choice.
+  app.post("/api/send-reminder", requireAuth, rateLimit("remind", 10), async (req, res) => {
+    try {
+      const callerUid = (req as any).uid as string;
+      const { debtorUid, groupId, amount, items } = req.body || {};
+
+      if (!debtorUid || typeof debtorUid !== "string" || !groupId || typeof groupId !== "string") {
+        return res.status(400).json({ error: "Missing debtor or group." });
+      }
+      if (debtorUid === callerUid) {
+        return res.status(400).json({ error: "You can't remind yourself." });
+      }
+      const normalizedAmount = Math.max(0, Math.round((Number(amount) || 0) * 100) / 100);
+      const safeItems = (Array.isArray(items) ? items : [])
+        .slice(0, 10)
+        .map((i: any) => ({
+          title: String(i?.title || "Shared expense").slice(0, 80),
+          amount: Math.max(0, Math.round((Number(i?.amount) || 0) * 100) / 100),
+        }));
+
+      await ensureAdminApp();
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const { getAuth } = await import("firebase-admin/auth");
+      const fs = getFirestore();
+
+      // Cherry + enforcement: reminders are a premium feature.
+      const callerDoc = await fs.collection("users").doc(callerUid).get();
+      const caller = callerDoc.data() || {};
+      const entExpiry = caller?.plusEntitlement?.expiresAt;
+      const callerHasPlus = !!caller.isPlus && (!entExpiry || new Date(entExpiry).getTime() > Date.now());
+      if (!callerHasPlus) {
+        return res.status(403).json({ error: "Payment reminders are a Cherry + feature." });
+      }
+
+      // Both people must belong to the group.
+      const groupDoc = await fs.collection("groups").doc(groupId).get();
+      const groupData = groupDoc.data() || {};
+      const memberIds: string[] = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
+      if (!memberIds.includes(callerUid) || !memberIds.includes(debtorUid)) {
+        return res.status(403).json({ error: "Both people must be members of this group." });
+      }
+
+      // The debtor's real email lives in Firebase Auth (Firestore only stores a hash).
+      const debtorAuth = await getAuth().getUser(debtorUid).catch(() => null);
+      if (!debtorAuth?.email) {
+        return res.status(404).json({ error: "That member has no email on file." });
+      }
+
+      const nameOf = (uid: string) =>
+        (Array.isArray(groupData.members) ? groupData.members : []).find((m: any) => m?.uid === uid)?.name || "A member";
+
+      await sendReminderEmail(
+        debtorAuth.email,
+        nameOf(debtorUid),
+        nameOf(callerUid),
+        groupData.name || "your group",
+        normalizedAmount,
+        safeItems
+      );
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Reminder Error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send the reminder. Please try again." });
     }
   });
 
