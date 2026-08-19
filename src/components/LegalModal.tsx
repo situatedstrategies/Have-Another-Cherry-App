@@ -7,7 +7,7 @@ export type LegalDoc = 'terms' | 'privacy';
 const EFFECTIVE_DATE = 'August 19, 2026';
 const CONTACT_EMAIL = 'help@haveanothercherry.com';
 const PRIVACY_CONTACT = 'olivia@situatedstrategies.org';
-const SITE = 'https://have-another-cherry-marketing.pages.dev';
+const SITE = 'https://www.haveanothercherry.com';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

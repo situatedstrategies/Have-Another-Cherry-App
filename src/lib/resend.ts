@@ -9,16 +9,16 @@ import path from "path";
 const EMAIL_COMPLIANCE_FOOTER = `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
   <tr><td align="center" style="padding:18px 24px 30px 24px;font-family:'Inter',Helvetica,Arial,sans-serif;">
-    <p style="margin:0 0 6px 0;font-size:11px;color:#8C857A;line-height:1.6;">
+    <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
       You're receiving this because you use Have Another Cherry, or someone invited you.
       We save your email address to service your account and nothing more: we never sell it or share it.
     </p>
-    <p style="margin:0 0 6px 0;font-size:11px;color:#8C857A;line-height:1.6;">
+    <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
       Don't want emails from us?
       <a href="mailto:help@haveanothercherry.com?subject=Unsubscribe" style="color:#C41200;">Unsubscribe</a>
       and we'll stop, aside from essential account emails like password resets you request.
     </p>
-    <p style="margin:0;font-size:11px;color:#8C857A;line-height:1.6;">
+    <p style="margin:0;font-size:11px;color:#71717A;line-height:1.6;">
       To make sure our emails reach you, add our @haveanothercherry.com senders to your contacts or safe senders list.
     </p>
   </td></tr>
@@ -251,24 +251,24 @@ export async function sendReminderEmail(
   const resend = new Resend(apiKey);
 
   const html = `
-  <div style="font-family: Inter, Helvetica, Arial, sans-serif; background:#F5F0E6; padding:32px 16px;">
-    <div style="max-width:520px; margin:0 auto; background:#FFFDF9; border:1px solid #E4DCCB; border-radius:16px; padding:32px;">
-      <h1 style="font-family: Georgia, serif; font-size:22px; color:#3A3733; margin:0 0 16px;">A gentle nudge from ${groupName}</h1>
-      <p style="color:#6B6459; font-size:14.5px; line-height:1.6; margin:0 0 16px;">
+  <div style="font-family: Inter, Helvetica, Arial, sans-serif; background:#F4F4F5; padding:32px 16px;">
+    <div style="max-width:520px; margin:0 auto; background:#FFFFFF; border:1px solid #D4D4D8; border-radius:16px; padding:32px;">
+      <h1 style="font-family: Georgia, serif; font-size:22px; color:#18181B; margin:0 0 16px;">A gentle nudge from ${groupName}</h1>
+      <p style="color:#52525B; font-size:14.5px; line-height:1.6; margin:0 0 16px;">
         Hi ${toName || "there"}, ${fromName} sent a friendly reminder from Have Another Cherry.
         There's an open balance waiting for you in ${groupName}. No rush and no pressure:
         this is just the app doing the asking so nobody has to.
       </p>
-      <p style="color:#6B6459; font-size:13px; line-height:1.6; margin:0 0 20px;">
+      <p style="color:#52525B; font-size:13px; line-height:1.6; margin:0 0 20px;">
         For your privacy, this email never includes amounts or expense details.
         Open the app to see exactly what's open and settle in a tap.
       </p>
       <a href="https://app.haveanothercherry.com" style="display:inline-block; background:#C41200; color:#ffffff; font-size:14px; font-weight:bold; padding:12px 24px; border-radius:999px; text-decoration:none;">Open Have Another Cherry</a>
-      <p style="color:#8C857A; font-size:11.5px; line-height:1.6; margin:20px 0 0;">
+      <p style="color:#71717A; font-size:11.5px; line-height:1.6; margin:20px 0 0;">
         Pay what you can, when you can. If you've already settled up, you can ignore this note: balances update as soon as payments are confirmed.
       </p>
     </div>
-    <p style="text-align:center; color:#8C857A; font-size:11px; margin:16px 0 0;">Have Another Cherry. Split fairly. Settle easily.</p>
+    <p style="text-align:center; color:#71717A; font-size:11px; margin:16px 0 0;">Have Another Cherry. Split fairly. Settle easily.</p>
   </div>`;
 
   const { data, error } = await resend.emails.send({

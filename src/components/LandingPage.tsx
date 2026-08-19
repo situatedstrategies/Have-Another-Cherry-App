@@ -5,27 +5,26 @@ interface LandingPageProps {
   onGetStarted: () => void;
 }
 
-// The marketing site (have-another-cherry-site repo). Swap to
-// https://haveanothercherry.com once the custom domain leaves Squarespace.
-const SITE = 'https://have-another-cherry-marketing.pages.dev';
+// The marketing site (have-another-cherry-site repo), on the custom domain.
+const SITE = 'https://www.haveanothercherry.com';
 
 // ---------------------------------------------------------------------------
-// This page deliberately mirrors the marketing site's index.html - same warm
-// cream palette, same section order (hero → why/compare → essentials → how it
+// This page deliberately mirrors the marketing site's index.html - same cool
+// grey palette, same section order (hero → why/compare → essentials → how it
 // works → CTA band → footer), same type scale - so app.haveanothercherry.com
 // and the marketing site read as one product. If the site's design changes,
 // change this with it. Palette from the site's styles.css:
 const C = {
-  bg: '#F5F0E6',        // warm cream
-  surface: '#FFFDF9',   // soft ivory card
-  text: '#3A3733',
-  muted: '#6B6459',
-  accent: '#8C857A',
-  border: '#E4DCCB',
-  pale: '#E7E4DD',
-  paleBorder: '#CFCABE',
+  bg: '#F4F4F5',        // cool grey (matches the app)
+  surface: '#FFFFFF',
+  text: '#18181B',
+  muted: '#52525B',
+  accent: '#71717A',
+  border: '#D4D4D8',
+  pale: '#E4E4E7',
+  paleBorder: '#C4C4CB',
   primary: '#C41200',
-  primaryWash: '#F7E9E2',
+  primaryWash: '#FBEAE7',
 };
 
 const CheckMark = () => (
@@ -47,7 +46,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     <>
       <div className="min-h-screen" style={{ background: C.bg, color: C.text }}>
         {/* ============ HEADER ============ */}
-        <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ borderColor: C.border, background: 'rgba(245,240,230,0.9)' }}>
+        <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ borderColor: C.border, background: 'rgba(244,244,245,0.9)' }}>
           <div className="max-w-[1120px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
             <a href={SITE} className="flex items-center gap-2.5 font-display font-semibold text-lg">
               <img src="/cherry2transparent.png" alt="Have Another Cherry logo" className="h-8 w-8 object-contain" />
