@@ -30,3 +30,9 @@ jobs:
           echo "--- first 300 bytes (should be Firebase's handler page, not the site gate):"
           head -c 300 handler.html || true
           echo
+      - name: Probe auth handler proxy on beta domain
+        run: |
+          curl -sS -m 30 "https://beta.haveanothercherry.com/__/auth/handler" -o beta-handler.html -w "HTTP %{http_code}\n" || true
+          echo "--- first 300 bytes (should be Firebase's handler page):"
+          head -c 300 beta-handler.html || true
+          echo
