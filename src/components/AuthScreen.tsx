@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
+import { verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
@@ -38,6 +39,12 @@ export default function AuthScreen() {
     setError('');
     setLoading(true);
     try {
+      const humanOk = await verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
+      if (!humanOk) {
+        setError('We could not verify this request. Please try again.');
+        setLoading(false);
+        return;
+      }
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {

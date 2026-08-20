@@ -6,3 +6,7 @@ env:
     secret: RESEND_API_KEY
     availability:
       - RUNTIME
+  - variable: RECAPTCHA_SECRET_KEY
+    secret: RECAPTCHA_SECRET_KEY
+    availability:
+      - RUNTIME
