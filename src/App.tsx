@@ -253,16 +253,19 @@ export default function App() {
 
   // 2b. Listen to the active Group
   useEffect(() => {
-    if (!activeGroupId) return;
+    if (!currentUser || !activeGroupId) return;
     const groupUnsubscribe = onSnapshot(doc(db, 'groups', activeGroupId), (groupSnapshot) => {
       if (groupSnapshot.exists()) {
         setGroup(groupSnapshot.data() as Group);
       }
     }, (error) => {
+      // Sign-out cancels live listeners with permission-denied before the
+      // effect cleanup runs. That is teardown noise, not a rules problem.
+      if (error.code === 'permission-denied' && !auth.currentUser) return;
       console.error('groupUnsubscribe error:', error);
     });
     return () => groupUnsubscribe();
-  }, [activeGroupId]);
+  }, [currentUser, activeGroupId]);
 
   // Cache the names of every group this user belongs to, for the header switcher.
   // The rules allow any signed-in user to `get` a group by id, so a light read
@@ -284,21 +287,35 @@ export default function App() {
     return () => { cancelled = true; };
   }, [groupIds.join(',')]);
 
+  // Live roster of the group's members. Firestore rules are not filters: a
+  // collection query cannot prove the per-document users `read` rule (it
+  // depends on each doc's groupIds), so a where(__name__, in, ...) query is
+  // denied outright with "Missing or insufficient permissions". Listen to
+  // each member doc individually instead - a single-doc read evaluates the
+  // rule against the actual document, which groupmates pass.
+  const memberIdsKey = (group?.memberIds || []).join(',');
   useEffect(() => {
-    if (!group || !group.memberIds || group.memberIds.length === 0) return;
-    const q = query(collection(db, 'users'), where('__name__', 'in', group.memberIds));
-    const unsub = onSnapshot(q, (snap) => {
-      const users: Record<string, any> = {};
-      snap.forEach(d => { users[d.id] = d.data(); });
-      setGroupUsers(users);
-    }, (error) => {
-      // Surface (don't swallow) a permission/query failure - otherwise the
-      // member roster silently stays empty and every feature built on it
-      // (names, income recalc, discrepancy banner) quietly does nothing.
-      console.error('group members listener error:', error);
-    });
-    return () => unsub();
-  }, [group?.memberIds]);
+    if (!currentUser || !memberIdsKey) return;
+    const memberIds = memberIdsKey.split(',');
+    const users: Record<string, any> = {};
+    const unsubs = memberIds.map((uid) =>
+      onSnapshot(doc(db, 'users', uid), (snap) => {
+        if (snap.exists()) {
+          users[uid] = snap.data();
+        } else {
+          delete users[uid];
+        }
+        setGroupUsers({ ...users });
+      }, (error) => {
+        if (error.code === 'permission-denied' && !auth.currentUser) return;
+        // Surface (don't swallow) a permission failure - otherwise the member
+        // roster silently stays empty and every feature built on it (names,
+        // income recalc, discrepancy banner) quietly does nothing.
+        console.error('group member listener error for ' + uid + ':', error);
+      })
+    );
+    return () => unsubs.forEach((u) => u());
+  }, [currentUser, memberIdsKey]);
 
   
   
