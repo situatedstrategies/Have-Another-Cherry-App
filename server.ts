@@ -52,6 +52,7 @@ async function startServer() {
   ]);
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
+    "/api/recaptcha-health",
     "/cherry2transparent.png",
     "/icon.svg",
     "/favicon.ico",
@@ -352,7 +353,28 @@ async function startServer() {
     }
   });
 
-  // 5. reCAPTCHA Enterprise assessment via ADC (no API key — org policy).
+  // 5. reCAPTCHA Enterprise assessment via ADC (no API key - org policy).
+  const createRecaptchaAssessment = async (token: string, action?: string) => {
+    const { GoogleAuth } = await import("google-auth-library");
+    const auth = new GoogleAuth({
+      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+    });
+    const client = await auth.getClient();
+    const project = process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990";
+
+    return client.request({
+      url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
+      method: "POST",
+      data: {
+        event: {
+          token,
+          expectedAction: action || undefined,
+          siteKey: firebaseConfig.recaptchaSiteKey,
+        },
+      },
+    }) as Promise<any>;
+  };
+
   app.post("/api/verify-recaptcha", async (req, res) => {
     try {
       const { token, action } = req.body;
@@ -360,24 +382,7 @@ async function startServer() {
         return res.status(400).json({ error: "Missing token" });
       }
 
-      const { GoogleAuth } = await import("google-auth-library");
-      const auth = new GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-      });
-      const client = await auth.getClient();
-      const project = process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990";
-
-      const assessment: any = await client.request({
-        url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
-        method: "POST",
-        data: {
-          event: {
-            token,
-            expectedAction: action || undefined,
-            siteKey: firebaseConfig.recaptchaSiteKey,
-          },
-        },
-      });
+      const assessment = await createRecaptchaAssessment(token, action);
 
       const props = assessment.data?.tokenProperties;
       const score = assessment.data?.riskAnalysis?.score;
@@ -402,6 +407,32 @@ async function startServer() {
       console.error("reCAPTCHA Assessment Error:", err.message);
       // Fail open: an assessment outage should not lock users out of auth.
       res.status(200).json({ success: true, allowed: true, error: err.message });
+    }
+  });
+
+  // 5b. reCAPTCHA health check: runs a dummy assessment so operators can
+  // confirm the Enterprise API, IAM role, and site key are wired up without
+  // needing a real browser token. Reports status only, never user data.
+  app.get("/api/recaptcha-health", async (_req, res) => {
+    try {
+      const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
+      const props = assessment.data?.tokenProperties;
+      // A dummy token is expected to be invalid. Reaching this line means the
+      // assessment API accepted the call, so auth and IAM are working.
+      res.status(200).json({
+        ok: true,
+        assessmentApi: "reachable",
+        siteKey: firebaseConfig.recaptchaSiteKey,
+        dummyTokenValid: props?.valid === true,
+        invalidReason: props?.invalidReason || null,
+      });
+    } catch (err: any) {
+      res.status(200).json({
+        ok: false,
+        assessmentApi: "error",
+        siteKey: firebaseConfig.recaptchaSiteKey,
+        error: err.message,
+      });
     }
   });
 
