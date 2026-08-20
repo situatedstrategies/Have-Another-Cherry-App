@@ -4,6 +4,7 @@ import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail } from "./src/lib/resend";
+import firebaseConfig from "./firebase-applet-config.json";
 
 async function startServer() {
   const app = express();
@@ -72,38 +73,12 @@ async function startServer() {
     }
   });
 
-  // 5. reCAPTCHA verification. Prefers the classic siteverify API when
-  // RECAPTCHA_SECRET_KEY is set (Secret Manager via apphosting.yaml);
-  // otherwise falls back to an Enterprise assessment via ADC (no API key — org policy).
+  // 5. reCAPTCHA Enterprise assessment via ADC (no API key — org policy).
   app.post("/api/verify-recaptcha", async (req, res) => {
     try {
       const { token, action } = req.body;
       if (!token) {
         return res.status(400).json({ error: "Missing token" });
-      }
-
-      const secretKey = process.env.RECAPTCHA_SECRET_KEY;
-      if (secretKey) {
-        const verifyRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ secret: secretKey, response: token }),
-        });
-        const result: any = await verifyRes.json();
-        const score = result.score;
-        const actionMatches = !action || !result.action || result.action === action;
-        const allowed = result.success === true && actionMatches && (score === undefined || score >= 0.5);
-
-        if (!allowed) {
-          console.warn("[reCAPTCHA] Blocked (siteverify):", {
-            success: result.success,
-            errorCodes: result["error-codes"],
-            expectedAction: action,
-            tokenAction: result.action,
-            score,
-          });
-        }
-        return res.status(200).json({ success: true, allowed, score });
       }
 
       const { GoogleAuth } = await import("google-auth-library");
@@ -120,7 +95,7 @@ async function startServer() {
           event: {
             token,
             expectedAction: action || undefined,
-            siteKey: "6LcvAYktAAAAAKG2B1e85ceC0ExEy1iIVSeUCcpB",
+            siteKey: firebaseConfig.recaptchaSiteKey,
           },
         },
       });

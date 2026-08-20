@@ -37,6 +37,7 @@ function loadRecaptchaScript(): Promise<void> {
 }
 
 // Mint a reCAPTCHA Enterprise token for a user action (e.g. "LOGIN", "SIGNUP").
+// Tokens expire after two minutes, so mint one right before each protected call.
 // Returns null when reCAPTCHA is unavailable (no site key, blocked script) so
 // callers can decide how to degrade.
 export async function getRecaptchaToken(action: string): Promise<string | null> {
