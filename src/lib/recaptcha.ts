@@ -36,6 +36,15 @@ function loadRecaptchaScript(): Promise<void> {
   return scriptPromise;
 }
 
+// Load the reCAPTCHA script ahead of time (e.g. when the auth screen mounts)
+// so the badge is visible before the user submits. Safe to call repeatedly.
+export function preloadRecaptcha(): void {
+  if (!RECAPTCHA_SITE_KEY) return;
+  loadRecaptchaScript().catch((err) => {
+    console.warn('reCAPTCHA preload failed:', err);
+  });
+}
+
 // Mint a reCAPTCHA Enterprise token for a user action (e.g. "LOGIN", "SIGNUP").
 // Tokens expire after two minutes, so mint one right before each protected call.
 // Returns null when reCAPTCHA is unavailable (no site key, blocked script) so

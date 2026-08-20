@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { verifyRecaptcha } from '../lib/recaptcha';
+import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
 import {
@@ -67,6 +67,12 @@ export default function AuthScreen() {
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [isReset, setIsReset] = useState(false);
   const [info, setInfo] = useState('');
+
+  // Load the reCAPTCHA script up front so the badge is visible on the auth
+  // screen and the first submit does not pay the script download cost.
+  useEffect(() => {
+    preloadRecaptcha();
+  }, []);
 
   // Switch between Log in / Sign up / Reset views, clearing any messages.
   const switchMode = (next: 'login' | 'signup' | 'reset') => {
