@@ -6,6 +6,7 @@ import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
+import firebaseConfig from "./firebase-applet-config.json";
 
 async function startServer() {
   const app = express();
@@ -348,6 +349,59 @@ async function startServer() {
     } catch (err: any) {
       console.error("Receipt Scan Error:", err);
       res.status(500).json({ error: "Could not scan the receipt. Please try again." });
+    }
+  });
+
+  // 5. reCAPTCHA Enterprise assessment via ADC (no API key — org policy).
+  app.post("/api/verify-recaptcha", async (req, res) => {
+    try {
+      const { token, action } = req.body;
+      if (!token) {
+        return res.status(400).json({ error: "Missing token" });
+      }
+
+      const { GoogleAuth } = await import("google-auth-library");
+      const auth = new GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      });
+      const client = await auth.getClient();
+      const project = process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990";
+
+      const assessment: any = await client.request({
+        url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
+        method: "POST",
+        data: {
+          event: {
+            token,
+            expectedAction: action || undefined,
+            siteKey: firebaseConfig.recaptchaSiteKey,
+          },
+        },
+      });
+
+      const props = assessment.data?.tokenProperties;
+      const score = assessment.data?.riskAnalysis?.score;
+      const valid = props?.valid === true;
+      const actionMatches = !action || props?.action === action;
+      // Google's recommended default threshold is 0.5.
+      const allowed = valid && actionMatches && (score === undefined || score >= 0.5);
+
+      if (!allowed) {
+        console.warn("[reCAPTCHA] Blocked:", {
+          valid,
+          invalidReason: props?.invalidReason,
+          expectedAction: action,
+          tokenAction: props?.action,
+          score,
+          reasons: assessment.data?.riskAnalysis?.reasons,
+        });
+      }
+
+      res.status(200).json({ success: true, allowed, score });
+    } catch (err: any) {
+      console.error("reCAPTCHA Assessment Error:", err.message);
+      // Fail open: an assessment outage should not lock users out of auth.
+      res.status(200).json({ success: true, allowed: true, error: err.message });
     }
   });
 

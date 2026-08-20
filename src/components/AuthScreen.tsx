@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
 import {
@@ -172,6 +173,12 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
+      const humanOk = await verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
+      if (!humanOk) {
+        setError('We could not verify this request. Please try again.');
+        setLoading(false);
+        return;
+      }
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
