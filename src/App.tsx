@@ -1,6 +1,7 @@
 import { getFullMembers } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
+import { mergeExpense } from './lib/merge';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -51,27 +52,6 @@ function getGreetingKey(memberCount: number): string {
   return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
 }
 
-// Union two lists of {id,...} without losing either side's entries. Used to
-// merge an incoming (remote) expense onto our local copy so a concurrently-added
-// settlement and comment don't clobber each other. A settlement that is
-// 'confirmed' on either side stays confirmed (status only moves forward).
-function mergeById<T extends { id: string }>(local: T[] = [], incoming: T[] = []): T[] {
-  const byId = new Map<string, T>();
-  for (const item of local) byId.set(item.id, item);
-  for (const item of incoming) {
-    const existing = byId.get(item.id) as any;
-    if (existing && (existing.status === 'confirmed' || (item as any).status === 'confirmed')) {
-      byId.set(item.id, { ...existing, ...item, status: 'confirmed' });
-    } else {
-      byId.set(item.id, existing ? { ...existing, ...item } : item);
-    }
-  }
-  return Array.from(byId.values());
-}
-
-// Merge a remote expense onto the local copy: scalar fields take the incoming
-// version, but settlements/comments are unioned by id so concurrent edits from
-// two members don't erase each other. Status is re-derived from the result.
 // Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
 const todayLocal = () => {
   const d = new Date();
@@ -94,16 +74,6 @@ function advanceRecurringDate(dateStr: string, interval?: string): string {
   }
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().split('T')[0];
-}
-
-function mergeExpense(local: Expense, incoming: Expense): Expense {
-  const merged: Expense = {
-    ...incoming,
-    settlements: mergeById(local.settlements, incoming.settlements),
-    comments: mergeById(local.comments, incoming.comments),
-  };
-  merged.status = getNormalizedExpenseStatus(merged);
-  return merged;
 }
 
 // Consistent, branded loading screen - same background as every other screen so
@@ -469,6 +439,7 @@ export default function App() {
             id: crypto.randomUUID(),
             date: dueDate,
             createdAt: new Date().toISOString(),
+            editedAt: new Date().toISOString(),
             status: 'OPEN',
             settlements: [],
             comments: [],
@@ -488,7 +459,7 @@ export default function App() {
 
     setExpenses(prev => {
       const updated = prev.map(e =>
-        sourceUpdates.has(e.id) ? { ...e, nextRecurringDate: sourceUpdates.get(e.id)! } : e
+        sourceUpdates.has(e.id) ? { ...e, nextRecurringDate: sourceUpdates.get(e.id)!, editedAt: new Date().toISOString() } : e
       );
       const merged = [...spawned, ...updated].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -509,7 +480,7 @@ export default function App() {
           ...spawned,
           ...expenses
             .filter(e => sourceUpdates.has(e.id))
-            .map(e => ({ ...e, nextRecurringDate: sourceUpdates.get(e.id)! })),
+            .map(e => ({ ...e, nextRecurringDate: sourceUpdates.get(e.id)!, editedAt: new Date().toISOString() })),
         ];
         for (const expensePayload of toSend) {
           const encrypted = await encryptData(expensePayload, groupId);
@@ -1077,13 +1048,18 @@ export default function App() {
 
       let finalExpense: Expense;
       if (editingExpense) {
-        finalExpense = { ...editingExpense, ...cleanForm };
+        // Build on the freshest copy of the expense, not the snapshot taken when
+        // the form opened — a settlement logged or confirmed while the form was
+        // open must survive the save. `editedAt` marks this content revision so
+        // merges elsewhere know these fields are the newest.
+        const latest = expenses.find(ex => ex.id === editingExpense.id) || editingExpense;
+        finalExpense = { ...latest, ...cleanForm, editedAt: new Date().toISOString() };
         // Shares/amount may have changed - re-derive status from the new shares
         // vs. the existing settlements so a previously-"settled" expense doesn't
         // keep hiding newly-created debt (or stay open after a reduction).
         finalExpense.status = getNormalizedExpenseStatus(finalExpense);
         setExpenses(prev => {
-          const updated = prev.map(ex => ex.id === finalExpense.id ? finalExpense : ex);
+          const updated = prev.map(ex => ex.id === finalExpense.id ? mergeExpense(ex, finalExpense) : ex);
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
           return updated;
         });
@@ -1116,13 +1092,15 @@ export default function App() {
           }
         }
 
+        const createdAt = new Date().toISOString();
         finalExpense = {
           ...cleanForm,
           settlements,
           id: newId,
           groupId: group.id,
           status,
-          createdAt: new Date().toISOString()
+          createdAt,
+          editedAt: createdAt
         };
         setExpenses(prev => {
           const updated = [finalExpense, ...prev];
@@ -1167,8 +1145,13 @@ export default function App() {
     const syncExpenseUpdate = async (updatedExpense: Expense) => {
     if (!group) return;
     const groupId = group.id;
+    // Merge onto the current copy instead of replacing it, so an update built
+    // from a slightly stale snapshot can't drop a settlement or comment that
+    // arrived from another member in the meantime.
+    const current = expenses.find(e => e.id === updatedExpense.id);
+    const merged = current ? mergeExpense(current, updatedExpense) : updatedExpense;
     setExpenses(prev => {
-      const updated = prev.map(e => e.id === updatedExpense.id ? updatedExpense : e);
+      const updated = prev.map(e => e.id === merged.id ? mergeExpense(e, merged) : e);
       try {
         localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
       } catch (e) {
@@ -1176,12 +1159,17 @@ export default function App() {
       }
       return updated;
     });
-    setSelectedExpense(updatedExpense);
-    await broadcastToMembers('UPSERT', updatedExpense);
+    setSelectedExpense(merged);
+    await broadcastToMembers('UPSERT', merged);
   };
 
   const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate?: string) => {
     if (!selectedExpense || !group) return;
+
+    // Work from the freshest copy of the expense, not the snapshot captured
+    // when the detail modal opened — an edit or confirmation may have synced in
+    // since, and validating against stale shares is how duplicates get logged.
+    const expense = expenses.find(e => e.id === selectedExpense.id) || selectedExpense;
 
     const normalizedAmount = roundCurrency(amount);
     const baseValid =
@@ -1189,27 +1177,27 @@ export default function App() {
       Number.isFinite(normalizedAmount) &&
       normalizedAmount > 0;
 
-    if (isDarkCherry(selectedExpense)) {
+    if (isDarkCherry(expense)) {
       // Dark Cherry: contributors are bound only by the creator's per-payment
       // range (the pot is hidden from them); the creator logging a received
       // payment is bound by what's actually left in the pot.
-      const isCreatorLogging = selectedExpense.paidBy === activeUser;
+      const isCreatorLogging = expense.paidBy === activeUser;
       if (isCreatorLogging) {
-        const potRemaining = getDarkCherryRemaining(selectedExpense, true);
+        const potRemaining = getDarkCherryRemaining(expense, true);
         if (!baseValid || normalizedAmount > potRemaining) {
           addToast('Invalid Payment', `Payment must be between $0.01 and $${potRemaining.toFixed(2)}.`, 'info');
           return;
         }
       } else {
-        const min = selectedExpense.blindMin || 0.01;
-        const max = selectedExpense.blindMax || Number.MAX_SAFE_INTEGER;
+        const min = expense.blindMin || 0.01;
+        const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
         if (!baseValid || normalizedAmount < min || normalizedAmount > max) {
           addToast('Invalid Payment', `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`, 'info');
           return;
         }
       }
     } else {
-      const remainingAmount = getRemainingSettlementAmount(selectedExpense, debtorId, true);
+      const remainingAmount = getRemainingSettlementAmount(expense, debtorId, true);
       if (!baseValid || normalizedAmount > remainingAmount) {
         addToast(
           'Invalid Payment',
@@ -1219,45 +1207,63 @@ export default function App() {
         return;
       }
     }
-    
-    const isCreditor = selectedExpense.paidBy === activeUser;
-    
+
+    const isCreditor = expense.paidBy === activeUser;
+
+    // The payer "logging a received payment" that exactly matches a payment the
+    // debtor already logged is a confirmation of that payment, not a second one.
+    // Without this, both entries end up confirmed and the debtor shows as
+    // having paid twice.
+    if (isCreditor) {
+      const matchingPending = (expense.settlements || []).find(
+        s =>
+          s.status === 'pending' &&
+          s.paidBy === debtorId &&
+          Math.abs(s.amount - normalizedAmount) < 0.005
+      );
+      if (matchingPending) {
+        setShowSettleModal(false);
+        await handleConfirmSettleReceipt(matchingPending.id);
+        return;
+      }
+    }
+
     const newSettlement: import('./types').Settlement = {
       id: crypto.randomUUID(),
-      expenseId: selectedExpense.id,
+      expenseId: expense.id,
       paidBy: debtorId,
-      receivedBy: selectedExpense.paidBy,
+      receivedBy: expense.paidBy,
       amount: normalizedAmount,
       instrumentType: instrumentType,
       label: label,
       timestamp: new Date().toISOString(),
       paymentDate: paymentDate || new Date().toISOString().split('T')[0],
       status: isCreditor ? 'confirmed' : 'pending',
-      mismatchType: computeMismatchForSettlement(selectedExpense, instrumentType)
+      mismatchType: computeMismatchForSettlement(expense, instrumentType)
     };
 
-    const settlements = [...(selectedExpense.settlements || []), newSettlement];
+    const settlements = [...(expense.settlements || []), newSettlement];
 
     // Status is derived per-debtor from the actual shares vs. settlements
     // (getNormalizedExpenseStatus), not an aggregate sum - so one overpaid
     // debtor can't mask another's shortfall and mark the whole expense closed.
-    const updatedExp: Expense = { ...selectedExpense, settlements };
+    const updatedExp: Expense = { ...expense, settlements };
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
       await syncExpenseUpdate(updatedExp);
-      
+
       // Write mismatch to protected collection
-      const computedMismatch = computeMismatchForSettlement(selectedExpense, instrumentType);
+      const computedMismatch = computeMismatchForSettlement(expense, instrumentType);
       if (computedMismatch !== 'NOT_CLASSIFIABLE' && computedMismatch !== 'NO_MISMATCH') {
         const mismatchRef = doc(db, 'group_mismatches', group.id, 'events', newSettlement.id);
         await setDoc(mismatchRef, {
-          expenseId: selectedExpense.id,
+          expenseId: expense.id,
           settlementId: newSettlement.id,
           mismatchType: computedMismatch,
           paidBy: debtorId,
-          receivedBy: selectedExpense.paidBy,
+          receivedBy: expense.paidBy,
           amount: normalizedAmount,
           timestamp: newSettlement.timestamp
         }).catch(e => console.error("Data write failed", e));
@@ -1280,6 +1286,30 @@ export default function App() {
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     await syncExpenseUpdate(updatedExp);
     addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+  };
+
+  // Remove a payment entry that was logged in error (e.g. the same real-world
+  // payment recorded twice). Voids rather than deletes: the entry stays in the
+  // audit trail as a tombstone so a merge with another device's copy can't
+  // resurrect it, but it no longer counts toward the balance.
+  const handleVoidSettlement = async (settlementId: string) => {
+    if (!group || !selectedExpense) return;
+    const expense = expenses.find(e => e.id === selectedExpense.id);
+    if (!expense) return;
+
+    const target = (expense.settlements || []).find(s => s.id === settlementId);
+    if (!target || target.status === 'voided') return;
+
+    const settlements = (expense.settlements || []).map(s =>
+      s.id === settlementId
+        ? { ...s, status: 'voided' as const, voidedAt: new Date().toISOString(), voidedBy: activeUser }
+        : s
+    );
+
+    const updatedExp: Expense = { ...expense, settlements };
+    updatedExp.status = getNormalizedExpenseStatus(updatedExp);
+    await syncExpenseUpdate(updatedExp);
+    addToast('Payment Removed', 'The payment entry was removed and the balance updated.', 'success');
   };
 
   // Let the user set/change their display name regardless of how they signed in.
@@ -1833,27 +1863,31 @@ export default function App() {
         />
       )}
 
+      {/* Render the live copy of the selected expense, not the snapshot taken
+          when it was opened — confirmations and edits synced from other members
+          must show up (and be validated against) immediately. */}
       {selectedExpense && (
         <ExpenseDetail
-          expense={selectedExpense}
+          expense={expenses.find(e => e.id === selectedExpense.id) || selectedExpense}
           group={group}
           activeUser={activeUser}
           onClose={() => setSelectedExpense(null)}
           onEdit={() => {
-            setEditingExpense(selectedExpense);
+            setEditingExpense(expenses.find(e => e.id === selectedExpense.id) || selectedExpense);
             setSelectedExpense(null);
             setShowForm(true);
           }}
           onDelete={() => handleDeleteExpense(selectedExpense.id)}
           onSettleClick={() => setShowSettleModal(true)}
           onConfirmReceipt={(settlementId) => handleConfirmSettleReceipt(settlementId)}
+          onVoidSettlement={(settlementId) => handleVoidSettlement(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
         />
       )}
 
       {showSettleModal && selectedExpense && (
         <SettleUpModal
-          expense={selectedExpense}
+          expense={expenses.find(e => e.id === selectedExpense.id) || selectedExpense}
           group={group}
           activeUser={activeUser}
           paymentHandlesByUid={paymentHandlesByUid}

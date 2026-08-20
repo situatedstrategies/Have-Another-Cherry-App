@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
-import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry } from 'lucide-react';
+import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 
 interface ExpenseDetailProps {
@@ -14,6 +14,7 @@ interface ExpenseDetailProps {
   onDelete: () => void;
   onSettleClick: () => void;
   onConfirmReceipt: (settlementId: string) => void;
+  onVoidSettlement: (settlementId: string) => void;
   onAddComment: (text: string) => void;
 }
 
@@ -26,11 +27,14 @@ export default function ExpenseDetail({
   onDelete,
   onSettleClick,
   onConfirmReceipt,
+  onVoidSettlement,
   onAddComment
 }: ExpenseDetailProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [expandedSettlement, setExpandedSettlement] = useState<string | null>(null);
+  // Settlement id awaiting inline "remove entry" confirmation.
+  const [voidingSettlement, setVoidingSettlement] = useState<string | null>(null);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -275,27 +279,36 @@ export default function ExpenseDetail({
               {/* Settlements */}
               {expense.settlements?.map((s) => {
                 const isExpanded = expandedSettlement === s.id;
+                const isVoided = s.status === 'voided';
+                // Either party to the payment can remove an entry logged in error.
+                const canVoid = !isVoided && (activeUser === s.paidBy || activeUser === s.receivedBy);
+                const voidedByName = s.voidedBy ? (members.find(m => m.uid === s.voidedBy)?.name || 'a member') : null;
                 return (
                 <div key={s.id} className="relative">
-                  <div className={`absolute -left-[27px] top-0 bg-white border-2 ${s.status === 'confirmed' ? 'border-natural-primary text-natural-primary' : 'border-natural-border/50 text-natural-text'} p-1 rounded-full flex items-center justify-center`}>
-                    {s.status === 'confirmed' ? <ShieldCheck className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                  <div className={`absolute -left-[27px] top-0 bg-white border-2 ${isVoided ? 'border-natural-border/50 text-natural-muted' : s.status === 'confirmed' ? 'border-natural-primary text-natural-primary' : 'border-natural-border/50 text-natural-text'} p-1 rounded-full flex items-center justify-center`}>
+                    {isVoided ? <Ban className="h-3.5 w-3.5" /> : s.status === 'confirmed' ? <ShieldCheck className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                   </div>
                   <button
                     type="button"
                     onClick={() => setExpandedSettlement(isExpanded ? null : s.id)}
                     className="text-left w-full group"
                   >
-                    <span className="block text-xs font-bold text-natural-text flex items-center gap-1">
-                      {s.status === 'confirmed' ? 'Payment Confirmed' : 'Payment Logged (Pending)'}
+                    <span className={`block text-xs font-bold flex items-center gap-1 ${isVoided ? 'text-natural-muted' : 'text-natural-text'}`}>
+                      {isVoided ? 'Payment Removed' : s.status === 'confirmed' ? 'Payment Confirmed' : 'Payment Logged (Pending)'}
                       <span className="text-[10px] font-normal text-natural-primary group-hover:underline">{isExpanded ? 'Hide' : 'Details'}</span>
                     </span>
-                    <p className="text-xs text-natural-muted mt-0.5">
-                      <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid{' '}
+                    <p className={`text-xs text-natural-muted mt-0.5 ${isVoided ? 'line-through' : ''}`}>
+                      <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid{' '}
                       {maskNumbers && s.paidBy !== activeUser
                         ? <strong>a contribution</strong>
                         : <strong>${s.amount.toFixed(2)}</strong>}{' '}
-                      to <strong className="capitalize text-natural-text">{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
+                      to <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
                     </p>
+                    {isVoided && (
+                      <p className="text-[10px] text-natural-muted mt-0.5">
+                        Removed{voidedByName ? <> by <span className="font-semibold capitalize">{voidedByName}</span></> : ''}{s.voidedAt ? ` on ${formatDateTime(s.voidedAt)}` : ''} — no longer counts toward the balance.
+                      </p>
+                    )}
                     <span className="text-[10px] text-natural-muted font-mono mt-1 block">
                       {formatDateTime(s.timestamp)}
                     </span>
@@ -307,11 +320,38 @@ export default function ExpenseDetail({
                       <div className="flex justify-between"><span className="text-natural-muted">Method</span><span className="font-semibold text-natural-text">{s.instrumentType}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Payment date</span><span className="font-semibold text-natural-text">{s.paymentDate ? formatDate(s.paymentDate) : ' - '}</span></div>
                       <div className="flex justify-between"><span className="text-natural-muted">Logged</span><span className="font-semibold text-natural-text">{formatDateTime(s.timestamp)}</span></div>
-                      <div className="flex justify-between"><span className="text-natural-muted">Status</span><span className={`font-bold ${s.status === 'confirmed' ? 'text-natural-primary' : 'text-natural-text'}`}>{s.status === 'confirmed' ? 'Confirmed' : 'Pending confirmation'}</span></div>
+                      <div className="flex justify-between"><span className="text-natural-muted">Status</span><span className={`font-bold ${isVoided ? 'text-natural-muted' : s.status === 'confirmed' ? 'text-natural-primary' : 'text-natural-text'}`}>{isVoided ? 'Removed' : s.status === 'confirmed' ? 'Confirmed' : 'Pending confirmation'}</span></div>
                       <div className="pt-1.5 border-t border-natural-border/50">
                         <span className="text-natural-muted block mb-0.5">Note</span>
                         <span className="text-natural-text">{s.label ? s.label : <span className="italic text-natural-muted">No note added.</span>}</span>
                       </div>
+                      {canVoid && (
+                        <div className="pt-1.5 border-t border-natural-border/50">
+                          {voidingSettlement === s.id ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-bold text-rose-600 uppercase">Remove this payment entry?</span>
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => setVoidingSettlement(null)} className="text-[11px] font-bold text-natural-muted hover:text-natural-text cursor-pointer">Cancel</button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setVoidingSettlement(null); onVoidSettlement(s.id); }}
+                                  className="text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-md cursor-pointer"
+                                >
+                                  Yes, Remove
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setVoidingSettlement(s.id)}
+                              className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Ban className="h-3 w-3" /> Remove entry (logged in error)
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

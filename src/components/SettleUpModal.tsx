@@ -153,6 +153,13 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                     <option key={uid} value={uid}>{members.find(m => m.uid === uid)?.name || 'Unknown'}</option>
                   ))}
                 </select>
+                {/* Logging a payment the debtor already logged creates a duplicate —
+                    those are waiting on a Confirm Receipt instead. */}
+                {(expense.settlements || []).filter(s => s.status === 'pending' && s.paidBy === selectedDebtor).map(s => (
+                  <p key={s.id} className="mt-2 text-[11px] text-natural-muted bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                    They already logged <span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span> ({s.instrumentType}) — it's waiting for your confirmation on the expense screen. Only log a payment here if this is a <span className="font-semibold">different</span> one.
+                  </p>
+                ))}
               </div>
             ) : (
               <div className="flex justify-between items-center pt-2 border-t border-natural-border/60">

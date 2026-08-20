@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from '../lib/crypto';
+import { mergeExpenseLists } from '../lib/merge';
 import { Expense } from '../types';
 
 interface Props {
@@ -9,52 +10,6 @@ interface Props {
   groupId?: string;
   expenses: Expense[];
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
-}
-
-function mergeById<T extends { id: string }>(
-  local: T[] = [],
-  remote: T[] = []
-): T[] {
-  const merged = new Map<string, T>();
-
-  for (const item of local) merged.set(item.id, item);
-  for (const item of remote) merged.set(item.id, item);
-
-  return Array.from(merged.values());
-}
-
-function mergeExpenses(local: Expense[], remote: Expense[]): Expense[] {
-  const byId = new Map<string, Expense>();
-
-  for (const expense of local) {
-    byId.set(expense.id, expense);
-  }
-
-  for (const incoming of remote) {
-    const existing = byId.get(incoming.id);
-
-    if (!existing) {
-      byId.set(incoming.id, incoming);
-      continue;
-    }
-
-    byId.set(incoming.id, {
-      ...existing,
-      ...incoming,
-      settlements: mergeById(
-        existing.settlements || [],
-        incoming.settlements || []
-      ),
-      comments: mergeById(
-        existing.comments || [],
-        incoming.comments || []
-      ),
-    });
-  }
-
-  return Array.from(byId.values()).sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
 }
 
 export function useGroupLedgerSnapshot({
@@ -103,7 +58,7 @@ export function useGroupLedgerSnapshot({
           }
         }
 
-        const merged = mergeExpenses(localExpenses, remoteExpenses);
+        const merged = mergeExpenseLists(localExpenses, remoteExpenses);
 
         if (!cancelled && groupRef.current === groupId) {
           setExpenses(merged);

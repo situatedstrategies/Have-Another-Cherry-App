@@ -15,7 +15,11 @@ export const getDarkCherryPotTotal = (
 ): number =>
   roundCurrency(
     (expense.settlements || [])
-      .filter(s => includePending || s.status === 'confirmed')
+      .filter(
+        s =>
+          s.status !== 'voided' &&
+          (includePending || s.status === 'confirmed')
+      )
       .reduce((total, s) => total + s.amount, 0)
   );
 
@@ -38,6 +42,7 @@ export const getSettlementTotal = (
       .filter(
         settlement =>
           settlement.paidBy === userId &&
+          settlement.status !== 'voided' &&
           (includePending || settlement.status === 'confirmed')
       )
       .reduce((total, settlement) => total + settlement.amount, 0)
