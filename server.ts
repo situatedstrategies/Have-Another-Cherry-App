@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import firebaseConfig from "./firebase-applet-config.json";
+import betaFirebaseConfig from "./firebase-applet-config.beta.json";
 
 async function startServer() {
   const app = express();
@@ -116,6 +117,9 @@ async function startServer() {
     const host = String(req.headers.host || "").split(":")[0].toLowerCase();
     if (!GATE_HOSTS.has(host)) return next();
     if (GATE_EXEMPT_PATHS.has(req.path)) return next();
+    // Firebase reserved namespace: the sign-in popup and iframe load
+    // /__/auth/* on our domain (authDomain), which must never see the gate.
+    if (req.path.startsWith("/__/")) return next();
 
     const cookieHeader = req.headers.cookie || "";
     const cookie = cookieHeader
@@ -140,6 +144,35 @@ async function startServer() {
     return res.status(401).send(gatePage(false));
   });
   // ---- end production view gate -------------------------------------------
+
+  // Firebase auth helpers. With authDomain set to our own domain, the Google
+  // sign-in popup opens https://<our domain>/__/auth/handler. Firebase Hosting
+  // serves those helper pages automatically but App Hosting (Cloud Run) does
+  // not, so proxy the reserved /__/auth namespace to the Firebase project's
+  // own domain. Host-aware so a beta hostname proxies to the beta project.
+  app.use("/__/auth", async (req, res) => {
+    try {
+      const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+      const upstreamOrigin =
+        host.startsWith("beta.") || host.startsWith("beta-")
+          ? "https://have-another-cherry-beta.firebaseapp.com"
+          : "https://gen-lang-client-0987674990.firebaseapp.com";
+      const upstream = await fetch(upstreamOrigin + req.originalUrl, {
+        method: req.method,
+        headers: { accept: String(req.headers.accept || "*/*") },
+      });
+      res.status(upstream.status);
+      upstream.headers.forEach((value, key) => {
+        if (!["content-encoding", "transfer-encoding", "content-length", "connection"].includes(key)) {
+          res.setHeader(key, value);
+        }
+      });
+      res.send(Buffer.from(await upstream.arrayBuffer()));
+    } catch (err: any) {
+      console.error("Auth handler proxy error:", err.message);
+      res.status(502).send("Auth handler unavailable. Please try again.");
+    }
+  });
 
 
   // Lightweight Alpha Lite abuse protection for public email endpoints.
@@ -360,7 +393,11 @@ async function startServer() {
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     });
     const client = await auth.getClient();
-    const project = process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990";
+    // Each environment assesses with its own project and site key: the beta
+    // backend runs in the beta Firebase project (App Hosting sets
+    // GOOGLE_CLOUD_PROJECT), whose clients mint tokens with the beta key.
+    const project = process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
+    const rcConfig = project === betaFirebaseConfig.projectId ? betaFirebaseConfig : firebaseConfig;
 
     return client.request({
       url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
@@ -369,7 +406,7 @@ async function startServer() {
         event: {
           token,
           expectedAction: action || undefined,
-          siteKey: firebaseConfig.recaptchaSiteKey,
+          siteKey: rcConfig.recaptchaSiteKey,
         },
       },
     }) as Promise<any>;

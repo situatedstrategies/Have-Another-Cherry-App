@@ -1,7 +1,8 @@
-# Post-deploy reCAPTCHA health check.
+# Post-deploy health checks.
 # Runs when this file changes on the deploy branch: waits out the App Hosting
-# rollout, then probes /api/recaptcha-health (gate-exempt, status only) so the
-# result is visible in the Actions log. Re-run it any time by touching this file.
+# rollout, then probes /api/recaptcha-health (gate-exempt, status only) and the
+# /__/auth/handler proxy on the branded auth domain, so the results are visible
+# in the Actions log. Re-run it any time by touching this file.
 name: reCAPTCHA health check
 
 on:
@@ -22,4 +23,10 @@ jobs:
           curl -sS -m 30 "https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/api/recaptcha-health" -o health.json -w "HTTP %{http_code}\n" || true
           echo "--- response body:"
           cat health.json || true
+          echo
+      - name: Probe auth handler proxy on branded domain
+        run: |
+          curl -sS -m 30 "https://app.haveanothercherry.com/__/auth/handler" -o handler.html -w "HTTP %{http_code}\n" || true
+          echo "--- first 300 bytes (should be Firebase's handler page, not the site gate):"
+          head -c 300 handler.html || true
           echo
