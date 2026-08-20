@@ -24,26 +24,12 @@ jobs:
           echo "--- response body:"
           cat health.json || true
           echo
-      - name: Probe auth handler proxy on branded domain
+      - name: Probe auth handler proxy (hosted.app, not Cloudflare-fronted)
         run: |
-          curl -sS -m 30 "https://app.haveanothercherry.com/__/auth/handler" -o handler.html -w "HTTP %{http_code}\n" || true
+          curl -sS -m 30 "https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/__/auth/handler" -o handler.html -w "HTTP %{http_code}\n" || true
           echo "--- first 300 bytes (should be Firebase's handler page, not the site gate):"
           head -c 300 handler.html || true
           echo
-      - name: Probe auth handler proxy on beta domain
-        run: |
-          curl -sS -m 30 "https://beta.haveanothercherry.com/__/auth/handler" -o beta-handler.html -w "HTTP %{http_code}\n" || true
-          echo "--- first 300 bytes (should be Firebase's handler page):"
-          head -c 300 beta-handler.html || true
-          echo
-      - name: Verify deployed bundle contains reCAPTCHA wiring (via ungated beta)
-        run: |
-          curl -sS -m 30 "https://beta.haveanothercherry.com/" -o index.html -w "HTTP %{http_code}\n" || true
-          BUNDLE=$(grep -oE 'assets/index-[^"]+\.js' index.html | head -1)
-          echo "bundle: ${BUNDLE:-not found}"
-          if [ -n "$BUNDLE" ]; then
-            curl -sS -m 30 "https://beta.haveanothercherry.com/$BUNDLE" -o bundle.js -w "HTTP %{http_code}\n" || true
-            echo "recaptcha script loader present: $(grep -c 'recaptcha/enterprise.js' bundle.js || true)"
-            echo "prod site key present: $(grep -c '6LemwG8t' bundle.js || true)"
-            echo "beta site key present: $(grep -c '6LcWuokt' bundle.js || true)"
-          fi
+      # The custom domains (app./beta.haveanothercherry.com) sit behind
+      # Cloudflare, which challenges curl with a 403 "Just a moment" page, so
+      # probing the branded hosts from CI is inconclusive. Real browsers pass.
