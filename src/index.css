@@ -12,6 +12,8 @@
   --color-natural-sidebar: #E4E4E7;
   --color-natural-border: #D4D4D8;
   --color-natural-primary: #C41200; /* bold cherry red */
+  --color-natural-primary-ink: #A00E00; /* deep cherry — hover state of solid red buttons */
+  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint for washes/highlights */
   --color-natural-accent: #71717A;
   --color-natural-muted: #52525B;
   --color-natural-sage: #E4E4E7;

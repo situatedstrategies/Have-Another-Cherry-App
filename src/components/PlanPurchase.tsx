@@ -36,7 +36,7 @@ type Juice = { level: string; cherries: number; recommended: boolean; blurb: str
 function juiceFor(score: number): Juice {
   if (score >= 75) return { level: 'Extra juicy', cherries: 2, recommended: true, color: 'text-natural-primary', blurb: 'Great time to bring this up - the balance is in your favor.' };
   if (score >= 55) return { level: 'Juicy', cherries: 1, recommended: true, color: 'text-natural-primary', blurb: 'This looks reasonable to propose right now.' };
-  if (score >= 35) return { level: 'A little juice', cherries: 1, recommended: false, color: 'text-amber-600', blurb: 'Doable, but worth a gentle, considerate conversation first.' };
+  if (score >= 35) return { level: 'A little juice', cherries: 1, recommended: false, color: 'text-natural-text', blurb: 'Doable, but worth a gentle, considerate conversation first.' };
   return { level: 'No juice', cherries: 0, recommended: false, color: 'text-natural-muted', blurb: 'Maybe hold off, or plan to cover more of it yourself for now.' };
 }
 
@@ -176,7 +176,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
             </div>
             <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
               <span className="block text-[10px] font-bold text-natural-muted uppercase">Net</span>
-              <span className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-amber-600'}`}>{net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
+              <span className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}>{net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
             </div>
           </div>
 
@@ -197,7 +197,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
                 <p className={`text-lg font-display font-semibold ${result.juice.color}`}>{result.juice.level}</p>
                 <p className="text-xs text-natural-muted mt-1">{result.juice.blurb}</p>
                 {otherThreshold > 0 && theirShare > otherThreshold && (
-                  <p className="text-[11px] text-amber-600 mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>
+                  <p className="text-[11px] text-natural-primary mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>
                 )}
               </div>
               <div className="bg-white rounded-xl p-3 border border-natural-border/60">

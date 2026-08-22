@@ -200,8 +200,8 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
         <div className="space-y-6">
           {msg && (
             <div className={`p-3 text-sm rounded-xl border ${
-              msg.type === 'success' ? 'bg-green-50 text-green-700 border-green-200'
-              : msg.type === 'error' ? 'bg-red-50 text-red-600 border-red-200'
+              msg.type === 'success' ? 'bg-natural-sidebar text-natural-text border-natural-border'
+              : msg.type === 'error' ? 'bg-natural-primary/5 text-natural-primary border-natural-primary/25'
               : 'bg-natural-sidebar text-natural-text border-natural-border'
             }`}>
               {msg.text}
@@ -218,11 +218,11 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
             </p>
 
             <div className="flex items-center gap-2">
-              <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-natural-sidebar text-natural-text' : 'bg-natural-primary/10 text-natural-primary'}`}>
                 {hasKey ? 'Key set on this device' : 'No key yet'}
               </span>
-              {keyMatches === true && <span className="text-[11px] font-bold text-green-700 flex items-center gap-1"><Check className="h-3 w-3" /> Matches your group</span>}
-              {keyMatches === false && <span className="text-[11px] font-bold text-amber-700">Doesn't match your group's saved key</span>}
+              {keyMatches === true && <span className="text-[11px] font-bold text-natural-text flex items-center gap-1"><Check className="h-3 w-3" /> Matches your group</span>}
+              {keyMatches === false && <span className="text-[11px] font-bold text-natural-primary">Doesn't match your group's saved key</span>}
             </div>
 
             <div>
@@ -242,11 +242,11 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
               <button onClick={handleGenerate} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
                 <Sparkles className="h-4 w-4 text-natural-primary" /> Generate
               </button>
-              <button onClick={handleSaveKey} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-[#A00E00] rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={handleSaveKey} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-natural-primary-ink rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
                 <Check className="h-4 w-4" /> Save Key
               </button>
             </div>
-            <button onClick={handleResetKey} disabled={loading} className="w-full py-2 text-xs font-bold text-natural-muted hover:text-red-500 bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50">
+            <button onClick={handleResetKey} disabled={loading} className="w-full py-2 text-xs font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50">
               <RefreshCw className="h-3.5 w-3.5" /> Reset key (lost or forgotten)
             </button>
           </div>

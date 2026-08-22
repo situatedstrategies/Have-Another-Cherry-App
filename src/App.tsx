@@ -1442,7 +1442,7 @@ export default function App() {
     >
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       {/* Cherry Checkered Border Top Strip */}
-      <div className="h-px bg-slate-200 w-full" />
+      <div className="h-px bg-natural-sidebar w-full" />
 
       <main className="max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
         
@@ -1499,7 +1499,7 @@ export default function App() {
                 setEditingExpense(null);
                 setShowForm(true);
               }}
-              className="bg-natural-primary hover:bg-[#A00E00] text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" /> Log Expense
             </button>
@@ -1595,7 +1595,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setSelectedExpense(pendingToConfirm[0])}
-                className="shrink-0 bg-natural-primary hover:bg-[#A00E00] text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
+                className="shrink-0 bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
               >
                 Review
               </button>
@@ -1603,8 +1603,8 @@ export default function App() {
           )}
 
           {overThresholdExpenses.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">
                   {overThresholdExpenses.length === 1 ? 'A shared expense is over your threshold' : `${overThresholdExpenses.length} shared expenses are over your threshold`}
@@ -1615,7 +1615,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setSelectedExpense(overThresholdExpenses[0])}
-                className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
+                className="shrink-0 bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
               >
                 Review
               </button>
@@ -1623,8 +1623,8 @@ export default function App() {
           )}
 
           {missingProfiles.length > 0 && !dismissedWaiting && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">Some members are still setting up</h3>
                 <p className="text-xs text-natural-muted mt-1">
@@ -1633,7 +1633,7 @@ export default function App() {
                 </p>
                 <div className="mt-2 space-y-0.5">
                   {missingProfiles.map(id => (
-                    <div key={id} className="text-xs font-medium text-amber-700">
+                    <div key={id} className="text-xs font-medium text-natural-primary">
                       {groupUsers[id]?.name || 'A member'} hasn't completed setup yet.
                     </div>
                   ))}
@@ -1641,7 +1641,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setDismissedWaiting(true)}
-                className="text-amber-500 hover:text-amber-700 bg-white/60 p-1 rounded-full border border-amber-200 shrink-0"
+                className="text-natural-primary hover:text-natural-dark bg-white/60 p-1 rounded-full border border-natural-primary/25 shrink-0"
                 title="Dismiss"
               >
                 <X size={14} />
@@ -1746,7 +1746,7 @@ export default function App() {
                           className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                         />
                       </div>
-                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] px-4 py-2 rounded-lg shrink-0">Save</button>
+                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg shrink-0">Save</button>
                     </div>
                   ) : (
                     <button
@@ -1779,7 +1779,7 @@ export default function App() {
                       placeholder="Zelle email or phone"
                       className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                     />
-                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] px-4 py-2 rounded-lg">Save Payment Info</button>
+                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg">Save Payment Info</button>
                   </div>
                 </div>
               </div>

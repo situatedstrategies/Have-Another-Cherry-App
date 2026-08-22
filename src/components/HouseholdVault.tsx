@@ -285,7 +285,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
 
       <div className="p-6 space-y-4">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold">{error}</div>
+          <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">{error}</div>
         )}
 
         {loading ? (
@@ -373,7 +373,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl transition-colors">
+              <button type="submit" className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors">
                 Add to Vault
               </button>
             </form>
@@ -396,7 +396,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                       </div>
                       <div className="flex items-center gap-3">
                         {bill.amount != null && <span className="text-sm font-mono font-bold text-natural-text">${bill.amount.toFixed(2)}</span>}
-                        <button onClick={() => removeBill(bill.id)} className="text-natural-muted hover:text-red-500" title="Remove">
+                        <button onClick={() => removeBill(bill.id)} className="text-natural-muted hover:text-natural-primary" title="Remove">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -440,7 +440,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                       <button onClick={() => handleDownload(d)} disabled={busy} className="p-1.5 text-natural-primary hover:bg-natural-sage/40 rounded-lg border border-natural-border disabled:opacity-50" title="Download">
                         <Download size={14} />
                       </button>
-                      <button onClick={() => handleDeleteDoc(d)} disabled={busy} className="p-1.5 text-natural-muted hover:text-red-500 rounded-lg border border-natural-border disabled:opacity-50" title="Delete">
+                      <button onClick={() => handleDeleteDoc(d)} disabled={busy} className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>

@@ -158,7 +158,7 @@ export default function ExpenseDetail({
                   </div>
                   <button
                     onClick={() => onConfirmReceipt(s.id)}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ShieldCheck className="h-4 w-4" /> Confirm Receipt
                   </button>
@@ -329,13 +329,13 @@ export default function ExpenseDetail({
                         <div className="pt-1.5 border-t border-natural-border/50">
                           {voidingSettlement === s.id ? (
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-bold text-rose-600 uppercase">Remove this payment entry?</span>
+                              <span className="text-[11px] font-bold text-natural-primary uppercase">Remove this payment entry?</span>
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => setVoidingSettlement(null)} className="text-[11px] font-bold text-natural-muted hover:text-natural-text cursor-pointer">Cancel</button>
                                 <button
                                   type="button"
                                   onClick={() => { setVoidingSettlement(null); onVoidSettlement(s.id); }}
-                                  className="text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-md cursor-pointer"
+                                  className="text-[11px] font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md cursor-pointer"
                                 >
                                   Yes, Remove
                                 </button>
@@ -345,7 +345,7 @@ export default function ExpenseDetail({
                             <button
                               type="button"
                               onClick={() => setVoidingSettlement(s.id)}
-                              className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
+                              className="text-[11px] font-bold text-natural-primary hover:text-natural-dark flex items-center gap-1 cursor-pointer"
                             >
                               <Ban className="h-3 w-3" /> Remove entry (logged in error)
                             </button>
@@ -418,15 +418,15 @@ export default function ExpenseDetail({
             </button>
 
             {isDeleting ? (
-              <div className="flex items-center gap-2 border border-rose-200 bg-rose-50 px-3 py-1.5 rounded-xl">
-                <span className="text-[10px] font-bold text-rose-600 uppercase">Confirm Delete?</span>
+              <div className="flex items-center gap-2 border border-natural-primary/25 bg-natural-primary/5 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] font-bold text-natural-primary uppercase">Confirm Delete?</span>
                 <button onClick={() => setIsDeleting(false)} className="text-[10px] font-bold text-natural-muted hover:text-natural-text">Cancel</button>
-                <button onClick={onDelete} className="text-[10px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-md">Yes, Delete</button>
+                <button onClick={onDelete} className="text-[10px] font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md">Yes, Delete</button>
               </div>
             ) : (
               <button
                 onClick={() => setIsDeleting(true)}
-                className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 bg-white hover:bg-natural-sidebar/30 border border-rose-200/50 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3 py-2 text-xs font-semibold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-sidebar/30 border border-natural-primary/15 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </button>
@@ -443,7 +443,7 @@ export default function ExpenseDetail({
                 return (
                   <button
                     onClick={onSettleClick}
-                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Cherry className="h-4 w-4" /> Dark Cherry Chip In
                   </button>
@@ -455,7 +455,7 @@ export default function ExpenseDetail({
               return leftToPay > 0.01 ? (
                 <button
                   onClick={onSettleClick}
-                  className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <CreditCard className="h-4 w-4" /> Settle My Share (${leftToPay.toFixed(2)})
                 </button>

@@ -225,7 +225,7 @@ export default function AuthActionHandler() {
               <div className="text-center mb-6">
                 <h2 className="text-sm font-medium text-natural-muted">Unsupported link</h2>
               </div>
-              <div className="bg-red-50 text-red-600 p-3 rounded-md mb-6 text-sm font-medium border border-red-100 flex items-start gap-2">
+              <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                 <span className="shrink-0">⚠️</span>
                 <span>
                   We do not recognise this type of link. If you were sent here from one of our emails, contact{' '}
@@ -246,7 +246,7 @@ export default function AuthActionHandler() {
               <div className="text-center mb-6">
                 <h2 className="text-sm font-medium text-natural-muted">This link did not work</h2>
               </div>
-              <div className="bg-red-50 text-red-600 p-3 rounded-md mb-6 text-sm font-medium border border-red-100 flex items-start gap-2">
+              <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                 <span className="shrink-0">⚠️</span>
                 <span>{phase.message}</span>
               </div>
@@ -254,13 +254,13 @@ export default function AuthActionHandler() {
               {phase.offerNewLink ? (
                 <>
                   {newLinkInfo && (
-                    <div className="bg-green-50 text-green-700 p-3 rounded-md mb-6 text-sm font-medium border border-green-100 flex items-start gap-2">
+                    <div className="bg-natural-sidebar text-natural-text p-3 rounded-md mb-6 text-sm font-medium border border-natural-border flex items-start gap-2">
                       <span className="shrink-0">✅</span>
                       <span>{newLinkInfo}</span>
                     </div>
                   )}
                   {newLinkError && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-md mb-6 text-sm font-medium border border-red-100 flex items-start gap-2">
+                    <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                       <span className="shrink-0">⚠️</span>
                       <span>{newLinkError}</span>
                     </div>
@@ -275,13 +275,13 @@ export default function AuthActionHandler() {
                           Email
                         </label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
                           <input
                             type="email"
                             required
                             value={newLinkEmail}
                             onChange={(e) => setNewLinkEmail(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 rounded-md text-natural-text placeholder-slate-400 font-sans text-sm outline-none transition-all"
+                            className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
                             placeholder="you@example.com"
                           />
                         </div>
@@ -311,7 +311,7 @@ export default function AuthActionHandler() {
               <div className="text-center mb-6">
                 <h2 className="text-sm font-medium text-natural-muted">{phase.heading}</h2>
               </div>
-              <div className="bg-green-50 text-green-700 p-3 rounded-md mb-6 text-sm font-medium border border-green-100 flex items-start gap-2">
+              <div className="bg-natural-sidebar text-natural-text p-3 rounded-md mb-6 text-sm font-medium border border-natural-border flex items-start gap-2">
                 <span className="shrink-0">✅</span>
                 <span>{phase.message}</span>
               </div>
@@ -335,7 +335,7 @@ export default function AuthActionHandler() {
               </p>
 
               {formError && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-md mb-6 text-sm font-medium border border-red-100 flex items-start gap-2">
+                <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                   <span className="shrink-0">⚠️</span>
                   <span>{formError}</span>
                 </div>
@@ -347,13 +347,13 @@ export default function AuthActionHandler() {
                     New password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 rounded-md text-natural-text placeholder-slate-400 font-sans text-sm outline-none transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
                       placeholder="••••••••"
                       minLength={8}
                       autoComplete="new-password"
@@ -366,7 +366,7 @@ export default function AuthActionHandler() {
                         <li
                           key={req.key}
                           className={`flex items-center gap-1.5 text-xs ${
-                            checks[req.key] ? 'text-green-600' : 'text-natural-muted'
+                            checks[req.key] ? 'text-natural-text' : 'text-natural-muted'
                           }`}
                         >
                           <span>{checks[req.key] ? '✓' : '○'}</span> {req.label}
@@ -381,13 +381,13 @@ export default function AuthActionHandler() {
                     Confirm new password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
                     <input
                       type="password"
                       required
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 rounded-md text-natural-text placeholder-slate-400 font-sans text-sm outline-none transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
                       placeholder="••••••••"
                       minLength={8}
                       autoComplete="new-password"

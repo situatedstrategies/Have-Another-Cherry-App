@@ -353,18 +353,18 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 <button 
                   type="submit" 
                   disabled={inviteStatus === 'sending'}
-                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-[#A00E00] transition-colors disabled:opacity-50"
+                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
                 >
                   {inviteStatus === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
                 </button>
               </div>
               {inviteStatus === 'success' && <p className="text-xs text-natural-primary font-medium mt-2">Invite sent successfully!</p>}
-              {inviteStatus === 'error' && <p className="text-xs text-red-500 font-medium mt-2">Failed to send invite. Check settings.</p>}
+              {inviteStatus === 'error' && <p className="text-xs text-natural-primary font-medium mt-2">Failed to send invite. Check settings.</p>}
             </form>
 
             <button
               onClick={() => onComplete(createdGroupInfo.groupId)}
-              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm"
+              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm"
             >
               Done, go to Dashboard
             </button>
@@ -601,7 +601,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 </div>
                 <div className="flex justify-between items-center mt-3 px-1">
                   <span className="text-xs font-medium text-natural-muted">Total:</span>
-                  <span className={`text-sm font-bold font-mono ${splitBalanced ? 'text-green-600' : 'text-natural-primary'}`}>
+                  <span className={`text-sm font-bold font-mono ${splitBalanced ? 'text-natural-text' : 'text-natural-primary'}`}>
                     {splitTotal.toFixed(1)}%
                   </span>
                 </div>
@@ -618,7 +618,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <button
                 type="submit"
                 disabled={loading || !splitBalanced}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Creating...' : `Create & Get Invite Code${numPeople > 2 ? 's' : ''}`}
               </button>
@@ -648,7 +648,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-[#A00E00] transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Joining...' : 'Join Group'}
               </button>

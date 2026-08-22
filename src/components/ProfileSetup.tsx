@@ -290,7 +290,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     return (
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto"></div>
+          <div className="w-12 h-12 border-4 border-natural-border border-t-natural-text rounded-full animate-spin mx-auto"></div>
           <h2 className="text-xl font-display font-semibold text-natural-text">Crafting your financial style…</h2>
           <p className="text-sm text-natural-muted">Reading between the lines of your answers.</p>
         </div>
@@ -330,14 +330,14 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                     value={answers[q.key] || ''}
                     onChange={e => setAnswer(q.key, e.target.value)}
                     placeholder={q.placeholder}
-                    className="w-full pl-7 p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-slate-900 text-sm"
+                    className="w-full pl-7 p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                   />
                 </div>
               ) : (
                 <select
                   value={answers[q.key] || ''}
                   onChange={e => setAnswer(q.key, e.target.value)}
-                  className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-slate-900 text-sm"
+                  className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                 >
                   <option value="">Select…</option>
                   {q.options?.map(o => (
@@ -370,7 +370,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               <button
                 onClick={handleSubmit}
                 disabled={!isStepComplete}
-                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-[#A00E00] transition-colors disabled:opacity-50`}
+                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary-ink transition-colors disabled:opacity-50`}
               >
                 Generate Profile
               </button>

@@ -25,15 +25,15 @@ function LendingTooltip({ active, payload, label, compare }: any) {
   const lentBy: Record<string, number> = d.lentBy || {};
   const borrowedBy: Record<string, number> = d.borrowedBy || {};
   return (
-    <div style={{ borderRadius: 8, border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: '#fff', padding: '10px 12px', fontSize: 12 }}>
+    <div style={{ borderRadius: 8, border: '1px solid #E4E4E7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: '#fff', padding: '10px 12px', fontSize: 12 }}>
       <p style={{ fontWeight: 700, color: '#18181B', marginBottom: 4 }}>{label}</p>
-      <p style={{ color: '#334155', fontWeight: 600 }}>Total lent: ${Number(d.lending || 0).toFixed(2)}</p>
+      <p style={{ color: '#18181B', fontWeight: 600 }}>Total lent: ${Number(d.lending || 0).toFixed(2)}</p>
       {compare && (
-        <p style={{ color: '#94A3B8' }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
+        <p style={{ color: '#A1A1AA' }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
       )}
       {Object.keys(lentBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <p style={{ color: '#64748B', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Lent by</p>
+          <p style={{ color: '#71717A', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Lent by</p>
           {Object.entries(lentBy).map(([name, amt]) => (
             <p key={name} style={{ color: '#18181B' }}>{name}: <strong>${Number(amt).toFixed(2)}</strong></p>
           ))}
@@ -41,7 +41,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
       )}
       {Object.keys(borrowedBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <p style={{ color: '#64748B', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Borrowed by</p>
+          <p style={{ color: '#71717A', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Borrowed by</p>
           {Object.entries(borrowedBy).map(([name, amt]) => (
             <p key={name} style={{ color: '#18181B' }}>{name}: <strong>${Number(amt).toFixed(2)}</strong></p>
           ))}
@@ -179,11 +179,11 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(val) => `$${val}`} width={45} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} tickFormatter={(val) => `$${val}`} width={45} />
                 <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E4E4E7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number, name: string) => [`$${Number(value).toFixed(2)}`, name === 'prevSpending' ? 'Previous' : 'This period']}
                 />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
@@ -200,13 +200,13 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(val) => `$${val}`} width={45} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} tickFormatter={(val) => `$${val}`} width={45} />
                 <Tooltip content={<LendingTooltip compare={compare} />} />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                <Line type="monotone" dataKey="lending" name="This period" stroke="#334155" strokeWidth={3} dot={{ r: 4, fill: '#334155' }} activeDot={{ r: 6 }} />
-                {compare && <Line type="monotone" dataKey="prevLending" name="Previous" stroke="#334155" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 3 }} strokeOpacity={0.5} />}
+                <Line type="monotone" dataKey="lending" name="This period" stroke="#18181B" strokeWidth={3} dot={{ r: 4, fill: '#18181B' }} activeDot={{ r: 6 }} />
+                {compare && <Line type="monotone" dataKey="prevLending" name="Previous" stroke="#18181B" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 3 }} strokeOpacity={0.5} />}
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -95,7 +95,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           Across {youOweCount} individual {youOweCount === 1 ? 'item' : 'items'}
         </p>
         {youOwePending > 0.01 && (
-          <p className="text-[11px] text-amber-600 mt-1 font-medium">
+          <p className="text-[11px] text-natural-primary mt-1 font-medium">
             ${youOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} awaiting confirmation
           </p>
         )}
@@ -124,7 +124,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           Across {othersOweYouCount} individual {othersOweYouCount === 1 ? 'item' : 'items'}
         </p>
         {othersOwePending > 0.01 && (
-          <p className="text-[11px] text-amber-600 mt-1 font-medium">
+          <p className="text-[11px] text-natural-primary mt-1 font-medium">
             ${othersOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending your confirmation
           </p>
         )}

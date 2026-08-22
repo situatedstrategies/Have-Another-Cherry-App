@@ -84,7 +84,7 @@ export default function PrivacyModal({ onClose, onOpenLegal, onExportData, onDel
 
           <button
             onClick={onDeleteAccount}
-            className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-red-500 hover:bg-red-50 border border-red-100 hover:border-red-200 rounded-xl transition-all shadow-sm"
+            className="w-full py-3 px-4 flex items-center justify-between text-sm font-bold text-natural-primary hover:bg-natural-primary/5 border border-natural-primary/15 hover:border-natural-primary/25 rounded-xl transition-all shadow-sm"
           >
             <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account &amp; All Data</span>
           </button>

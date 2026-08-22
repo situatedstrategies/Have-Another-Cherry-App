@@ -1,0 +1,233 @@
+/* ==========================================================================
+   Have Another Cherry — Brand Style Sheet v1.0
+   A simpler, sweeter way to share household expenses.
+
+   Drop-in CSS for ads, landing pages, and marketing HTML.
+   Pair with the brand guidelines in docs/brand-guide.html.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* --------------------------------------------------------------------------
+   1. Design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Color — cherry red is the ONLY hue. Everything else is a zinc neutral. */
+  --hac-cherry:       #C41200;  /* primary accent: CTAs, tick bar, highlights */
+  --hac-cherry-ink:   #A00E00;  /* deep cherry: hover state of solid red buttons */
+  --hac-cherry-wash:  #FBEAE7;  /* pale cherry tint: soft washes and highlights  */
+  --hac-ink:          #18181B;  /* headlines, body text                       */
+  --hac-paper:        #F4F4F5;  /* page background                            */
+  --hac-surface:      #FFFFFF;  /* cards, panels                              */
+  --hac-sidebar:      #E4E4E7;  /* secondary background, soft panels          */
+  --hac-border:       #D4D4D8;  /* 1px hairline borders                       */
+  --hac-muted:        #52525B;  /* secondary text                             */
+  --hac-faint:        #71717A;  /* tertiary text, fine print                  */
+
+  /* Type — three faces, three jobs. Never substitute. */
+  --hac-font-display: "Lora", Georgia, serif;                    /* headlines, wordmark */
+  --hac-font-body:    "Inter", Helvetica, Arial, sans-serif;     /* everything else     */
+  --hac-font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; /* money, codes, % */
+
+  /* Shape — soft but precise */
+  --hac-radius-sm:   8px;    /* inputs, small chips        */
+  --hac-radius-md:   10px;   /* buttons                    */
+  --hac-radius-lg:   12px;   /* inner panels, code boxes   */
+  --hac-radius-xl:   16px;   /* cards, containers          */
+  --hac-radius-pill: 999px;  /* pill CTAs, the tick bar    */
+
+  /* Elevation — barely there */
+  --hac-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
+  --hac-shadow-md: 0 4px 12px rgba(24, 24, 27, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   2. Base
+   -------------------------------------------------------------------------- */
+.hac {
+  background: var(--hac-paper);
+  color: var(--hac-ink);
+  font-family: var(--hac-font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hac h1, .hac h2, .hac h3 {
+  font-family: var(--hac-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--hac-ink);
+  margin: 0;
+}
+.hac h1 { font-size: clamp(2rem, 5vw, 3rem); }
+.hac h2 { font-size: 1.625rem; }
+.hac h3 { font-size: 1.25rem; }
+
+.hac p     { margin: 0 0 1em; }
+.hac small { font-size: 0.75rem; color: var(--hac-faint); }
+.hac a     { color: var(--hac-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.hac a:hover { color: var(--hac-cherry); }
+
+/* Money, percentages, invite codes — always mono, always tabular */
+.hac-num {
+  font-family: var(--hac-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Uppercase micro-label (section eyebrows, field labels) */
+.hac-label {
+  font-family: var(--hac-font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--hac-muted);
+}
+
+/* The tick — the brand's signature underline device */
+.hac-tick {
+  display: block;
+  width: 44px;
+  height: 3px;
+  border-radius: var(--hac-radius-pill);
+  background: var(--hac-cherry);
+  border: 0;
+  margin: 14px 0 0;
+}
+.hac-tick--center { margin-left: auto; margin-right: auto; }
+
+/* --------------------------------------------------------------------------
+   3. Buttons
+   -------------------------------------------------------------------------- */
+.hac-btn {
+  display: inline-block;
+  font-family: var(--hac-font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: var(--hac-radius-md);
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Primary: cherry red, white text. One per composition. */
+.hac-btn--primary {
+  background: var(--hac-cherry);
+  color: #FFFFFF;
+  box-shadow: var(--hac-shadow-sm);
+}
+.hac-btn--primary:hover { background: var(--hac-cherry-ink); box-shadow: var(--hac-shadow-md); }
+
+/* Secondary: white with hairline border */
+.hac-btn--secondary {
+  background: var(--hac-surface);
+  color: var(--hac-ink);
+  border: 1px solid var(--hac-border);
+  box-shadow: var(--hac-shadow-sm);
+}
+.hac-btn--secondary:hover { background: var(--hac-sidebar); }
+
+/* Pill variant: compact rounded-full CTA (app header style) */
+.hac-btn--pill {
+  font-size: 0.75rem;
+  padding: 10px 20px;
+  border-radius: var(--hac-radius-pill);
+}
+
+.hac-btn:focus-visible {
+  outline: 2px solid var(--hac-cherry);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Surfaces
+   -------------------------------------------------------------------------- */
+.hac-card {
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-xl);
+  box-shadow: var(--hac-shadow-sm);
+  padding: 32px;
+}
+
+/* Dashed container — reserved for codes and "cut here" moments */
+.hac-code-box {
+  background: var(--hac-paper);
+  border: 1px dashed var(--hac-border);
+  border-radius: var(--hac-radius-lg);
+  padding: 22px 16px;
+  text-align: center;
+}
+.hac-code-box .hac-code {
+  font-family: var(--hac-font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--hac-ink);
+}
+
+/* Callout — soft panel with a 4px cherry spine */
+.hac-callout {
+  background: var(--hac-sidebar);
+  border-left: 4px solid var(--hac-cherry);
+  border-radius: 0 var(--hac-radius-lg) var(--hac-radius-lg) 0;
+  padding: 16px;
+  box-shadow: var(--hac-shadow-sm);
+}
+
+/* White tile for placing the cherry mark on non-white grounds */
+.hac-logo-tile {
+  display: inline-block;
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-xl);
+  padding: 6px;
+  box-shadow: var(--hac-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   5. Forms
+   -------------------------------------------------------------------------- */
+.hac-input {
+  width: 100%;
+  font-family: var(--hac-font-body);
+  font-size: 0.875rem;
+  color: var(--hac-ink);
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-sm);
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.hac-input::placeholder { color: var(--hac-faint); }
+.hac-input:focus {
+  border-color: var(--hac-muted);
+  box-shadow: 0 0 0 1px var(--hac-muted);
+}
+
+/* --------------------------------------------------------------------------
+   6. Wordmark
+   -------------------------------------------------------------------------- */
+.hac-wordmark {
+  font-family: var(--hac-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--hac-ink);
+}
+
+/* Red-flood variant (high-impact ads): everything on cherry */
+.hac-flood {
+  background: var(--hac-cherry);
+  color: #FFFFFF;
+}
+.hac-flood .hac-wordmark,
+.hac-flood h1, .hac-flood h2, .hac-flood h3 { color: #FFFFFF; }
+.hac-flood .hac-tick { background: #FFFFFF; }
+.hac-flood .hac-btn--primary { background: #FFFFFF; color: var(--hac-cherry); }

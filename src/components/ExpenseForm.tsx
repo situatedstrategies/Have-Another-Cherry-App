@@ -526,7 +526,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
           <button
             type="submit"
             form="expense-form"
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
+            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
             {editingExpense ? 'Update Expense' : 'Save Expense'}
           </button>
@@ -607,7 +607,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 type="button"
                 onClick={applyItemAssignments}
                 disabled={numericAmount <= 0}
-                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-[#A00E00] rounded-xl transition-colors disabled:opacity-50"
+                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
               >
                 Apply Items to Split
               </button>
@@ -616,8 +616,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
           {/* Spending threshold heads-up */}
           {thresholdWarnings.length > 0 && numericAmount > 0 && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-              <span className="text-amber-500 shrink-0 font-bold">!</span>
+            <div className="flex items-start gap-2 p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl">
+              <span className="text-natural-primary shrink-0 font-bold">!</span>
               <p className="text-xs text-natural-text leading-relaxed">
                 {thresholdWarnings.map(m => `${m.name}'s share ($${(previewShares[m.uid] || 0).toFixed(2)}) is over their spending threshold of $${(memberThresholds?.[m.uid] || 0).toFixed(0)}`).join('; ')}. They'll get a heads-up on their side.
               </p>
@@ -1040,7 +1040,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
                       </div>
-                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-red-500 p-1.5 shrink-0" title="Remove">
+                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0" title="Remove">
                         <X className="h-4 w-4" />
                       </button>
                     </div>

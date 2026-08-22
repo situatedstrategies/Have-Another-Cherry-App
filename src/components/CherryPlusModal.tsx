@@ -66,14 +66,14 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="bg-natural-primary hover:bg-[#A00E00] text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                className="bg-natural-primary hover:bg-natural-primary-ink text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
                 aria-label="Sign up for updates"
               >
                 {status === 'sending' ? <span className="animate-spin inline-block text-xs">◌</span> : <Send size={16} />}
               </button>
             </div>
             {status === 'error' && (
-              <p className="text-xs text-red-500 font-medium">Couldn't save that - please try again.</p>
+              <p className="text-xs text-natural-primary font-medium">Couldn't save that - please try again.</p>
             )}
             <p className="text-[10px] text-natural-muted">
               Just launch news - no spam, and never your ledger.

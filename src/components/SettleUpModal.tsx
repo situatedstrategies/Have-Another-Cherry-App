@@ -133,7 +133,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
     >
         <form onSubmit={handleSettleSubmit} className="p-6 space-y-5">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+            <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-sm font-semibold">
               {error}
             </div>
           )}
@@ -156,7 +156,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                 {/* Logging a payment the debtor already logged creates a duplicate —
                     those are waiting on a Confirm Receipt instead. */}
                 {(expense.settlements || []).filter(s => s.status === 'pending' && s.paidBy === selectedDebtor).map(s => (
-                  <p key={s.id} className="mt-2 text-[11px] text-natural-muted bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  <p key={s.id} className="mt-2 text-[11px] text-natural-muted bg-natural-primary/5 border border-natural-primary/25 rounded-lg px-2.5 py-1.5">
                     They already logged <span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span> ({s.instrumentType}) — it's waiting for your confirmation on the expense screen. Only log a payment here if this is a <span className="font-semibold">different</span> one.
                   </p>
                 ))}
@@ -303,7 +303,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
             <button type="button" onClick={onClose} className="w-full py-2.5 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
               Cancel
             </button>
-            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-[#A00E00] rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
               <Check className="h-4 w-4" /> Log Payment
             </button>
           </div>

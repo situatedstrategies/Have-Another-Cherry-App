@@ -52,7 +52,7 @@ export default function SettingsModal({
       footer={
         <button
           onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 bg-white hover:bg-red-50 border border-red-200 py-2.5 rounded-xl transition-colors shadow-sm"
+          className="w-full flex items-center justify-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-primary/5 border border-natural-primary/25 py-2.5 rounded-xl transition-colors shadow-sm"
         >
           <LogOut size={16} /> Sign Out
         </button>
@@ -145,10 +145,10 @@ export default function SettingsModal({
                     </div>
                     <div>
                       {!isGhost ? (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Joined</span>
+                        <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">Joined</span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
+                          <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">Pending</span>
                           <button onClick={() => onResendInvite(memberName)} className="text-[10px] uppercase font-bold text-natural-primary hover:underline">Resend Invite</button>
                         </div>
                       )}
@@ -186,7 +186,7 @@ export default function SettingsModal({
           <div className="border-t border-natural-border/50 pt-3">
             <button
               onClick={onLeaveGroup}
-              className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-red-500 bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
+              className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
             >
               <LogOut size={14} /> Leave This Group
             </button>

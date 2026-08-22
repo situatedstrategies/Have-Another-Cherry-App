@@ -77,22 +77,9 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
     return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors = [
-      'text-blue-700 bg-blue-50 border-blue-200',
-      'text-emerald-700 bg-emerald-50 border-emerald-200',
-      'text-violet-700 bg-violet-50 border-violet-200',
-      'text-amber-700 bg-amber-50 border-amber-200',
-      'text-rose-700 bg-rose-50 border-rose-200',
-      'text-cyan-700 bg-cyan-50 border-cyan-200',
-      'text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200',
-    ];
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-      hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
+  const getCategoryColor = (_category: string) => {
+    // Brand system: one hue only. Category chips are uniform neutral zinc.
+    return 'text-natural-muted bg-natural-sidebar border-natural-border';
   };
 
   return (
@@ -338,7 +325,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
           {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button 
               onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
-              className="text-natural-text hover:text-[#c49363] font-bold flex items-center gap-1 cursor-pointer"
+              className="text-natural-text hover:text-natural-primary font-bold flex items-center gap-1 cursor-pointer"
               id="clear-filters-footer-btn"
             >
               <RefreshCw className="h-3 w-3" /> Clear filters

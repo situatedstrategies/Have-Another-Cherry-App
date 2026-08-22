@@ -40,7 +40,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
   // Mirrors the site's .btn / .btn-lg spec exactly: JetBrains Mono 500,
   // 15px/30px padding at hero size, pill radius, red glow on primary.
   const btnPrimary =
-    'inline-flex items-center justify-center gap-2 font-mono font-medium text-[15px] tracking-[-0.01em] px-[30px] py-[15px] rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] hover:shadow-[0_10px_24px_-10px_rgba(196,18,0,0.8)] hover:bg-[#A00E00] transition-all cursor-pointer';
+    'inline-flex items-center justify-center gap-2 font-mono font-medium text-[15px] tracking-[-0.01em] px-[30px] py-[15px] rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] hover:shadow-[0_10px_24px_-10px_rgba(196,18,0,0.8)] hover:bg-natural-primary-ink transition-all cursor-pointer';
   const btnGhost =
     'inline-flex items-center justify-center gap-2 font-mono font-medium text-[15px] tracking-[-0.01em] px-[30px] py-[15px] rounded-full transition-all cursor-pointer hover:border-[#18181B]';
 
@@ -74,7 +74,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <a href={`${SITE}/features#pricing`} className="hidden sm:inline-flex font-mono font-medium text-sm tracking-[-0.01em] px-[22px] py-3 rounded-full border transition-colors hover:border-[#18181B]" style={{ borderColor: C.border, background: C.surface }}>
                 Pricing
               </a>
-              <button onClick={onGetStarted} className="font-mono font-medium text-sm tracking-[-0.01em] px-[22px] py-3 rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] transition-colors hover:bg-[#A00E00]" style={{ background: C.primary }}>
+              <button onClick={onGetStarted} className="font-mono font-medium text-sm tracking-[-0.01em] px-[22px] py-3 rounded-full text-white shadow-[0_6px_16px_-8px_rgba(196,18,0,0.7)] transition-colors hover:bg-natural-primary-ink" style={{ background: C.primary }}>
                 Log in
               </button>
             </div>
