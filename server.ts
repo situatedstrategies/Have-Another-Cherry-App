@@ -4,7 +4,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendReminderEmail } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import firebaseConfig from "./firebase-applet-config.json";
 import betaFirebaseConfig from "./firebase-applet-config.beta.json";
@@ -22,7 +22,10 @@ async function startServer() {
   // same-origin, so this doesn't affect it - it just blocks other sites).
   const allowedOrigins = (
     process.env.ALLOWED_ORIGINS ||
-    "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000"
+    "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000," +
+    // Marketing site origins: the beta signup form on these pages posts to
+    // /api/beta-signup cross-origin.
+    "https://haveanothercherry.com,https://www.haveanothercherry.com,https://have-another-cherry-marketing.pages.dev"
   ).split(",").map(o => o.trim()).filter(Boolean);
   app.use(cors({
     origin: (origin, cb) => {
@@ -54,6 +57,7 @@ async function startServer() {
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
     "/api/recaptcha-health",
+    "/api/beta-signup",
     "/cherry2transparent.png",
     "/icon.svg",
     "/favicon.ico",
@@ -851,6 +855,40 @@ async function startServer() {
       console.error("Waitlist Error:", err?.message || err);
       // If Mailchimp got them, the signup still succeeded.
       if (subscribed) return res.status(200).json({ success: true, subscribed });
+      return res.status(500).json({ error: "Could not save your signup. Please try again." });
+    }
+  });
+
+  // 11a2. Beta signup (public). The marketing site's beta form posts here
+  //      cross-origin (see the marketing origins in ALLOWED_ORIGINS and the
+  //      gate exemption above). No auth: visitors are anonymous. Each signup
+  //      is forwarded to the poolside@ inbox via Resend. Rate limited per IP
+  //      to keep the public endpoint from being abused.
+  app.post("/api/beta-signup", rateLimit("beta-signup", 5), async (req, res) => {
+    const body = req.body || {};
+    const clean = (v: unknown, max: number) =>
+      typeof v === "string" ? v.trim().slice(0, max) : "";
+
+    const email = clean(body.email, 254);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "A valid email address is required." });
+    }
+    if (body.consent !== "yes") {
+      return res.status(400).json({ error: "Consent is required so we know we can email you." });
+    }
+
+    try {
+      await sendBetaSignupNotification({
+        name: clean(body.name, 100),
+        email,
+        household: clean(body.household, 100),
+        interests: clean(body.interests, 300),
+        notes: clean(body.notes, 1000),
+        source: clean(body.source, 300),
+      });
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Beta signup error:", err?.message || err);
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
   });

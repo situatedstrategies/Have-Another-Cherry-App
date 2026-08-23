@@ -229,6 +229,47 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
   return data;
 }
 
+// Beta signup: forward each "get on the list" submission from the marketing
+// site's beta form to the poolside@ inbox. This carries marketing data only
+// (name, email, stated preferences) - never any ledger detail.
+export async function sendBetaSignupNotification(signup: {
+  name: string;
+  email: string;
+  household: string;
+  interests: string;
+  notes: string;
+  source: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const resend = new Resend(apiKey);
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <notifications@haveanothercherry.com>",
+    to: "poolside@haveanothercherry.com",
+    replyTo: signup.email,
+    subject: `Beta signup: ${signup.name || signup.email}`,
+    text:
+      `New beta signup from the marketing site:\n\n` +
+      `Name: ${signup.name || "not given"}\n` +
+      `Email: ${signup.email}\n` +
+      `Shares money with: ${signup.household || "not given"}\n` +
+      `Wants to test: ${signup.interests || "not given"}\n` +
+      `Notes: ${signup.notes || "none"}\n` +
+      `Page: ${signup.source || "unknown"}\n\n` +
+      `Signed up ${new Date().toISOString()} with consent to be emailed.`,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 // Cherry + payment reminder, sent on a member's behalf from
 // tartcherry@haveanothercherry.com. Deliberately warm and no-pressure: the
 // point of the feature is that nobody has to send the awkward text.
