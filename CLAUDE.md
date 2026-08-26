@@ -80,6 +80,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Logo: `/cherry2transparent.png` (in `public/`). The old Squarespace logo URL is dead - do not use it.
 
 ## Deploy flow
+- **`main` is NOT what gets deployed.** `development/web-production` is the deployed branch. Always push work there.
 - Push to `development/web-production` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
