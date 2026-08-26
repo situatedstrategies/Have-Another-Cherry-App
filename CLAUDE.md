@@ -116,4 +116,3 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.
 - Keep `PORT` as `Number(process.env.PORT) || 3000` in `server.ts`.
-- AI Studio's GitHub import is one-way (snapshot). Changes made in AI Studio must be pushed back to `development/web-production` to deploy.
