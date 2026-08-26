@@ -73,8 +73,8 @@ async function recordTermsAcceptance(uid: string) {
   }
 }
 
-// Brand logo (public/logo.svg, mirrored from the marketing site). Sign-in is a
-// brand placement; the small cherry icons inside the app keep the old mark.
+// Brand logo (public/logo.svg, mirrored from the marketing site), used across
+// the app; the email templates keep the PNG mark for email-client support.
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
     <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
