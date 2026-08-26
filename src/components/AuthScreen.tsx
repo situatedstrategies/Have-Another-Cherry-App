@@ -283,7 +283,21 @@ export default function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-natural-sidebar flex flex-col font-sans">
+      <nav className="w-full flex items-center justify-between px-6 py-4">
+        <a href="https://haveanothercherry.com" className="flex items-center gap-2">
+          <CherryLogo className="h-6 w-6" />
+          <span className="font-display font-semibold text-natural-text tracking-tight">Have Another Cherry</span>
+        </a>
+        <a
+          href="https://haveanothercherry.com/blog"
+          className="text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
+        >
+          Blog
+        </a>
+      </nav>
+
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-sm overflow-hidden relative">
         <div className="p-8">
           <div className="text-center mb-8">
@@ -483,6 +497,7 @@ export default function AuthScreen() {
             </p>
           )}
         </div>
+      </div>
       </div>
 
       {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}
