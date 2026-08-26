@@ -2,10 +2,12 @@
 # Runs when this file changes on the deploy branch: waits out the App Hosting
 # rollout, then probes /api/recaptcha-health (gate-exempt, status only) and the
 # /__/auth/handler proxy on the branded auth domain, so the results are visible
-# in the Actions log. Re-run it any time by touching this file.
+# in the Actions log. Re-run it any time from the Actions tab (workflow_dispatch)
+# or by touching this file.
 name: reCAPTCHA health check
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - development/web-production
