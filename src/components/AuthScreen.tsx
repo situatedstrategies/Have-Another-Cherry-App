@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
@@ -103,6 +103,26 @@ export default function AuthScreen() {
     preloadRecaptcha();
   }, []);
 
+  // Complete a Google sign-in that came back via the redirect flow (mobile).
+  // Success swaps this screen out through onAuthStateChanged; this hook only
+  // needs to record consent for brand-new accounts and surface failures.
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && getAdditionalUserInfo(result)?.isNewUser) {
+          return recordTermsAcceptance(result.user.uid);
+        }
+      })
+      .catch((err) => {
+        // This check runs on every load, usually with no redirect pending, so a
+        // network hiccup here is not worth alarming the user over. Real sign-in
+        // attempts report their own network failures.
+        if (err?.code !== 'auth/network-request-failed') {
+          setError(friendlyAuthError(err));
+        }
+      });
+  }, []);
+
   // Switch between Log in / Sign up / Reset views, clearing any messages.
   const switchMode = (next: 'login' | 'signup' | 'reset') => {
     setError('');
@@ -128,9 +148,19 @@ export default function AuthScreen() {
       return;
     }
     setError('');
+    const provider = new GoogleAuthProvider();
+    // Mobile browsers (and home-screen installs) handle popups poorly or not at
+    // all; the full-page redirect flow is the reliable path there. The popup
+    // stays for desktop, where redirect would lose in-page state unnecessarily.
+    const preferRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     try {
       setGoogleLoading(true);
-      const provider = new GoogleAuthProvider();
+      if (preferRedirect) {
+        // Navigates away from the app; the watchdog only matters if the
+        // pre-redirect handshake stalls, so the button can't stick forever.
+        await withTimeout(signInWithRedirect(auth, provider), 30_000);
+        return;
+      }
       // Long timeout: the user may legitimately spend time in the popup. If the
       // popup completes but can never message back (blocked cross-site storage),
       // this unfreezes the UI with an actionable error instead of hanging.
@@ -140,6 +170,15 @@ export default function AuthScreen() {
         await recordTermsAcceptance(result.user.uid);
       }
     } catch (err: any) {
+      // A blocked or unsupported popup still has a way forward: the redirect flow.
+      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: any) {
+          err = redirectErr;
+        }
+      }
       setError(friendlyAuthError(err));
       setGoogleLoading(false);
     }
