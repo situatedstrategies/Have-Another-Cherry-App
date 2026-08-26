@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import prodConfig from '../firebase-applet-config.json';
 import betaConfig from '../firebase-applet-config.beta.json';
 
@@ -33,9 +33,28 @@ export const APP_ENV: 'beta' | 'production' = isBetaEnv ? 'beta' : 'production';
 
 const app = initializeApp(firebaseConfig);
 
-// App Check must be initialized before any Firestore/Auth traffic so requests carry an attestation token.
-if (import.meta.env.DEV) (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-if (firebaseConfig.recaptchaSiteKey) initializeAppCheck(app, { provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey), isTokenAutoRefreshEnabled: true });
+// App Check must be initialized before any Firestore/Auth traffic so requests
+// carry an attestation token. The site key is a reCAPTCHA *Enterprise* key
+// (the server assesses tokens via the Enterprise API), so the provider must be
+// ReCaptchaEnterpriseProvider: the V3 provider exchanges tokens against a
+// different App Check endpoint and fails with a 403 for Enterprise keys, which
+// blocks sign-in whenever App Check enforcement is on.
+//
+// Quick checks: dev builds always use a debug token (the token prints in the
+// browser console on first load; allowlist it in Firebase Console -> App Check
+// -> Apps -> Manage debug tokens). For a production-like build you control,
+// set VITE_APPCHECK_DEBUG_TOKEN to an allowlisted token at build time to
+// bypass reCAPTCHA attestation entirely while debugging.
+const appCheckDebugToken = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
+if (import.meta.env.DEV || appCheckDebugToken) {
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken || true;
+}
+if (firebaseConfig.recaptchaSiteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(firebaseConfig.recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 // Initialize Firestore with the custom database ID as the third argument
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
@@ -51,56 +70,5 @@ export async function authHeader(): Promise<Record<string, string>> {
   } catch {
     return {};
   }
-}
-
-// Mobile integration placeholders
-// export const appleProvider = new OAuthProvider('apple.com');
-
-
-export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  }
-}
-
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid || null,
-      email: auth.currentUser?.email || null,
-      emailVerified: auth.currentUser?.emailVerified || null,
-      isAnonymous: auth.currentUser?.isAnonymous || null,
-      tenantId: auth.currentUser?.tenantId || null,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
 }
 

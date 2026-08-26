@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Have Another Cherry
 
-# Run and deploy your AI Studio app
+The app that makes sharing expenses sweeter. A household expense-splitter: create a group, set a percentage split, log shared expenses, settle up. Includes AI receipt scanning and a financial-profile quiz.
 
-This contains everything you need to run your app locally.
+See `CLAUDE.md` for the full project reference (stack, deploy flow, environments, hard rules).
 
-View your app in AI Studio: https://ai.studio/apps/3836874c-6bf3-42de-b5a5-f54b905b5975
+## Run locally
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js (or Bun) and the gcloud CLI.
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   `bun install` (or `npm install`)
+2. Copy `.env.example` to `.env.local` and set `RESEND_API_KEY` (only needed for email flows).
+3. Authenticate for Gemini via Vertex AI (there is deliberately no `GEMINI_API_KEY`; this org blocks standalone keys):
+   ```
+   gcloud auth application-default login
+   gcloud config set project gen-lang-client-0987674990
+   ```
+4. Run the app:
+   `npm run dev` then open http://localhost:3000
+
+## Deploy
+
+Push to `development/web-production`. Firebase App Hosting builds and deploys automatically (about 4-5 minutes). Firestore rules deploy separately via `.github/workflows/deploy-firestore-rules.yml`.
