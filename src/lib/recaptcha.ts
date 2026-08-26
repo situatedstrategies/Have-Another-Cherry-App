@@ -49,13 +49,28 @@ export function preloadRecaptcha(): void {
 // Tokens expire after two minutes, so mint one right before each protected call.
 // Returns null when reCAPTCHA is unavailable (no site key, blocked script) so
 // callers can decide how to degrade.
+//
+// Capped at 10s: grecaptcha's ready()/execute() never settle at all when the
+// site key is misconfigured for the current domain or the API is blocked, and
+// without a cap that hang freezes sign-in on "Please wait..." forever. Timing
+// out degrades to null, the same fail-open path as a blocked script.
 export async function getRecaptchaToken(action: string): Promise<string | null> {
   if (!RECAPTCHA_SITE_KEY) return null;
-  try {
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), 10_000);
+  });
+  const mint = (async () => {
     await loadRecaptchaScript();
     const grecaptcha = window.grecaptcha!;
     await new Promise<void>((resolve) => grecaptcha.enterprise.ready(resolve));
     return await grecaptcha.enterprise.execute(RECAPTCHA_SITE_KEY, { action });
+  })();
+  try {
+    const token = await Promise.race([mint, timeout]);
+    if (token === null) console.warn('reCAPTCHA timed out; continuing without a token');
+    // Keep a late rejection from surfacing as an unhandled promise error.
+    mint.catch(() => {});
+    return token;
   } catch (err) {
     console.warn('reCAPTCHA token unavailable:', err);
     return null;

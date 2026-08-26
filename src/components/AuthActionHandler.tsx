@@ -30,7 +30,7 @@ type Phase =
 
 function CherryLogo({ className = 'h-10 w-10' }: { className?: string }) {
   return (
-    <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
   );
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
@@ -35,10 +35,33 @@ function friendlyAuthError(err: any): string {
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
     case 'auth/network-request-failed':
-      return 'Network error. Check your connection and try again.';
+      return 'Couldn’t reach the sign-in service. Check your connection — VPNs, ad blockers, or strict privacy settings can block it — and try again.';
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google sign-in window. Allow popups for this site and try again.';
+    case 'auth/unauthorized-domain':
+      return 'Sign-in isn’t authorized on this domain. Please use the official app link.';
+    case 'auth/ui-timeout':
+      return 'Sign-in is taking too long. If a Google window opened and closed without signing you in, your browser may be blocking cross-site sign-in — try email and password, or a different browser.';
     default:
       return 'Something went wrong. Please try again.';
   }
+}
+
+// Rejects if the auth call neither resolves nor rejects within `ms`, so the UI
+// can recover instead of sitting on "Please wait..." forever. If the underlying
+// sign-in still completes later, onAuthStateChanged picks it up regardless.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err: any = new Error('Sign-in timed out');
+      err.code = 'auth/ui-timeout';
+      reject(err);
+    }, ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
 }
 
 // Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
@@ -50,8 +73,8 @@ async function recordTermsAcceptance(uid: string) {
   }
 }
 
-// Brand logo (public/logo.svg, mirrored from the marketing site). Sign-in is a
-// brand placement; the small cherry icons inside the app keep the old mark.
+// Brand logo (public/logo.svg, mirrored from the marketing site), used across
+// the app; the email templates keep the PNG mark for email-client support.
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
     <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
@@ -64,7 +87,11 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // Separate loading flags so a hung Google popup can never wedge the email
+  // form (or vice versa); both buttons still disable during any attempt.
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const loading = emailLoading || googleLoading;
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [isReset, setIsReset] = useState(false);
@@ -74,6 +101,26 @@ export default function AuthScreen() {
   // screen and the first submit does not pay the script download cost.
   useEffect(() => {
     preloadRecaptcha();
+  }, []);
+
+  // Complete a Google sign-in that came back via the redirect flow (mobile).
+  // Success swaps this screen out through onAuthStateChanged; this hook only
+  // needs to record consent for brand-new accounts and surface failures.
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && getAdditionalUserInfo(result)?.isNewUser) {
+          return recordTermsAcceptance(result.user.uid);
+        }
+      })
+      .catch((err) => {
+        // This check runs on every load, usually with no redirect pending, so a
+        // network hiccup here is not worth alarming the user over. Real sign-in
+        // attempts report their own network failures.
+        if (err?.code !== 'auth/network-request-failed') {
+          setError(friendlyAuthError(err));
+        }
+      });
   }, []);
 
   // Switch between Log in / Sign up / Reset views, clearing any messages.
@@ -100,17 +147,40 @@ export default function AuthScreen() {
       setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
       return;
     }
+    setError('');
+    const provider = new GoogleAuthProvider();
+    // Mobile browsers (and home-screen installs) handle popups poorly or not at
+    // all; the full-page redirect flow is the reliable path there. The popup
+    // stays for desktop, where redirect would lose in-page state unnecessarily.
+    const preferRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     try {
-      setLoading(true);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      setGoogleLoading(true);
+      if (preferRedirect) {
+        // Navigates away from the app; the watchdog only matters if the
+        // pre-redirect handshake stalls, so the button can't stick forever.
+        await withTimeout(signInWithRedirect(auth, provider), 30_000);
+        return;
+      }
+      // Long timeout: the user may legitimately spend time in the popup. If the
+      // popup completes but can never message back (blocked cross-site storage),
+      // this unfreezes the UI with an actionable error instead of hanging.
+      const result = await withTimeout(signInWithPopup(auth, provider), 90_000);
       // Record consent for brand-new accounts (Google already verifies the email).
       if (getAdditionalUserInfo(result)?.isNewUser) {
         await recordTermsAcceptance(result.user.uid);
       }
     } catch (err: any) {
+      // A blocked or unsupported popup still has a way forward: the redirect flow.
+      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: any) {
+          err = redirectErr;
+        }
+      }
       setError(friendlyAuthError(err));
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -124,7 +194,7 @@ export default function AuthScreen() {
       setError('Enter your email address to reset your password.');
       return;
     }
-    setLoading(true);
+    setEmailLoading(true);
     try {
       const res = await fetch('/api/send-password-reset', {
         method: 'POST',
@@ -139,7 +209,7 @@ export default function AuthScreen() {
     } catch (err: any) {
       setError(err.message || 'Unable to send reset email. Please try again later.');
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
@@ -179,18 +249,18 @@ export default function AuthScreen() {
       }
     }
 
-    setLoading(true);
+    setEmailLoading(true);
     try {
       const humanOk = await verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
       if (!humanOk) {
         setError('We could not verify this request. Please try again.');
-        setLoading(false);
+        setEmailLoading(false);
         return;
       }
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        await withTimeout(signInWithEmailAndPassword(auth, email, password), 30_000);
       } else {
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const userCred = await withTimeout(createUserWithEmailAndPassword(auth, email, password), 30_000);
         if (name.trim()) {
           await updateProfile(userCred.user, { displayName: name.trim() });
         }
@@ -208,12 +278,26 @@ export default function AuthScreen() {
       }
     } catch (err: any) {
       setError(friendlyAuthError(err));
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-natural-sidebar flex flex-col font-sans">
+      <nav className="w-full flex items-center justify-between px-6 py-4">
+        <a href="https://haveanothercherry.com" className="flex items-center gap-2">
+          <CherryLogo className="h-6 w-6" />
+          <span className="font-display font-semibold text-natural-text tracking-tight">Have Another Cherry</span>
+        </a>
+        <a
+          href="https://haveanothercherry.com/blog"
+          className="text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
+        >
+          Blog
+        </a>
+      </nav>
+
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-sm overflow-hidden relative">
         <div className="p-8">
           <div className="text-center mb-8">
@@ -347,7 +431,7 @@ export default function AuthScreen() {
               disabled={loading || (!isReset && !isLogin && (!passwordValid || !agreeTerms))}
               className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
             >
-              {loading ? 'Please wait...' : (isReset ? 'Send reset link' : (isLogin ? 'Log In' : 'Sign Up'))}
+              {emailLoading ? 'Please wait...' : (isReset ? 'Send reset link' : (isLogin ? 'Log In' : 'Sign Up'))}
             </button>
           </form>
 
@@ -386,7 +470,7 @@ export default function AuthScreen() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {googleLoading ? 'Waiting for Google...' : 'Continue with Google'}
           </button>
           </>
           )}
@@ -413,6 +497,7 @@ export default function AuthScreen() {
             </p>
           )}
         </div>
+      </div>
       </div>
 
       {legalDoc && <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />}

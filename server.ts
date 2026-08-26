@@ -1039,8 +1039,14 @@ async function startServer() {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith("index.html")) {
           res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        } else {
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          // Only Vite's content-hashed bundles are safe to cache forever.
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          // Un-hashed public/ files (logo.svg, icons, manifest) keep their
+          // names when their content changes, so cap how long a stale copy
+          // can outlive a deploy.
+          res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
         }
       },
     }));
