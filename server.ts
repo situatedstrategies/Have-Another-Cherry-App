@@ -390,6 +390,141 @@ async function startServer() {
     }
   });
 
+  // 4b. Household Vault extraction. Turns a free-form note, or a photo of a
+  // bill/statement, into structured fields the client can confirm and save.
+  //
+  // Privacy contract (see privacy.html section 7): this endpoint is STATELESS.
+  // The submitted text/image is used to produce the extraction and is never
+  // written to a database, never logged as content, and never used for
+  // training. The client encrypts the result before storing it, so nothing
+  // readable is persisted anywhere by this request.
+  app.post("/api/vault-extract", requireAuth, rateLimit("vault", 30), async (req, res) => {
+    try {
+      const { GoogleGenAI, Type } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
+        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+      });
+
+      const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+      const image = typeof req.body?.image === "string" ? req.body.image : "";
+      // What the user said they want kept, e.g. "just the due date and amount".
+      const intent = typeof req.body?.intent === "string" ? req.body.intent.trim().slice(0, 400) : "";
+      const categories: string[] = Array.isArray(req.body?.categories)
+        ? req.body.categories.filter((c: any) => typeof c === "string").slice(0, 40)
+        : [];
+
+      if (!text && !image) {
+        return res.status(400).json({ error: "Nothing to organise — add a note or a photo." });
+      }
+
+      const parts: any[] = [];
+      if (image) {
+        parts.push({
+          inlineData: {
+            data: image.includes(",") ? image.split(",")[1] : image,
+            mimeType: req.body?.mimeType || "image/jpeg",
+          },
+        });
+      }
+      if (text) parts.push(`Here is what the user wrote:\n${text.slice(0, 8000)}`);
+      if (intent) parts.push(`The user asked specifically for: ${intent}`);
+      if (categories.length) {
+        parts.push(`Prefer one of the household's existing categories when it fits: ${categories.join(", ")}.`);
+      }
+      parts.push(
+        "Turn this into one structured household record. Write `body` as clean, readable prose " +
+        "— keep every fact, drop filler, do not invent anything. " +
+        "Only fill a field if the source actually supports it; leave it out otherwise. " +
+        "Set confidence to `high` only when the value is stated outright, `medium` when it is " +
+        "strongly implied, and `low` when you are guessing. Dates must be YYYY-MM-DD. " +
+        "Return ONLY valid JSON."
+      );
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: parts,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: "Short title, e.g. 'Con Ed — August'" },
+              body: { type: Type.STRING, description: "The note itself, cleaned up. Never invent facts." },
+              vendor: { type: Type.STRING, description: "Who it is with, e.g. 'Con Edison'" },
+              amount: { type: Type.NUMBER, description: "Amount due, if stated" },
+              dueDate: { type: Type.STRING, description: "YYYY-MM-DD, if stated or clearly implied" },
+              recurrence: {
+                type: Type.STRING,
+                description: "one of: none, weekly, biweekly, monthly, quarterly, yearly",
+              },
+              accountHint: { type: Type.STRING, description: "Which account pays it, e.g. 'joint Chase'. Never a full account number." },
+              category: { type: Type.STRING },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              confidence: {
+                type: Type.OBJECT,
+                description: "high | medium | low per field that was filled",
+                properties: {
+                  amount: { type: Type.STRING },
+                  dueDate: { type: Type.STRING },
+                  vendor: { type: Type.STRING },
+                  recurrence: { type: Type.STRING },
+                  accountHint: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                },
+              },
+            },
+            required: ["title", "body"],
+          },
+        },
+      });
+
+      if (!response.text) {
+        return res.status(422).json({ error: "Could not make sense of that. Try adding a little more detail." });
+      }
+
+      const parsed = JSON.parse(stripEmDashes(response.text.trim()));
+      const allowedRecurrence = ["none", "weekly", "biweekly", "monthly", "quarterly", "yearly"];
+      const isoDate = (v: any) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+      const conf = (v: any) => (["high", "medium", "low"].includes(v) ? v : undefined);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          title: String(parsed.title || "Untitled").slice(0, 120),
+          body: String(parsed.body || "").slice(0, 8000),
+          vendor: parsed.vendor ? String(parsed.vendor).slice(0, 120) : undefined,
+          amount: Number.isFinite(Number(parsed.amount)) && Number(parsed.amount) > 0
+            ? Math.round(Number(parsed.amount) * 100) / 100
+            : undefined,
+          dueDate: isoDate(parsed.dueDate),
+          recurrence: allowedRecurrence.includes(parsed.recurrence) && parsed.recurrence !== "none"
+            ? parsed.recurrence
+            : undefined,
+          accountHint: parsed.accountHint ? String(parsed.accountHint).slice(0, 80) : undefined,
+          category: parsed.category ? String(parsed.category).slice(0, 60) : undefined,
+          tags: (Array.isArray(parsed.tags) ? parsed.tags : [])
+            .map((t: any) => String(t).slice(0, 40))
+            .filter(Boolean)
+            .slice(0, 8),
+          confidence: {
+            amount: conf(parsed.confidence?.amount),
+            dueDate: conf(parsed.confidence?.dueDate),
+            vendor: conf(parsed.confidence?.vendor),
+            recurrence: conf(parsed.confidence?.recurrence),
+            accountHint: conf(parsed.confidence?.accountHint),
+            category: conf(parsed.confidence?.category),
+          },
+        },
+      });
+    } catch (err: any) {
+      // Deliberately does not log the submitted content.
+      console.error("Vault extract error:", err?.message || err);
+      res.status(500).json({ error: "Could not organise that right now. Please try again." });
+    }
+  });
+
   // 5. reCAPTCHA Enterprise assessment via ADC (no API key - org policy).
   const createRecaptchaAssessment = async (token: string, action?: string) => {
     const { GoogleAuth } = await import("google-auth-library");
