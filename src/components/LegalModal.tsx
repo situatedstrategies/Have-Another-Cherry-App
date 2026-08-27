@@ -37,14 +37,16 @@ function PrivacyPolicy() {
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Account information:</strong> your name and email address. We save your email: it is how you sign in and how we reach you. It is the only contact information we keep, and only a hashed (SHA-256) version sits alongside your ledger data.</li>
           <li><strong>Financial profile:</strong> your responses to the profile quiz and the income figures you enter, used to tailor split recommendations and insights.</li>
-          <li><strong>Expense &amp; ledger data:</strong> the expenses, settlements, and comments you log. These are end-to-end encrypted on your device before being sent to our database.</li>
+          <li><strong>Expense &amp; ledger data:</strong> the expenses, settlements, and comments you log. These are end-to-end encrypted on your device before being sent to our database. Entries older than six months are archived to cloud storage in that same encrypted form and pulled back on demand.</li>
           <li><strong>Receipt images</strong> you choose to scan, which are processed to extract expense details.</li>
+          <li><strong>Household Vault content</strong> you ask us to organise &mdash; notes, bills, statements, photos. Unlike your ledger, this is readable during processing so a model can extract a title, amount, due date and category; the endpoint is stateless and retains nothing, and the result is encrypted on your device before it is saved. Vault entries you save without requesting AI organisation are never sent.</li>
         </ul>
       </Section>
 
       <Section title="How We Protect Your Data">
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>End-to-end encryption:</strong> expense details and ledgers are encrypted on your device (AES) and can only be decrypted with your group's invite code.</li>
+          <li><strong>End-to-end encryption:</strong> expense details and ledgers are encrypted on your device (AES) and can only be decrypted with your group's invite code. This holds for archived history too &mdash; older entries move to cloud storage still encrypted.</li>
+          <li><strong>The one exception:</strong> content you explicitly submit for AI processing (receipt scans, Vault organisation) is readable while it is processed. Nothing else leaves your device unencrypted.</li>
           <li><strong>Hashed identifiers:</strong> your email is hashed before storage; we do not store raw emails alongside your ledger data.</li>
           <li><strong>Group isolation:</strong> security rules restrict data access to members of your own group.</li>
         </ul>
