@@ -6,6 +6,7 @@ import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
+import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
 import betaFirebaseConfig from "./firebase-applet-config.beta.json";
 
@@ -590,6 +591,15 @@ async function startServer() {
   // confirm the Enterprise API, IAM role, and site key are wired up without
   // needing a real browser token. Reports status only, never user data.
   app.get("/api/recaptcha-health", async (_req, res) => {
+    // Report the key and project this environment actually uses. Reporting
+    // firebaseConfig unconditionally made a beta misconfiguration look like a
+    // production key problem.
+    const healthProject =
+      process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
+    const healthConfig =
+      healthProject === betaFirebaseConfig.projectId
+        ? betaFirebaseConfig
+        : firebaseConfig;
     try {
       const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
       const props = assessment.data?.tokenProperties;
@@ -598,7 +608,8 @@ async function startServer() {
       res.status(200).json({
         ok: true,
         assessmentApi: "reachable",
-        siteKey: firebaseConfig.recaptchaSiteKey,
+        project: healthProject,
+        siteKey: healthConfig.recaptchaSiteKey,
         dummyTokenValid: props?.valid === true,
         invalidReason: props?.invalidReason || null,
       });
@@ -606,7 +617,8 @@ async function startServer() {
       res.status(200).json({
         ok: false,
         assessmentApi: "error",
-        siteKey: firebaseConfig.recaptchaSiteKey,
+        project: healthProject,
+        siteKey: healthConfig.recaptchaSiteKey,
         error: err.message,
       });
     }
@@ -1012,20 +1024,67 @@ async function startServer() {
       return res.status(400).json({ error: "Consent is required so we know we can email you." });
     }
 
+    // Bot filters. Both must run here, not in the browser: a scripted post
+    // never executes our JS, so a client-side check catches nothing that
+    // matters.
+    //
+    // Answer 200 rather than 4xx. A bot that gets an error learns which field
+    // betrayed it and retries without it; one that gets a success moves on. The
+    // visitor sees the normal confirmation either way, and no lead is written.
+    const honeypot = typeof body.company === "string" ? body.company.trim() : "";
+    if (honeypot) {
+      console.warn("[signup] honeypot filled, dropped");
+      return res.status(200).json({ success: true });
+    }
+
+    // Humans do not read, type and submit in under two seconds. Missing or
+    // unparseable elapsed time is allowed through: it means an older cached
+    // page, not necessarily a bot, and silently dropping real people is worse
+    // than letting a few through.
+    const elapsedMs = Number(body.elapsedMs);
+    if (Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs < 2000) {
+      console.warn("[signup] submitted in " + elapsedMs + "ms, dropped");
+      return res.status(200).json({ success: true });
+    }
+
+    const platform = clean(body.platform, 20);
+    const notes = clean(body.notes, 1000);
+    const source = clean(body.source, 300);
+
     try {
       await sendBetaSignupNotification({
         name: clean(body.name, 100),
         email,
         household: clean(body.household, 100),
         interests: clean(body.interests, 300),
-        notes: clean(body.notes, 1000),
-        source: clean(body.source, 300),
+        notes,
+        source,
       });
-      return res.status(200).json({ success: true });
     } catch (err: any) {
       console.error("Beta signup error:", err?.message || err);
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
+
+    // Mirror into Notion after the email has gone. The email is the system of
+    // record; a Notion outage must not cost us the lead or show the visitor an
+    // error for something already saved.
+    try {
+      await addWaitlistLeadToNotion({
+        email,
+        name: clean(body.name, 100),
+        platform,
+        source,
+        referrer: clean(body.referrer, 500),
+        consent: true,
+        notes,
+        formType: clean(body.formType, 20) === "Beta" ? "Beta" : "Waitlist",
+        device: deviceFromUserAgent(req.get("user-agent")),
+      });
+    } catch (err: any) {
+      console.error("Notion waitlist mirror failed:", err?.message || err);
+    }
+
+    return res.status(200).json({ success: true });
   });
 
   // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from

@@ -1472,30 +1472,40 @@ export default function App() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap" id="header-controls">
+          {/* Phones get three equal columns that span the width; from sm up the
+              buttons sit their natural size in a row. flex-wrap alone left them
+              ragged on narrow screens because the padding is fixed. */}
+          <div
+            className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
+            id="header-controls"
+          >
             <button
               onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
-              className="bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs px-4 py-2.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-[11px] sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
               title="Household Vault"
             >
-              <VaultIcon className="h-4 w-4" /> Vault
-              {!isPlus && <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+              <VaultIcon className="h-4 w-4 shrink-0" /> Vault
+              {!isPlus && <span className="hidden sm:inline text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
             </button>
             <button
               onClick={() => setShowPlanPurchase(true)}
-              className="bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs px-4 py-2.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-[11px] sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
               title="Plan a shared purchase"
             >
-              <TrendingUp className="h-4 w-4" /> Plan a Purchase
+              <TrendingUp className="h-4 w-4 shrink-0" />
+              <span className="sm:hidden">Plan</span>
+              <span className="hidden sm:inline">Plan a Purchase</span>
             </button>
             <button
               onClick={() => {
                 setEditingExpense(null);
                 setShowForm(true);
               }}
-              className="bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-[11px] sm:text-xs px-2.5 sm:px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
             >
-              <Plus className="h-4 w-4" /> Log Expense
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="sm:hidden">Log</span>
+              <span className="hidden sm:inline">Log Expense</span>
             </button>
           </div>
         </header>
