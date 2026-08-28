@@ -590,6 +590,15 @@ async function startServer() {
   // confirm the Enterprise API, IAM role, and site key are wired up without
   // needing a real browser token. Reports status only, never user data.
   app.get("/api/recaptcha-health", async (_req, res) => {
+    // Report the key and project this environment actually uses. Reporting
+    // firebaseConfig unconditionally made a beta misconfiguration look like a
+    // production key problem.
+    const healthProject =
+      process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
+    const healthConfig =
+      healthProject === betaFirebaseConfig.projectId
+        ? betaFirebaseConfig
+        : firebaseConfig;
     try {
       const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
       const props = assessment.data?.tokenProperties;
@@ -598,7 +607,8 @@ async function startServer() {
       res.status(200).json({
         ok: true,
         assessmentApi: "reachable",
-        siteKey: firebaseConfig.recaptchaSiteKey,
+        project: healthProject,
+        siteKey: healthConfig.recaptchaSiteKey,
         dummyTokenValid: props?.valid === true,
         invalidReason: props?.invalidReason || null,
       });
@@ -606,7 +616,8 @@ async function startServer() {
       res.status(200).json({
         ok: false,
         assessmentApi: "error",
-        siteKey: firebaseConfig.recaptchaSiteKey,
+        project: healthProject,
+        siteKey: healthConfig.recaptchaSiteKey,
         error: err.message,
       });
     }

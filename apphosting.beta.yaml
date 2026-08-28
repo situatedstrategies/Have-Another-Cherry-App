@@ -7,3 +7,14 @@ env:
     secret: BETA_RESEND_API
     availability:
       - RUNTIME
+
+  # Without this, every `process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-..."`
+  # fallback in server.ts silently resolves to PRODUCTION: reCAPTCHA assessments
+  # and all Vertex AI calls from beta were being billed to, and authorised
+  # against, the production project. Same class of bug the firebase-admin init
+  # already guards against.
+  - variable: GOOGLE_CLOUD_PROJECT
+    value: have-another-cherry-beta
+    availability:
+      - BUILD
+      - RUNTIME
