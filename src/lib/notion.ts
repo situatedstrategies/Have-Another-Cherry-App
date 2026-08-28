@@ -14,9 +14,30 @@ export type WaitlistLead = {
   referrer?: string;
   consent?: boolean;
   notes?: string;
+  formType?: string;   // "Waitlist" | "Beta"
+  device?: string;     // "iPhone" | "iPad" | "Android" | "Mac" | "Windows" | "Other"
 };
 
+// Derived from the User-Agent header rather than sent by the client: a
+// client-supplied value is trivially spoofed and would mean another field on
+// the form for no benefit. Coarse on purpose — we only want to know whether
+// someone asking for Android is browsing on an iPhone.
+export function deviceFromUserAgent(ua?: string): string {
+  const s = (ua || "").toLowerCase();
+  if (!s) return "Other";
+  if (/iphone|ipod/.test(s)) return "iPhone";
+  if (/ipad/.test(s)) return "iPad";
+  // iPadOS reports as desktop Safari; the touch-capable Mac signature is an iPad.
+  if (/macintosh/.test(s) && /mobile/.test(s)) return "iPad";
+  if (/android/.test(s)) return "Android";
+  if (/macintosh|mac os x/.test(s)) return "Mac";
+  if (/windows/.test(s)) return "Windows";
+  return "Other";
+}
+
 const PLATFORMS = new Set(["iOS", "Android", "Either"]);
+const FORM_TYPES = new Set(["Waitlist", "Beta"]);
+const DEVICES = new Set(["iPhone", "iPad", "Android", "Mac", "Windows", "Other"]);
 
 export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void> {
   const token = process.env.NOTION_TOKEN;
@@ -39,6 +60,12 @@ export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void>
   if (notes) properties.Notes = notes;
   if (lead.platform && PLATFORMS.has(lead.platform)) {
     properties.Platform = { multi_select: [{ name: lead.platform }] };
+  }
+  if (lead.formType && FORM_TYPES.has(lead.formType)) {
+    properties.Form = { select: { name: lead.formType } };
+  }
+  if (lead.device && DEVICES.has(lead.device)) {
+    properties.Device = { select: { name: lead.device } };
   }
   // Notion rejects a malformed URL outright, which would drop an otherwise
   // good lead, so only send it when it parses.

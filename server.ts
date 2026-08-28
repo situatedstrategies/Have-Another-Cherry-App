@@ -6,7 +6,7 @@ import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
-import { addWaitlistLeadToNotion } from "./src/lib/notion";
+import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
 import betaFirebaseConfig from "./firebase-applet-config.beta.json";
 
@@ -1054,6 +1054,8 @@ async function startServer() {
         referrer: clean(body.referrer, 500),
         consent: true,
         notes,
+        formType: clean(body.formType, 20) === "Beta" ? "Beta" : "Waitlist",
+        device: deviceFromUserAgent(req.get("user-agent")),
       });
     } catch (err: any) {
       console.error("Notion waitlist mirror failed:", err?.message || err);

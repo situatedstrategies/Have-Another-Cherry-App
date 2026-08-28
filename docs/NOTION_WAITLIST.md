@@ -84,13 +84,31 @@ that is marketing PII.
 | Consent | always true — the endpoint rejects submissions without it |
 | Source | `location.pathname + location.search`, so utm tags survive |
 | Referrer | `document.referrer`, only when it parses as a URL |
+| Form | `Waitlist` or `Beta`, so the two forms are separable |
+| Device | derived server-side from the User-Agent header |
 | Status | set to `Not started` |
 | Signed Up | Notion's created time |
 | Lead ID | Notion auto-increment, `WL-` prefix |
 
+## Platform vs Device
+
+Two different questions, both worth having:
+
+- **Platform** is what they *asked for* — the select on the form.
+- **Device** is what they were *browsing on*, derived from the User-Agent
+  header server-side.
+
+Detection is deliberately server-side. A client-supplied value is trivially
+spoofed and would mean another field on the form for nothing. It is also
+deliberately coarse — iPhone / iPad / Android / Mac / Windows / Other — because
+the only question worth answering is whether someone asking for Android is
+signing up on an iPhone.
+
+One quirk it handles: iPadOS reports itself as desktop Safari, so a Macintosh
+UA that also says `Mobile` is treated as an iPad.
+
 ## Note on the beta form
 
-`beta.html` posts to the same endpoint, so beta signups now also appear in
-Notion. They arrive without a Platform, which distinguishes them from app
-waitlist rows. If you want them separated, add a `formType` field to both forms
-and split on it.
+`beta.html` posts to the same endpoint, so beta signups appear in Notion too.
+They are tagged `Form = Beta` where the homepage sends `Form = Waitlist`, so
+filter or group on that to keep the two lists apart.
