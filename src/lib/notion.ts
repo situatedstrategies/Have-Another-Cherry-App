@@ -42,7 +42,13 @@ const DEVICES = new Set(["iPhone", "iPad", "Android", "Mac", "Windows", "Other"]
 export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void> {
   const token = process.env.NOTION_TOKEN;
   const databaseId = process.env.NOTION_WAITLIST_DB_ID;
-  if (!token || !databaseId) return;
+
+  // "disabled" turns the mirror off explicitly. apphosting.yaml is shared by
+  // both backends, so a secret declared there has to resolve in beta too, and
+  // App Hosting rejects an empty string as a value. A named sentinel is how
+  // beta opts out without needing its own copy of the production token, and it
+  // beats letting a placeholder through to fail one API call per signup.
+  if (!token || !databaseId || token.toLowerCase() === "disabled") return;
 
   const text = (v?: string) =>
     v && v.trim() ? { rich_text: [{ text: { content: v.trim().slice(0, 1900) } }] } : undefined;

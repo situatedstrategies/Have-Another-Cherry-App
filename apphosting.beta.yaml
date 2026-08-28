@@ -26,11 +26,12 @@ env:
   # build failed resolving it and the whole rollout died. App Hosting resolves
   # every declared secret at build time; a missing one is fatal, not skipped.
   #
-  # Beta has no reason to write to the live waitlist database anyway. An empty
-  # value is the correct behaviour rather than a workaround: the mirror checks
-  # for a token and no-ops without one (src/lib/notion.ts), so beta signups
-  # still send their email and simply do not reach Notion.
+  # Beta has no reason to write to the live waitlist database anyway, so it
+  # opts out by name. Not an empty string: App Hosting rejects one and fails
+  # the whole build with "not formatted properly". src/lib/notion.ts treats
+  # "disabled" as unset, so beta signups still send their email and simply do
+  # not reach Notion.
   - variable: NOTION_TOKEN
-    value: ""
+    value: disabled
     availability:
       - RUNTIME

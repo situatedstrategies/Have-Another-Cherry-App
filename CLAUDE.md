@@ -31,6 +31,38 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - Start built app: `npm run start`.
 - Typecheck: `npm run lint` (`tsc --noEmit`).
 
+## Check live backend state before assuming it (hard rule)
+
+**Never reason about deploy state from this file, from git, or from what was
+true earlier in the session. Query it.** Backends get renamed, reconnected,
+disabled and re-secreted outside the repo, and every one of those changes is
+invisible to the code.
+
+Run these first, every time, before diagnosing anything about a deploy:
+
+```bash
+firebase apphosting:backends:get <backend> --project <project>   # repo link, ABIU, runtime
+firebase apphosting:secrets:describe <NAME> --project <project>  # per project, not per repo
+gh api repos/<owner>/<repo>/commits/<sha>/check-runs             # what actually ran
+```
+
+Things this rule exists to stop, all of which have already happened here:
+
+- Diagnosing a build failure from a stale `backends:list` read taken an hour
+  earlier, after the owner had already fixed the repository link.
+- Assuming a secret exists in both projects because it is declared once in the
+  shared `apphosting.yaml`. Secrets are per project.
+- Reading a green "App Hosting - Rollout" check as proof the new code is
+  serving. A rollout can succeed while `ABIU: Disabled` means nothing was
+  triggered by the push at all.
+- Comparing local build hashes to live ones to confirm a deploy. A local
+  `npm ci` resolves differently from the server's, so the hashes never match
+  and the comparison proves nothing. Compare a static asset instead.
+
+When a deploy looks wrong, get the real error rather than inferring one:
+`firebase apphosting:rollouts:create <backend> --project <p> --git-branch <b>`
+returns the actual build failure, including a Cloud Build log link.
+
 ## Google Cloud / Firebase project
 - Project: "Have Another Cherry SSLLC" = `gen-lang-client-0987674990`.
 - Firestore: `(default)` database (nam5). Security rules in `firestore.rules`.
