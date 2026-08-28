@@ -89,7 +89,7 @@ export default function ExpenseDetail({
             <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Expense Details</span>
             <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
               getNormalizedExpenseStatus(expense) === 'CLOSED'
-                ? 'bg-natural-graphite-wash text-natural-graphite border-natural-graphite/20'
+                ? 'bg-natural-pebble text-natural-muted border-natural-border'
                 : getNormalizedExpenseStatus(expense) === 'PARTIALLY_SETTLED'
                 ? 'bg-natural-pebble text-natural-primary border-natural-primary/25'
                 : 'bg-natural-primary-wash text-natural-primary border-natural-primary/30'

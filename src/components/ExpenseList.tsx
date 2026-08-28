@@ -245,7 +245,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                         the other way, pointing the eye at the rows that
                         needed nothing. */}
                     {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
-                      <div className="p-2 bg-natural-graphite-wash text-natural-graphite rounded-full border border-natural-graphite/20">
+                      <div className="p-2 bg-natural-pebble text-natural-muted rounded-full border border-natural-border">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                     ) : getNormalizedExpenseStatus(exp) === 'PARTIALLY_SETTLED' ? (
