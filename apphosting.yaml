@@ -12,3 +12,22 @@ env:
     secret: RESET_RESEND_API
     availability:
       - RUNTIME
+
+  # Waitlist mirror into Notion. The token must already exist in Secret Manager
+  # before this config rolls out: App Hosting resolves every declared secret at
+  # build time and fails the whole rollout if one is missing, so declaring a
+  # secret you have not set yet takes the site down rather than degrading.
+  #
+  #   firebase apphosting:secrets:set NOTION_TOKEN --project gen-lang-client-0987674990
+  #
+  # The database ID is a plain value: it is a pointer, not a credential, and it
+  # is useless to anyone without the token. With NOTION_TOKEN unset the mirror
+  # is a no-op by design (src/lib/notion.ts), so signups still land by email.
+  - variable: NOTION_TOKEN
+    secret: NOTION_TOKEN
+    availability:
+      - RUNTIME
+  - variable: NOTION_WAITLIST_DB_ID
+    value: bf32909e-e162-429e-a854-165cb86158ac
+    availability:
+      - RUNTIME
