@@ -6,6 +6,7 @@ import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
+import { addWaitlistLeadToNotion } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
 import betaFirebaseConfig from "./firebase-applet-config.beta.json";
 
@@ -1023,20 +1024,42 @@ async function startServer() {
       return res.status(400).json({ error: "Consent is required so we know we can email you." });
     }
 
+    const platform = clean(body.platform, 20);
+    const notes = clean(body.notes, 1000);
+    const source = clean(body.source, 300);
+
     try {
       await sendBetaSignupNotification({
         name: clean(body.name, 100),
         email,
         household: clean(body.household, 100),
         interests: clean(body.interests, 300),
-        notes: clean(body.notes, 1000),
-        source: clean(body.source, 300),
+        notes,
+        source,
       });
-      return res.status(200).json({ success: true });
     } catch (err: any) {
       console.error("Beta signup error:", err?.message || err);
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
+
+    // Mirror into Notion after the email has gone. The email is the system of
+    // record; a Notion outage must not cost us the lead or show the visitor an
+    // error for something already saved.
+    try {
+      await addWaitlistLeadToNotion({
+        email,
+        name: clean(body.name, 100),
+        platform,
+        source,
+        referrer: clean(body.referrer, 500),
+        consent: true,
+        notes,
+      });
+    } catch (err: any) {
+      console.error("Notion waitlist mirror failed:", err?.message || err);
+    }
+
+    return res.status(200).json({ success: true });
   });
 
   // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
