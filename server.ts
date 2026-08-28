@@ -1024,6 +1024,29 @@ async function startServer() {
       return res.status(400).json({ error: "Consent is required so we know we can email you." });
     }
 
+    // Bot filters. Both must run here, not in the browser: a scripted post
+    // never executes our JS, so a client-side check catches nothing that
+    // matters.
+    //
+    // Answer 200 rather than 4xx. A bot that gets an error learns which field
+    // betrayed it and retries without it; one that gets a success moves on. The
+    // visitor sees the normal confirmation either way, and no lead is written.
+    const honeypot = typeof body.company === "string" ? body.company.trim() : "";
+    if (honeypot) {
+      console.warn("[signup] honeypot filled, dropped");
+      return res.status(200).json({ success: true });
+    }
+
+    // Humans do not read, type and submit in under two seconds. Missing or
+    // unparseable elapsed time is allowed through: it means an older cached
+    // page, not necessarily a bot, and silently dropping real people is worse
+    // than letting a few through.
+    const elapsedMs = Number(body.elapsedMs);
+    if (Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs < 2000) {
+      console.warn("[signup] submitted in " + elapsedMs + "ms, dropped");
+      return res.status(200).json({ success: true });
+    }
+
     const platform = clean(body.platform, 20);
     const notes = clean(body.notes, 1000);
     const source = clean(body.source, 300);
