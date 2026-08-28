@@ -13,11 +13,34 @@
   --color-natural-border: #D4D4D8;
   --color-natural-primary: #C41200; /* bold cherry red */
   --color-natural-primary-ink: #A00E00; /* deep cherry — hover state of solid red buttons */
-  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint for washes/highlights */
+  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint. See the note below. */
   --color-natural-accent: #71717A;
   --color-natural-muted: #52525B;
   --color-natural-sage: #E4E4E7;
   --color-natural-dark: #18181B;
+
+  /* Pebble.
+     Every neutral above sits at hue 240 and about 5% saturation, which is
+     genuinely cool. primary-wash is the outlier: hue 9 at 71% saturation, a
+     pale red. It was the ground behind almost every icon, and enough pale red
+     circles made a cool-grey product read as pink. Pink is what red becomes
+     when you tint it, so the red stays saturated and small, the glyphs stay
+     cherry, and the grounds they sit on go grey.
+
+     Keep in sync with Cherry in the Flutter client's lib/core/theme.dart. */
+  /* Corner radius, mirroring the Flutter client's CherryRadius. Tailwind's
+     defaults (md 6px, lg 8px, xl 12px) read sharp next to the app's soft
+     surfaces. Remapping the scale here softens every existing rounded-*
+     class at once instead of rewriting them across two hundred call sites. */
+  --radius-sm: 0.5rem;    /* 8px  */
+  --radius-md: 0.75rem;   /* 12px */
+  --radius-lg: 1rem;      /* 16px */
+  --radius-xl: 1.25rem;   /* 20px */
+  --radius-2xl: 1.5rem;   /* 24px */
+  --radius-3xl: 1.75rem;  /* 28px */
+
+  --color-natural-pebble: #E8E8EB;      /* neutral ground under a cherry glyph */
+  --color-natural-pebble-deep: #DCDCE0; /* pressed/divider state of pebble */
 }
 
 /* Custom styles for professional scrollbars and subtle animations */

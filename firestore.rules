@@ -133,6 +133,16 @@ service cloud.firestore {
     match /group_ledgers/{groupId} {
       allow read, create, update, delete:
         if isGroupMember(groupId);
+
+      // Six-month cloud archive: one client-encrypted document per calendar
+      // month, written when entries age past the cutoff and read back when
+      // someone scrolls that far. Same membership test as the live ledger,
+      // stated separately because rules do not cascade into subcollections,
+      // so without this the archive writes are denied.
+      match /archive/{month} {
+        allow read, create, update, delete:
+          if isGroupMember(groupId);
+      }
     }
 
     // Household Vault: an encrypted per-group store (catalogued recurring
