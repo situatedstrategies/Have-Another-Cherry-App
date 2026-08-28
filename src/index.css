@@ -13,11 +13,28 @@
   --color-natural-border: #D4D4D8;
   --color-natural-primary: #C41200; /* bold cherry red */
   --color-natural-primary-ink: #A00E00; /* deep cherry — hover state of solid red buttons */
-  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint for washes/highlights */
+  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint. See the note below. */
   --color-natural-accent: #71717A;
   --color-natural-muted: #52525B;
   --color-natural-sage: #E4E4E7;
   --color-natural-dark: #18181B;
+
+  /* Pebble and graphite.
+     Every neutral above sits at hue 240 and about 5% saturation, which is
+     genuinely cool. primary-wash is the outlier: hue 9 at 71% saturation, a
+     pale red. It was the ground behind almost every icon, and enough pale red
+     circles made a cool-grey product read as pink. Pink is what red becomes
+     when you tint it, so the red stays saturated and small and the areas it
+     used to fill are grey.
+
+     The rule these encode: if something on screen is cherry, money is
+     outstanding. Anything settled, closed, or purely navigational is
+     graphite. Keep in sync with Cherry in the Flutter client's
+     lib/core/theme.dart. */
+  --color-natural-pebble: #E8E8EB;      /* neutral ground under a cherry glyph */
+  --color-natural-pebble-deep: #DCDCE0; /* pressed/divider state of pebble */
+  --color-natural-graphite: #414B57;    /* settled / utility accent */
+  --color-natural-graphite-wash: #E6E9EE;
 }
 
 /* Custom styles for professional scrollbars and subtle animations */

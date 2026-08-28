@@ -240,16 +240,20 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
                   {/* Status indicator ring */}
                   <div className="mt-0.5 shrink-0" id={`status-ring-${exp.id}`}>
+                    {/* Cherry means money is outstanding, so open is the
+                        loudest and closed is the quietest. This used to run
+                        the other way, pointing the eye at the rows that
+                        needed nothing. */}
                     {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
-                      <div className="p-2 bg-natural-sage text-natural-primary rounded-full border border-natural-primary/20">
+                      <div className="p-2 bg-natural-graphite-wash text-natural-graphite rounded-full border border-natural-graphite/20">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
                     ) : getNormalizedExpenseStatus(exp) === 'PARTIALLY_SETTLED' ? (
-                      <div className="p-2 bg-natural-sidebar text-natural-text rounded-full border border-natural-border/20 animate-pulse">
+                      <div className="p-2 bg-natural-pebble text-natural-primary rounded-full border border-natural-primary/25 animate-pulse">
                         <Clock className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="p-2 bg-natural-sidebar text-natural-muted rounded-full border border-natural-border">
+                      <div className="p-2 bg-natural-primary-wash text-natural-primary rounded-full border border-natural-primary/30">
                         <AlertCircle className="h-4 w-4" />
                       </div>
                     )}
