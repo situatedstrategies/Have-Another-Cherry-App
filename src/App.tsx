@@ -1669,11 +1669,44 @@ export default function App() {
                   onExpenseClick={(exp) => setSelectedExpense(exp)}
                 />
               </div>
-              <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+              {/* Month-over-month is "Insights and monthly trends" on the
+                  paywall, so it is gated with the rest of it rather than
+                  being the one Cherry + feature the web gives away. */}
+              {isPlus && (
+                <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+              )}
             </div>
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
-              <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+              {/* Insights is a Cherry + feature, and Cherry + is sold inside
+                  the mobile apps. On web it opens the waitlist instead of the
+                  feature, which is the same treatment every other Cherry +
+                  surface here already gets. */}
+              {isPlus ? (
+                <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCherryPlus(true)}
+                  className="w-full text-left bg-white border border-natural-border rounded-2xl p-5 shadow-sm hover:border-natural-primary/40 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Insights</span>
+                    <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>
+                  </div>
+                  <p className="mt-2 font-display text-lg font-semibold text-natural-text">
+                    See where the money actually goes
+                  </p>
+                  <p className="mt-1 text-sm text-natural-muted">
+                    How it was paid, who is carrying the card, and how long
+                    things take to come back. Arriving with the iOS and Android
+                    apps.
+                  </p>
+                  <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
+                    Join the waitlist
+                  </span>
+                </button>
+              )}
               <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
             </div>
           </div>

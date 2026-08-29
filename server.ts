@@ -995,6 +995,26 @@ async function startServer() {
       }
     }
 
+    // Same Notion database as the marketing site's waitlist, so there is one
+    // list of people waiting on the mobile apps rather than two. Best-effort
+    // for the same reason as the site form: a Notion outage must never cost
+    // the lead, and the email is the system of record.
+    try {
+      await addWaitlistLeadToNotion({
+        email,
+        formType: "Waitlist",
+        source: "cherry-plus (web app)",
+        notes: "Asked for a Cherry+ feature in the web app",
+        consent: true,
+        device: deviceFromUserAgent(req.get("user-agent"), {
+          platform: req.get("sec-ch-ua-platform"),
+          mobile: req.get("sec-ch-ua-mobile"),
+        }),
+      });
+    } catch (e: any) {
+      console.error("Notion mirror failed for plus-waitlist:", e?.message || e);
+    }
+
     try {
       await sendWaitlistNotification(email);
       return res.status(200).json({ success: true, subscribed });
