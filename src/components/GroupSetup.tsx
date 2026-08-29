@@ -327,7 +327,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
             <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
               <p className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">Invite Code</p>
               <div className="flex items-center justify-center gap-3">
-                <span className="text-4xl font-mono font-bold text-natural-text tracking-[0.2em]">{createdGroupInfo.inviteCode}</span>
+                <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">{createdGroupInfo.inviteCode}</span>
               </div>
               <button
                 onClick={copyToClipboard}

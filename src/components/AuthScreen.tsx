@@ -320,7 +320,7 @@ export default function AuthScreen() {
             <div className="inline-flex items-center justify-center mb-4">
               <CherryLogo className="h-10 w-10" />
             </div>
-            <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
               Have Another Cherry
             </h1>
           </div>
@@ -530,7 +530,7 @@ export default function AuthScreen() {
           ) : !isLogin && (
             /* The same promise the marketing site makes at the moment of the
                click, repeated where the hesitation actually lands. */
-            <p className="text-center font-mono text-[11px] leading-relaxed text-natural-accent mt-6">
+            <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
               Everything you need is free. No credit card required.
             </p>
           )}

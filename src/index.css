@@ -76,15 +76,20 @@
 /* iOS Safari zooms the whole page in when a focused control's text is under
    16px, and it does not zoom back out on blur. The app's inputs are text-sm
    (14px), so tapping almost any field left the user zoomed in with the layout
-   off screen. Setting the floor here fixes all 65 controls at once and cannot
-   drift the way 65 separate class strings would.
+   off screen.
 
-   Scoped to phone widths so the denser desktop sizing is untouched. */
+   max(16px, 1em) is a floor, not an override. 1em resolves against the parent,
+   so a control that deliberately inherits a display size keeps it: the settle
+   amount field sits inside a text-4xl row next to a "$" and has to match it,
+   which a flat 16px broke. Anything smaller than 16px is raised; anything
+   larger is left alone.
+
+   Scoped to phone widths, where the zoom actually happens. */
 @media (max-width: 640px) {
   input:not([type='checkbox']):not([type='radio']),
   select,
   textarea {
-    font-size: 16px;
+    font-size: max(16px, 1em);
   }
 }
 

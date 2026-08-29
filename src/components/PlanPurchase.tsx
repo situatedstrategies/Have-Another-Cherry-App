@@ -167,15 +167,15 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           {/* Balance snapshot */}
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-[10px] font-bold text-natural-muted uppercase">They owe you</span>
+              <span className="block text-xs font-bold text-natural-muted uppercase">They owe you</span>
               <span className="block text-sm font-bold text-natural-text mt-0.5">${theyOweYou.toFixed(2)}</span>
             </div>
             <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-[10px] font-bold text-natural-muted uppercase">You owe them</span>
+              <span className="block text-xs font-bold text-natural-muted uppercase">You owe them</span>
               <span className="block text-sm font-bold text-natural-text mt-0.5">${youOweThem.toFixed(2)}</span>
             </div>
             <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-[10px] font-bold text-natural-muted uppercase">Net</span>
+              <span className="block text-xs font-bold text-natural-muted uppercase">Net</span>
               <span className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}>{net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
                 <p className={`text-lg font-display font-semibold ${result.juice.color}`}>{result.juice.level}</p>
                 <p className="text-xs text-natural-muted mt-1">{result.juice.blurb}</p>
                 {otherThreshold > 0 && theirShare > otherThreshold && (
-                  <p className="text-[11px] text-natural-primary mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>
+                  <p className="text-xs text-natural-primary mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>
                 )}
               </div>
               <div className="bg-white rounded-xl p-3 border border-natural-border/60">

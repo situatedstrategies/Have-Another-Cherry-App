@@ -88,7 +88,7 @@ export default function PrivacyModal({ onClose, onOpenLegal, onExportData, onDel
           >
             <span className="flex items-center gap-2"><Trash2 size={18} /> Delete Account &amp; All Data</span>
           </button>
-          <p className="text-[11px] text-natural-muted px-1 leading-relaxed">
+          <p className="text-xs text-natural-muted px-1 leading-relaxed">
             Permanently deletes your profile, financial data, group membership, and your sign-in account. This cannot be undone.
           </p>
         </div>

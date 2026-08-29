@@ -75,7 +75,7 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
             {status === 'error' && (
               <p className="text-xs text-natural-primary font-medium">Couldn't save that - please try again.</p>
             )}
-            <p className="text-[10px] text-natural-muted">
+            <p className="text-xs text-natural-muted">
               Just launch news - no spam, and never your ledger.
             </p>
           </form>

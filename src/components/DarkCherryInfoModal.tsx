@@ -31,7 +31,7 @@ export default function DarkCherryInfoModal({ onClose }: { onClose: () => void }
       footer={
         <button
           onClick={onClose}
-          className="w-full py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md transition-all cursor-pointer"
+          className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md transition-all cursor-pointer"
         >
           Got it
         </button>

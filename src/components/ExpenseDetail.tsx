@@ -195,7 +195,7 @@ export default function ExpenseDetail({
                     <span className="text-natural-muted">Still to go</span>
                     <span className="font-bold font-mono text-natural-text">${getDarkCherryRemaining(expense, false).toFixed(2)}</span>
                   </div>
-                  <p className="text-[11px] text-natural-muted pt-2 border-t border-natural-border/50">
+                  <p className="text-xs text-natural-muted pt-2 border-t border-natural-border/50">
                     Members can log between <span className="font-mono font-semibold">${(expense.blindMin || 0).toFixed(2)}</span> and{' '}
                     <span className="font-mono font-semibold">${(expense.blindMax || 0).toFixed(2)}</span> per payment.
                     Only you can see these numbers.
@@ -270,7 +270,7 @@ export default function ExpenseDetail({
                   <p className="text-xs text-natural-muted mt-0.5">
                     Logged by <span className="font-semibold capitalize text-natural-text">{payerName}</span>.
                   </p>
-                  <span className="text-[10px] text-natural-muted font-mono mt-1 block">
+                  <span className="text-xs text-natural-muted font-mono mt-1 block">
                     {formatDateTime(expense.createdAt)}
                   </span>
                 </div>
@@ -295,7 +295,7 @@ export default function ExpenseDetail({
                   >
                     <span className={`block text-xs font-bold flex items-center gap-1 ${isVoided ? 'text-natural-muted' : 'text-natural-text'}`}>
                       {isVoided ? 'Payment Removed' : s.status === 'confirmed' ? 'Payment Confirmed' : 'Payment Logged (Pending)'}
-                      <span className="text-[10px] font-normal text-natural-primary group-hover:underline">{isExpanded ? 'Hide' : 'Details'}</span>
+                      <span className="text-xs font-normal text-natural-primary group-hover:underline">{isExpanded ? 'Hide' : 'Details'}</span>
                     </span>
                     <p className={`text-xs text-natural-muted mt-0.5 ${isVoided ? 'line-through' : ''}`}>
                       <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>{members.find(m => m.uid === s.paidBy)?.name || 'Someone'}</strong> paid{' '}
@@ -305,11 +305,11 @@ export default function ExpenseDetail({
                       to <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>{members.find(m => m.uid === s.receivedBy)?.name || payerName}</strong> via {s.instrumentType}.
                     </p>
                     {isVoided && (
-                      <p className="text-[10px] text-natural-muted mt-0.5">
+                      <p className="text-xs text-natural-muted mt-0.5">
                         Removed{voidedByName ? <> by <span className="font-semibold capitalize">{voidedByName}</span></> : ''}{s.voidedAt ? ` on ${formatDateTime(s.voidedAt)}` : ''} — no longer counts toward the balance.
                       </p>
                     )}
-                    <span className="text-[10px] text-natural-muted font-mono mt-1 block">
+                    <span className="text-xs text-natural-muted font-mono mt-1 block">
                       {formatDateTime(s.timestamp)}
                     </span>
                   </button>
@@ -329,13 +329,13 @@ export default function ExpenseDetail({
                         <div className="pt-1.5 border-t border-natural-border/50">
                           {voidingSettlement === s.id ? (
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-bold text-natural-primary uppercase">Remove this payment entry?</span>
+                              <span className="text-xs font-bold text-natural-primary uppercase">Remove this payment entry?</span>
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setVoidingSettlement(null)} className="text-[11px] font-bold text-natural-muted hover:text-natural-text cursor-pointer">Cancel</button>
+                                <button type="button" onClick={() => setVoidingSettlement(null)} className="text-xs font-bold text-natural-muted hover:text-natural-text cursor-pointer">Cancel</button>
                                 <button
                                   type="button"
                                   onClick={() => { setVoidingSettlement(null); onVoidSettlement(s.id); }}
-                                  className="text-[11px] font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md cursor-pointer"
+                                  className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md cursor-pointer"
                                 >
                                   Yes, Remove
                                 </button>
@@ -345,7 +345,7 @@ export default function ExpenseDetail({
                             <button
                               type="button"
                               onClick={() => setVoidingSettlement(s.id)}
-                              className="text-[11px] font-bold text-natural-primary hover:text-natural-dark flex items-center gap-1 cursor-pointer"
+                              className="text-xs font-bold text-natural-primary hover:text-natural-dark flex items-center gap-1 cursor-pointer"
                             >
                               <Ban className="h-3 w-3" /> Remove entry (logged in error)
                             </button>
@@ -391,7 +391,7 @@ export default function ExpenseDetail({
                     <div className="bg-natural-sidebar/30 p-3 rounded-xl rounded-tl-none border border-natural-border/50 flex-1">
                       <div className="flex justify-between items-baseline mb-1">
                         <span className="text-xs font-bold text-natural-text capitalize">{members.find(m => m.uid === c.userId)?.name || 'Unknown'}</span>
-                        <span className="text-[10px] text-natural-muted">{formatDateTime(c.timestamp)}</span>
+                        <span className="text-xs text-natural-muted">{formatDateTime(c.timestamp)}</span>
                       </div>
                       <p className="text-xs text-natural-text">{c.text}</p>
                     </div>
@@ -419,9 +419,9 @@ export default function ExpenseDetail({
 
             {isDeleting ? (
               <div className="flex items-center gap-2 border border-natural-primary/25 bg-natural-primary/5 px-3 py-1.5 rounded-xl">
-                <span className="text-[10px] font-bold text-natural-primary uppercase">Confirm Delete?</span>
-                <button onClick={() => setIsDeleting(false)} className="text-[10px] font-bold text-natural-muted hover:text-natural-text">Cancel</button>
-                <button onClick={onDelete} className="text-[10px] font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md">Yes, Delete</button>
+                <span className="text-xs font-bold text-natural-primary uppercase">Confirm Delete?</span>
+                <button onClick={() => setIsDeleting(false)} className="text-xs font-bold text-natural-muted hover:text-natural-text">Cancel</button>
+                <button onClick={onDelete} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md">Yes, Delete</button>
               </div>
             ) : (
               <button
@@ -443,7 +443,7 @@ export default function ExpenseDetail({
                 return (
                   <button
                     onClick={onSettleClick}
-                    className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Cherry className="h-4 w-4" /> Dark Cherry Chip In
                   </button>
@@ -455,7 +455,7 @@ export default function ExpenseDetail({
               return leftToPay > 0.01 ? (
                 <button
                   onClick={onSettleClick}
-                  className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <CreditCard className="h-4 w-4" /> Settle My Share (${leftToPay.toFixed(2)})
                 </button>
@@ -465,7 +465,7 @@ export default function ExpenseDetail({
             {!isExpenseFullySettled(expense) && isCreditorActive && (
               <button
                 onClick={onSettleClick}
-                className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <CreditCard className="h-4 w-4" /> Log Received Payment
               </button>

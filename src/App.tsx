@@ -1484,15 +1484,15 @@ export default function App() {
           >
             <button
               onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
-              className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-[11px] sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
               title="Household Vault"
             >
               <VaultIcon className="h-4 w-4 shrink-0" /> Vault
-              {!isPlus && <span className="hidden sm:inline text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+              {!isPlus && <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
             </button>
             <button
               onClick={() => setShowPlanPurchase(true)}
-              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-[11px] sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
               title="Plan a shared purchase"
             >
               <TrendingUp className="h-4 w-4 shrink-0" />
@@ -1504,7 +1504,7 @@ export default function App() {
                 setEditingExpense(null);
                 setShowForm(true);
               }}
-              className="min-w-0 w-full sm:w-auto bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-[11px] sm:text-xs px-2.5 sm:px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
+              className="min-w-0 w-full sm:w-auto bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs sm:text-xs px-2.5 sm:px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span className="sm:hidden">Log</span>
@@ -1531,7 +1531,7 @@ export default function App() {
                 <div className="relative mt-0.5">
                   <button
                     onClick={() => setShowGroupMenu(v => !v)}
-                    className="text-[11px] text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
+                    className="text-xs text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
                     title="Switch group"
                   >
                     Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
@@ -1588,7 +1588,7 @@ export default function App() {
             <div className="bg-natural-primary/5 border border-natural-primary/30 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <div className="relative shrink-0 mt-0.5">
                 <AlertCircle className="h-5 w-5 text-natural-primary" />
-                <span className="absolute -top-1.5 -right-1.5 bg-natural-primary text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 bg-natural-primary text-white text-xs font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
                   {pendingConfirmCount}
                 </span>
               </div>
@@ -1695,7 +1695,7 @@ export default function App() {
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Insights</span>
-                    <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>
+                    <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>
                   </div>
                   <p className="mt-2 font-display text-lg font-semibold text-natural-text">
                     See where the money actually goes
@@ -1715,7 +1715,7 @@ export default function App() {
           </div>
         </div>
 
-        <footer className="text-center text-[10px] text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1" id="app-footer">
+        <footer className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1" id="app-footer">
           <p>Have Another Cherry • Shared Home Ledger</p>
           <p className="font-mono">Real-time Cloud Sync Active</p>
         </footer>
@@ -1760,7 +1760,7 @@ export default function App() {
                 <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider">Budget & Payments</h3>
                 <button
                   onClick={() => setShowCherryPlus(true)}
-                  className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
+                  className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
                   title="About Cherry +"
                 >
                   Cherry +
@@ -1770,9 +1770,9 @@ export default function App() {
                 <div>
                   <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-2">
                     Spending threshold
-                    {!isPlus && <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+                    {!isPlus && <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
                   </label>
-                  <p className="text-[11px] text-natural-muted mb-2">The most you want to owe on a single shared expense. Both sides get a heads-up when a split goes over it.</p>
+                  <p className="text-xs text-natural-muted mb-2">The most you want to owe on a single shared expense. Both sides get a heads-up when a split goes over it.</p>
                   {isPlus ? (
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
@@ -1800,7 +1800,7 @@ export default function App() {
 
                 <div className="border-t border-natural-primary/10 pt-3">
                   <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-1.5"><Wallet size={12} /> How people pay you</label>
-                  <p className="text-[11px] text-natural-muted mb-2">Add your handles and group members get a one-tap way into Venmo or Zelle when they settle up with you.</p>
+                  <p className="text-xs text-natural-muted mb-2">Add your handles and group members get a one-tap way into Venmo or Zelle when they settle up with you.</p>
                   <div className="space-y-2">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">@</span>
@@ -1819,7 +1819,7 @@ export default function App() {
                       placeholder="Zelle email or phone"
                       className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                     />
-                    <button onClick={handleSavePaymentHandles} className="w-full text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg">Save Payment Info</button>
+                    <button onClick={handleSavePaymentHandles} className="w-full text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg">Save Payment Info</button>
                   </div>
                 </div>
               </div>

@@ -128,7 +128,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
                 </div>
               );
             })}
-            <p className="text-[11px] text-natural-muted pt-1">
+            <p className="text-xs text-natural-muted pt-1">
               These differ by up to <span className="font-mono font-bold">{Math.round(severityPct)}%</span> - that gap is what triggered this check-in.
             </p>
           </div>

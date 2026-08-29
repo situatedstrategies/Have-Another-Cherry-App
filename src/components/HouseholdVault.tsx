@@ -299,7 +299,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               <div className="text-center">
                 <span className="text-sm font-display font-semibold text-natural-text">{MONTH_NAMES[viewMonth]} {viewYear}</span>
                 {monthTotal > 0 && (
-                  <span className="block text-[10px] font-mono text-natural-muted">~${monthTotal.toFixed(2)} in recurring costs</span>
+                  <span className="block text-xs font-mono text-natural-muted">~${monthTotal.toFixed(2)} in recurring costs</span>
                 )}
               </div>
               <button onClick={() => shiftMonth(1)} className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"><ChevronRight size={16} /></button>
@@ -307,7 +307,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
 
             <div className="grid grid-cols-7 gap-1 text-center">
               {WEEKDAYS.map((d, i) => (
-                <span key={i} className="text-[10px] font-bold text-natural-muted uppercase py-1">{d}</span>
+                <span key={i} className="text-xs font-bold text-natural-muted uppercase py-1">{d}</span>
               ))}
               {Array.from({ length: firstWeekday }).map((_, i) => <span key={`pad-${i}`} />)}
               {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -322,21 +322,21 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                     }`}
                     title={items.map(x => `${x.label}${x.amount ? ` ($${x.amount.toFixed(2)})` : ''}`).join('\n')}
                   >
-                    <span className={`text-[10px] font-mono ${isToday ? 'font-bold text-natural-primary' : 'text-natural-muted'}`}>{day}</span>
+                    <span className={`text-xs font-mono ${isToday ? 'font-bold text-natural-primary' : 'text-natural-muted'}`}>{day}</span>
                     {items.slice(0, 2).map((x, idx) => (
-                      <span key={idx} className="block text-[9px] leading-tight font-semibold text-natural-text truncate">
+                      <span key={idx} className="block text-xs leading-tight font-semibold text-natural-text truncate">
                         {x.label}
                       </span>
                     ))}
                     {items.length > 2 && (
-                      <span className="block text-[9px] text-natural-muted">+{items.length - 2} more</span>
+                      <span className="block text-xs text-natural-muted">+{items.length - 2} more</span>
                     )}
                   </div>
                 );
               })}
             </div>
 
-            <p className="text-[11px] text-natural-muted flex items-center gap-1.5">
+            <p className="text-xs text-natural-muted flex items-center gap-1.5">
               <Repeat size={12} className="shrink-0" />
               Shows bills catalogued in the vault plus recurring expenses from your ledger.
             </p>
@@ -373,7 +373,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors">
+              <button type="submit" className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors">
                 Add to Vault
               </button>
             </form>
@@ -389,7 +389,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                     <div key={bill.id} className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5">
                       <div>
                         <span className="text-sm font-semibold text-natural-text">{bill.name}</span>
-                        <span className="block text-[11px] text-natural-muted">
+                        <span className="block text-xs text-natural-muted">
                           Due the {ordinal(bill.dueDay)}
                           {bill.category ? ` · ${bill.category}` : ''}
                         </span>
@@ -432,7 +432,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   <div key={d.id} className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5 gap-3">
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-natural-text truncate block">{d.name}</span>
-                      <span className="block text-[11px] text-natural-muted">
+                      <span className="block text-xs text-natural-muted">
                         {(d.size / 1024).toFixed(0)}KB · {memberNames[d.uploadedBy] || 'A member'} · {new Date(d.uploadedAt).toLocaleDateString()}
                       </span>
                     </div>

@@ -156,7 +156,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                 {/* Logging a payment the debtor already logged creates a duplicate —
                     those are waiting on a Confirm Receipt instead. */}
                 {(expense.settlements || []).filter(s => s.status === 'pending' && s.paidBy === selectedDebtor).map(s => (
-                  <p key={s.id} className="mt-2 text-[11px] text-natural-muted bg-natural-primary/5 border border-natural-primary/25 rounded-lg px-2.5 py-1.5">
+                  <p key={s.id} className="mt-2 text-xs text-natural-muted bg-natural-primary/5 border border-natural-primary/25 rounded-lg px-2.5 py-1.5">
                     They already logged <span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span> ({s.instrumentType}) — it's waiting for your confirmation on the expense screen. Only log a payment here if this is a <span className="font-semibold">different</span> one.
                   </p>
                 ))}
@@ -175,7 +175,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
             <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">
               {blindContributor ? 'Dark Cherry Chip In' : 'Settle Amount'}
             </span>
-            <div className="flex items-center text-4xl font-display font-semibold text-natural-text mt-1">
+            <div className="flex items-center text-3xl sm:text-4xl font-display font-semibold text-natural-text mt-1">
               $
               <input
                 type="number"
@@ -189,19 +189,19 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
               />
             </div>
             {blindContributor ? (
-              <span className="text-[11px] font-medium text-natural-muted mt-1">
+              <span className="text-xs font-medium text-natural-muted mt-1">
                 Anything between <span className="font-bold text-natural-text">${(expense.blindMin || 0).toFixed(2)}</span> and{' '}
                 <span className="font-bold text-natural-text">${(expense.blindMax || 0).toFixed(2)}</span>
               </span>
             ) : (
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-[11px] font-medium text-natural-muted">
+                <span className="text-xs font-medium text-natural-muted">
                   Remaining owed: <span className="font-bold text-natural-text">${getRemainingAmount(selectedDebtor).toFixed(2)}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setAmountToPay(getRemainingAmount(selectedDebtor).toFixed(2))}
-                  className="text-[11px] font-bold text-natural-primary hover:underline"
+                  className="text-xs font-bold text-natural-primary hover:underline"
                 >
                   Settle full
                 </button>
@@ -242,7 +242,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
             {/* Deep-link-lite: jump out of the app into Venmo/Zelle. */}
             {!isCreditor && paymentMethod === 'VENMO' && (
               <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
-                <p className="text-[11px] text-natural-muted">
+                <p className="text-xs text-natural-muted">
                   {venmo
                     ? <>Pay <span className="font-bold text-natural-text">{venmo.handle}</span> in Venmo - amount and note come prefilled.</>
                     : <>They haven't added a Venmo handle yet, but you can head to Venmo and pay them there.</>}
@@ -255,7 +255,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                 >
                   <ExternalLink size={14} /> Open Venmo
                 </a>
-                <p className="text-[10px] text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
+                <p className="text-xs text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
               </div>
             )}
 
@@ -263,15 +263,15 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
               <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
                 {zelle ? (
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-natural-muted min-w-0">
+                    <p className="text-xs text-natural-muted min-w-0">
                       Their Zelle: <span className="font-bold text-natural-text break-all">{zelle.handle}</span>
                     </p>
-                    <button type="button" onClick={copyZelleHandle} className="shrink-0 text-[11px] font-bold text-natural-primary flex items-center gap-1 hover:underline">
+                    <button type="button" onClick={copyZelleHandle} className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline">
                       <Copy size={12} /> {copiedZelle ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
                 ) : (
-                  <p className="text-[11px] text-natural-muted">
+                  <p className="text-xs text-natural-muted">
                     They haven't added a Zelle handle yet. Zelle lives inside your banking app - open it there, or start from Zelle's site.
                   </p>
                 )}
@@ -283,7 +283,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                 >
                   <ExternalLink size={14} /> Open Zelle
                 </a>
-                <p className="text-[10px] text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
+                <p className="text-xs text-natural-muted">Then come back and log the payment below so it hits the ledger.</p>
               </div>
             )}
           </div>
@@ -300,10 +300,10 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="button" onClick={onClose} className="w-full py-2.5 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
+            <button type="button" onClick={onClose} className="w-full py-2.5 text-sm font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer">
               Cancel
             </button>
-            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={!selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)} className="w-full py-2.5 text-sm font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50">
               <Check className="h-4 w-4" /> Log Payment
             </button>
           </div>

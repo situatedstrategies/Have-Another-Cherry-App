@@ -576,12 +576,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 <button
                   type="button"
                   onClick={() => { setScannedItems([]); setItemAssign({}); }}
-                  className="text-[11px] font-semibold text-natural-muted hover:text-natural-text"
+                  className="text-xs font-semibold text-natural-muted hover:text-natural-text"
                 >
                   Dismiss
                 </button>
               </div>
-              <p className="text-[11px] text-natural-muted leading-relaxed">
+              <p className="text-xs text-natural-muted leading-relaxed">
                 We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the receipt. Assign
                 each one, leave it shared, then apply - tax and tip get shared automatically.
               </p>
@@ -593,7 +593,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     <select
                       value={itemAssign[i] || 'shared'}
                       onChange={(e) => setItemAssign(prev => ({ ...prev, [i]: e.target.value }))}
-                      className="text-[11px] bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
+                      className="text-xs bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
                     >
                       <option value="shared">Shared</option>
                       {members.map(m => (
@@ -607,7 +607,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 type="button"
                 onClick={applyItemAssignments}
                 disabled={numericAmount <= 0}
-                className="w-full py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
+                className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
               >
                 Apply Items to Split
               </button>
@@ -919,7 +919,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCherryPlus(true); }}
-                        className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
+                        className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
                         title="About Cherry +"
                       >
                         Cherry +
@@ -1177,7 +1177,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     <span className="text-lg font-display font-semibold text-natural-text">
                       ${(previewShares[m.uid] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[10px] text-natural-text font-medium">
+                    <span className="text-xs text-natural-text font-medium">
                       {paidBy === m.uid ? 'Paid - No debt' : 'Owes payer'}
                     </span>
                   </div>
@@ -1188,7 +1188,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     <span className="text-lg font-display font-semibold text-natural-text">
                       ${((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[10px] text-natural-text font-medium">Guest (this expense)</span>
+                    <span className="text-xs text-natural-text font-medium">Guest (this expense)</span>
                   </div>
                 ))}
               </div>

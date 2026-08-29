@@ -218,11 +218,11 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
             </p>
 
             <div className="flex items-center gap-2">
-              <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-natural-sidebar text-natural-text' : 'bg-natural-primary/10 text-natural-primary'}`}>
+              <span className={`text-xs font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-natural-sidebar text-natural-text' : 'bg-natural-primary/10 text-natural-primary'}`}>
                 {hasKey ? 'Key set on this device' : 'No key yet'}
               </span>
-              {keyMatches === true && <span className="text-[11px] font-bold text-natural-text flex items-center gap-1"><Check className="h-3 w-3" /> Matches your group</span>}
-              {keyMatches === false && <span className="text-[11px] font-bold text-natural-primary">Doesn't match your group's saved key</span>}
+              {keyMatches === true && <span className="text-xs font-bold text-natural-text flex items-center gap-1"><Check className="h-3 w-3" /> Matches your group</span>}
+              {keyMatches === false && <span className="text-xs font-bold text-natural-primary">Doesn't match your group's saved key</span>}
             </div>
 
             <div>
@@ -246,7 +246,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
                 <Check className="h-4 w-4" /> Save Key
               </button>
             </div>
-            <button onClick={handleResetKey} disabled={loading} className="w-full py-2 text-xs font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50">
+            <button onClick={handleResetKey} disabled={loading} className="w-full py-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50">
               <RefreshCw className="h-3.5 w-3.5" /> Reset key (lost or forgotten)
             </button>
           </div>
@@ -271,7 +271,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
                 <Download className="h-4 w-4" /> Restore
               </button>
             </div>
-            <p className="text-[11px] text-natural-muted flex items-start gap-1.5">
+            <p className="text-xs text-natural-muted flex items-start gap-1.5">
               <Shield className="h-3.5 w-3.5 text-natural-primary shrink-0 mt-0.5" />
               Restoring replaces your current ledger - you'll be asked to confirm first.
             </p>

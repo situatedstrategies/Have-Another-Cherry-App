@@ -108,17 +108,17 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
           <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
             <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> Your Rhythm
           </h3>
-          <span className="text-[9px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">Cherry +</span>
+          <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">Cherry +</span>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center" aria-hidden="true">
           {['Settled', 'Days to settle', 'Month streak'].map(label => (
             <div key={label} className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
               <span className="block text-lg font-display font-semibold text-natural-border select-none">···</span>
-              <span className="block text-[10px] font-semibold text-natural-muted uppercase">{label}</span>
+              <span className="block text-xs font-semibold text-natural-muted uppercase">{label}</span>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-natural-muted flex items-center gap-1.5">
+        <p className="text-xs text-natural-muted flex items-center gap-1.5">
           <Sparkles className="h-3 w-3 shrink-0" /> Settle streaks, anniversaries, and milestones - with Cherry +.
         </p>
       </button>
@@ -143,22 +143,22 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
           <span className="block text-lg font-display font-semibold text-natural-text">{rhythm.settledPct}%</span>
-          <span className="block text-[10px] font-semibold text-natural-muted uppercase">Settled</span>
+          <span className="block text-xs font-semibold text-natural-muted uppercase">Settled</span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
           <span className="block text-lg font-display font-semibold text-natural-text">
             {rhythm.medianSettleDays == null ? ' - ' : rhythm.medianSettleDays < 1 ? '<1' : Math.round(rhythm.medianSettleDays)}
           </span>
-          <span className="block text-[10px] font-semibold text-natural-muted uppercase">Days to settle</span>
+          <span className="block text-xs font-semibold text-natural-muted uppercase">Days to settle</span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
           <span className="block text-lg font-display font-semibold text-natural-text">{rhythm.streakMonths}</span>
-          <span className="block text-[10px] font-semibold text-natural-muted uppercase">Month streak</span>
+          <span className="block text-xs font-semibold text-natural-muted uppercase">Month streak</span>
         </div>
       </div>
 
       {rhythm.streakMonths === 0 && !rhythm.celebration && (
-        <p className="text-[11px] text-natural-muted flex items-center gap-1.5">
+        <p className="text-xs text-natural-muted flex items-center gap-1.5">
           <Sparkles className="h-3 w-3 shrink-0" /> Settle out a full month to start a streak.
         </p>
       )}

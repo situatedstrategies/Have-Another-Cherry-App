@@ -125,26 +125,26 @@ export default function OwedBreakdownModal({
                   <span className="text-sm font-bold text-natural-text capitalize">
                     {mode === 'you_owe' ? `You owe ${nameOf(person.uid)}` : nameOf(person.uid)}
                   </span>
-                  <span className="block text-[11px] text-natural-muted">
+                  <span className="block text-xs text-natural-muted">
                     {person.items.length} open {person.items.length === 1 ? 'item' : 'items'} · {fmt(person.total)}
                   </span>
                 </div>
                 {mode === 'owed_to_you' && (
                   remindedUids.includes(person.uid) ? (
-                    <span className="text-[11px] font-bold text-natural-primary flex items-center gap-1">
+                    <span className="text-xs font-bold text-natural-primary flex items-center gap-1">
                       <Check size={12} /> Reminder sent
                     </span>
                   ) : (
                     <button
                       onClick={() => sendReminder(person.uid)}
                       disabled={sendingTo === person.uid}
-                      className="shrink-0 text-[11px] font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      className="shrink-0 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
                       {sendingTo === person.uid
                         ? <RefreshCcw size={12} className="animate-spin" />
                         : <BellRing size={12} />}
                       Send reminder
-                      {!isPlus && <span className="text-[8px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+                      {!isPlus && <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
                     </button>
                   )
                 )}
@@ -158,7 +158,7 @@ export default function OwedBreakdownModal({
                   >
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-natural-text truncate block">{expense.title}</span>
-                      <span className="text-[11px] text-natural-muted font-mono">{fmtDate(expense.date)} · {expense.category}</span>
+                      <span className="text-xs text-natural-muted font-mono">{fmtDate(expense.date)} · {expense.category}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-sm font-mono font-bold text-natural-text">{fmt(amount)}</span>
@@ -172,7 +172,7 @@ export default function OwedBreakdownModal({
         )}
 
         {mode === 'owed_to_you' && byPerson.length > 0 && (
-          <p className="text-[11px] text-natural-muted">
+          <p className="text-xs text-natural-muted">
             Reminders arrive as a kind, no-pressure email from tartcherry@haveanothercherry.com. For privacy, the email never includes amounts or expense names: it just says an open balance is waiting in the app.
           </p>
         )}

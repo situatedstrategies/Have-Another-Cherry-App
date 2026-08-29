@@ -268,7 +268,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
+                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
                           <Repeat size={10} />
                         </span>
                       )}
@@ -279,7 +279,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       <span className="text-natural-border">•</span>
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
-                      <span className="font-mono text-[11px]">
+                      <span className="font-mono text-xs">
                         {isDark
                           ? 'Dark Cherry · blind split'
                           : <>Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
@@ -297,7 +297,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                         ? <span className="inline-flex items-center gap-1"><Cherry className="h-4 w-4 text-natural-primary" /> •••</span>
                         : formatCurrency(exp.amount)}
                     </span>
-                    <span className={`inline-block text-[10px] px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
                       {balanceText}
                     </span>
                   </div>

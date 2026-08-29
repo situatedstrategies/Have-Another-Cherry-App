@@ -104,7 +104,7 @@ export default function SettingsModal({
               {Array.isArray(fp.traits) && fp.traits.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {fp.traits.map((t: string, i: number) => (
-                    <span key={i} className="text-[10px] font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full">{t}</span>
+                    <span key={i} className="text-xs font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full">{t}</span>
                   ))}
                 </div>
               )}
@@ -149,7 +149,7 @@ export default function SettingsModal({
                       ) : (
                         <div className="flex items-center gap-2">
                           <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">Pending</span>
-                          <button onClick={() => onResendInvite(memberName)} className="text-[10px] uppercase font-bold text-natural-primary hover:underline">Resend Invite</button>
+                          <button onClick={() => onResendInvite(memberName)} className="text-xs uppercase font-bold text-natural-primary hover:underline">Resend Invite</button>
                         </div>
                       )}
                     </div>
@@ -159,7 +159,7 @@ export default function SettingsModal({
             </div>
             {Object.keys(groupUsers).length === 2 && (
               <button
-                className="mt-3 w-full text-xs font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
+                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
                 onClick={onRecalculateSplit}
               >
                 Recalculate Using Reported Incomes
@@ -186,11 +186,11 @@ export default function SettingsModal({
           <div className="border-t border-natural-border/50 pt-3">
             <button
               onClick={onLeaveGroup}
-              className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
+              className="w-full py-2 flex items-center justify-center gap-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
             >
               <LogOut size={14} /> Leave This Group
             </button>
-            <p className="text-[11px] text-natural-muted mt-1.5 text-center">Removes you from this group but keeps your account.</p>
+            <p className="text-xs text-natural-muted mt-1.5 text-center">Removes you from this group but keeps your account.</p>
           </div>
         </div>
       </div>
