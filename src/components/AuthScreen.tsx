@@ -251,12 +251,10 @@ export default function AuthScreen() {
 
     setEmailLoading(true);
     try {
-      const humanOk = await verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
-      if (!humanOk) {
-        setError('We could not verify this request. Please try again.');
-        setEmailLoading(false);
-        return;
-      }
+      // Firebase App Check already protects the application.
+      // Keep the custom reCAPTCHA assessment as telemetry only; it must not
+      // prevent legitimate users from reaching Firebase Authentication.
+      void verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
       if (isLogin) {
         await withTimeout(signInWithEmailAndPassword(auth, email, password), 30_000);
       } else {
