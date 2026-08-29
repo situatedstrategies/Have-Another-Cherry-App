@@ -566,7 +566,10 @@ async function startServer() {
       const valid = props?.valid === true;
       const actionMatches = !action || props?.action === action;
       // Google's recommended default threshold is 0.5.
-      const allowed = valid && actionMatches && (score === undefined || score >= 0.5);
+      // Authentication must not be hard-blocked solely by the risk score.
+      // Require a valid reCAPTCHA token and matching action; retain the score
+      // for monitoring while the Enterprise key establishes a reliable baseline.
+      const allowed = valid && actionMatches;
 
       if (!allowed) {
         console.warn("[reCAPTCHA] Blocked:", {
