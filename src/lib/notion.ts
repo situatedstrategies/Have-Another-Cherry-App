@@ -18,22 +18,49 @@ export type WaitlistLead = {
   device?: string;     // "iPhone" | "iPad" | "Android" | "Mac" | "Windows" | "Other"
 };
 
-// Derived from the User-Agent header rather than sent by the client: a
+// Derived from request headers rather than sent by the client: a
 // client-supplied value is trivially spoofed and would mean another field on
 // the form for no benefit. Coarse on purpose — we only want to know whether
 // someone asking for Android is browsing on an iPhone.
-export function deviceFromUserAgent(ua?: string): string {
+//
+// User-Agent is the primary signal but it is not guaranteed. Chrome's UA
+// reduction strips the platform on some surfaces, privacy browsers send a
+// generic string, and anything that is not a browser sends none at all, which
+// silently recorded every such lead as "Other". So client hints are consulted
+// as a fallback: Chromium sends Sec-CH-UA-Platform and Sec-CH-UA-Mobile by
+// default on secure origins, and between them they answer the same question.
+export function deviceFromUserAgent(ua?: string, hints?: DeviceHints): string {
   const s = (ua || "").toLowerCase();
-  if (!s) return "Other";
-  if (/iphone|ipod/.test(s)) return "iPhone";
-  if (/ipad/.test(s)) return "iPad";
-  // iPadOS reports as desktop Safari; the touch-capable Mac signature is an iPad.
-  if (/macintosh/.test(s) && /mobile/.test(s)) return "iPad";
-  if (/android/.test(s)) return "Android";
-  if (/macintosh|mac os x/.test(s)) return "Mac";
-  if (/windows/.test(s)) return "Windows";
+
+  if (s) {
+    if (/iphone|ipod/.test(s)) return "iPhone";
+    if (/ipad/.test(s)) return "iPad";
+    // iPadOS reports as desktop Safari; the touch-capable Mac signature is an iPad.
+    if (/macintosh/.test(s) && /mobile/.test(s)) return "iPad";
+    if (/android/.test(s)) return "Android";
+    if (/macintosh|mac os x/.test(s)) return "Mac";
+    if (/windows/.test(s)) return "Windows";
+  }
+
+  // Values arrive quoted, e.g. Sec-CH-UA-Platform: "macOS", and mobile is the
+  // literal "?1" / "?0".
+  const platform = (hints?.platform || "").toLowerCase().replace(/"/g, "").trim();
+  const mobile = (hints?.mobile || "").includes("1");
+  if (platform === "ios") return mobile ? "iPhone" : "iPad";
+  if (platform === "android") return "Android";
+  if (platform === "macos") return "Mac";
+  if (platform === "windows") return "Windows";
+
   return "Other";
 }
+
+/** Chromium client hints, read from the request headers. */
+export type DeviceHints = {
+  /** `Sec-CH-UA-Platform`, e.g. `"macOS"`. */
+  platform?: string;
+  /** `Sec-CH-UA-Mobile`, `?1` or `?0`. */
+  mobile?: string;
+};
 
 const PLATFORMS = new Set(["iOS", "Android", "Either"]);
 const FORM_TYPES = new Set(["Waitlist", "Beta"]);

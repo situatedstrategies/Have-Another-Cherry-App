@@ -1078,7 +1078,10 @@ async function startServer() {
         consent: true,
         notes,
         formType: clean(body.formType, 20) === "Beta" ? "Beta" : "Waitlist",
-        device: deviceFromUserAgent(req.get("user-agent")),
+        device: deviceFromUserAgent(req.get("user-agent"), {
+          platform: req.get("sec-ch-ua-platform"),
+          mobile: req.get("sec-ch-ua-mobile"),
+        }),
       });
     } catch (err: any) {
       console.error("Notion waitlist mirror failed:", err?.message || err);
