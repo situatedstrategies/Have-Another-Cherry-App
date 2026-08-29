@@ -43,6 +43,59 @@
   --color-natural-pebble-deep: #DCDCE0; /* pressed/divider state of pebble */
 }
 
+/* ---------- mobile ----------
+
+   index.html sets viewport-fit=cover, which is what lets the app paint under
+   the status bar and the home indicator. Nothing was reading the insets back,
+   so on any notched iPhone the bottom row of a full-screen sheet sat under the
+   home indicator and the last control was hard to hit. These expose the insets
+   so layout can pad for them. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Applied to a full-screen phone sheet. Padding the sheet itself keeps every
+   child inside the safe area, so headers, bodies and footers do not each have
+   to reason about insets (and cannot each get it slightly wrong). Phone widths
+   only: the centred desktop card is nowhere near an inset. */
+@media (max-width: 639.98px) {
+  .sheet-safe {
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+}
+
+/* Bottom inset only, added to whatever padding the element already has, for
+   the end of a scrolling page rather than a sheet. Needs its own class because
+   a padding utility replaces the value instead of adding to it. */
+.scroll-end-safe { margin-bottom: var(--safe-bottom); }
+
+/* iOS Safari zooms the whole page in when a focused control's text is under
+   16px, and it does not zoom back out on blur. The app's inputs are text-sm
+   (14px), so tapping almost any field left the user zoomed in with the layout
+   off screen. Setting the floor here fixes all 65 controls at once and cannot
+   drift the way 65 separate class strings would.
+
+   Scoped to phone widths so the denser desktop sizing is untouched. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* A tap target below about 44px is unreliable with a thumb. Applied to the
+   controls that are genuinely small rather than globally, so it never stretches
+   a layout that was already fine. */
+.tap-target {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
 /* Custom styles for professional scrollbars and subtle animations */
 ::-webkit-scrollbar {
   width: 6px;

@@ -1463,11 +1463,14 @@ export default function App() {
 
         {/* Top bar */}
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8" id="app-header">
-          <div className="flex items-center gap-4 relative">
+          {/* The masthead was a 56px mark beside a 30px display face, which on a
+              phone pushed the balances and the ledger below the fold before any
+              of them had said anything. It scales back up from sm. */}
+          <div className="flex items-center gap-3 sm:gap-4 relative">
             <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
-              <CherryLogo className="h-14 w-14" />
+              <CherryLogo className="h-9 w-9 sm:h-14 sm:w-14" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-natural-text leading-tight">
+            <h1 className="text-xl sm:text-4xl font-display font-semibold tracking-tight text-natural-text leading-tight">
               Have Another Cherry
             </h1>
           </div>
@@ -1712,7 +1715,7 @@ export default function App() {
           </div>
         </div>
 
-        <footer className="text-center text-[10px] text-natural-muted mt-12 space-y-1" id="app-footer">
+        <footer className="text-center text-[10px] text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1" id="app-footer">
           <p>Have Another Cherry • Shared Home Ledger</p>
           <p className="font-mono">Real-time Cloud Sync Active</p>
         </footer>

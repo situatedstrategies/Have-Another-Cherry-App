@@ -81,8 +81,26 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   );
 }
 
+// Which view to open on. The marketing site sends people here from two very
+// different buttons: "Create an account" and "Log in". Landing a would-be
+// signup on the login form and making them find a small text link at the bottom
+// is where that funnel leaked, so the intent travels in the URL.
+//
+// Accepts ?signup / ?signup=1 / #signup, and the login equivalents, so the site
+// can link either way without this having to know which form it used.
+function initialIsLogin(): boolean {
+  if (typeof window === 'undefined') return true;
+  const { search, hash } = window.location;
+  const q = new URLSearchParams(search);
+  const wantsSignup = q.has('signup') || q.get('mode') === 'signup' || hash === '#signup';
+  const wantsLogin = q.has('login') || q.get('mode') === 'login' || hash === '#login';
+  if (wantsSignup) return false;
+  if (wantsLogin) return true;
+  return true;
+}
+
 export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -307,11 +325,37 @@ export default function AuthScreen() {
             </h1>
           </div>
 
-          <div className="text-center mb-6">
-            <h2 className="text-sm font-medium text-natural-muted">
-              {isReset ? 'Reset your password' : (isLogin ? 'Log in to your account' : 'Create a new account')}
-            </h2>
-          </div>
+          {/* Both ways in, side by side, in the same shape the marketing site
+              uses. The old version put "Sign up" in a small text link below the
+              fold of a phone screen, so arriving from a "Create an account"
+              button meant hunting for the form you had already asked for. */}
+          {isReset ? (
+            <div className="text-center mb-6">
+              <h2 className="text-sm font-medium text-natural-muted">Reset your password</h2>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1 p-1 mb-6 bg-natural-sidebar border border-natural-border rounded-full" role="tablist">
+              {([['login', 'Log in'], ['signup', 'Sign up']] as const).map(([mode, label]) => {
+                const active = isLogin === (mode === 'login');
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => switchMode(mode)}
+                    className={`min-h-11 px-3 rounded-full font-mono text-xs transition-all cursor-pointer ${
+                      active
+                        ? 'bg-white text-natural-text font-medium shadow-sm'
+                        : 'text-natural-muted hover:text-natural-text'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {error && (
             <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
@@ -483,15 +527,11 @@ export default function AuthScreen() {
                 Back to log in
               </button>
             </p>
-          ) : (
-            <p className="text-center text-sm text-natural-muted mt-6">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button
-                onClick={() => switchMode(isLogin ? 'signup' : 'login')}
-                className="text-natural-text hover:underline font-medium transition-colors"
-              >
-                {isLogin ? 'Sign up' : 'Log in'}
-              </button>
+          ) : !isLogin && (
+            /* The same promise the marketing site makes at the moment of the
+               click, repeated where the hesitation actually lands. */
+            <p className="text-center font-mono text-[11px] leading-relaxed text-natural-accent mt-6">
+              Everything you need is free. No credit card required.
             </p>
           )}
         </div>

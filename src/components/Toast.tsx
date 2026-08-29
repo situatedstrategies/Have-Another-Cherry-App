@@ -16,7 +16,11 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+    /* w-full with only a right anchor made the stack 384px wide starting 16px
+       from the right edge, so on any phone narrower than 400px it ran off the
+       left of the screen. Anchoring both sides on phones and releasing the left
+       anchor from sm up keeps the desktop position identical. */
+    <div className="fixed top-4 left-4 right-4 sm:left-auto z-50 flex flex-col gap-2 w-auto sm:w-full sm:max-w-sm">
       <AnimatePresence>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} removeToast={removeToast} />
