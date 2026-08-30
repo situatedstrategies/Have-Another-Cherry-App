@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cherry, Send, Check } from 'lucide-react';
+import { Cherry, Send, Check, Smartphone } from 'lucide-react';
 import Modal from './Modal';
 import { authHeader } from '../firebase';
 
@@ -80,6 +80,20 @@ export default function CherryPlusModal({ onClose }: { onClose: () => void }) {
             </p>
           </form>
         )}
+
+        {/* Where Cherry + is actually bought, stated once and in both states.
+            Purchases happen in the iOS and Android apps through the store's own
+            billing; the web reads the same entitlement, so premium bought there
+            works here. Nothing is ever sold on this page, which is what keeps
+            the app clear of Apple's and Google's rules on outside payment. */}
+        <div className="flex items-start gap-3 text-left bg-natural-pebble/60 border border-natural-border rounded-xl p-3.5 max-w-sm mx-auto">
+          <Smartphone className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
+          <p className="text-xs text-natural-muted leading-relaxed">
+            Cherry + lives in the iPhone and Android apps. Subscribe there once
+            and it unlocks here too, on the same account. There is nothing to
+            buy on the web.
+          </p>
+        </div>
       </div>
     </Modal>
   );
