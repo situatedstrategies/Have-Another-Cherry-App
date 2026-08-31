@@ -1228,7 +1228,12 @@ async function startServer() {
           {
             isPlus: true,
             plusEntitlement: {
-              source: event?.store === "PLAY_STORE" ? "revenuecat_android" : "revenuecat_ios",
+              source:
+                event?.store === "PLAY_STORE"
+                  ? "revenuecat_android"
+                  : event?.store === "STRIPE" || event?.store === "RC_BILLING"
+                    ? "revenuecat_web"
+                    : "revenuecat_ios",
               productId: event?.product_id || "",
               ...(event?.expiration_at_ms
                 ? { expiresAt: new Date(Number(event.expiration_at_ms)).toISOString() }

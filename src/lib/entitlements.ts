@@ -19,12 +19,22 @@
 // Nothing else in the codebase may check isPlus directly: always go through
 // this module so the entitlement source can change without a hunt.
 
-// The features behind Cherry +. Keep in sync with the store product copy.
-export const PLUS_FEATURES = ['dark_cherry', 'vault', 'thresholds', 'rhythm'] as const;
+// The features behind Cherry +. Keep in sync with the store product copy and
+// the feature list on haveanothercherry.com/features.html — the site is the
+// stated product, so every Cherry + row there must appear here and be gated.
+export const PLUS_FEATURES = [
+  'dark_cherry',
+  'vault',
+  'thresholds',
+  'rhythm',
+  'insights', // Insights & monthly trends
+  'backup', // Backups & export (BackupModal)
+  'mismatch', // Payment-mismatch detection surfaces
+] as const;
 export type PlusFeature = (typeof PLUS_FEATURES)[number];
 
 export interface PlusEntitlement {
-  source: 'revenuecat_ios' | 'revenuecat_android' | 'promo';
+  source: 'revenuecat_ios' | 'revenuecat_android' | 'revenuecat_web' | 'promo';
   productId?: string;
   /** ISO datetime; absent = non-expiring (e.g. promo). */
   expiresAt?: string;

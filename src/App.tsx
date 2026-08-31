@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader } from './firebase';
+import { configureBilling } from './lib/billing';
 import { Expense, Group } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
@@ -174,6 +175,11 @@ export default function App() {
       setCurrentUser(user);
       if (!user) {
         setIsLoading(false);
+      } else {
+        // Web billing is dormant unless VITE_RC_WEB_KEY is set; when it is,
+        // key it to the Firebase uid (same rule as the mobile apps) so a
+        // purchase maps to users/{uid} via the webhook.
+        configureBilling(user.uid).catch(console.error);
       }
     });
     return () => unsubscribe();
@@ -1727,7 +1733,7 @@ export default function App() {
           <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
         </div>
       )}
-      {showBackup && (
+      {showBackup && isPlus && (
         <BackupModal
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
@@ -1751,7 +1757,12 @@ export default function App() {
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}
           onLeaveGroup={handleLeaveGroup}
-          onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
+          onOpenBackup={() => {
+            // Backups & export are Cherry + (site feature list): free users
+            // get the upgrade page, never a dead end.
+            setShowSettings(false);
+            if (isPlus) { setShowBackup(true); } else { setShowCherryPlus(true); }
+          }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
           onSignOut={() => { setShowSettings(false); handleSignOut(); }}
           extraSection={
@@ -1851,7 +1862,24 @@ export default function App() {
         />
       )}
 
-      {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
+      {showCherryPlus && (
+        <CherryPlusModal
+          onClose={() => setShowCherryPlus(false)}
+          customerEmail={currentUser?.email || userProfile?.email}
+          onPurchased={() =>
+            // Unlock immediately; the RevenueCat webhook writes the durable
+            // copy to users/{uid} and wins on the next profile load.
+            setUserProfile((prev: any) => ({
+              ...(prev || {}),
+              isPlus: true,
+              plusEntitlement: {
+                source: 'revenuecat_web',
+                updatedAt: new Date().toISOString(),
+              },
+            }))
+          }
+        />
+      )}
 
       {showPlanPurchase && (
         <PlanPurchase
