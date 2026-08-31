@@ -1048,7 +1048,29 @@ export default function App() {
       return;
     }
     if (normalizedAmount.wasRounded) {
-      formData = { ...formData, amount: normalizedAmount.value };
+      // The shares were computed from the unrounded amount; scale them by the
+      // same factor so they still cover the saved total exactly (a purchase
+      // this size is an estimate anyway - the ratios are what matter).
+      const scale = normalizedAmount.value / Number(formData.amount);
+      const scaled = (v: number) => Math.round(v * scale * 100) / 100;
+      formData = {
+        ...formData,
+        amount: normalizedAmount.value,
+        shares: Object.fromEntries(
+          Object.entries(formData.shares || {}).map(([uid, s]) => [uid, scaled(Number(s))])
+        ),
+        ...(formData.thirdPersonShare != null
+          ? { thirdPersonShare: scaled(Number(formData.thirdPersonShare)) }
+          : {}),
+        ...(formData.extraParticipants
+          ? {
+              extraParticipants: formData.extraParticipants.map(g => ({
+                ...g,
+                share: scaled(g.share),
+              })),
+            }
+          : {}),
+      };
       addToast('Rounded', `Saved as $${normalizedAmount.value.toLocaleString()} - amounts this large round to the nearest $100,000.`, 'info');
     }
     try {
