@@ -8,6 +8,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader } from './firebase';
+import { configureBilling } from './lib/billing';
+import ErrorSupportModal from './components/ErrorSupportModal';
+import { CHERRY_ERRORS, CherryError } from './lib/errors';
+import { normalizeAmount } from './lib/limits';
 import { Expense, Group } from './types';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
@@ -124,6 +128,9 @@ export default function App() {
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
+  // The one error dialog: what failed, what stands, and a pre-filled path
+  // to help@haveanothercherry.com. Set from any failure point.
+  const [supportError, setSupportError] = useState<{ error: CherryError; screen?: string; detail?: string } | null>(null);
   const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
   // Settings inputs for the spending threshold and direct-payment handles.
   const [thresholdInput, setThresholdInput] = useState('');
@@ -174,6 +181,11 @@ export default function App() {
       setCurrentUser(user);
       if (!user) {
         setIsLoading(false);
+      } else {
+        // Web billing is dormant unless VITE_RC_WEB_KEY is set; when it is,
+        // key it to the Firebase uid (same rule as the mobile apps) so a
+        // purchase maps to users/{uid} via the webhook.
+        configureBilling(user.uid).catch(console.error);
       }
     });
     return () => unsubscribe();
@@ -1028,6 +1040,39 @@ export default function App() {
   };
 
   const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
+    // Money limits (lib/limits.ts): exact to $999,999, rounded to the
+    // nearest $100k from $1M, refused past the hard cap as a typo.
+    const normalizedAmount = normalizeAmount(Number(formData.amount));
+    if (!normalizedAmount) {
+      setSupportError({ error: CHERRY_ERRORS.amountTooLarge, screen: 'Log expense' });
+      return;
+    }
+    if (normalizedAmount.wasRounded) {
+      // The shares were computed from the unrounded amount; scale them by the
+      // same factor so they still cover the saved total exactly (a purchase
+      // this size is an estimate anyway - the ratios are what matter).
+      const scale = normalizedAmount.value / Number(formData.amount);
+      const scaled = (v: number) => Math.round(v * scale * 100) / 100;
+      formData = {
+        ...formData,
+        amount: normalizedAmount.value,
+        shares: Object.fromEntries(
+          Object.entries(formData.shares || {}).map(([uid, s]) => [uid, scaled(Number(s))])
+        ),
+        ...(formData.thirdPersonShare != null
+          ? { thirdPersonShare: scaled(Number(formData.thirdPersonShare)) }
+          : {}),
+        ...(formData.extraParticipants
+          ? {
+              extraParticipants: formData.extraParticipants.map(g => ({
+                ...g,
+                share: scaled(g.share),
+              })),
+            }
+          : {}),
+      };
+      addToast('Rounded', `Saved as $${normalizedAmount.value.toLocaleString()} - amounts this large round to the nearest $100,000.`, 'info');
+    }
     try {
       if (!group.categories?.includes(formData.category)) {
         const groupRef = doc(db, 'groups', group.id);
@@ -1106,9 +1151,9 @@ export default function App() {
 
       // Sync to every other group member.
       await broadcastToMembers('UPSERT', finalExpense);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Failed to save expense locally or sync.');
+      setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Log expense', detail: String(e?.message || e) });
     }
   };
 
@@ -1132,7 +1177,16 @@ export default function App() {
       }
     } catch (e: any) {
       console.error("Delete error:", e);
-      alert("Failed to delete data locally.");
+      setSupportError({
+        error: {
+          code: 'EXPENSE_DELETE_FAILED',
+          title: "That expense didn't delete",
+          message: 'The expense could not be removed, so it still stands in the ledger.',
+          hint: 'Try again in a moment. If it keeps failing, contact us.',
+        },
+        screen: 'Ledger',
+        detail: String(e?.message || e),
+      });
     }
   };
 
@@ -1326,7 +1380,7 @@ export default function App() {
       addToast('Name Updated', 'Your name has been updated.', 'success');
     } catch (e) {
       console.error('Failed to update name', e);
-      addToast('Error', 'Could not update your name. Please try again.', 'error');
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - name' });
     }
   };
 
@@ -1340,7 +1394,7 @@ export default function App() {
       addToast('Threshold Saved', val > 0 ? `We'll flag shared expenses over $${val}.` : 'Threshold cleared.', 'success');
     } catch (e) {
       console.error('Failed to save threshold', e);
-      addToast('Error', 'Could not save your threshold. Please try again.', 'error');
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - spending threshold' });
     }
   };
 
@@ -1364,7 +1418,7 @@ export default function App() {
       addToast('Payment Info Saved', 'Encrypted and saved. Group members can now pay you directly through Venmo or Zelle.', 'success');
     } catch (e) {
       console.error('Failed to save payment handles', e);
-      addToast('Error', 'Could not save your payment info. Please try again.', 'error');
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - payment handles' });
     }
   };
 
@@ -1385,9 +1439,9 @@ export default function App() {
         body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
       });
       if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
-      else addToast('Error', 'Failed to send invite', 'error');
+      else setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
     } catch {
-      addToast('Error', 'Failed to send invite', 'error');
+      setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
     }
   };
 
@@ -1727,7 +1781,7 @@ export default function App() {
           <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
         </div>
       )}
-      {showBackup && (
+      {showBackup && isPlus && (
         <BackupModal
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
@@ -1751,7 +1805,12 @@ export default function App() {
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}
           onLeaveGroup={handleLeaveGroup}
-          onOpenBackup={() => { setShowSettings(false); setShowBackup(true); }}
+          onOpenBackup={() => {
+            // Backups & export are Cherry + (site feature list): free users
+            // get the upgrade page, never a dead end.
+            setShowSettings(false);
+            if (isPlus) { setShowBackup(true); } else { setShowCherryPlus(true); }
+          }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
           onSignOut={() => { setShowSettings(false); handleSignOut(); }}
           extraSection={
@@ -1851,7 +1910,33 @@ export default function App() {
         />
       )}
 
-      {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
+      {showCherryPlus && (
+        <CherryPlusModal
+          onClose={() => setShowCherryPlus(false)}
+          customerEmail={currentUser?.email || userProfile?.email}
+          onPurchased={() =>
+            // Unlock immediately; the RevenueCat webhook writes the durable
+            // copy to users/{uid} and wins on the next profile load.
+            setUserProfile((prev: any) => ({
+              ...(prev || {}),
+              isPlus: true,
+              plusEntitlement: {
+                source: 'revenuecat_web',
+                updatedAt: new Date().toISOString(),
+              },
+            }))
+          }
+        />
+      )}
+
+      {supportError && (
+        <ErrorSupportModal
+          error={supportError.error}
+          screen={supportError.screen}
+          detail={supportError.detail}
+          onClose={() => setSupportError(null)}
+        />
+      )}
 
       {showPlanPurchase && (
         <PlanPurchase

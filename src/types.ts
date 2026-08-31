@@ -13,7 +13,7 @@ export interface User {
   // promo grant). Read through lib/entitlements.hasPlus - never directly.
   isPlus?: boolean;
   plusEntitlement?: {
-    source: 'revenuecat_ios' | 'revenuecat_android' | 'promo';
+    source: 'revenuecat_ios' | 'revenuecat_android' | 'revenuecat_web' | 'promo';
     productId?: string;
     expiresAt?: string;
     updatedAt: string;

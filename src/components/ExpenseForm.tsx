@@ -6,6 +6,7 @@ import Modal from './Modal';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
+import { amountError, percentError } from '../lib/limits';
 
 interface ExpenseFormProps {
   group: Group;
@@ -313,6 +314,14 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       return;
     }
 
+    // Impossible amounts are refused here; very large ones are rounded to
+    // the nearest $100k at save time (see lib/limits.ts).
+    const amountLimitError = amountError(numericAmount);
+    if (amountLimitError) {
+      setError(amountLimitError);
+      return;
+    }
+
     // Heads-up if a debtor's share exceeds their spending threshold.
     if (thresholdWarnings.length > 0) {
       const names = thresholdWarnings.map(m => m.name).join(', ');
@@ -366,15 +375,34 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         setError('Please enter a name for each added cherry.');
         return;
       }
+      // Per-line ceiling (quiet headroom above 100% exists for lending with
+      // interest; past it is treated as a typo).
+      for (const m of members) {
+        const pErr = percentError(parseFloat(customPct[m.uid]) || 0);
+        if (pErr) {
+          setError(pErr);
+          return;
+        }
+      }
+      for (const g of guestEntries) {
+        const pErr = percentError(g.pct);
+        if (pErr) {
+          setError(pErr);
+          return;
+        }
+      }
       let totalPct = 0;
       members.forEach(m => (totalPct += parseFloat(customPct[m.uid]) || 0));
       guestEntries.forEach(g => (totalPct += g.pct));
-      if (Math.abs(totalPct - 100) > 0.01) {
-        setError('Percentages (members + added cherries) must add up to 100%.');
+      // Under 100% leaves part of the expense belonging to nobody. OVER 100%
+      // is allowed on purpose: that is how interest is expressed - the shares
+      // then intentionally sum past the amount.
+      if (totalPct < 100 - 0.01) {
+        setError('Percentages (members + added cherries) must cover at least 100%.');
         return;
       }
       // Round each share, then absorb any leftover cent into the last line
-      // so the parts sum exactly to the total.
+      // so the parts sum exactly to what the percentages call for.
       let running = 0;
       members.forEach(m => {
         const share = round2((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
@@ -386,7 +414,10 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         running += share;
         return { name: g.name, share };
       });
-      const diff = round2(numericAmount - running);
+      // The reconciliation target is what the percentages call for - equal to
+      // the amount at exactly 100%, above it when interest is in play.
+      const pctTarget = round2((numericAmount * totalPct) / 100);
+      const diff = round2(pctTarget - running);
       if (Math.abs(diff) >= 0.01) {
         if (guestShares.length) {
           guestShares[guestShares.length - 1].share = round2(guestShares[guestShares.length - 1].share + diff);
@@ -400,6 +431,11 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       const amts = members.map(m => parseFloat(customAmt[m.uid]) || 0);
       if (amts.some(a => a < 0)) {
         setError('Individual shares cannot be negative.');
+        return;
+      }
+      const shareCapError = amts.map(a => amountError(a)).find(Boolean);
+      if (shareCapError) {
+        setError(shareCapError);
         return;
       }
       const totalAmt = amts.reduce((a, b) => a + b, 0);
