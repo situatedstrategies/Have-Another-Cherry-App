@@ -110,8 +110,15 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
   };
 
   const generateInviteCode = () => {
+    // The code doubles as the group's document id, and the rules let any
+    // signed-in user `get` a group by id, so the code is a bearer secret:
+    // crypto-strength randomness, not Math.random().
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const get6 = () => Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const get6 = () => {
+      const bytes = new Uint8Array(6);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => chars[b % chars.length]).join('');
+    };
     return `${get6()}-${get6()}`;
   };
 

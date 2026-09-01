@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import express from "express";
 import path from "path";
 import cors from "cors";
@@ -17,7 +17,36 @@ async function startServer() {
   // Behind App Hosting / Cloud Run every request arrives via Google's front-end
   // proxy; trust it so req.ip reflects the real client (X-Forwarded-For) and the
   // rate limiter buckets per user instead of collapsing to one global bucket.
-  app.set("trust proxy", true);
+  //
+  // Exactly ONE hop, not `true`: Google's proxy appends the real client IP as
+  // the last X-Forwarded-For entry, so trusting one hop reads that entry.
+  // Trusting every hop would read the FIRST entry, which the client writes
+  // itself, letting an abuser rotate fake IPs past the per-IP rate limits.
+  app.set("trust proxy", 1);
+
+  // Constant-time string comparison for secrets (gate password, webhook auth),
+  // so a mismatch reveals nothing about how much of the value was right.
+  const safeEqual = (a: string, b: string) => {
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return ab.length === bb.length && timingSafeEqual(ab, bb);
+  };
+
+  // Baseline security headers on every response. No Content-Security-Policy
+  // here yet: the SPA pulls Firebase, reCAPTCHA and Google Fonts, so a CSP
+  // must be introduced deliberately and tested, not bolted on.
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // The Firebase auth helper pages under /__/ render inside our own iframe
+    // during sign-in, so they are the one place framing must stay allowed.
+    if (!req.path.startsWith("/__/")) {
+      res.setHeader("X-Frame-Options", "DENY");
+    }
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()");
+    next();
+  });
 
   // Restrict cross-origin browser access to our own app origins (the SPA is
   // same-origin, so this doesn't affect it - it just blocks other sites).
@@ -132,11 +161,11 @@ async function startServer() {
       .map(part => part.trim())
       .find(part => part.startsWith(`${GATE_COOKIE}=`));
     const cookieValue = cookie ? decodeURIComponent(cookie.slice(GATE_COOKIE.length + 1)) : "";
-    if (cookieValue === gateHash) return next();
+    if (safeEqual(cookieValue, gateHash)) return next();
 
     if (req.method === "POST" && req.path === "/gate/unlock") {
       const password = String((req.body as any)?.password ?? "");
-      if (password && sha256Hex(password) === gateHash) {
+      if (password && safeEqual(sha256Hex(password), gateHash)) {
         res.setHeader(
           "Set-Cookie",
           `${GATE_COOKIE}=${gateHash}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`
@@ -216,6 +245,13 @@ async function startServer() {
       bucket.count += 1;
       next();
     };
+
+  // Only the image types phones and browsers actually produce. Anything else
+  // (an SVG, a PDF, a made-up type) collapses to JPEG rather than being passed
+  // through to the model verbatim.
+  const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+  const cleanImageMime = (v: unknown): string =>
+    typeof v === "string" && ALLOWED_IMAGE_MIME.has(v.toLowerCase()) ? v.toLowerCase() : "image/jpeg";
 
   // Lazily initialize the Firebase Admin SDK (ADC) once, shared across endpoints.
   const ensureAdminApp = async () => {
@@ -325,7 +361,7 @@ async function startServer() {
       }
       {
         const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
-        const mimeType = req.body?.mimeType || "image/jpeg";
+        const mimeType = cleanImageMime(req.body?.mimeType);
 
         console.log("Analyzing uploaded receipt image with Gemini API (Vertex)...");
         const response = await ai.models.generateContent({
@@ -425,7 +461,7 @@ async function startServer() {
         parts.push({
           inlineData: {
             data: image.includes(",") ? image.split(",")[1] : image,
-            mimeType: req.body?.mimeType || "image/jpeg",
+            mimeType: cleanImageMime(req.body?.mimeType),
           },
         });
       }
@@ -552,7 +588,10 @@ async function startServer() {
     }) as Promise<any>;
   };
 
-  app.post("/api/verify-recaptcha", async (req, res) => {
+  // Rate limited: each call is a billed Enterprise assessment, and this runs
+  // pre-auth by nature, so per-IP quota is the only thing between the endpoint
+  // and someone burning assessment quota for sport.
+  app.post("/api/verify-recaptcha", rateLimit("recaptcha", 30), async (req, res) => {
     try {
       const { token, action } = req.body;
       if (!token) {
@@ -593,7 +632,7 @@ async function startServer() {
   // 5b. reCAPTCHA health check: runs a dummy assessment so operators can
   // confirm the Enterprise API, IAM role, and site key are wired up without
   // needing a real browser token. Reports status only, never user data.
-  app.get("/api/recaptcha-health", async (_req, res) => {
+  app.get("/api/recaptcha-health", rateLimit("recaptcha-health", 10), async (_req, res) => {
     // Report the key and project this environment actually uses. Reporting
     // firebaseConfig unconditionally made a beta misconfiguration look like a
     // production key problem.
@@ -634,8 +673,22 @@ async function startServer() {
       if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "A valid recipient email is required." });
       }
+      // The template escapes HTML, so these caps are about size, not markup:
+      // an authenticated caller should not be able to mail a megabyte of text
+      // to an arbitrary address under our sending domain.
+      const cap = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+      if (split && JSON.stringify(split).length > 4000) {
+        return res.status(400).json({ error: "Split details are too large." });
+      }
 
-      const data = await sendInviteEmail(email, groupName, inviteCode, recipientName, fromName, split);
+      const data = await sendInviteEmail(
+        email,
+        cap(groupName, 80),
+        cap(inviteCode, 64),
+        cap(recipientName, 80),
+        cap(fromName, 80),
+        split
+      );
       res.status(200).json({ success: true, data });
     } catch (err: any) {
       console.error("Server Invite Error:", err);
@@ -1193,7 +1246,7 @@ async function startServer() {
     if (!expectedAuth) {
       return res.status(503).json({ error: "Cherry + billing is not configured yet." });
     }
-    if ((req.headers.authorization || "") !== expectedAuth) {
+    if (!safeEqual(String(req.headers.authorization || ""), expectedAuth)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
