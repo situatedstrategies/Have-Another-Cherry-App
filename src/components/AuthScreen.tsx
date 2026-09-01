@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, applyKeepSignedIn } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
@@ -34,6 +34,8 @@ function friendlyAuthError(err: any): string {
       return 'You already have an account with this email using a different sign-in method. Try that one.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/operation-not-allowed':
+      return "That sign-in method isn't switched on for this app yet. Please try another way to sign in.";
     case 'auth/network-request-failed':
       return 'Couldn’t reach the sign-in service. Check your connection — VPNs, ad blockers, or strict privacy settings can block it — and try again.';
     case 'auth/popup-blocked':
@@ -109,7 +111,8 @@ export default function AuthScreen() {
   // form (or vice versa); both buttons still disable during any attempt.
   const [emailLoading, setEmailLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const loading = emailLoading || googleLoading;
+  const [appleLoading, setAppleLoading] = useState(false);
+  const loading = emailLoading || googleLoading || appleLoading;
   const [agreeTerms, setAgreeTerms] = useState(false);
   // Opt-in to staying signed in across visits. Off by default: without it the
   // session ends with the browser tab and the next visit asks for login again.
@@ -162,7 +165,12 @@ export default function AuthScreen() {
   // const handleAppleAuth = async () => { ... }
   // const handleGoogleAuthMobile = async () => { ... }
 
-  const handleGoogleAuth = async () => {
+  // One popup/redirect dance shared by every federated provider (Google,
+  // Apple), so their behavior can never drift apart.
+  const handleProviderAuth = async (
+    provider: GoogleAuthProvider | OAuthProvider,
+    setBusy: (v: boolean) => void,
+  ) => {
     // New (sign-up) accounts must accept the terms first - matches the email flow.
     if (!isLogin && !agreeTerms) {
       setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
@@ -172,13 +180,12 @@ export default function AuthScreen() {
     // Store and apply the "keep me signed in" choice before anything happens,
     // especially before the redirect flow navigates away from the app.
     await applyKeepSignedIn(keepSignedIn);
-    const provider = new GoogleAuthProvider();
     // Mobile browsers (and home-screen installs) handle popups poorly or not at
     // all; the full-page redirect flow is the reliable path there. The popup
     // stays for desktop, where redirect would lose in-page state unnecessarily.
     const preferRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     try {
-      setGoogleLoading(true);
+      setBusy(true);
       if (preferRedirect) {
         // Navigates away from the app; the watchdog only matters if the
         // pre-redirect handshake stalls, so the button can't stick forever.
@@ -189,7 +196,8 @@ export default function AuthScreen() {
       // popup completes but can never message back (blocked cross-site storage),
       // this unfreezes the UI with an actionable error instead of hanging.
       const result = await withTimeout(signInWithPopup(auth, provider), 90_000);
-      // Record consent for brand-new accounts (Google already verifies the email).
+      // Record consent for brand-new accounts (the provider already verified
+      // the email address).
       if (getAdditionalUserInfo(result)?.isNewUser) {
         await recordTermsAcceptance(result.user.uid);
       }
@@ -204,8 +212,19 @@ export default function AuthScreen() {
         }
       }
       setError(friendlyAuthError(err));
-      setGoogleLoading(false);
+      setBusy(false);
     }
+  };
+
+  const handleGoogleAuth = () => handleProviderAuth(new GoogleAuthProvider(), setGoogleLoading);
+
+  const handleAppleAuth = () => {
+    const provider = new OAuthProvider('apple.com');
+    // Apple only shares name and email on the very first authorization, and
+    // only when asked; Firebase fills displayName from it for new accounts.
+    provider.addScope('email');
+    provider.addScope('name');
+    return handleProviderAuth(provider, setAppleLoading);
   };
 
   // Request a password reset email. This hits our server endpoint, which mints a
@@ -511,6 +530,21 @@ export default function AuthScreen() {
               <span className="px-2 bg-white text-natural-muted">or</span>
             </div>
           </div>
+
+          <button
+            onClick={handleAppleAuth}
+            type="button"
+            disabled={loading}
+            className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-black/85 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed text-sm mb-3"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 384 512" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"
+              />
+            </svg>
+            {appleLoading ? 'Waiting for Apple...' : 'Continue with Apple'}
+          </button>
 
           <button
             onClick={handleGoogleAuth}
