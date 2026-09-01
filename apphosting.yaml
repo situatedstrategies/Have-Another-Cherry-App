@@ -1,8 +1,43 @@
 # Firebase App Hosting configuration
 # https://firebase.google.com/docs/app-hosting/configure
+#
+# Beta-only variables live in apphosting.beta.yaml.
+#
+# THIS FILE IS SHARED BY BOTH BACKENDS. A `secret:` reference added here has to
+# resolve in production AND in have-another-cherry-beta, because App Hosting
+# resolves every declared secret at build time and a missing one fails the
+# whole rollout rather than being skipped.
+#
+# So when you add a secret here, do one of two things:
+#   1. create it in both projects, or
+#   2. override it in apphosting.beta.yaml with a plain value.
+# NOTION_TOKEN is an example of the second; it took beta's build down first.
 
 env:
   - variable: RESEND_API_KEY
     secret: RESEND_API_KEY
+    availability:
+      - RUNTIME
+  - variable: RESET_RESEND_API
+    secret: RESET_RESEND_API
+    availability:
+      - RUNTIME
+
+  # Waitlist mirror into Notion. The token must already exist in Secret Manager
+  # before this config rolls out: App Hosting resolves every declared secret at
+  # build time and fails the whole rollout if one is missing, so declaring a
+  # secret you have not set yet takes the site down rather than degrading.
+  #
+  #   firebase apphosting:secrets:set NOTION_TOKEN --project gen-lang-client-0987674990
+  #
+  # The database ID is a plain value: it is a pointer, not a credential, and it
+  # is useless to anyone without the token. With NOTION_TOKEN unset the mirror
+  # is a no-op by design (src/lib/notion.ts), so signups still land by email.
+  - variable: NOTION_TOKEN
+    secret: NOTION_TOKEN
+    availability:
+      - RUNTIME
+  - variable: NOTION_WAITLIST_DB_ID
+    value: bf32909e-e162-429e-a854-165cb86158ac
     availability:
       - RUNTIME

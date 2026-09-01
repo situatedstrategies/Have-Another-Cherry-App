@@ -2,11 +2,11 @@
   "projectId": "gen-lang-client-0987674990",
   "appId": "1:721937789867:web:401a6910bd41a4a9e018ee",
   "apiKey": "AIzaSyC5WOJajqcbXPJGwd2xsI5XxEPLlDWeLeo",
-  "authDomain": "gen-lang-client-0987674990.firebaseapp.com",
+  "authDomain": "app.haveanothercherry.com",
   "firestoreDatabaseId": "(default)",
   "storageBucket": "gen-lang-client-0987674990.firebasestorage.app",
   "messagingSenderId": "721937789867",
   "measurementId": "G-7LBGSBQCS4",
   "oAuthClientId": "721937789867-8iu82rbl1v2l2eaffjstqvjahbo5ibeg.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "recaptchaSiteKey": "6LfddZotAAAAAJeFARjZfo9E1o3gzIllOHeRjSex"
 }

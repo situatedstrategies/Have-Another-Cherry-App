@@ -1,13 +1,35 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Go ahead. Have Another Cherry</title>
+
+    <!-- Install / home-screen (PWA) -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#C41200" />
+    <meta name="description" content="Split shared household expenses, sweetly." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Have Another Cherry" />
+
+    <!-- Link previews, so a shared link reads as the product rather than a bare URL. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Have Another Cherry" />
+    <meta property="og:title" content="Have Another Cherry" />
+    <meta property="og:description" content="The app that makes sharing expenses sweeter." />
+    <meta property="og:url" content="https://app.haveanothercherry.com/" />
+    <meta property="og:image" content="https://app.haveanothercherry.com/cherry2transparent.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Have Another Cherry" />
+    <meta name="twitter:description" content="The app that makes sharing expenses sweeter." />
+    <meta name="twitter:image" content="https://app.haveanothercherry.com/cherry2transparent.png" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

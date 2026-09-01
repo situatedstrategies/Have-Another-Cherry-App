@@ -1,0 +1,620 @@
+<title>Have Another Cherry Brand Book</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  /* Brand book chrome. Deliberately single-theme: a color spec must show true color
+     on the brand's own paper, regardless of the viewer's OS theme. */
+  :root {
+    --cherry: #C41200;
+    --ink: #18181B;
+    --paper: #F4F4F5;
+    --surface: #FFFFFF;
+    --sidebar: #E4E4E7;
+    --border: #D4D4D8;
+    --muted: #52525B;
+    --faint: #71717A;
+    --display: "Lora", Georgia, serif;
+    --body: "Inter", Helvetica, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 860px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 40px 0 8px; }
+  .hero img { width: 72px; height: 72px; object-fit: contain; }
+  .hero h1 {
+    font-family: var(--display);
+    font-size: clamp(2.1rem, 6vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 12px 0 0;
+    text-wrap: balance;
+  }
+  .tick {
+    display: block; width: 44px; height: 3px; border: 0;
+    border-radius: 999px; background: var(--cherry); margin: 18px auto 0;
+  }
+  .hero .tag {
+    font-size: 1.05rem; color: var(--muted); margin: 20px auto 0; max-width: 34em;
+  }
+  .hero .meta {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--faint);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-top: 14px;
+  }
+
+  /* Sections */
+  section { margin-top: 72px; }
+  .eyebrow {
+    font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--muted); margin: 0;
+  }
+  .eyebrow + .tick { margin: 10px 0 0; }
+  section > h2 {
+    font-family: var(--display); font-size: 1.7rem; font-weight: 700;
+    letter-spacing: -0.01em; margin: 18px 0 10px; text-wrap: balance;
+  }
+  section > p.lede { color: var(--muted); max-width: 42em; margin: 0 0 24px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; box-shadow: 0 1px 2px rgba(24,24,27,0.06);
+  }
+
+  /* Swatches */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .swatch {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .swatch .chip { height: 84px; border-bottom: 1px solid var(--border); }
+  .swatch .info { padding: 12px 14px 14px; }
+  .swatch .name { font-weight: 600; font-size: 0.9rem; }
+  .swatch .hex { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-top: 1px; }
+  .swatch .use { font-size: 0.78rem; color: var(--faint); margin-top: 6px; line-height: 1.45; }
+
+  /* Type specimens */
+  .specimen { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: baseline; padding: 20px 0; border-top: 1px solid var(--border); }
+  .specimen:first-of-type { border-top: 0; padding-top: 0; }
+  .specimen .role { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.6; }
+  .specimen .sample { min-width: 0; overflow-wrap: break-word; }
+  .specimen .spec { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+
+  /* Do / Don't */
+  .dodont { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .dodont { grid-template-columns: 1fr; } .specimen { grid-template-columns: 1fr; gap: 6px; } }
+  .rulecard { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+  .rulecard h3 { margin: 0 0 10px; font-family: var(--body); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; }
+  .rulecard.do h3 { color: var(--ink); }
+  .rulecard.dont h3 { color: var(--cherry); }
+  .rulecard ul { margin: 0; padding-left: 18px; }
+  .rulecard li { margin: 7px 0; font-size: 0.92rem; }
+
+  /* Voice examples */
+  .voice-pair { border-top: 1px solid var(--border); padding: 16px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .voice-pair:first-of-type { border-top: 0; padding-top: 0; }
+  @media (max-width: 640px) { .voice-pair { grid-template-columns: 1fr; } }
+  .voice-pair .lab { font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .voice-pair .on .lab { color: var(--ink); }
+  .voice-pair .off .lab { color: var(--cherry); }
+  .voice-pair blockquote { margin: 0; font-size: 0.95rem; }
+  .voice-pair .off blockquote { color: var(--faint); text-decoration: line-through; text-decoration-color: rgba(196,18,0,0.4); }
+
+  /* Demos */
+  .demo-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .btn { display: inline-block; font-family: var(--body); font-size: 0.9375rem; font-weight: 600; padding: 13px 30px; border-radius: 10px; border: 0; cursor: pointer; text-decoration: none; }
+  .btn-primary { background: var(--cherry); color: #FFFFFF; box-shadow: 0 1px 2px rgba(24,24,27,0.08); }
+  .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+  .btn-pill { font-size: 0.75rem; padding: 10px 20px; border-radius: 999px; background: var(--cherry); color: #fff; font-weight: 600; border: 0; }
+  .code-box { background: var(--paper); border: 1px dashed var(--border); border-radius: 12px; padding: 20px 16px; text-align: center; }
+  .code-box .lab { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .code-box .code { font-family: var(--mono); font-size: 1.6rem; font-weight: 700; letter-spacing: 0.14em; }
+  .callout { background: var(--sidebar); border-left: 4px solid var(--cherry); border-radius: 0 12px 12px 0; padding: 14px 16px; font-size: 0.92rem; }
+  .flood { background: var(--cherry); color: #fff; border-radius: 16px; padding: 36px 28px; text-align: center; }
+  .flood .fm { font-family: var(--display); font-weight: 700; font-size: 1.6rem; letter-spacing: -0.01em; }
+  .flood .tick { background: #fff; }
+  .flood p { color: rgba(255,255,255,0.9); font-size: 0.95rem; margin: 16px auto 0; max-width: 30em; }
+  .logo-tile { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 6px; box-shadow: 0 1px 2px rgba(24,24,27,0.06); }
+
+  /* Contrast table */
+  table.contrast { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  table.contrast th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.contrast td { padding: 9px 10px; border-bottom: 1px solid var(--sidebar); }
+  table.contrast td.r { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .pass { display: inline-block; font-family: var(--mono); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px; background: var(--sidebar); color: var(--ink); }
+
+  /* Code block */
+  .css-wrap { background: var(--ink); border-radius: 16px; overflow: hidden; border: 1px solid var(--ink); }
+  .css-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid #3F3F46; }
+  .css-head .fn { font-family: var(--mono); font-size: 0.75rem; color: #E4E4E7; }
+  .css-head button { font-family: var(--body); font-size: 0.72rem; font-weight: 600; background: transparent; color: #E4E4E7; border: 1px solid #52525B; border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+  .css-head button:hover { border-color: #E4E4E7; }
+  .css-wrap pre { margin: 0; padding: 18px; overflow-x: auto; max-height: 480px; }
+  .css-wrap code { font-family: var(--mono); font-size: 0.76rem; line-height: 1.6; color: #E4E4E7; }
+
+  footer { margin-top: 80px; border-top: 1px solid var(--border); padding-top: 22px; text-align: center; font-size: 0.8rem; color: var(--faint); }
+  :focus-visible { outline: 2px solid var(--cherry); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn { transition: background-color 0.15s ease; }
+    .btn-primary:hover, .btn-pill:hover { background: #181818; }
+    .btn-secondary:hover { background: var(--sidebar); }
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <img src="data:image/png;base64,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" alt="Have Another Cherry cherry mark">
+    <h1>Have Another Cherry</h1>
+    <hr class="tick">
+    <p class="tag">Brand guidelines for anyone designing ads, landing pages, or marketing for the household expense app. Everything here comes from the shipped product — follow it and your work will look like ours.</p>
+    <p class="meta">Brand book · v1.0 · August 2026</p>
+  </header>
+
+  <section>
+    <p class="eyebrow">The brand</p>
+    <hr class="tick">
+    <h2>At a glance</h2>
+    <p class="lede">Have Another Cherry is a household expense splitter: couples and roommates set a percentage split, log shared expenses, and settle up. Money between people who live together is a touchy subject — the brand's job is to make it feel light.</p>
+    <div class="card">
+      <p style="margin:0 0 14px;"><strong>Positioning:</strong> "A simpler, sweeter way to share household expenses."</p>
+      <p style="margin:0 0 14px;"><strong>Personality:</strong> warm, plainspoken, lightly sweet, quietly precise. Think a well-set kitchen table, not a banking app. The single glossy cherry against calm zinc grey is the whole idea: one drop of delight in an otherwise disciplined, minimal system.</p>
+      <p style="margin:0;"><strong>Audience:</strong> couples, roommates, and families splitting rent, groceries, and bills — people who want fairness without spreadsheets or awkward conversations.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Logo</p>
+    <hr class="tick">
+    <h2>The cherry and the wordmark</h2>
+    <p class="lede">The mark is a single photorealistic cherry with its stem — glossy, dimensional, appetizing. It is a photograph-style asset, not a flat icon: never trace, recolor, or flatten it.</p>
+    <div class="card">
+      <div style="display:flex; flex-wrap:wrap; gap:28px; align-items:center;">
+        <div style="text-align:center;">
+          <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABDCAYAAABqS6DaAAABomlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgOS4xLWMwMDIgNzkuYTZhNjM5NiwgMjAyNC8wMy8xMi0wNzo0ODoyMyAgICAgICAgIj4KIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBFeHByZXNzIDEuMC4wIi8+CiA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgo8P3hwYWNrZXQgZW5kPSJyIj8+a1HVagAAAAlwSFlzAAAOwwAADsMBx2+oZAAAC75JREFUeAHsm9uPG9Udx3/nzN3j69reXe+aTdosARIIVAUCEZRFBSQeWrVIpgWpEk/wxDOP6/wFfajUB6SKPrMPvdCCQKVZSkugbSBcdpPNXu1d2+v7eOzx3Of0TFaRWqmKCFLUM9sdnd+MLZ8Z/37fz/md3xlfMBxtTClwBIQpHABHQI6AMKYAY+4cZcgREMYUYMydoww5AsKYAoy5w1SGEABULpcxIQd28Jgg+D/amAESiv+LV58V5+GT+Ls/v5i++Kvd9E+fUlRYWREIIcz4ebvHxu0J9Ba9poKjhye6gqp42U67dU+tNjhrmJ2HvL5+T518OQXQkGkf7hYvG8nuTACB8+dRr9eTGl2r2Ok75zqD0Q87/f5zA2v/GdtpP6C312YA2koIhdqhnsKYALK0soJ0i3BjEqh92y80deeuRl97oDdoPTy0Omf1cfu+bnelCPCJCrDMEQIoksP/azjNBJDV06cJkV0X5Fg/EOSK4fNbfZPU+qZtaKaR6Q3bpzp67d6N6tYdOztafBkuHFooTAChBZ3whYydmYzXE7nsJ0oi9zbImT94XPx9k6Aruj1AvWHjTt3o3jvG5uyZnhIDeJMJ37/GoL+lLqwERV5++XXvGPDaRDG9Xjg+//Hk7MkL8dz0MkjiR6ZjrZn2iNiu823PCe4ZWONCu50Pawor/t+S6DfrzExACAEpLS65r712epgunG0/eaxYy+cn9yRf3EIo+Aow3iTAYwIw73nunRynZjY2NsIl8aGqJ8wACUdNCAWhcvDKK6+4p0tld2Fh0V5YODUEIV4XpNRaTInXREFQOeycML1xMT8v0qnrcH2FwBSQEMoNO4CDCELP+09996wRz800ZGFihxcEnXBBDgneMWSPsgB74mFaCjML5AaYg+OCb3kwUmPJXcwJVY7jAiCkaLvGzBBGhypLIgEEIUT2LoLji7jLgbiDUdAlYCYD1CtaemsCYOfQ1BIMEdlKpVLgdUyTSPw+gFX3vCFYZnfG9TuT1cGesgRLkYnlZpJHJogwSz77bORxuqkDcRpOYOhju58a24OCQPRkCU5xh6GWRAZIOKrCLJmbU00PoRa9H2kRl+N9T5gFj88B8BLtE/klMKZBRKaFWbIM4KlKbsCRTIfjMj5GSt4n/mSrpdHivhypeP6b8JELYAEWAsFJWSKX7gLiB67nSkPTyg+dILGzc5yP+rQVOSB0VBFdNx0frK7t6S3HGxMI0ATBYlJVVf48/Sif9olsixyQcNo6fhw8zd8yPL+pY2xhgUeZuBgkBMHgFxcXIwsjdDxyQEKnl5Z+SbDU8iTR9hXJFyTRinPYUAyjxS0tLUW6sEcSSAhFJVmSEBOByCEUEE0YuZsC/fwx0jDCuCIKpAQxfy4AmLYs0x9rw5bb6a/DvvHlrQMJVWDIIglkdXWVGMaMOxxwg/36uFXZbhmVShe3Giafz+cjDSVSQAgQRMplvLhyCiXX+/7+rj7Y2262ahtDZ7grxoLuTExqtwVSKnEEQivjsH94HkNJcFNXIgEkvLe4UL7AX3r5dWXnMiQb1mrGeX8jJVzpSUHNRnyfj8XGqYJUw7PJP/013/zLIDuKjyaGd7cz8MlEHF59RyRlEolYmXcyhLFyfkmA+qX0uN843hzq32norUd7nfo5qTl+MD1CdyeH/rzS1c/A2vqj9tX1xy0yeHyMxo/1nc6jVWv3vmrt77Od6msqKb3J/G+7mAZC6BQVwtjsr2c6verJSqvyxDWt9uMreuOF9f3qC7vblef0SmvBrTXPmDtbD3Y3159tt5rPa87oxTbRX2w47Z9s9TZ/UNu7fFZb+fKOXvUNCqXENBSmgSy9uYTbWi1m7rfmmu3aIxWt+vSGUfv+1WH9idX69uNX164+sre2dVrbqNyhbe4cb+3t3l/Xu+eqgf54hRt+b5v0F7aN2tPbverTW/3GQ+vgFFcgr4R15aYT+f/wRWaBEACUXzUEczzKjgb9U/2h9rDhjc842DtmE3Oyq7Wz+7VaprPbSAz22oq+145p7X6yOx5lmpw/0U/JWScfn3KT0gmdRw/tI+6xLi/d6wgou9GdEMLrA4Mbs0DOl8vIXK+Irf3adEvXTumOeRcn8JNTqbQyHYvzCiFcYJqcPzKxrVtoPLCRY9jY8QMOZIlLF6a5Y3ee5Oe+Pa+quVzRUZQzI+LdNx5qhbRxWQR6fQZ5sPuLjRUq2NalD4Xa1kq626oX9LGeswNHDjDBAYcgwNSookEQgOdScwIIPAL0bhGAo0xkGXLJJJrJZLiMmoxxnj9Fep0ibK5lWh9fEZbKZURPZ65h5jz6N4f0vQoeN6qi1dtXxqO+2Bx08bVuA9aGPaj7DvRp3wHCoGFq4REh6CECddeCvc4+tCtbYNT3kDsYYN8wZOhqqtvsS/xuF5foubexfeNLMwskFCwOI8iMTZRybCRYNhqNhlDVOrA90mDfc6j4AC0OQ4NmRJ3nYJ9ajULZpkBWOw34YuMKrFxbhWpjDxljE2NfxLIfx5io6BsrdptPZBZIGPc83RWp2AVAKEcAZM8D37bB9lywSQBjKusAY+hSKNeNPu7TqaxDfKjZJmwMurBNM0XT+4ADROJKNohnCyQ+HV45RE7fgLHGNJDp6QJMplOQj6lkAvOQpgUi5RNQ/QCkgFwvgAEV1AUEoXkUUPgcEwK874PgOKDYFqRpkckIgpPIpszY3Jyj3jcfAJs8rsdEQ2KwlUqgFotEnpoOuEzK52U5kBEmCQoiTS1FLUlNpeKHFqfH8PkEhTXt+TBLs2nG9WDK80mGEFcVUV/IKE1+Lqu59xdcOH2aMBg1w0CoWt6JycCZmbJH2fRYi8m2wXNBgBCRqJTxAGjGBJCjGZMPzQuo+AEFEcAdrg/T9HmcAiOAfIfDY5cL6iZnb41FaOuQcGBxkdC3YK4xO2WFf+LhsidduzDd0+KJWlcW230eWwaHaPVAINGMSHkAWSp8nlqWLnkz1A6mNBTWDLAQTzRBdHRZ7Ix5tGm5xjZG3d4OVDyE6HIM2Nswey4deLRYXiRcUXEGYqKl88KawQubpiD2bY53fQREpOM7zIA0hRBagmaJQrOGp+bTmmIhjphYcB1B1TwpuQlKfIWI8u4QGuMPAGivg/dhbc8sEASIzPdedUGN95CgXlN49UtZkHcw5gcBwjQnEOEJAYVOSyqFodJjWOgRQeABJh7iPIyVYRwlKik+94UsF1aVWLo1nBk65XI5YA3EDX+YBXLdwTIQ2LLMvK/uTWHxs0kkXUpgcRtxwsDisEvvLIiPADDtxhOgeQHgYRTY9DXgpYEKyk7ej39a8DP/nMTZ7aKXGy4sLvvA8MY0EESzZPU0eFlF6R13pCvFQPhomlc+VgV5wxVErc/zTofn/C6PicahgNYYv8/zlqFIHZCVawkhdjEfKB9OG9xXuVGmM3826yJE6UUVCAt+h9NLaSllzyK3WeSFz4ty/IMJMXYRCdKaJvKtmsjrVVEwqpJgNCSx11XEXVNVL3Pp5AU1FX8/haVPVcTX176oWKjM7lR1Q2umM+SGkwjKwTNfnDMn1UQjh8XPVUlc5kX5givIH5mi8rkhxK6OhNiqIcUu2UrsAxKLvYsnEu+Lk9lPFQXVV9tgPg9LTE9VN2KNBJDQ2RtQksnMPhHxZV6Q30vK8d9MiMnfTeHEWzku9VZKTv82lkj/nk9klmPZyZVuItc60zwXGRhAt8gAob7Sol0OLl16y8o6k81EIr0yl8z97e5Y9t27YOKPJ2Di7Tv5yT9/KzP3j2Lu+Obd5+7vvbT8hh2CDM+NikUKSChqGSB4deMdJ/2jBf2EcLJ5lzm1M4f4tVksXysGs7tPiPf3jHMnzCfLZboAQyQ8J0oWOSChuAiAfi1eDl659LpX2luySu1l42fN98Yv7fzafnK57IULAdovcjCoz3QJH+6ja/Q2EP7DohvKgeeRzJAD1w/n/ggIY1yPgBwBYUwBxtw5ypAjIIwpwJg7RxlyBIQxBRhz5yhDGAPyLwAAAP//9s6aYwAAAAZJREFUAwBHWcXSDZyOJgAAAABJRU5ErkJggg==" alt="Cherry mark on light ground" style="width:64px;height:64px;object-fit:contain;">
+          <div style="font-size:0.75rem;color:var(--faint);margin-top:6px;">On light grounds: use as-is</div>
+        </div>
+        <div style="text-align:center;">
+          <span class="logo-tile"><img src="data:image/png;base64,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" alt="Cherry mark in white tile" style="width:56px;height:56px;object-fit:contain;display:block;"></span>
+          <div style="font-size:0.75rem;color:var(--faint);margin-top:6px;">On busy, dark, or red grounds: white tile, 16px radius, 1px border</div>
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <div style="font-family:var(--display);font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;">Have Another Cherry</div>
+          <hr class="tick" style="margin:10px 0 0;">
+          <div style="font-size:0.78rem;color:var(--faint);margin-top:10px;">Wordmark: Lora Bold, tracking −1%, title case, ink #18181B, with the tick beneath.</div>
+        </div>
+      </div>
+    </div>
+    <div class="dodont" style="margin-top:14px;">
+      <div class="rulecard do">
+        <h3>Do</h3>
+        <ul>
+          <li>Give the cherry clear space of at least half its own width on all sides.</li>
+          <li>Keep it at 24&nbsp;px minimum on screen; drop it entirely below that rather than shrinking further.</li>
+          <li>Lock mark above or left of the wordmark, stem up.</li>
+          <li>Use the <strong>tick</strong> — the 44&nbsp;×&nbsp;3&nbsp;px cherry-red rounded bar — under the wordmark and as a section underline. It is the brand's signature punctuation.</li>
+        </ul>
+      </div>
+      <div class="rulecard dont">
+        <h3>Don't</h3>
+        <ul>
+          <li>Don't recolor, outline, flatten, or add drop shadows or glows to the cherry.</li>
+          <li>Don't set the wordmark in any face but Lora, and never in all caps.</li>
+          <li>Don't place the cherry directly on the red flood — it disappears. Use the white tile.</li>
+          <li>Don't pair it with other fruit, illustrations of cherries, or cherry emoji in the same composition.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Color</p>
+    <hr class="tick">
+    <h2>One hue, its shades, and zinc neutrals</h2>
+    <p class="lede">Cherry red is the only hue in the system — used at three strengths: Cherry, deep Cherry Ink, and the pale Cherry Wash. Every other color is a zinc-family neutral. Compositions should be roughly 90% neutral and 10% cherry — the red is punctuation, not wallpaper. Never introduce a second hue. One exception: third-party payment buttons (Venmo, Zelle) keep those services' own brand colors — theirs, not ours.</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#C41200;"></div><div class="info"><div class="name">Cherry</div><div class="hex">#C41200</div><div class="use">The accent. CTAs, the tick, key highlights. One primary button per composition.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#A00E00;"></div><div class="info"><div class="name">Cherry Ink</div><div class="hex">#A00E00</div><div class="use">Deep cherry. Hover state of solid red buttons; never a resting fill.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FBEAE7;"></div><div class="info"><div class="name">Cherry Wash</div><div class="hex">#FBEAE7</div><div class="use">Pale cherry tint for soft washes and warning fills. Background only, never text.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#18181B;"></div><div class="info"><div class="name">Ink</div><div class="hex">#18181B</div><div class="use">Headlines and body text. Also the hover state of red buttons (via #181818).</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#F4F4F5;"></div><div class="info"><div class="name">Paper</div><div class="hex">#F4F4F5</div><div class="use">Default page and ad background.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF;"></div><div class="info"><div class="name">Surface</div><div class="hex">#FFFFFF</div><div class="use">Cards and panels sitting on Paper.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#E4E4E7;"></div><div class="info"><div class="name">Soft</div><div class="hex">#E4E4E7</div><div class="use">Secondary panels, callout fills, quiet chips.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#D4D4D8;"></div><div class="info"><div class="name">Border</div><div class="hex">#D4D4D8</div><div class="use">All hairline borders, always 1px (or 1px dashed for code boxes).</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#52525B;"></div><div class="info"><div class="name">Muted</div><div class="hex">#52525B</div><div class="use">Secondary text, uppercase labels.</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#71717A;"></div><div class="info"><div class="name">Faint</div><div class="hex">#71717A</div><div class="use">Fine print, tertiary text.</div></div></div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <p class="eyebrow" style="margin-bottom:12px;">Accessibility — measured, not vibes</p>
+      <div style="overflow-x:auto;">
+      <table class="contrast">
+        <tr><th>Pair</th><th>Ratio</th><th>WCAG</th></tr>
+        <tr><td>Ink #18181B on Paper #F4F4F5</td><td class="r">15.6&nbsp;:&nbsp;1</td><td><span class="pass">AAA</span></td></tr>
+        <tr><td>White on Cherry #C41200</td><td class="r">6.1&nbsp;:&nbsp;1</td><td><span class="pass">AA all sizes</span></td></tr>
+        <tr><td>Cherry #C41200 on White</td><td class="r">6.1&nbsp;:&nbsp;1</td><td><span class="pass">AA all sizes</span></td></tr>
+        <tr><td>Muted #52525B on White</td><td class="r">7.6&nbsp;:&nbsp;1</td><td><span class="pass">AAA</span></td></tr>
+      </table>
+      </div>
+      <p style="font-size:0.85rem;color:var(--muted);margin:14px 0 0;">Never set Cherry text on Paper or Soft grounds smaller than 18&nbsp;px — keep red type on white, or white type on red.</p>
+    </div>
+    <div class="flood" style="margin-top:14px;">
+      <div class="fm">The red flood</div>
+      <hr class="tick tick--center" style="margin-left:auto;margin-right:auto;">
+      <p>For high-impact ads only, invert the ratio: a full Cherry field with white Lora type and a white tick. On the flood, buttons become white with cherry text, and the cherry mark sits in its white tile. Use at most one flood per campaign surface.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Typography</p>
+    <hr class="tick">
+    <h2>Three faces, three jobs</h2>
+    <p class="lede">All three are free on Google Fonts. No substitutions in digital work; if a print vendor can't load them, fall back to Georgia / Helvetica — never to another decorative face.</p>
+    <div class="card">
+      <div class="specimen">
+        <div class="role">Display<br>Lora 600–700</div>
+        <div class="sample">
+          <div style="font-family:var(--display);font-size:2rem;font-weight:700;letter-spacing:-0.01em;line-height:1.2;">Split the bills, keep the peace.</div>
+          <div class="spec">Headlines, the wordmark, big numbers' labels. Tracking −1%, tight leading (1.1–1.2), sentence case. Italic Lora is allowed for one warm word, sparingly.</div>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="role">Body & UI<br>Inter 400–700</div>
+        <div class="sample">
+          <div style="font-size:1rem;">Log the groceries, and Cherry does the math — who owes what, down to the cent, at whatever split your household agreed on.</div>
+          <div class="spec">Everything that isn't a headline or a number. Body 15–17&nbsp;px at 1.5–1.65 leading, max ~65 characters per line. Buttons: Inter 600.</div>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="role">Numbers & codes<br>JetBrains Mono 500–700</div>
+        <div class="sample">
+          <div style="font-family:var(--mono);font-size:1.4rem;font-weight:700;letter-spacing:0.06em;font-variant-numeric:tabular-nums;">$1,284.50&nbsp;&nbsp;·&nbsp;&nbsp;60/40&nbsp;&nbsp;·&nbsp;&nbsp;CHRY-4821</div>
+          <div class="spec">A signature move: every dollar amount, percentage, and invite code is set in mono with tabular figures. If an ad shows money, the money is in JetBrains Mono.</div>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="role">Micro-label<br>Inter 700 caps</div>
+        <div class="sample">
+          <div style="font-size:0.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);">Your invite code</div>
+          <div class="spec">Eyebrows, field labels, table headers: 11–12&nbsp;px, uppercase, letter-spacing 8–12%, Muted #52525B.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Shape & surface</p>
+    <hr class="tick">
+    <h2>Soft corners, hairline borders, almost no shadow</h2>
+    <p class="lede">Surfaces read as calm and precise: white cards with 1px borders and 16px corners on a Paper ground. Depth comes from borders, not shadows — shadows stay whisper-quiet (6–8% ink, small blur).</p>
+    <div class="card">
+      <div class="demo-row" style="margin-bottom:22px;">
+        <a class="btn btn-primary" href="#css">Join the group</a>
+        <a class="btn btn-secondary" href="#css">See how it works</a>
+        <button class="btn-pill" type="button">+ Add expense</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;">
+        <div class="code-box">
+          <div class="lab">Your invite code</div>
+          <div class="code">CHRY-4821</div>
+        </div>
+        <div class="callout"><strong>The dashed box is reserved.</strong> A dashed 1px border means "a code or thing to act on" — never use it decoratively. This grey callout with its 4px cherry spine is how tips and notices appear.</div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--muted);margin:22px 0 0;">Corner radii: 8&nbsp;px inputs · 10&nbsp;px buttons · 12&nbsp;px inner panels · 16&nbsp;px cards · full pill for compact CTAs and the tick. Primary buttons are Cherry with white Inter 600, darkening to deep Cherry Ink #A00E00 on hover.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Voice</p>
+    <hr class="tick">
+    <h2>Warm, plain, one pun maximum</h2>
+    <p class="lede">We talk about money the way good housemates do: directly, kindly, and without jargon or guilt. The cherry gives us "sweet" — use it lightly, at most once per piece, and never force a second fruit pun.</p>
+    <div class="card">
+      <div class="voice-pair">
+        <div class="on"><div class="lab">On brand</div><blockquote>"A simpler, sweeter way to share household expenses."</blockquote></div>
+        <div class="off"><div class="lab">Off brand</div><blockquote>"Revolutionize your financial cohabitation workflow."</blockquote></div>
+      </div>
+      <div class="voice-pair">
+        <div class="on"><div class="lab">On brand</div><blockquote>"Make sharing expenses sweet (or sweeter)."</blockquote></div>
+        <div class="off"><div class="lab">Off brand</div><blockquote>"Stop fighting about money!! 🍒🍒🔥"</blockquote></div>
+      </div>
+      <div class="voice-pair">
+        <div class="on"><div class="lab">On brand</div><blockquote>"You paid $62.10. Sam owes $24.84."</blockquote></div>
+        <div class="off"><div class="lab">Off brand</div><blockquote>"Your outstanding receivable balance has been computed."</blockquote></div>
+      </div>
+      <div class="voice-pair">
+        <div class="on"><div class="lab">On brand</div><blockquote>"We don't sell or unnecessarily store your data."</blockquote></div>
+        <div class="off"><div class="lab">Off brand</div><blockquote>"Bank-grade military-level security."</blockquote></div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--muted);margin:18px 0 0;">Rules of thumb: sentence case everywhere except micro-labels. Buttons say exactly what happens ("Join the group", "Add expense"). Show real, specific numbers in ads — precision is part of the charm. No exclamation points about money; the privacy line above may be quoted verbatim.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Ads</p>
+    <hr class="tick">
+    <h2>Rules for campaign work</h2>
+    <div class="dodont">
+      <div class="rulecard do">
+        <h3>Do</h3>
+        <ul>
+          <li>Ground every layout in Paper #F4F4F5 or White — or, for one hero unit per campaign, the red flood.</li>
+          <li>Lead with a real moment: a split ("60/40"), a settled balance, an invite code in its dashed box.</li>
+          <li>Use one Cherry CTA per unit, Inter 600 white on red, 10px radius or pill.</li>
+          <li>Let whitespace carry the luxury — the brand is minimal and high-contrast, so leave room.</li>
+          <li>End on the tick or the cherry mark as the sign-off.</li>
+        </ul>
+      </div>
+      <div class="rulecard dont">
+        <h3>Don't</h3>
+        <ul>
+          <li>No gradients, no second hue, no pastel pinks or "cherry blossom" drift.</li>
+          <li>No stock photos of couples arguing over bills, piggy banks, or cash fans.</li>
+          <li>No cherry emoji 🍒 in designed surfaces (social copy text is the one exception).</li>
+          <li>No drop shadows heavier than 8% ink, no glass-morphism, no dark mode ads — the brand is a light-mode brand.</li>
+          <li>Never render fake UI with numbers in a proportional font — money is always mono.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="css">
+    <p class="eyebrow">The style sheet</p>
+    <hr class="tick">
+    <h2>Drop-in CSS</h2>
+    <p class="lede">The complete brand style sheet — tokens, type, buttons, cards, forms, and the red-flood variant. It ships in the repo at <code style="font-family:var(--mono);font-size:0.85em;">docs/brand.css</code>; copy it into any HTML ad or landing page and use the <code style="font-family:var(--mono);font-size:0.85em;">.hac-*</code> classes.</p>
+    <div class="css-wrap">
+      <div class="css-head">
+        <span class="fn">brand.css · v1.0</span>
+        <button type="button" onclick="const c=document.getElementById('brandcss').textContent;navigator.clipboard&&navigator.clipboard.writeText(c).then(()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1500)}).catch(()=>{})">Copy</button>
+      </div>
+      <pre><code id="brandcss">/* ==========================================================================
+   Have Another Cherry — Brand Style Sheet v1.0
+   A simpler, sweeter way to share household expenses.
+
+   Drop-in CSS for ads, landing pages, and marketing HTML.
+   Pair with the brand guidelines in docs/brand-guide.html.
+   ========================================================================== */
+
+@import url(&#x27;https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap&#x27;);
+
+/* --------------------------------------------------------------------------
+   1. Design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Color — cherry red is the ONLY hue. Everything else is a zinc neutral. */
+  --hac-cherry:       #C41200;  /* primary accent: CTAs, tick bar, highlights */
+  --hac-cherry-ink:   #A00E00;  /* deep cherry: hover state of solid red buttons */
+  --hac-cherry-wash:  #FBEAE7;  /* pale cherry tint: soft washes and highlights  */
+  --hac-ink:          #18181B;  /* headlines, body text                       */
+  --hac-paper:        #F4F4F5;  /* page background                            */
+  --hac-surface:      #FFFFFF;  /* cards, panels                              */
+  --hac-sidebar:      #E4E4E7;  /* secondary background, soft panels          */
+  --hac-border:       #D4D4D8;  /* 1px hairline borders                       */
+  --hac-muted:        #52525B;  /* secondary text                             */
+  --hac-faint:        #71717A;  /* tertiary text, fine print                  */
+
+  /* Type — three faces, three jobs. Never substitute. */
+  --hac-font-display: &quot;Lora&quot;, Georgia, serif;                    /* headlines, wordmark */
+  --hac-font-body:    &quot;Inter&quot;, Helvetica, Arial, sans-serif;     /* everything else     */
+  --hac-font-mono:    &quot;JetBrains Mono&quot;, ui-monospace, SFMono-Regular, monospace; /* money, codes, % */
+
+  /* Shape — soft but precise */
+  --hac-radius-sm:   8px;    /* inputs, small chips        */
+  --hac-radius-md:   10px;   /* buttons                    */
+  --hac-radius-lg:   12px;   /* inner panels, code boxes   */
+  --hac-radius-xl:   16px;   /* cards, containers          */
+  --hac-radius-pill: 999px;  /* pill CTAs, the tick bar    */
+
+  /* Elevation — barely there */
+  --hac-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
+  --hac-shadow-md: 0 4px 12px rgba(24, 24, 27, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   2. Base
+   -------------------------------------------------------------------------- */
+.hac {
+  background: var(--hac-paper);
+  color: var(--hac-ink);
+  font-family: var(--hac-font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hac h1, .hac h2, .hac h3 {
+  font-family: var(--hac-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--hac-ink);
+  margin: 0;
+}
+.hac h1 { font-size: clamp(2rem, 5vw, 3rem); }
+.hac h2 { font-size: 1.625rem; }
+.hac h3 { font-size: 1.25rem; }
+
+.hac p     { margin: 0 0 1em; }
+.hac small { font-size: 0.75rem; color: var(--hac-faint); }
+.hac a     { color: var(--hac-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.hac a:hover { color: var(--hac-cherry); }
+
+/* Money, percentages, invite codes — always mono, always tabular */
+.hac-num {
+  font-family: var(--hac-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Uppercase micro-label (section eyebrows, field labels) */
+.hac-label {
+  font-family: var(--hac-font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--hac-muted);
+}
+
+/* The tick — the brand&#x27;s signature underline device */
+.hac-tick {
+  display: block;
+  width: 44px;
+  height: 3px;
+  border-radius: var(--hac-radius-pill);
+  background: var(--hac-cherry);
+  border: 0;
+  margin: 14px 0 0;
+}
+.hac-tick--center { margin-left: auto; margin-right: auto; }
+
+/* --------------------------------------------------------------------------
+   3. Buttons
+   -------------------------------------------------------------------------- */
+.hac-btn {
+  display: inline-block;
+  font-family: var(--hac-font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: var(--hac-radius-md);
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Primary: cherry red, white text. One per composition. */
+.hac-btn--primary {
+  background: var(--hac-cherry);
+  color: #FFFFFF;
+  box-shadow: var(--hac-shadow-sm);
+}
+.hac-btn--primary:hover { background: var(--hac-cherry-ink); box-shadow: var(--hac-shadow-md); }
+
+/* Secondary: white with hairline border */
+.hac-btn--secondary {
+  background: var(--hac-surface);
+  color: var(--hac-ink);
+  border: 1px solid var(--hac-border);
+  box-shadow: var(--hac-shadow-sm);
+}
+.hac-btn--secondary:hover { background: var(--hac-sidebar); }
+
+/* Pill variant: compact rounded-full CTA (app header style) */
+.hac-btn--pill {
+  font-size: 0.75rem;
+  padding: 10px 20px;
+  border-radius: var(--hac-radius-pill);
+}
+
+.hac-btn:focus-visible {
+  outline: 2px solid var(--hac-cherry);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Surfaces
+   -------------------------------------------------------------------------- */
+.hac-card {
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-xl);
+  box-shadow: var(--hac-shadow-sm);
+  padding: 32px;
+}
+
+/* Dashed container — reserved for codes and &quot;cut here&quot; moments */
+.hac-code-box {
+  background: var(--hac-paper);
+  border: 1px dashed var(--hac-border);
+  border-radius: var(--hac-radius-lg);
+  padding: 22px 16px;
+  text-align: center;
+}
+.hac-code-box .hac-code {
+  font-family: var(--hac-font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--hac-ink);
+}
+
+/* Callout — soft panel with a 4px cherry spine */
+.hac-callout {
+  background: var(--hac-sidebar);
+  border-left: 4px solid var(--hac-cherry);
+  border-radius: 0 var(--hac-radius-lg) var(--hac-radius-lg) 0;
+  padding: 16px;
+  box-shadow: var(--hac-shadow-sm);
+}
+
+/* White tile for placing the cherry mark on non-white grounds */
+.hac-logo-tile {
+  display: inline-block;
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-xl);
+  padding: 6px;
+  box-shadow: var(--hac-shadow-sm);
+}
+
+/* --------------------------------------------------------------------------
+   5. Forms
+   -------------------------------------------------------------------------- */
+.hac-input {
+  width: 100%;
+  font-family: var(--hac-font-body);
+  font-size: 0.875rem;
+  color: var(--hac-ink);
+  background: var(--hac-surface);
+  border: 1px solid var(--hac-border);
+  border-radius: var(--hac-radius-sm);
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.hac-input::placeholder { color: var(--hac-faint); }
+.hac-input:focus {
+  border-color: var(--hac-muted);
+  box-shadow: 0 0 0 1px var(--hac-muted);
+}
+
+/* --------------------------------------------------------------------------
+   6. Wordmark
+   -------------------------------------------------------------------------- */
+.hac-wordmark {
+  font-family: var(--hac-font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--hac-ink);
+}
+
+/* Red-flood variant (high-impact ads): everything on cherry */
+.hac-flood {
+  background: var(--hac-cherry);
+  color: #FFFFFF;
+}
+.hac-flood .hac-wordmark,
+.hac-flood h1, .hac-flood h2, .hac-flood h3 { color: #FFFFFF; }
+.hac-flood .hac-tick { background: #FFFFFF; }
+.hac-flood .hac-btn--primary { background: #FFFFFF; color: var(--hac-cherry); }
+</code></pre>
+    </div>
+  </section>
+
+  <footer>
+    Have Another Cherry — make sharing expenses sweet (or sweeter).<br>
+    Questions about usage: check the shipped app first; it is the source of truth.
+  </footer>
+
+</div>

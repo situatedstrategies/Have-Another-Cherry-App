@@ -1,7 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { getFullMembers, getFullDefaultSplit } from '../lib/members';
-import { Expense, Group, SplitType } from '../types';
-import { Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat } from 'lucide-react';
+import { getFullMembers } from '../lib/members';
+import { Expense, Group } from '../types';
+import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
+import { Search, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
+
+// Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
+// bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
+const fmtDate = (dateStr: string) => {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -17,10 +25,15 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unsettled' | 'pending_confirmation' | 'settled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // The ledger shows at most PAGE_SIZE rows at a time; "Show more" reveals the
+  // next batch so old unsettled items stay reachable without flooding the page.
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Sort and Filter logic
   const filteredExpenses = expenses
@@ -29,7 +42,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       const matchesSearch = exp.title.toLowerCase().includes(search.toLowerCase()) || 
                             exp.category.toLowerCase().includes(search.toLowerCase());
       // Status
-      const matchesStatus = statusFilter === 'all' || exp.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || getNormalizedExpenseStatus(exp) === statusFilter;
       // Category
       const matchesCategory = categoryFilter === 'all' || exp.category === categoryFilter;
 
@@ -64,22 +77,9 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
     return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors = [
-      'text-blue-700 bg-blue-50 border-blue-200',
-      'text-emerald-700 bg-emerald-50 border-emerald-200',
-      'text-violet-700 bg-violet-50 border-violet-200',
-      'text-amber-700 bg-amber-50 border-amber-200',
-      'text-rose-700 bg-rose-50 border-rose-200',
-      'text-cyan-700 bg-cyan-50 border-cyan-200',
-      'text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200',
-    ];
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-      hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
+  const getCategoryColor = (_category: string) => {
+    // Brand system: one hue only. Category chips are uniform neutral zinc.
+    return 'text-natural-muted bg-natural-sidebar border-natural-border';
   };
 
   return (
@@ -87,11 +87,11 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       {/* Controls Header */}
       <div className="p-5 border-b border-natural-border space-y-4" id="list-controls-header">
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <h2 className="text-xl font-display font-bold text-natural-text">Itemized Transactions</h2>
+          <h2 className="text-xl font-display font-semibold text-natural-text">Itemized Transactions</h2>
           
           {/* Quick Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0" id="status-filters">
-            {(['all', 'unsettled', 'pending_confirmation', 'settled'] as const).map((status) => (
+            {(['all', 'OPEN', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -102,7 +102,13 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                 }`}
                 id={`filter-status-${status}`}
               >
-                {status === 'all' ? 'All Items' : status.replace('_', ' ')}
+                {status === 'all'
+                  ? 'All Items'
+                  : status === 'OPEN'
+                    ? 'Open'
+                    : status === 'PARTIALLY_SETTLED'
+                      ? 'Partially Settled'
+                      : 'Fully Settled'}
               </button>
             ))}
           </div>
@@ -173,132 +179,129 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             <AlertCircle className="h-10 w-10 text-natural-muted mx-auto mb-3" />
             <p className="text-natural-text font-semibold text-sm">No expenses found</p>
             <p className="text-natural-muted text-xs mt-1">Try relaxing your search terms or filters.</p>
+            {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
+              <button
+                onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
+                className="mt-3 text-natural-primary hover:underline text-xs font-bold inline-flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Clear filters
+              </button>
+            )}
           </div>
         ) : (
-          filteredExpenses.map((exp) => {
+          filteredExpenses.slice(0, visibleCount).map((exp) => {
             const payerMember = members.find(m => m.uid === exp.paidBy);
             const payerName = payerMember?.name || 'Unknown';
             const isPayerActive = exp.paidBy === activeUser;
-            const myShare = exp.shares?.[activeUser] || 0;
+            const isFullySettled = isExpenseFullySettled(exp);
+            const myRemainingBalance = getRemainingSettlementAmount(exp, activeUser, false);
+            const totalRemainingToPayer = getTotalRemainingOwedToPayer(exp, false);
+            // Dark Cherry: only its creator ever sees numbers.
+            const isDark = isDarkCherry(exp);
+            const maskNumbers = isDark && !isPayerActive;
 
-            // Determine relation to active user
-            // If active user paid: others owe them
-            // If active user didn't pay: active user owes payer
-            
             let balanceText = '';
             let balanceStyle = '';
-            
-            let settledByDebtor: Record<string, number> = {};
-            if (exp.settlements) {
-              exp.settlements.forEach(s => {
-                if (s.status === 'confirmed') {
-                  settledByDebtor[s.paidBy] = (settledByDebtor[s.paidBy] || 0) + s.amount;
-                }
-              });
-            }
 
-            if (exp.status === 'settled' || exp.status === 'CLOSED') {
+            if (isFullySettled) {
               balanceText = 'Fully Settled';
               balanceStyle = 'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
-            } else {
+            } else if (isDark) {
               if (isPayerActive) {
-                // I paid, so people owe me (total amount minus my share minus what they've paid)
-                let totalRemainder = 0;
-                Object.entries(exp.shares || {}).forEach(([uid, share]) => {
-                  if (uid !== activeUser) {
-                    const paid = settledByDebtor[uid] || 0;
-                    const left = share - paid;
-                    if (left > 0.01) {
-                      totalRemainder += left;
-                    }
-                  }
-                });
-                
-                if (totalRemainder > 0.01) {
-                  balanceText = `Others owe you $${totalRemainder.toFixed(2)}`;
-                  balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
-                } else {
-                  balanceText = 'No balance for you';
-                  balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
-                }
+                balanceText = `Pot: $${getDarkCherryRemaining(exp, false).toFixed(2)} to go`;
+                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
-                // Someone else paid, I owe my share to them minus what I've paid
-                const paidByMe = settledByDebtor[activeUser] || 0;
-                const leftToPay = myShare - paidByMe;
-                if (leftToPay > 0.01) {
-                  balanceText = `You owe ${payerName} $${leftToPay.toFixed(2)}`;
-                  balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
-                } else {
-                  balanceText = 'No balance for you';
-                  balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
-                }
+                balanceText = 'Chip in when you can';
+                balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
               }
+            } else if (isPayerActive) {
+              if (totalRemainingToPayer > 0.01) {
+                balanceText = `Others owe you $${totalRemainingToPayer.toFixed(2)}`;
+                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
+              } else {
+                balanceText = 'No balance for you';
+                balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
+              }
+            } else if (myRemainingBalance > 0.01) {
+              balanceText = `You owe ${payerName} $${myRemainingBalance.toFixed(2)}`;
+              balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
+            } else {
+              balanceText = 'No balance for you';
+              balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
             }
 
             return (
               <div
                 key={exp.id}
                 onClick={() => onExpenseClick(exp)}
-                className="p-4 sm:p-5 flex items-center justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
                 id={`expense-row-${exp.id}`}
               >
-                <div className="flex items-start gap-4 min-w-0 flex-1">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
                   {/* Status indicator ring */}
-                  <div className="mt-1" id={`status-ring-${exp.id}`}>
-                    {exp.status === 'settled' ? (
-                      <div className="p-2 bg-natural-sage text-natural-primary rounded-full border border-natural-primary/20">
+                  <div className="mt-0.5 shrink-0" id={`status-ring-${exp.id}`}>
+                    {/* Cherry means money is outstanding, so open is the
+                        loudest and closed is the quietest. This used to run
+                        the other way, pointing the eye at the rows that
+                        needed nothing. */}
+                    {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
+                      <div className="p-2 bg-natural-pebble text-natural-muted rounded-full border border-natural-border">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
-                    ) : exp.status === 'pending_confirmation' ? (
-                      <div className="p-2 bg-natural-sidebar text-natural-text rounded-full border border-natural-border/20 animate-pulse">
+                    ) : getNormalizedExpenseStatus(exp) === 'PARTIALLY_SETTLED' ? (
+                      <div className="p-2 bg-natural-pebble text-natural-primary rounded-full border border-natural-primary/25 animate-pulse">
                         <Clock className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="p-2 bg-natural-sidebar text-natural-muted rounded-full border border-natural-border">
+                      <div className="p-2 bg-natural-primary-wash text-natural-primary rounded-full border border-natural-primary/30">
                         <AlertCircle className="h-4 w-4" />
                       </div>
                     )}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate max-w-full">
                         {exp.title}
                       </span>
                       <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}>
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span className="text-[10px] font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
+                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
                           <Repeat size={10} />
                         </span>
                       )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-natural-muted">
-                      <span className="font-mono">{new Date(exp.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span className="font-mono">{fmtDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
-                      <span className="font-mono text-[11px]">
-                        Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
-                        {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}
+                      <span className="font-mono text-xs">
+                        {isDark
+                          ? 'Dark Cherry · blind split'
+                          : <>Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
+                            {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}</>}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Right Area: Amount and Share Balance */}
-                <div className="flex items-center gap-4 pl-4 shrink-0" id={`expense-balance-${exp.id}`}>
-                  <div className="text-right">
-                    <span className="block text-base font-display font-bold text-natural-text">
-                      {formatCurrency(exp.amount)}
+                {/* Right (desktop) / bottom (mobile): amount + share balance */}
+                <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
+                  <div className="sm:text-right">
+                    <span className="block text-base font-display font-semibold text-natural-text">
+                      {maskNumbers
+                        ? <span className="inline-flex items-center gap-1"><Cherry className="h-4 w-4 text-natural-primary" /> •••</span>
+                        : formatCurrency(exp.amount)}
                     </span>
-                    <span className={`inline-block text-[10px] px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
                       {balanceText}
                     </span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="hidden sm:block h-5 w-5 text-natural-border group-hover:text-natural-primary group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </div>
             );
@@ -306,14 +309,27 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
         )}
       </div>
 
+      {/* Show more (list is capped at PAGE_SIZE rows at a time) */}
+      {filteredExpenses.length > visibleCount && (
+        <div className="p-3 border-t border-natural-border text-center">
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="text-xs font-bold text-natural-primary hover:text-natural-dark bg-natural-sage/30 hover:bg-natural-sage/50 border border-natural-primary/20 px-5 py-2 rounded-full transition-all cursor-pointer"
+            id="show-more-expenses-btn"
+          >
+            Show more ({filteredExpenses.length - visibleCount} more)
+          </button>
+        </div>
+      )}
+
       {/* Stats Counter Footer */}
       {filteredExpenses.length > 0 && (
         <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl" id="list-footer-stats">
-          <span className="font-medium font-mono">Showing {filteredExpenses.length} of {expenses.length} expense items</span>
-          {statusFilter !== 'all' && (
+          <span className="font-medium font-mono">Showing {Math.min(visibleCount, filteredExpenses.length)} of {expenses.length} expense items</span>
+          {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button 
               onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
-              className="text-natural-text hover:text-[#c49363] font-bold flex items-center gap-1 cursor-pointer"
+              className="text-natural-text hover:text-natural-primary font-bold flex items-center gap-1 cursor-pointer"
               id="clear-filters-footer-btn"
             >
               <RefreshCw className="h-3 w-3" /> Clear filters

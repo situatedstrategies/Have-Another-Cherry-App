@@ -1,0 +1,100 @@
+import firebaseConfig from '../../firebase-applet-config.json';
+
+declare global {
+  interface Window {
+    grecaptcha?: {
+      enterprise: {
+        ready: (cb: () => void) => void;
+        execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      };
+    };
+  }
+}
+
+export const RECAPTCHA_SITE_KEY = firebaseConfig.recaptchaSiteKey;
+
+let scriptPromise: Promise<void> | null = null;
+
+function loadRecaptchaScript(): Promise<void> {
+  if (!scriptPromise) {
+    scriptPromise = new Promise((resolve, reject) => {
+      if (window.grecaptcha?.enterprise) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        scriptPromise = null;
+        reject(new Error('Failed to load reCAPTCHA script'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return scriptPromise;
+}
+
+// Load the reCAPTCHA script ahead of time (e.g. when the auth screen mounts)
+// so the badge is visible before the user submits. Safe to call repeatedly.
+export function preloadRecaptcha(): void {
+  if (!RECAPTCHA_SITE_KEY) return;
+  loadRecaptchaScript().catch((err) => {
+    console.warn('reCAPTCHA preload failed:', err);
+  });
+}
+
+// Mint a reCAPTCHA Enterprise token for a user action (e.g. "LOGIN", "SIGNUP").
+// Tokens expire after two minutes, so mint one right before each protected call.
+// Returns null when reCAPTCHA is unavailable (no site key, blocked script) so
+// callers can decide how to degrade.
+//
+// Capped at 10s: grecaptcha's ready()/execute() never settle at all when the
+// site key is misconfigured for the current domain or the API is blocked, and
+// without a cap that hang freezes sign-in on "Please wait..." forever. Timing
+// out degrades to null, the same fail-open path as a blocked script.
+export async function getRecaptchaToken(action: string): Promise<string | null> {
+  if (!RECAPTCHA_SITE_KEY) return null;
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), 10_000);
+  });
+  const mint = (async () => {
+    await loadRecaptchaScript();
+    const grecaptcha = window.grecaptcha!;
+    await new Promise<void>((resolve) => grecaptcha.enterprise.ready(resolve));
+    return await grecaptcha.enterprise.execute(RECAPTCHA_SITE_KEY, { action });
+  })();
+  try {
+    const token = await Promise.race([mint, timeout]);
+    if (token === null) console.warn('reCAPTCHA timed out; continuing without a token');
+    // Keep a late rejection from surfacing as an unhandled promise error.
+    mint.catch(() => {});
+    return token;
+  } catch (err) {
+    console.warn('reCAPTCHA token unavailable:', err);
+    return null;
+  }
+}
+
+// Verify a user action against the server-side assessment endpoint.
+// Fails open (returns true) when reCAPTCHA never produced a token or the
+// verification endpoint is unreachable, and closed when Google scores the
+// interaction as risky.
+export async function verifyRecaptcha(action: string): Promise<boolean> {
+  const token = await getRecaptchaToken(action);
+  if (!token) return true;
+  try {
+    const res = await fetch('/api/verify-recaptcha', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, action }),
+    });
+    if (!res.ok) return true;
+    const data = await res.json();
+    return data.allowed !== false;
+  } catch (err) {
+    console.warn('reCAPTCHA verification unavailable:', err);
+    return true;
+  }
+}

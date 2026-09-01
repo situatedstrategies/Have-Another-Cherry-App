@@ -2,7 +2,7 @@ import { PaymentInstrument, MismatchType, Expense } from '../types';
 
 export const getInstrumentClass = (instrument?: PaymentInstrument): 'IMMEDIATE' | 'DEFERRED' | null => {
   if (!instrument) return null;
-  if (['CASH', 'DEBIT', 'TRANSFER'].includes(instrument)) return 'IMMEDIATE';
+  if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(instrument)) return 'IMMEDIATE';
   if (instrument === 'CREDIT') return 'DEFERRED';
   return null; // OTHER
 };

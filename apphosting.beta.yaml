@@ -1,0 +1,37 @@
+# Firebase App Hosting configuration overrides for the "beta" environment.
+# Merged on top of apphosting.yaml when the backend's environment name is "beta".
+# https://firebase.google.com/docs/app-hosting/configure
+
+env:
+  - variable: BETA_RESEND_API
+    secret: BETA_RESEND_API
+    availability:
+      - RUNTIME
+
+  # Without this, every `process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-..."`
+  # fallback in server.ts silently resolves to PRODUCTION: reCAPTCHA assessments
+  # and all Vertex AI calls from beta were being billed to, and authorised
+  # against, the production project. Same class of bug the firebase-admin init
+  # already guards against.
+  - variable: GOOGLE_CLOUD_PROJECT
+    value: have-another-cherry-beta
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Overrides the NOTION_TOKEN secret declared in apphosting.yaml.
+  #
+  # That file is shared by both backends, so a `secret:` reference there has to
+  # resolve in BOTH projects. NOTION_TOKEN exists only in production, so beta's
+  # build failed resolving it and the whole rollout died. App Hosting resolves
+  # every declared secret at build time; a missing one is fatal, not skipped.
+  #
+  # Beta has no reason to write to the live waitlist database anyway, so it
+  # opts out by name. Not an empty string: App Hosting rejects one and fails
+  # the whole build with "not formatted properly". src/lib/notion.ts treats
+  # "disabled" as unset, so beta signups still send their email and simply do
+  # not reach Notion.
+  - variable: NOTION_TOKEN
+    value: disabled
+    availability:
+      - RUNTIME

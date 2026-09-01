@@ -1,0 +1,132 @@
+# Deploys firestore.rules to production AND beta whenever they change on the
+# deploy branch, so the published rules can never silently drift from the app
+# that depends on them (App Hosting builds the app but never reads this file).
+#
+# Each project is an independent job: one being unconfigured or failing never
+# blocks the other. A job whose credentials are missing skips with a loud
+# warning instead of failing the run.
+#
+# Auth, in order of preference per project:
+#   1. Workload Identity Federation via repo VARIABLES (keyless, preferred):
+#        production: GCP_WIF_PROVIDER_PROD + GCP_SERVICE_ACCOUNT_PROD
+#        beta:       GCP_WIF_PROVIDER_BETA + GCP_SERVICE_ACCOUNT_BETA
+#   2. Production only: a service-account JSON key in the FIREBASE_SERVICE_ACCOUNT
+#      repo SECRET (the account needs roles/firebaserules.admin on the project).
+#
+# Note: the Run workflow button is unavailable while this file lives only on
+# development/web-production, so pushes are the trigger.
+name: Deploy Firestore Rules
+
+on:
+  push:
+    branches:
+      - development/web-production
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .github/workflows/deploy-firestore-rules.yml
+  workflow_dispatch:
+
+concurrency:
+  group: firestore-rules-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    name: Deploy rules to gen-lang-client-0987674990 (production)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Pick an auth method
+        id: guard
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT_PROD }}
+          SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$WIF_PROVIDER" ] && [ -n "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "method=wif" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SA_KEY" ]; then
+            echo "method=key" >> "$GITHUB_OUTPUT"
+          else
+            echo "method=none" >> "$GITHUB_OUTPUT"
+            echo "::warning::No production credentials. Set the GCP_WIF_PROVIDER_PROD + GCP_SERVICE_ACCOUNT_PROD repo variables (keyless, preferred) or the FIREBASE_SERVICE_ACCOUNT secret. Skipping - production Firestore rules are NOT being deployed from this push."
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.method != 'none'
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: steps.guard.outputs.method != 'none'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: steps.guard.outputs.method == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_PROD }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: steps.guard.outputs.method == 'key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore rules to production
+        if: steps.guard.outputs.method != 'none'
+        run: |
+          npx --yes firebase-tools@14 deploy \
+            --only firestore:rules \
+            --project gen-lang-client-0987674990 \
+            --non-interactive
+
+  deploy-beta:
+    name: Deploy rules to have-another-cherry-beta
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check target is configured
+        id: guard
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER_BETA }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT_BETA }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "::warning::GCP_WIF_PROVIDER_BETA and/or GCP_SERVICE_ACCOUNT_BETA are not set. Skipping the beta rules deploy."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        if: steps.guard.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Authenticate to Google Cloud
+        if: steps.guard.outputs.configured == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_BETA }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_BETA }}
+
+      - name: Deploy Firestore rules to beta
+        if: steps.guard.outputs.configured == 'true'
+        run: |
+          npx --yes firebase-tools@14 deploy \
+            --only firestore:rules \
+            --project have-another-cherry-beta \
+            --non-interactive

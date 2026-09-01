@@ -1,20 +1,20 @@
 import { hashString } from '../lib/crypto';
-import React, { useState } from 'react';
-import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth } from '../firebase';
+import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
   return (
-    <img src="/cherry2transparent.png" alt="Cherry Logo" className={className} style={{ objectFit: 'contain' }} />
+    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
   );
 }
 
 const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 
-export default function GroupSetup({ onComplete }: { onComplete: (groupId: string) => void }) {
+export default function GroupSetup({ onComplete, onCancel }: { onComplete: (groupId: string) => void; onCancel?: () => void }) {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [inviteCode, setInviteCode] = useState('');
@@ -31,31 +31,52 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [partnerIncome, setPartnerIncome] = useState('');
+  const [myIncome, setMyIncome] = useState('');
+  const [recMessage, setRecMessage] = useState('');
   const [inviteName, setInviteName] = useState('');
 
-  const recommendSplit = async () => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-      const myIncome = userDoc.data()?.income;
-      
-      const incomeValues: Record<string, number> = {
-        'under_50k': 35000,
-        '50k_100k': 75000,
-        '100k_150k': 125000,
-        'over_150k': 175000
-      };
+  // The split has to add up to 100% before a group can be created, so this
+  // total gates the submit button. Derived once here rather than recomputed
+  // inline, so the number shown, the warning, and the disabled state can never
+  // disagree with each other.
+  const splitTotal = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
+  const splitBalanced = Math.abs(splitTotal - 100) <= 0.01;
 
-      const myVal = incomeValues[myIncome] || 75000;
-      const partnerVal = incomeValues[partnerIncome] || 75000;
-      
-      const total = myVal + partnerVal;
-      const myPct = Math.round((myVal / total) * 100);
-      const partnerPct = 100 - myPct;
-      
-      setSplits([String(myPct), String(partnerPct)]);
-    } catch (e) {
-      console.error(e);
+  // Pre-fill the creator's income from their saved profile (from the quiz), if available.
+  useEffect(() => {
+    const loadIncome = async () => {
+      try {
+        if (!auth.currentUser) return;
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        const saved = userDoc.data()?.income;
+        if (saved != null && String(saved).trim() !== '') setMyIncome(String(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadIncome();
+  }, []);
+
+  // Recommend a split proportional to the two annual incomes.
+  const recommendSplit = () => {
+    const myVal = parseFloat(myIncome);
+    const partnerVal = parseFloat(partnerIncome);
+
+    if (!myVal || myVal <= 0) {
+      setRecMessage('Enter your income first to calculate a split.');
+      return;
     }
+    if (!partnerVal || partnerVal <= 0) {
+      setRecMessage("Enter your partner's income first to calculate a split.");
+      return;
+    }
+
+    const total = myVal + partnerVal;
+    const myPct = Math.round((myVal / total) * 100);
+    const partnerPct = 100 - myPct;
+
+    setSplits([String(myPct), String(partnerPct)]);
+    setRecMessage(`Recommended: you ${myPct}% / partner ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -65,7 +86,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           email: inviteEmail,
           groupName: createdGroupInfo.groupName,
@@ -89,8 +110,15 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
   };
 
   const generateInviteCode = () => {
+    // The code doubles as the group's document id, and the rules let any
+    // signed-in user `get` a group by id, so the code is a bearer secret:
+    // crypto-strength randomness, not Math.random().
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const get6 = () => Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const get6 = () => {
+      const bytes = new Uint8Array(6);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => chars[b % chars.length]).join('');
+    };
     return `${get6()}-${get6()}`;
   };
 
@@ -110,12 +138,21 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
 
       for (let i = 1; i < numPeople; i++) {
         if (!memberNames[i] || !memberNames[i].trim()) {
-          throw new Error(`Please enter a name for 🍒 ${NUMBER_WORDS[i] || i + 1}`);
+          throw new Error(`Please enter a name for Cherry ${NUMBER_WORDS[i] || i + 1}`);
         }
       }
 
-      const newInviteCode = generateInviteCode();
-      const groupId = newInviteCode; // Use invite code as document ID
+      // Use the invite code as the document ID, but make sure we don't reuse an
+      // existing group's code - setDoc would overwrite (and destroy) that group.
+      let newInviteCode = generateInviteCode();
+      let groupId = newInviteCode;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const existing = await getDoc(doc(db, 'groups', groupId));
+        if (!existing.exists()) break;
+        newInviteCode = generateInviteCode();
+        groupId = newInviteCode;
+        if (attempt === 5) throw new Error('Could not generate a unique invite code. Please try again.');
+      }
 
       const totalSplit = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
       if (Math.abs(totalSplit - 100) > 0.01) {
@@ -127,7 +164,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
       };
       
       const availableSplits = splits.slice(1).map((s, idx) => ({
-        name: memberNames[idx + 1] || `🍒 ${NUMBER_WORDS[idx + 1] || idx + 2}`,
+        name: memberNames[idx + 1] || `Cherry ${NUMBER_WORDS[idx + 1] || idx + 2}`,
         split: parseFloat(s) || 0
       }));
 
@@ -145,10 +182,13 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
 
       await setDoc(doc(db, 'groups', groupId), newGroup);
       
-      // Update user doc with their groupId
+      // Add this group to the user's membership set and make it active. Uses
+      // arrayUnion so creating an additional group never drops the existing ones.
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
         groupId: groupId,
+        activeGroupId: groupId,
+        groupIds: arrayUnion(groupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
       }, { merge: true });
@@ -180,70 +220,85 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         email: auth.currentUser.email || ''
       };
 
-      // In a real app we might query for the invite code. For simplicity if the code is the document ID we could do that.
-      // Wait, we need to query the 'groups' collection where inviteCode == inviteCode
-      // Instead of writing a complex query, we can query by inviteCode.
-      // But let's assume we do a quick query. Wait, we need to import query, collection, where, getDocs.
-      const { doc, getDoc } = await import('firebase/firestore');
-      const groupDocRef = doc(db, 'groups', inviteCode.toUpperCase());
-      const groupDocSnap = await getDoc(groupDocRef);
-      
-      if (!groupDocSnap.exists()) {
-        throw new Error("Invalid invite code");
-      }
-      
-      const groupDoc = groupDocSnap;
-      const groupData = groupDoc.data() as Group;
-      
-      if (groupData.members.length >= 5) {
-        throw new Error("This group is already full (max 5 members)");
-      }
-      
-      if (groupData.members.find(m => m.uid === currentUser.uid)) {
-         // Already a member
-      } else {
-        // Calculate remaining split
-        let currentSplitSum = 0;
-        if (groupData.defaultSplit) {
-           currentSplitSum = Object.values(groupData.defaultSplit).reduce((a, b) => a + b, 0);
+      const groupRef = doc(db, 'groups', inviteCode.toUpperCase());
+
+      // Join inside a transaction so two people joining at once can't both take
+      // the same split slot or leave a ghost behind (read-modify-write is atomic
+      // and retried on conflict).
+      const joinedGroupId = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(groupRef);
+        if (!snap.exists()) throw new Error("Invalid invite code");
+        const groupData = snap.data() as Group;
+
+        const existingMembers = Array.isArray(groupData.members) ? groupData.members : [];
+        const existingMemberIds = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
+
+        const inMembers = existingMembers.some(m => m?.uid === currentUser.uid);
+        const inMemberIds = existingMemberIds.includes(currentUser.uid);
+
+        // Already fully a member - nothing to change.
+        if (inMembers && inMemberIds) return snap.id;
+
+        // Repair path: the two member lists have drifted apart, so the user is
+        // half-in the group. Every other Firestore rule keys off `memberIds`, so
+        // someone present in `members` but missing from `memberIds` can read the
+        // group and then be denied on everything else. Heal the drift instead of
+        // re-adding them, which would duplicate an entry and trip the join rule.
+        if (inMembers !== inMemberIds) {
+          tx.update(groupRef, {
+            members: inMembers ? existingMembers : [...existingMembers, currentUser],
+            memberIds: inMemberIds ? existingMemberIds : [...existingMemberIds, currentUser.uid],
+          });
+          return snap.id;
         }
-        const targetNumPeople = groupData.targetNumPeople || 2;
-        const membersLeft = targetNumPeople - groupData.members.length;
-        
-        // Take the next available split
+
+        const capacity = groupData.targetNumPeople || 5;
+        // Count joined people by unique uid so a stale duplicate can't make a
+        // group with a free seat look full.
+        const joinedCount = new Set([
+          ...existingMemberIds,
+          ...existingMembers.map(m => m?.uid).filter(Boolean),
+        ]).size;
+        if (joinedCount >= capacity) {
+          throw new Error(`This group is already full (${capacity} members).`);
+        }
+
+        // Take the next available split slot, or fall back to the even remainder.
+        const newAvailable = [...(groupData.availableSplits || [])];
         let mySplit = 0;
-        let newAvailable = [...(groupData.availableSplits || [])];
         if (newAvailable.length > 0) {
           const nextSplit = newAvailable.shift();
           mySplit = typeof nextSplit === 'number' ? nextSplit : (nextSplit?.split || 0);
         } else {
-          // Fallback
-          let currentSplitSum = 0;
-          if (groupData.defaultSplit) {
-             currentSplitSum = Object.values(groupData.defaultSplit).reduce((a, b) => a + b, 0);
-          }
+          const currentSplitSum = Object.values(groupData.defaultSplit || {})
+            .reduce((a: number, b) => a + (Number(b) || 0), 0);
+          const membersLeft = capacity - joinedCount;
           mySplit = membersLeft > 0 ? (100 - currentSplitSum) / membersLeft : 0;
         }
+        // A malformed split map must not write NaN into the group document.
+        if (!Number.isFinite(mySplit)) mySplit = 0;
 
-        const { arrayUnion } = await import('firebase/firestore');
-        // Add member
-        await updateDoc(groupDoc.ref, {
-          members: arrayUnion(currentUser),
-          memberIds: arrayUnion(currentUser.uid),
+        tx.update(groupRef, {
+          members: [...existingMembers, currentUser],
+          memberIds: [...existingMemberIds, currentUser.uid],
           availableSplits: newAvailable,
-          [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10)
+          [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10),
         });
-      }
-      
-      // Update user doc
+        return snap.id;
+      });
+
+      // Add this group to the user's membership set and make it active, so
+      // joining a second group keeps the first rather than replacing it.
       const hashedEmail = currentUser.email ? (await hashString(currentUser.email)).substring(0, 6) : '';
       await setDoc(doc(db, 'users', currentUser.uid), {
-        groupId: groupDoc.id,
+        groupId: joinedGroupId,
+        activeGroupId: joinedGroupId,
+        groupIds: arrayUnion(joinedGroupId),
         name: currentUser.name || 'Friend',
         email: hashedEmail
       }, { merge: true });
 
-      onComplete(groupDoc.id);
+      onComplete(joinedGroupId);
 
     } catch (err: any) {
       setError(err.message);
@@ -268,7 +323,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
                 <Users className="h-12 w-12 text-natural-primary" />
               </div>
-              <h1 className="text-3xl font-bold font-display text-natural-text mb-2 tracking-tight">
+              <h1 className="text-3xl font-semibold font-display text-natural-text mb-2 tracking-tight">
                 Group Created!
               </h1>
               <p className="text-natural-muted font-medium">
@@ -279,7 +334,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
             <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
               <p className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">Invite Code</p>
               <div className="flex items-center justify-center gap-3">
-                <span className="text-4xl font-mono font-bold text-natural-text tracking-[0.2em]">{createdGroupInfo.inviteCode}</span>
+                <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">{createdGroupInfo.inviteCode}</span>
               </div>
               <button
                 onClick={copyToClipboard}
@@ -305,18 +360,18 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                 <button 
                   type="submit" 
                   disabled={inviteStatus === 'sending'}
-                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-dark transition-colors disabled:opacity-50"
+                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
                 >
                   {inviteStatus === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
                 </button>
               </div>
               {inviteStatus === 'success' && <p className="text-xs text-natural-primary font-medium mt-2">Invite sent successfully!</p>}
-              {inviteStatus === 'error' && <p className="text-xs text-red-500 font-medium mt-2">Failed to send invite. Check settings.</p>}
+              {inviteStatus === 'error' && <p className="text-xs text-natural-primary font-medium mt-2">Failed to send invite. Check settings.</p>}
             </form>
 
             <button
               onClick={() => onComplete(createdGroupInfo.groupId)}
-              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm"
+              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm"
             >
               Done, go to Dashboard
             </button>
@@ -332,17 +387,17 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
         <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative">
           
           <div className="p-8">
-            <button 
-              onClick={() => signOut(auth)}
+            <button
+              onClick={() => onCancel ? onCancel() : (forgetKeepSignedIn(), signOut(auth))}
               className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
             >
-              <ArrowLeft size={16} /> Back
+              <ArrowLeft size={16} /> {onCancel ? 'Cancel' : 'Back'}
             </button>
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
                 <CherryLogo className="h-12 w-12" />
               </div>
-              <h1 className="text-3xl font-bold font-display text-natural-text mb-1 tracking-tight">
+              <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 Welcome!
               </h1>
               <p className="text-natural-accent font-medium text-sm uppercase tracking-widest">
@@ -406,7 +461,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
           </button>
 
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold font-display text-natural-text">
+            <h2 className="text-2xl font-semibold font-display text-natural-text">
               {mode === 'create' ? 'Create a Group' : 'Join a Group'}
             </h2>
           </div>
@@ -471,27 +526,47 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">Want an income-based split recommendation?</p>
-                    <div className="flex gap-2">
-                      <select 
-                        value={partnerIncome} 
-                        onChange={(e) => setPartnerIncome(e.target.value)}
-                        className="flex-1 p-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-                      >
-                        <option value="">Partner's Income...</option>
-                        <option value="under_50k">Under $50,000</option>
-                        <option value="50k_100k">$50,000 - $100,000</option>
-                        <option value="100k_150k">$100,000 - $150,000</option>
-                        <option value="over_150k">Over $150,000</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={recommendSplit}
-                        disabled={!partnerIncome}
-                        className="bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90 disabled:opacity-50"
-                      >
-                        Calculate
-                      </button>
+                    <p className="text-xs text-natural-muted">Enter both annual incomes and we'll suggest a split proportional to income. You can still adjust the percentages below.</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">Your annual income</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={myIncome}
+                            onChange={(e) => { setMyIncome(e.target.value); setRecMessage(''); }}
+                            placeholder="e.g. 75000"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">Partner's annual income</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={partnerIncome}
+                            onChange={(e) => { setPartnerIncome(e.target.value); setRecMessage(''); }}
+                            placeholder="e.g. 60000"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                          />
+                        </div>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={recommendSplit}
+                      className="w-full bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90"
+                    >
+                      Calculate Recommended Split
+                    </button>
+                    {recMessage && (
+                      <p className="text-xs font-medium text-natural-primary">{recMessage}</p>
+                    )}
                   </div>
                 )}
                 <div className="space-y-3">
@@ -508,7 +583,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                             newNames[idx] = e.target.value;
                             setMemberNames(newNames);
                           }}
-                          placeholder={`🍒 ${NUMBER_WORDS[idx] || idx + 1}`}
+                          placeholder={`Cherry ${NUMBER_WORDS[idx] || idx + 1}`}
                           className="w-24 shrink-0 text-sm font-medium text-natural-text bg-transparent border-b border-dashed border-natural-border focus:border-natural-primary outline-none"
                         />
                       )}
@@ -533,16 +608,24 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
                 </div>
                 <div className="flex justify-between items-center mt-3 px-1">
                   <span className="text-xs font-medium text-natural-muted">Total:</span>
-                  <span className={`text-sm font-bold font-mono ${Math.abs(splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0) - 100) > 0.01 ? 'text-natural-primary' : 'text-natural-primary'}`}>
-                    {splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0).toFixed(1)}%
+                  <span className={`text-sm font-bold font-mono ${splitBalanced ? 'text-natural-text' : 'text-natural-primary'}`}>
+                    {splitTotal.toFixed(1)}%
                   </span>
                 </div>
+                {!splitBalanced && (
+                  <p className="mt-2 px-1 text-xs font-medium text-natural-primary">
+                    Percentages need to add up to 100% before you can create the group
+                    {splitTotal > 100
+                      ? ` - that's ${(splitTotal - 100).toFixed(1)}% too much.`
+                      : ` - ${(100 - splitTotal).toFixed(1)}% still to assign.`}
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading || Math.abs(splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0) - 100) > 0.01}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                disabled={loading || !splitBalanced}
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Creating...' : `Create & Get Invite Code${numPeople > 2 ? 's' : ''}`}
               </button>
@@ -572,7 +655,7 @@ export default function GroupSetup({ onComplete }: { onComplete: (groupId: strin
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? 'Joining...' : 'Join Group'}
               </button>

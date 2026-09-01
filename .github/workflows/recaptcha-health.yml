@@ -1,0 +1,37 @@
+# Post-deploy health checks.
+# Runs when this file changes on the deploy branch: waits out the App Hosting
+# rollout, then probes /api/recaptcha-health (gate-exempt, status only) and the
+# /__/auth/handler proxy on the branded auth domain, so the results are visible
+# in the Actions log. Re-run it any time from the Actions tab (workflow_dispatch)
+# or by touching this file.
+name: reCAPTCHA health check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - development/web-production
+    paths:
+      - ".github/workflows/recaptcha-health.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for App Hosting rollout
+        run: sleep 300
+      - name: Probe recaptcha-health endpoint
+        run: |
+          curl -sS -m 30 "https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/api/recaptcha-health" -o health.json -w "HTTP %{http_code}\n" || true
+          echo "--- response body:"
+          cat health.json || true
+          echo
+      - name: Probe auth handler proxy (hosted.app, not Cloudflare-fronted)
+        run: |
+          curl -sS -m 30 "https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/__/auth/handler" -o handler.html -w "HTTP %{http_code}\n" || true
+          echo "--- first 300 bytes (should be Firebase's handler page, not the site gate):"
+          head -c 300 handler.html || true
+          echo
+      # The custom domains (app./beta.haveanothercherry.com) sit behind
+      # Cloudflare, which challenges curl with a 403 "Just a moment" page, so
+      # probing the branded hosts from CI is inconclusive. Real browsers pass.

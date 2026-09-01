@@ -1,8 +1,0 @@
-{
-  "name": "Remix: Have Another Cherry Alpha Lite",
-  "description": "The app that makes sharing expenses sweeter",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

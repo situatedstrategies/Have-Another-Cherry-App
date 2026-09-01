@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" fill="#FBF3EC"/>
+  <g transform="translate(165.3,112.0) scale(1.3333)">
+
+  <defs>
+    <mask id="leafmask">
+      <rect x="0" y="0" width="520" height="600" fill="white"/>
+      <path d="M292 186 C 352 158, 416 162, 470 204" fill="none" stroke="black" stroke-width="16" stroke-linecap="round"/>
+    </mask>
+    <mask id="cherrymask">
+      <rect x="0" y="0" width="520" height="600" fill="white"/>
+      <ellipse cx="224" cy="243" rx="40" ry="20" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- cherry body with stem notch cut out -->
+  <circle cx="232" cy="388" r="162" fill="#C41200" mask="url(#cherrymask)"/>
+
+  <!-- highlights -->
+  <g fill="#FBEAE7">
+    <ellipse cx="170" cy="300" rx="32" ry="19" transform="rotate(-32 170 300)"/>
+    <circle cx="132" cy="336" r="11"/>
+  </g>
+
+  <!-- dollar sign -->
+  <text x="298" y="456" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="200" fill="#FBEAE7" transform="rotate(-6 298 400)">$</text>
+
+  <!-- stem -->
+  <path d="M 224 254 C 212 192, 176 132, 126 84" fill="none" stroke="#0B0B0B" stroke-width="24" stroke-linecap="round"/>
+  <ellipse cx="123" cy="79" rx="24" ry="14" fill="#0B0B0B" transform="rotate(-38 123 79)"/>
+
+  <!-- leaf with vein slash cut out -->
+  <path d="M 234 154 C 316 76, 452 104, 492 212 C 416 242, 300 238, 234 154 Z" fill="#0B0B0B" mask="url(#leafmask)"/>
+
+  </g>
+</svg>
