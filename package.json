@@ -11,6 +11,9 @@
     "lint": "tsc --noEmit",
     "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules"
   },
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@revenuecat/purchases-js": "^1.55.0",
