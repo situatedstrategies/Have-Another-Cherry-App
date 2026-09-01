@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, getAdditionalUserInfo, type User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth, db, applyKeepSignedIn } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -111,6 +111,9 @@ export default function AuthScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const loading = emailLoading || googleLoading;
   const [agreeTerms, setAgreeTerms] = useState(false);
+  // Opt-in to staying signed in across visits. Off by default: without it the
+  // session ends with the browser tab and the next visit asks for login again.
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [isReset, setIsReset] = useState(false);
   const [info, setInfo] = useState('');
@@ -166,6 +169,9 @@ export default function AuthScreen() {
       return;
     }
     setError('');
+    // Store and apply the "keep me signed in" choice before anything happens,
+    // especially before the redirect flow navigates away from the app.
+    await applyKeepSignedIn(keepSignedIn);
     const provider = new GoogleAuthProvider();
     // Mobile browsers (and home-screen installs) handle popups poorly or not at
     // all; the full-page redirect flow is the reliable path there. The popup
@@ -273,6 +279,7 @@ export default function AuthScreen() {
       // Keep the custom reCAPTCHA assessment as telemetry only; it must not
       // prevent legitimate users from reaching Firebase Authentication.
       void verifyRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
+      await applyKeepSignedIn(keepSignedIn);
       if (isLogin) {
         await withTimeout(signInWithEmailAndPassword(auth, email, password), 30_000);
       } else {
@@ -464,6 +471,23 @@ export default function AuthScreen() {
                   <button type="button" onClick={() => setLegalDoc('terms')} className="font-semibold text-natural-primary hover:underline">Terms of Service</button>
                   {' '}and{' '}
                   <button type="button" onClick={() => setLegalDoc('privacy')} className="font-semibold text-natural-primary hover:underline">Privacy Policy</button>.
+                </span>
+              </label>
+            )}
+
+            {!isReset && (
+              /* Applies to whichever way they sign in, email below or Google
+                 further down: the handlers both read this one checkbox. */
+              <label className="flex items-start gap-2 text-xs text-natural-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={keepSignedIn}
+                  onChange={(e) => setKeepSignedIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+                />
+                <span>
+                  <span className="font-semibold text-natural-text">Keep me signed in on this device.</span>{' '}
+                  Skip the login screen next time. Signing out in Settings turns this back off.
                 </span>
               </label>
             )}
