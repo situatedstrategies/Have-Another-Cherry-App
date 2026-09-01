@@ -2,7 +2,7 @@ import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth, authHeader } from '../firebase';
+import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 
@@ -381,7 +381,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           
           <div className="p-8">
             <button
-              onClick={() => onCancel ? onCancel() : signOut(auth)}
+              onClick={() => onCancel ? onCancel() : (forgetKeepSignedIn(), signOut(auth))}
               className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
             >
               <ArrowLeft size={16} /> {onCancel ? 'Cancel' : 'Back'}

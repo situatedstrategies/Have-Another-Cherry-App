@@ -7,7 +7,7 @@ import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
-import { auth, db, authHeader } from './firebase';
+import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
@@ -704,6 +704,10 @@ export default function App() {
   
 
   const handleSignOut = () => {
+    // Signing out also resets the "keep me signed in" choice, so the next
+    // visit always asks for login again instead of silently restoring a
+    // session.
+    forgetKeepSignedIn();
     // Just sign out and let the auth listener reset state. Clearing userProfile
     // synchronously here briefly renders ProfileSetup (no financialProfile) for a
     // frame before currentUser clears - so we don't.

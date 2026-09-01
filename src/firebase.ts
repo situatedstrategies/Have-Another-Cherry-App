@@ -1,6 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import {
+  initializeAuth,
+  setPersistence,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  inMemoryPersistence,
+  browserPopupRedirectResolver,
+} from 'firebase/auth';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import prodConfig from '../firebase-applet-config.json';
 import betaConfig from '../firebase-applet-config.beta.json';
@@ -58,7 +66,61 @@ if (firebaseConfig.recaptchaSiteKey) {
 
 // Initialize Firestore with the custom database ID as the third argument
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+
+// Staying signed in across visits is opt-in, not the default. Firebase's
+// default (local) persistence silently restored the previous Google or email
+// session on every visit, which read as "the app logged me in without asking".
+// Now a session only survives the browser tab unless the user ticked "keep me
+// signed in" at login; that choice is remembered here and cleared on sign-out.
+const KEEP_SIGNED_IN_KEY = 'hac:keepSignedIn';
+
+export function getKeepSignedIn(): boolean {
+  try {
+    return localStorage.getItem(KEEP_SIGNED_IN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+// Record the user's choice and apply it to future sign-ins in this page load.
+// Called right before a sign-in attempt (email or Google), and before the
+// Google redirect flow navigates away, so the choice is already stored when
+// the app reloads on the way back.
+export async function applyKeepSignedIn(keep: boolean): Promise<void> {
+  try {
+    if (keep) localStorage.setItem(KEEP_SIGNED_IN_KEY, '1');
+    else localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+  } catch {
+    // Storage can be blocked (private mode, strict settings); sign-in still
+    // works, it just won't survive the tab.
+  }
+  try {
+    await setPersistence(auth, keep ? indexedDBLocalPersistence : browserSessionPersistence);
+  } catch {
+    // Unsupported persistence layer; fall through with whatever is active.
+  }
+}
+
+// Forget the "keep me signed in" choice. Every sign-out path calls this so
+// the next visit always lands on the login screen and asks again.
+export function forgetKeepSignedIn(): void {
+  try {
+    localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+  } catch {
+    // Ignore blocked storage; there is nothing stored to forget then anyway.
+  }
+}
+
+// initializeAuth instead of getAuth so the persistence layers honor the saved
+// choice from the very first read: with the flag set the previous session is
+// restored from durable storage, without it only the current tab's session
+// (if any) is picked up and a past visit's session is never resurrected.
+export const auth = initializeAuth(app, {
+  persistence: getKeepSignedIn()
+    ? [indexedDBLocalPersistence, browserLocalPersistence]
+    : [browserSessionPersistence, inMemoryPersistence],
+  popupRedirectResolver: browserPopupRedirectResolver,
+});
 
 // Build the Authorization header for calls to our authenticated API endpoints.
 // Returns {} when signed out so callers degrade gracefully.
