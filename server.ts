@@ -86,6 +86,14 @@ async function startServer() {
   ]);
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
+    "/api/apple-notifications",
+    // Apple's CDN fetches this to verify the app/domain association; it
+    // arrives with no cookies and must never see the gate.
+    "/.well-known/apple-app-site-association",
+    "/apple-app-site-association",
+    // The push service worker is fetched by the browser's SW machinery and
+    // must load even when the page itself sits behind the gate.
+    "/firebase-messaging-sw.js",
     "/api/recaptcha-health",
     "/api/beta-signup",
     "/cherry2transparent.png",
@@ -1303,6 +1311,293 @@ async function startServer() {
       console.error("RevenueCat webhook error:", err?.message || err);
       return res.status(500).json({ error: "Webhook processing failed" });
     }
+  });
+
+  // ---- Push notifications (FCM via the Admin SDK, ADC - no keys) ----------
+  //
+  // Same privacy rule as email (see CLAUDE.md): a push lands on a lock screen
+  // and travels through FCM, so it must NEVER contain amounts, balances, or
+  // expense titles. First names and the group name only; the details stay
+  // behind the app's encryption.
+  //
+  // Clients register FCM device tokens on their own user doc as a map
+  // `fcmTokens: { [token]: updatedAtIso }`. Sends fan out to every token a
+  // recipient has; tokens FCM reports dead are pruned so the map cannot fill
+  // with corpses.
+  const sendPushToUsers = async (
+    uids: string[],
+    title: string,
+    body: string,
+  ): Promise<number> => {
+    if (!uids.length) return 0;
+    await ensureAdminApp();
+    const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+    const { getMessaging } = await import("firebase-admin/messaging");
+    const fs = getFirestore();
+
+    const tokenOwners: { token: string; uid: string }[] = [];
+    await Promise.all(uids.map(async uid => {
+      const snap = await fs.collection("users").doc(uid).get();
+      const tokens = snap.data()?.fcmTokens;
+      if (tokens && typeof tokens === "object") {
+        for (const token of Object.keys(tokens)) tokenOwners.push({ token, uid });
+      }
+    }));
+    if (!tokenOwners.length) return 0;
+
+    const res = await getMessaging().sendEachForMulticast({
+      tokens: tokenOwners.map(t => t.token),
+      notification: { title, body },
+      apns: { payload: { aps: { sound: "default" } } },
+      // Android icon and accent color come from the app's manifest defaults
+      // (the cherry mark and #C41200), so nothing brand-shaped is set here.
+    });
+
+    // Prune tokens FCM says are gone (uninstalled app, rotated token).
+    const dead = res.responses
+      .map((r, i) => ({ r, t: tokenOwners[i] }))
+      .filter(({ r }) => {
+        const code = (r.error as any)?.code || "";
+        return code.includes("registration-token-not-registered") || code.includes("invalid-argument");
+      });
+    await Promise.allSettled(dead.map(({ t }) =>
+      fs.collection("users").doc(t.uid).update({ [`fcmTokens.${t.token}`]: FieldValue.delete() })
+    ));
+
+    return res.successCount;
+  };
+
+  // A little variety so the lock screen does not read like a robot, but a
+  // small, fixed pool so the voice stays consistent. No amounts, no titles.
+  const LEDGER_PUSH_COPY: Record<string, ((name: string, group: string) => { title: string; body: string })[]> = {
+    expense_logged: [
+      (n, g) => ({ title: "New on the ledger", body: `${n} logged a shared expense in ${g}.` }),
+      (n, g) => ({ title: "Fresh cherry", body: `${n} added something to the ${g} ledger. Peek when you have a sec.` }),
+      (n, g) => ({ title: "New shared expense", body: `${n} just logged one for ${g}.` }),
+    ],
+    payment_logged: [
+      (n, g) => ({ title: "Payment logged", body: `${n} paid something back in ${g}. One step closer to settled.` }),
+      (n, g) => ({ title: "Cherry progress", body: `${n} logged a payment in ${g}.` }),
+      (n, g) => ({ title: "Money moved", body: `${n} recorded a payment in ${g}. Sweet.` }),
+    ],
+  };
+
+  const NUDGE_PUSH_COPY: ((name: string, group: string) => { title: string; body: string })[] = [
+    (n, g) => ({ title: "A gentle nudge", body: `${n} sent a gentle reminder: the ${g} ledger could use a look.` }),
+    (n, g) => ({ title: "Gentle reminder", body: `A friendly poke from ${n}: there is an open balance in ${g}.` }),
+    (n, g) => ({ title: "When you have a moment", body: `${n} would love to settle up in ${g}. No rush, just a nudge.` }),
+  ];
+
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+  // Loads the group, confirms the caller belongs to it, and returns what the
+  // notification copy needs. Membership is enforced HERE, not trusted from
+  // the client, so nobody can push-spam a group they are not in.
+  const loadGroupForNotify = async (groupId: string, callerUid: string) => {
+    await ensureAdminApp();
+    const { getFirestore } = await import("firebase-admin/firestore");
+    const snap = await getFirestore().collection("groups").doc(groupId).get();
+    const data = snap.data();
+    const memberIds: string[] = Array.isArray(data?.memberIds) ? data!.memberIds : [];
+    if (!data || !memberIds.includes(callerUid)) return null;
+    const members: any[] = Array.isArray(data.members) ? data.members : [];
+    const callerName = members.find((m: any) => m?.uid === callerUid)?.name || "A member";
+    return { memberIds, callerName, groupName: String(data.name || "your group") };
+  };
+
+  // 14. Ledger event push: called by a client right after it logs an expense
+  //     or a payment, so the rest of the group hears about it. Deliberately
+  //     content-free (see the privacy note above); the event kind is all the
+  //     server ever learns.
+  app.post("/api/notify-ledger-event", requireAuth, rateLimit("notify", 60), async (req, res) => {
+    try {
+      const callerUid = (req as any).uid as string;
+      const { groupId, kind } = req.body || {};
+      if (typeof groupId !== "string" || !LEDGER_PUSH_COPY[kind]) {
+        return res.status(400).json({ error: "Missing group or unknown event kind." });
+      }
+      const groupInfo = await loadGroupForNotify(groupId, callerUid);
+      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+
+      const recipients = groupInfo.memberIds.filter(id => id !== callerUid);
+      const { title, body } = pick(LEDGER_PUSH_COPY[kind])(groupInfo.callerName, groupInfo.groupName);
+      const sent = await sendPushToUsers(recipients, title, body);
+      return res.status(200).json({ success: true, sent });
+    } catch (err: any) {
+      console.error("Ledger notify error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send notifications." });
+    }
+  });
+
+  // 15. Gently remind: a member manually nudges specific group members (or
+  //     everyone else) that the ledger could use a look. Tightly rate limited
+  //     because a nudge someone can spam stops being gentle.
+  app.post("/api/send-nudge", requireAuth, rateLimit("nudge", 10), async (req, res) => {
+    try {
+      const callerUid = (req as any).uid as string;
+      const { groupId } = req.body || {};
+      const toUids: string[] = Array.isArray(req.body?.toUids)
+        ? req.body.toUids.filter((u: any) => typeof u === "string").slice(0, 10)
+        : [];
+      if (typeof groupId !== "string") {
+        return res.status(400).json({ error: "Missing group." });
+      }
+      const groupInfo = await loadGroupForNotify(groupId, callerUid);
+      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+
+      // Only fellow members can be nudged; an empty list means everyone else.
+      const recipients = (toUids.length ? toUids : groupInfo.memberIds)
+        .filter(id => id !== callerUid && groupInfo.memberIds.includes(id));
+      if (!recipients.length) {
+        return res.status(400).json({ error: "Nobody to remind." });
+      }
+
+      const { title, body } = pick(NUDGE_PUSH_COPY)(groupInfo.callerName, groupInfo.groupName);
+      const sent = await sendPushToUsers(recipients, title, body);
+      return res.status(200).json({ success: true, sent });
+    } catch (err: any) {
+      console.error("Nudge error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send the reminder." });
+    }
+  });
+
+  // 13. Sign in with Apple server-to-server notifications. Configured in the
+  //     Apple Developer portal (Identifiers -> the App ID -> Sign in with
+  //     Apple -> Edit -> Server-to-Server Notification Endpoint) as
+  //     https://app.haveanothercherry.com/api/apple-notifications
+  //
+  //     Apple POSTs { payload: <JWT> } signed with its published keys whenever
+  //     a user changes the relationship: revokes consent for the app, deletes
+  //     their Apple ID outright, or toggles Hide My Email forwarding. Nothing
+  //     in the request is trusted until the JWT verifies against Apple's JWKS
+  //     with the right issuer and one of our client ids as audience.
+  //
+  //     Data handling on consent-revoked / account-delete: if Apple was the
+  //     account's ONLY sign-in method, the account is wiped (the Auth user and
+  //     the users/{uid} profile document). If the account can still sign in
+  //     another way (password, Google), only the Apple link is removed and all
+  //     sessions are revoked, so the person keeps the account they still have
+  //     access to. Group documents and the E2E-encrypted ledger are shared
+  //     data and are not touched from here.
+  const APPLE_NOTIFICATION_AUDIENCES = (
+    process.env.APPLE_CLIENT_IDS ||
+    "com.situatedstrategies.haveAnotherCherry,com.situatedstrategies.haveAnotherCherry.web"
+  ).split(",").map(s => s.trim()).filter(Boolean);
+
+  app.post("/api/apple-notifications", async (req, res) => {
+    const token = typeof req.body?.payload === "string" ? req.body.payload : "";
+    if (!token) return res.status(400).json({ error: "Missing payload" });
+
+    let event: any;
+    try {
+      const { createRemoteJWKSet, jwtVerify } = await import("jose");
+      const jwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: "https://appleid.apple.com",
+        audience: APPLE_NOTIFICATION_AUDIENCES,
+      });
+      const rawEvents = (payload as any).events;
+      event = typeof rawEvents === "string" ? JSON.parse(rawEvents) : rawEvents;
+    } catch (err: any) {
+      console.warn("Apple notification rejected:", err?.message || err);
+      return res.status(401).json({ error: "Invalid notification" });
+    }
+
+    const type = String(event?.type || "");
+    const appleSub = String(event?.sub || "");
+    // email-disabled / email-enabled need no action; acknowledge so Apple
+    // stops retrying.
+    if (!appleSub || (type !== "consent-revoked" && type !== "account-delete")) {
+      return res.status(200).json({ received: true, ignored: type || "no event" });
+    }
+
+    try {
+      await ensureAdminApp();
+      const { getAuth } = await import("firebase-admin/auth");
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const adminAuth = getAuth();
+
+      const found = await adminAuth.getUsers([
+        { providerId: "apple.com", providerUid: appleSub },
+      ]);
+      const user = found.users[0];
+      if (!user) {
+        return res.status(200).json({ received: true, ignored: "no matching account" });
+      }
+
+      const hasOtherSignIn = user.providerData.some(p => p.providerId !== "apple.com");
+      if (hasOtherSignIn) {
+        await adminAuth.updateUser(user.uid, { providersToUnlink: ["apple.com"] });
+        await adminAuth.revokeRefreshTokens(user.uid);
+        console.log(`Apple ${type}: unlinked apple.com from ${user.uid}, sessions revoked`);
+      } else {
+        await getFirestore().collection("users").doc(user.uid).delete();
+        await adminAuth.deleteUser(user.uid);
+        console.log(`Apple ${type}: wiped account ${user.uid}`);
+      }
+      return res.status(200).json({ received: true });
+    } catch (err: any) {
+      console.error("Apple notification error:", err?.message || err);
+      // Non-2xx so Apple retries; a deletion request must not be lost silently.
+      return res.status(500).json({ error: "Processing failed" });
+    }
+  });
+
+  // 16. Associated domains. Apple (via its CDN) fetches this file to verify
+  //     that this domain and the iOS app belong together, which unlocks
+  //     universal links (https links that open the app when installed) and
+  //     shared password autofill between the web app and the iOS app.
+  //
+  //     The app id needs the Apple Team ID prefix, which only exists once
+  //     Developer Program enrollment completes, so it comes from the
+  //     APPLE_TEAM_ID env var (a plain value in apphosting.yaml, not a
+  //     secret: this file is public by design). Until the var is set the
+  //     route 404s, which Apple simply reads as "not associated yet".
+  //
+  //     Universal links deliberately cover ONLY /expense/* for now. Auth
+  //     action links (password reset, verification) must keep opening in the
+  //     browser, where the handler pages live.
+  app.get(
+    ["/.well-known/apple-app-site-association", "/apple-app-site-association"],
+    (_req, res) => {
+      const teamId = process.env.APPLE_TEAM_ID;
+      if (!teamId) return res.status(404).json({ error: "Not configured yet" });
+      const appId = `${teamId}.com.situatedstrategies.haveAnotherCherry`;
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).json({
+        applinks: {
+          details: [{ appIDs: [appId], components: [{ "/": "/expense/*" }] }],
+        },
+        webcredentials: { apps: [appId] },
+      });
+    }
+  );
+
+  // 17. Push service worker. FCM's web SDK registers /firebase-messaging-sw.js
+  //     to display notifications that arrive while the tab is closed or in
+  //     the background. Served dynamically (host-aware) rather than as a
+  //     static file so a beta hostname gets the beta Firebase project's
+  //     config instead of production's - the same reason src/firebase.ts
+  //     picks its config at runtime. Only public identifiers are embedded.
+  app.get("/firebase-messaging-sw.js", (req, res) => {
+    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    const cfg = /^beta[.-]/.test(host) ? betaFirebaseConfig : firebaseConfig;
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(
+      `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");\n` +
+      `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");\n` +
+      `firebase.initializeApp(${JSON.stringify({
+        apiKey: cfg.apiKey,
+        authDomain: cfg.authDomain,
+        projectId: cfg.projectId,
+        messagingSenderId: cfg.messagingSenderId,
+        appId: cfg.appId,
+      })});\n` +
+      // Instantiating messaging is what wires the background handler that
+      // displays incoming notification payloads.
+      `firebase.messaging();\n`
+    );
   });
 
   // Unknown API routes should return JSON 404, not fall through to the SPA HTML.

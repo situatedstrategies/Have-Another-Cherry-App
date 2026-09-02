@@ -86,8 +86,18 @@ function PrivacyPolicy() {
         <p>We keep your information for as long as your account is active. When you delete your account, your profile and personal data are removed and you are scrubbed from your group's member list.</p>
       </Section>
 
-      <Section title="Children">
-        <p>The app is not directed to individuals under 18, and we do not knowingly collect their information.</p>
+      <Section title="Age Suitability">
+        <p>
+          Have Another Cherry is for anyone 13 and up. We built it for households, roommates, friends, and
+          young people who are learning to manage shared money and to have honest, low-drama conversations
+          about it. If you are between 13 and 17, use the app with a parent or guardian's permission.
+          Inviting them into your group is a fine way to practice.
+        </p>
+        <p>
+          The app is not directed to children under 13, and we do not knowingly collect their information.
+          If you believe a child under 13 has created an account, email help@haveanothercherry.com and we
+          will delete it.
+        </p>
       </Section>
 
       <Section title="Changes to This Policy">
@@ -120,7 +130,7 @@ function TermsOfService() {
       </Section>
 
       <Section title="Eligibility &amp; Accounts">
-        <p>You must be at least 18 years old to use the Service. You are responsible for keeping your login credentials secure and for all activity under your account. Your group's invite code is what keeps your ledger private - share it only with people you trust.</p>
+        <p>You must be at least 13 years old to use the Service. If you are under 18, you may use it only with the permission of a parent or legal guardian, who agrees to these Terms on your behalf. You are responsible for keeping your login credentials secure and for all activity under your account. Your group's invite code is what keeps your ledger private - share it only with people you trust.</p>
       </Section>
 
       <Section title="Not Financial or Legal Advice">

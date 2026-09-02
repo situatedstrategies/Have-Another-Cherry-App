@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
-import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban } from 'lucide-react';
+import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban, BellRing } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
+import ReflectionsSection from './ReflectionsSection';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -16,6 +17,7 @@ interface ExpenseDetailProps {
   onConfirmReceipt: (settlementId: string) => void;
   onVoidSettlement: (settlementId: string) => void;
   onAddComment: (text: string) => void;
+  onGentleRemind?: () => Promise<void> | void;
 }
 
 export default function ExpenseDetail({
@@ -28,9 +30,11 @@ export default function ExpenseDetail({
   onSettleClick,
   onConfirmReceipt,
   onVoidSettlement,
-  onAddComment
+  onAddComment,
+  onGentleRemind
 }: ExpenseDetailProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [nudging, setNudging] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [expandedSettlement, setExpandedSettlement] = useState<string | null>(null);
   // Settlement id awaiting inline "remove entry" confirmation.
@@ -382,7 +386,7 @@ export default function ExpenseDetail({
             </form>
 
             {expense.comments && expense.comments.length > 0 && (
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3 mt-4" id="detail-comments-list">
                 {expense.comments.map(c => (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="h-7 w-7 rounded-full bg-natural-sidebar flex items-center justify-center shrink-0 border border-natural-border">
@@ -400,7 +404,10 @@ export default function ExpenseDetail({
               </div>
             )}
           </div>
-          
+
+          {/* Reflections: how this one felt. Private by default. */}
+          <ReflectionsSection expenseId={expense.id} group={group} activeUser={activeUser} />
+
         </div>
 
         {/* Footer (Quick Actions) */}
@@ -463,12 +470,28 @@ export default function ExpenseDetail({
             })()}
             
             {!isExpenseFullySettled(expense) && isCreditorActive && (
-              <button
-                onClick={onSettleClick}
-                className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <CreditCard className="h-4 w-4" /> Log Received Payment
-              </button>
+              <>
+                {onGentleRemind && (
+                  <button
+                    onClick={async () => {
+                      if (nudging) return;
+                      setNudging(true);
+                      try { await onGentleRemind(); } finally { setNudging(false); }
+                    }}
+                    disabled={nudging}
+                    title="Send a gentle push notification. It says a look is due; never any amounts."
+                    className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <BellRing className="h-4 w-4" /> {nudging ? 'Nudging...' : 'Gently Remind'}
+                  </button>
+                )}
+                <button
+                  onClick={onSettleClick}
+                  className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <CreditCard className="h-4 w-4" /> Log Received Payment
+                </button>
+              </>
             )}
 
             {isExpenseFullySettled(expense) && (

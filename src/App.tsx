@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
+import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
@@ -190,6 +191,26 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 1b. Web push. If this browser already granted notifications, silently
+  // refresh the token registration; either way, surface pushes that arrive
+  // while the app is open as toasts (the browser only shows them when the
+  // tab is in the background). The first permission ask lives in Settings,
+  // behind a click - never an unprompted browser dialog on load.
+  useEffect(() => {
+    if (!currentUser) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      if (pushPermission() === 'granted') {
+        await enableWebPush(currentUser.uid).catch(() => {});
+      }
+      const u = await listenForegroundPush((title, body) => addToast(title, body, 'info'));
+      if (cancelled) u();
+      else unsub = u;
+    })();
+    return () => { cancelled = true; unsub?.(); };
+  }, [currentUser]);
 
   // 2. Fetch User Profile
   useEffect(() => {
@@ -703,7 +724,11 @@ export default function App() {
   }
   
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    // Stop push delivery to this browser for the account being left. Best
+    // effort: cleanup must never block signing out.
+    const uid = auth.currentUser?.uid;
+    if (uid) await disableWebPush(uid).catch(() => {});
     // Signing out also resets the "keep me signed in" choice, so the next
     // visit always asks for login again instead of silently restoring a
     // session.
@@ -1043,6 +1068,51 @@ export default function App() {
     }
   };
 
+  // Fire-and-forget push to the rest of the group after a ledger write. Best
+  // effort by design: a notification failing must never block or fail the
+  // write it follows, so errors are swallowed. The server enforces membership
+  // and the pushes carry no amounts or titles (see server.ts).
+  const notifyLedgerEvent = (kind: 'expense_logged' | 'payment_logged') => {
+    const gid = group?.id;
+    if (!gid) return;
+    (async () => {
+      try {
+        await fetch('/api/notify-ledger-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+          body: JSON.stringify({ groupId: gid, kind }),
+        });
+      } catch { /* best effort */ }
+    })();
+  };
+
+  // Gently remind: manual push to this expense's outstanding debtors. Returns
+  // whether anything was sent so the caller can toast accordingly.
+  const handleGentleRemind = async (expense: Expense) => {
+    if (!group) return;
+    const debtors = group.memberIds.filter(uid =>
+      uid !== expense.paidBy && getRemainingSettlementAmount(expense, uid, false) > 0.01
+    );
+    try {
+      const res = await fetch('/api/send-nudge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ groupId: group.id, toUids: debtors }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not send the reminder.');
+      addToast(
+        'Nudge Sent',
+        data.sent > 0
+          ? 'A gentle reminder is on its way.'
+          : "Sent - though nobody's devices are set up for notifications yet.",
+        'success'
+      );
+    } catch (e: any) {
+      addToast('Could Not Nudge', e?.message || 'Please try again in a moment.', 'info');
+    }
+  };
+
   const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
     // Money limits (lib/limits.ts): exact to $999,999, rounded to the
     // nearest $100k from $1M, refused past the hard cap as a typo.
@@ -1155,6 +1225,9 @@ export default function App() {
 
       // Sync to every other group member.
       await broadcastToMembers('UPSERT', finalExpense);
+
+      // Tell the group. New expenses only: edits would be noisy.
+      if (!editingExpense) notifyLedgerEvent('expense_logged');
     } catch (e: any) {
       console.error(e);
       setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Log expense', detail: String(e?.message || e) });
@@ -1305,6 +1378,7 @@ export default function App() {
       setShowSettleModal(false);
       addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
       await syncExpenseUpdate(updatedExp);
+      notifyLedgerEvent('payment_logged');
 
       // Write mismatch to protected collection
       const computedMismatch = computeMismatchForSettlement(expense, instrumentType);
@@ -2011,6 +2085,7 @@ export default function App() {
           onConfirmReceipt={(settlementId) => handleConfirmSettleReceipt(settlementId)}
           onVoidSettlement={(settlementId) => handleVoidSettlement(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
+          onGentleRemind={() => handleGentleRemind(expenses.find(e => e.id === selectedExpense.id) || selectedExpense)}
         />
       )}
 
