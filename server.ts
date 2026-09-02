@@ -94,6 +94,8 @@ async function startServer() {
     // The push service worker is fetched by the browser's SW machinery and
     // must load even when the page itself sits behind the gate.
     "/firebase-messaging-sw.js",
+    // App Store server notifications arrive from Apple with no cookies.
+    "/api/apple-purchase-notifications",
     "/api/recaptcha-health",
     "/api/beta-signup",
     "/cherry2transparent.png",
@@ -1598,6 +1600,74 @@ async function startServer() {
       // displays incoming notification payloads.
       `firebase.messaging();\n`
     );
+  });
+
+  // 18. App Store server notifications (in-app purchase events: renewals,
+  //     refunds, billing issues). Apple POSTs { signedPayload: <JWS> } to the
+  //     URL configured in App Store Connect. This endpoint is a RELAY, not a
+  //     second entitlement pipeline: RevenueCat stays the system of record
+  //     for Cherry+ (Apple -> here -> RevenueCat -> /api/revenuecat-webhook
+  //     -> users/{uid}.isPlus). Owning the URL means Apple's config points
+  //     at our domain, we get a log line per event, and the processor behind
+  //     it can change without touching App Store Connect.
+  //
+  //     Set APPLE_ASN_FORWARD_URL to RevenueCat's Apple server notification
+  //     URL (RevenueCat dashboard -> the Apple app's settings). RevenueCat
+  //     verifies the JWS signature itself, so the relay forwards the payload
+  //     untouched; the decode below is for logging only and trusts nothing.
+  //
+  //     Reachable two ways, same handler: the path on any of our hosts, and
+  //     the bare root of the purchasestatus. subdomain so the URL given to
+  //     Apple can be simply https://purchasestatus.haveanothercherry.com/
+  //     once that custom domain is attached to this backend.
+  const handleApplePurchaseNotification = async (req: express.Request, res: express.Response) => {
+    const signedPayload = req.body?.signedPayload;
+    if (typeof signedPayload !== "string" || !signedPayload) {
+      return res.status(400).json({ error: "Missing signedPayload" });
+    }
+
+    // Best-effort peek at the notification type for the log line. Unverified
+    // by design: nothing here acts on it.
+    let notificationType = "unknown";
+    try {
+      const claims = JSON.parse(Buffer.from(signedPayload.split(".")[1], "base64url").toString("utf8"));
+      notificationType = String(claims?.notificationType || "unknown");
+      if (claims?.subtype) notificationType += `/${String(claims.subtype)}`;
+    } catch { /* opaque payload; still forwarded */ }
+
+    const forwardUrl = process.env.APPLE_ASN_FORWARD_URL;
+    if (!forwardUrl) {
+      // Not wired to a processor yet. Acknowledge so Apple does not mark the
+      // endpoint as failing; RevenueCat still learns about purchases through
+      // receipt validation, just without the instant nudge.
+      console.warn(`App Store notification received (${notificationType}) but APPLE_ASN_FORWARD_URL is not set; acknowledged without forwarding.`);
+      return res.status(200).json({ received: true, forwarded: false });
+    }
+
+    try {
+      const upstream = await fetch(forwardUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signedPayload }),
+      });
+      if (!upstream.ok) {
+        console.error(`App Store notification forward failed: ${upstream.status} (${notificationType})`);
+        // Non-2xx so Apple retries; a purchase event must not be lost.
+        return res.status(502).json({ error: "Forward failed" });
+      }
+      console.log(`App Store notification relayed: ${notificationType}`);
+      return res.status(200).json({ received: true });
+    } catch (err: any) {
+      console.error("App Store notification relay error:", err?.message || err);
+      return res.status(502).json({ error: "Forward failed" });
+    }
+  };
+
+  app.post("/api/apple-purchase-notifications", handleApplePurchaseNotification);
+  app.post("/", (req, res, next) => {
+    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    if (!host.startsWith("purchasestatus.")) return next();
+    return handleApplePurchaseNotification(req, res);
   });
 
   // Unknown API routes should return JSON 404, not fall through to the SPA HTML.

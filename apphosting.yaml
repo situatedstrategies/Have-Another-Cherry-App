@@ -51,3 +51,15 @@ env:
     value: 4964KRMB5H
     availability:
       - RUNTIME
+
+  # App Store server notifications relay target. Set this to RevenueCat's
+  # Apple server-to-server notification URL (RevenueCat dashboard -> the
+  # Apple app's settings) so purchase events Apple sends to our domain are
+  # passed through to the processor that owns entitlements. A plain value:
+  # the URL contains no credentials RevenueCat does not already publish to
+  # the app. Until set, the endpoint acknowledges and logs without
+  # forwarding.
+  # - variable: APPLE_ASN_FORWARD_URL
+  #   value: https://api.revenuecat.com/...
+  #   availability:
+  #     - RUNTIME
