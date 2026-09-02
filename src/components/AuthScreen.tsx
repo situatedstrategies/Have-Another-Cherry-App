@@ -12,7 +12,9 @@ import {
   isPasswordValid,
 } from '../lib/password';
 
-const TERMS_VERSION = '2026-08-08';
+// Bumped 2026-09-02: eligibility lowered from 18+ to 13+ (parent or guardian
+// permission required under 18), and signup now records an age attestation.
+const TERMS_VERSION = '2026-09-02';
 
 // Turn Firebase's internal auth error codes into friendly, non-enumerating text.
 function friendlyAuthError(err: any): string {
@@ -69,7 +71,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
 async function recordTermsAcceptance(uid: string) {
   try {
-    await setDoc(doc(db, 'users', uid), { termsAcceptedAt: new Date().toISOString(), termsVersion: TERMS_VERSION }, { merge: true });
+    await setDoc(doc(db, 'users', uid), {
+      termsAcceptedAt: new Date().toISOString(),
+      termsVersion: TERMS_VERSION,
+      // The 13+ attestation made at signup (under 18 requires a parent or
+      // guardian's permission, per the Terms).
+      ageAttestedAt: new Date().toISOString(),
+    }, { merge: true });
   } catch (e) {
     console.error('Failed to record terms acceptance', e);
   }
@@ -173,7 +181,7 @@ export default function AuthScreen() {
   ) => {
     // New (sign-up) accounts must accept the terms first - matches the email flow.
     if (!isLogin && !agreeTerms) {
-      setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+      setError("Please confirm you're at least 13 and agree to the Terms of Service and Privacy Policy to create an account.");
       return;
     }
     setError('');
@@ -287,7 +295,7 @@ export default function AuthScreen() {
         return;
       }
       if (!agreeTerms) {
-        setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+        setError("Please confirm you're at least 13 and agree to the Terms of Service and Privacy Policy to create an account.");
         return;
       }
     }
@@ -486,7 +494,7 @@ export default function AuthScreen() {
                   className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
                 />
                 <span>
-                  I agree to the{' '}
+                  I'm at least 13 years old (13 to 17 with a parent or guardian's permission), and I agree to the{' '}
                   <button type="button" onClick={() => setLegalDoc('terms')} className="font-semibold text-natural-primary hover:underline">Terms of Service</button>
                   {' '}and{' '}
                   <button type="button" onClick={() => setLegalDoc('privacy')} className="font-semibold text-natural-primary hover:underline">Privacy Policy</button>.
