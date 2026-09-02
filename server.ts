@@ -1306,6 +1306,154 @@ async function startServer() {
     }
   });
 
+  // ---- Push notifications (FCM via the Admin SDK, ADC - no keys) ----------
+  //
+  // Same privacy rule as email (see CLAUDE.md): a push lands on a lock screen
+  // and travels through FCM, so it must NEVER contain amounts, balances, or
+  // expense titles. First names and the group name only; the details stay
+  // behind the app's encryption.
+  //
+  // Clients register FCM device tokens on their own user doc as a map
+  // `fcmTokens: { [token]: updatedAtIso }`. Sends fan out to every token a
+  // recipient has; tokens FCM reports dead are pruned so the map cannot fill
+  // with corpses.
+  const sendPushToUsers = async (
+    uids: string[],
+    title: string,
+    body: string,
+  ): Promise<number> => {
+    if (!uids.length) return 0;
+    await ensureAdminApp();
+    const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+    const { getMessaging } = await import("firebase-admin/messaging");
+    const fs = getFirestore();
+
+    const tokenOwners: { token: string; uid: string }[] = [];
+    await Promise.all(uids.map(async uid => {
+      const snap = await fs.collection("users").doc(uid).get();
+      const tokens = snap.data()?.fcmTokens;
+      if (tokens && typeof tokens === "object") {
+        for (const token of Object.keys(tokens)) tokenOwners.push({ token, uid });
+      }
+    }));
+    if (!tokenOwners.length) return 0;
+
+    const res = await getMessaging().sendEachForMulticast({
+      tokens: tokenOwners.map(t => t.token),
+      notification: { title, body },
+      apns: { payload: { aps: { sound: "default" } } },
+      // Android icon and accent color come from the app's manifest defaults
+      // (the cherry mark and #C41200), so nothing brand-shaped is set here.
+    });
+
+    // Prune tokens FCM says are gone (uninstalled app, rotated token).
+    const dead = res.responses
+      .map((r, i) => ({ r, t: tokenOwners[i] }))
+      .filter(({ r }) => {
+        const code = (r.error as any)?.code || "";
+        return code.includes("registration-token-not-registered") || code.includes("invalid-argument");
+      });
+    await Promise.allSettled(dead.map(({ t }) =>
+      fs.collection("users").doc(t.uid).update({ [`fcmTokens.${t.token}`]: FieldValue.delete() })
+    ));
+
+    return res.successCount;
+  };
+
+  // A little variety so the lock screen does not read like a robot, but a
+  // small, fixed pool so the voice stays consistent. No amounts, no titles.
+  const LEDGER_PUSH_COPY: Record<string, ((name: string, group: string) => { title: string; body: string })[]> = {
+    expense_logged: [
+      (n, g) => ({ title: "New on the ledger", body: `${n} logged a shared expense in ${g}.` }),
+      (n, g) => ({ title: "Fresh cherry", body: `${n} added something to the ${g} ledger. Peek when you have a sec.` }),
+      (n, g) => ({ title: "New shared expense", body: `${n} just logged one for ${g}.` }),
+    ],
+    payment_logged: [
+      (n, g) => ({ title: "Payment logged", body: `${n} paid something back in ${g}. One step closer to settled.` }),
+      (n, g) => ({ title: "Cherry progress", body: `${n} logged a payment in ${g}.` }),
+      (n, g) => ({ title: "Money moved", body: `${n} recorded a payment in ${g}. Sweet.` }),
+    ],
+  };
+
+  const NUDGE_PUSH_COPY: ((name: string, group: string) => { title: string; body: string })[] = [
+    (n, g) => ({ title: "A gentle nudge", body: `${n} sent a gentle reminder: the ${g} ledger could use a look.` }),
+    (n, g) => ({ title: "Gentle reminder", body: `A friendly poke from ${n}: there is an open balance in ${g}.` }),
+    (n, g) => ({ title: "When you have a moment", body: `${n} would love to settle up in ${g}. No rush, just a nudge.` }),
+  ];
+
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+  // Loads the group, confirms the caller belongs to it, and returns what the
+  // notification copy needs. Membership is enforced HERE, not trusted from
+  // the client, so nobody can push-spam a group they are not in.
+  const loadGroupForNotify = async (groupId: string, callerUid: string) => {
+    await ensureAdminApp();
+    const { getFirestore } = await import("firebase-admin/firestore");
+    const snap = await getFirestore().collection("groups").doc(groupId).get();
+    const data = snap.data();
+    const memberIds: string[] = Array.isArray(data?.memberIds) ? data!.memberIds : [];
+    if (!data || !memberIds.includes(callerUid)) return null;
+    const members: any[] = Array.isArray(data.members) ? data.members : [];
+    const callerName = members.find((m: any) => m?.uid === callerUid)?.name || "A member";
+    return { memberIds, callerName, groupName: String(data.name || "your group") };
+  };
+
+  // 14. Ledger event push: called by a client right after it logs an expense
+  //     or a payment, so the rest of the group hears about it. Deliberately
+  //     content-free (see the privacy note above); the event kind is all the
+  //     server ever learns.
+  app.post("/api/notify-ledger-event", requireAuth, rateLimit("notify", 60), async (req, res) => {
+    try {
+      const callerUid = (req as any).uid as string;
+      const { groupId, kind } = req.body || {};
+      if (typeof groupId !== "string" || !LEDGER_PUSH_COPY[kind]) {
+        return res.status(400).json({ error: "Missing group or unknown event kind." });
+      }
+      const groupInfo = await loadGroupForNotify(groupId, callerUid);
+      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+
+      const recipients = groupInfo.memberIds.filter(id => id !== callerUid);
+      const { title, body } = pick(LEDGER_PUSH_COPY[kind])(groupInfo.callerName, groupInfo.groupName);
+      const sent = await sendPushToUsers(recipients, title, body);
+      return res.status(200).json({ success: true, sent });
+    } catch (err: any) {
+      console.error("Ledger notify error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send notifications." });
+    }
+  });
+
+  // 15. Gently remind: a member manually nudges specific group members (or
+  //     everyone else) that the ledger could use a look. Tightly rate limited
+  //     because a nudge someone can spam stops being gentle.
+  app.post("/api/send-nudge", requireAuth, rateLimit("nudge", 10), async (req, res) => {
+    try {
+      const callerUid = (req as any).uid as string;
+      const { groupId } = req.body || {};
+      const toUids: string[] = Array.isArray(req.body?.toUids)
+        ? req.body.toUids.filter((u: any) => typeof u === "string").slice(0, 10)
+        : [];
+      if (typeof groupId !== "string") {
+        return res.status(400).json({ error: "Missing group." });
+      }
+      const groupInfo = await loadGroupForNotify(groupId, callerUid);
+      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+
+      // Only fellow members can be nudged; an empty list means everyone else.
+      const recipients = (toUids.length ? toUids : groupInfo.memberIds)
+        .filter(id => id !== callerUid && groupInfo.memberIds.includes(id));
+      if (!recipients.length) {
+        return res.status(400).json({ error: "Nobody to remind." });
+      }
+
+      const { title, body } = pick(NUDGE_PUSH_COPY)(groupInfo.callerName, groupInfo.groupName);
+      const sent = await sendPushToUsers(recipients, title, body);
+      return res.status(200).json({ success: true, sent });
+    } catch (err: any) {
+      console.error("Nudge error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send the reminder." });
+    }
+  });
+
   // 13. Sign in with Apple server-to-server notifications. Configured in the
   //     Apple Developer portal (Identifiers -> the App ID -> Sign in with
   //     Apple -> Edit -> Server-to-Server Notification Endpoint) as
