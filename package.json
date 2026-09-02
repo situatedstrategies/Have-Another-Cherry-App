@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules"
+    "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules",
+    "test:parity": "tsx scripts/archive-parity.ts"
   },
   "overrides": {
     "uuid": "^11.1.1"

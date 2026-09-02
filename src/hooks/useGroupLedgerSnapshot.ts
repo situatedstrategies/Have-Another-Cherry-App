@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from '../lib/crypto';
 import { mergeExpenseLists } from '../lib/merge';
+import { splitForArchive } from '../lib/archive';
 import { Expense } from '../types';
 
 interface Props {
@@ -58,7 +59,37 @@ export function useGroupLedgerSnapshot({
           }
         }
 
-        const merged = mergeExpenseLists(localExpenses, remoteExpenses);
+        // Cold storage. The Flutter client moves entries older than six months
+        // into group_ledgers/{id}/archive/{YYYY-MM} and drops them from the
+        // document read above, so without this the web client simply stopped
+        // showing anything older than six months once a phone had synced.
+        //
+        // Read after the main document rather than in parallel: the recent
+        // half is what anyone is looking at, and a household with years of
+        // history has a document per month to decrypt.
+        let archived: Expense[] = [];
+        try {
+          const months = await getDocs(
+            collection(db, 'group_ledgers', groupId, 'archive')
+          );
+          for (const month of months.docs) {
+            const payload = month.data()?.payload;
+            if (!payload) continue;
+            const decrypted = await decryptData(payload, groupId);
+            if (Array.isArray(decrypted)) {
+              archived = archived.concat(decrypted as Expense[]);
+            }
+          }
+        } catch (error) {
+          // Never fatal. Missing archive means older history is not shown
+          // this session; failing the whole hydrate would hide everything.
+          console.error('Ledger archive read failed', error);
+        }
+
+        const merged = mergeExpenseLists(
+          localExpenses,
+          remoteExpenses.concat(archived)
+        );
 
         if (!cancelled && groupRef.current === groupId) {
           setExpenses(merged);
@@ -107,7 +138,47 @@ export function useGroupLedgerSnapshot({
 
     const persist = async () => {
       try {
-        const payload = await encryptData(expenses, groupId);
+        // Split before writing, exactly as the Flutter client does. Writing
+        // the whole list here would put every archived entry back into the
+        // main document on the next keystroke, undoing the archive and growing
+        // the blob the archive exists to keep small.
+        const split = splitForArchive(expenses);
+        const now = new Date().toISOString();
+
+        // Archive months go first. If the process dies in between, the worst
+        // case is an entry present in both places, which merges back to
+        // itself. The other order loses it outright.
+        if (split.hasArchive) {
+          for (const [month, entries] of Object.entries(split.byMonth)) {
+            const monthRef = doc(db, 'group_ledgers', groupId, 'archive', month);
+
+            // Merge with whatever that month already holds: this write only
+            // sees what is currently in memory, which after a previous archive
+            // pass is a subset of the month.
+            let existing: Expense[] = [];
+            try {
+              const snap = await getDoc(monthRef);
+              const payload = snap.data()?.payload;
+              if (payload) {
+                const decrypted = await decryptData(payload, groupId);
+                if (Array.isArray(decrypted)) existing = decrypted as Expense[];
+              }
+            } catch (error) {
+              console.error(`Archive month ${month} read failed`, error);
+            }
+
+            const mergedMonth = mergeExpenseLists(existing, entries);
+            const monthPayload = await encryptData(mergedMonth, groupId);
+            if (cancelled) return;
+            await setDoc(
+              monthRef,
+              { groupId, month, payload: monthPayload, updatedAt: now, updatedBy: activeUser },
+              { merge: true }
+            );
+          }
+        }
+
+        const payload = await encryptData(split.recent, groupId);
 
         if (cancelled) return;
 
@@ -116,7 +187,7 @@ export function useGroupLedgerSnapshot({
           {
             groupId,
             payload,
-            updatedAt: new Date().toISOString(),
+            updatedAt: now,
             updatedBy: activeUser,
           },
           { merge: true }
