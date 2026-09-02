@@ -86,6 +86,7 @@ async function startServer() {
   ]);
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
+    "/api/apple-notifications",
     "/api/recaptcha-health",
     "/api/beta-signup",
     "/cherry2transparent.png",
@@ -1302,6 +1303,88 @@ async function startServer() {
     } catch (err: any) {
       console.error("RevenueCat webhook error:", err?.message || err);
       return res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
+  // 13. Sign in with Apple server-to-server notifications. Configured in the
+  //     Apple Developer portal (Identifiers -> the App ID -> Sign in with
+  //     Apple -> Edit -> Server-to-Server Notification Endpoint) as
+  //     https://app.haveanothercherry.com/api/apple-notifications
+  //
+  //     Apple POSTs { payload: <JWT> } signed with its published keys whenever
+  //     a user changes the relationship: revokes consent for the app, deletes
+  //     their Apple ID outright, or toggles Hide My Email forwarding. Nothing
+  //     in the request is trusted until the JWT verifies against Apple's JWKS
+  //     with the right issuer and one of our client ids as audience.
+  //
+  //     Data handling on consent-revoked / account-delete: if Apple was the
+  //     account's ONLY sign-in method, the account is wiped (the Auth user and
+  //     the users/{uid} profile document). If the account can still sign in
+  //     another way (password, Google), only the Apple link is removed and all
+  //     sessions are revoked, so the person keeps the account they still have
+  //     access to. Group documents and the E2E-encrypted ledger are shared
+  //     data and are not touched from here.
+  const APPLE_NOTIFICATION_AUDIENCES = (
+    process.env.APPLE_CLIENT_IDS ||
+    "com.situatedstrategies.haveAnotherCherry,com.situatedstrategies.haveAnotherCherry.web"
+  ).split(",").map(s => s.trim()).filter(Boolean);
+
+  app.post("/api/apple-notifications", async (req, res) => {
+    const token = typeof req.body?.payload === "string" ? req.body.payload : "";
+    if (!token) return res.status(400).json({ error: "Missing payload" });
+
+    let event: any;
+    try {
+      const { createRemoteJWKSet, jwtVerify } = await import("jose");
+      const jwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: "https://appleid.apple.com",
+        audience: APPLE_NOTIFICATION_AUDIENCES,
+      });
+      const rawEvents = (payload as any).events;
+      event = typeof rawEvents === "string" ? JSON.parse(rawEvents) : rawEvents;
+    } catch (err: any) {
+      console.warn("Apple notification rejected:", err?.message || err);
+      return res.status(401).json({ error: "Invalid notification" });
+    }
+
+    const type = String(event?.type || "");
+    const appleSub = String(event?.sub || "");
+    // email-disabled / email-enabled need no action; acknowledge so Apple
+    // stops retrying.
+    if (!appleSub || (type !== "consent-revoked" && type !== "account-delete")) {
+      return res.status(200).json({ received: true, ignored: type || "no event" });
+    }
+
+    try {
+      await ensureAdminApp();
+      const { getAuth } = await import("firebase-admin/auth");
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const adminAuth = getAuth();
+
+      const found = await adminAuth.getUsers([
+        { providerId: "apple.com", providerUid: appleSub },
+      ]);
+      const user = found.users[0];
+      if (!user) {
+        return res.status(200).json({ received: true, ignored: "no matching account" });
+      }
+
+      const hasOtherSignIn = user.providerData.some(p => p.providerId !== "apple.com");
+      if (hasOtherSignIn) {
+        await adminAuth.updateUser(user.uid, { providersToUnlink: ["apple.com"] });
+        await adminAuth.revokeRefreshTokens(user.uid);
+        console.log(`Apple ${type}: unlinked apple.com from ${user.uid}, sessions revoked`);
+      } else {
+        await getFirestore().collection("users").doc(user.uid).delete();
+        await adminAuth.deleteUser(user.uid);
+        console.log(`Apple ${type}: wiped account ${user.uid}`);
+      }
+      return res.status(200).json({ received: true });
+    } catch (err: any) {
+      console.error("Apple notification error:", err?.message || err);
+      // Non-2xx so Apple retries; a deletion request must not be lost silently.
+      return res.status(500).json({ error: "Processing failed" });
     }
   });
 
