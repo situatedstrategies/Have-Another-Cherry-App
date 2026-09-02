@@ -182,6 +182,28 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Reflections: short journal entries about how an expense felt.
+    // Private by default: entries under user_reflections belong to one person
+    // and nobody else can ever read them (they are additionally encrypted
+    // client-side with a key the author holds). Sharing an entry moves it to
+    // group_reflections, where any member may read it but only its author may
+    // change or remove it.
+    match /user_reflections/{userId}/entries/{entryId} {
+      allow read, create, update, delete:
+        if signedIn() && request.auth.uid == userId;
+    }
+
+    match /group_reflections/{groupId}/entries/{entryId} {
+      allow read:
+        if isGroupMember(groupId);
+      allow create:
+        if isGroupMember(groupId)
+        && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete:
+        if isGroupMember(groupId)
+        && resource.data.authorUid == request.auth.uid;
+    }
+
     // Invite email is sent through the authenticated backend endpoint,
     // not through unrestricted client-side Firestore writes.
     match /mail/{mailId} {

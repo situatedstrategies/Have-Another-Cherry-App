@@ -4,6 +4,7 @@ import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
 import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
+import ReflectionsSection from './ReflectionsSection';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -382,7 +383,7 @@ export default function ExpenseDetail({
             </form>
 
             {expense.comments && expense.comments.length > 0 && (
-              <div className="space-y-3 mt-4">
+              <div className="space-y-3 mt-4" id="detail-comments-list">
                 {expense.comments.map(c => (
                   <div key={c.id} className="flex gap-2.5">
                     <div className="h-7 w-7 rounded-full bg-natural-sidebar flex items-center justify-center shrink-0 border border-natural-border">
@@ -400,7 +401,10 @@ export default function ExpenseDetail({
               </div>
             )}
           </div>
-          
+
+          {/* Reflections: how this one felt. Private by default. */}
+          <ReflectionsSection expenseId={expense.id} group={group} activeUser={activeUser} />
+
         </div>
 
         {/* Footer (Quick Actions) */}
