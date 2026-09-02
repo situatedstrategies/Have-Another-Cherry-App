@@ -120,7 +120,7 @@ function TermsOfService() {
       </Section>
 
       <Section title="Eligibility &amp; Accounts">
-        <p>You must be at least 18 years old to use the Service. You are responsible for keeping your login credentials secure and for all activity under your account. Your group's invite code is what keeps your ledger private - share it only with people you trust.</p>
+        <p>You must be at least 13 years old to use the Service. If you are under 18, you may use it only with the permission of a parent or legal guardian, who agrees to these Terms on your behalf. You are responsible for keeping your login credentials secure and for all activity under your account. Your group's invite code is what keeps your ledger private - share it only with people you trust.</p>
       </Section>
 
       <Section title="Not Financial or Legal Advice">
