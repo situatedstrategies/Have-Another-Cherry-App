@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
+import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
@@ -190,6 +191,26 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 1b. Web push. If this browser already granted notifications, silently
+  // refresh the token registration; either way, surface pushes that arrive
+  // while the app is open as toasts (the browser only shows them when the
+  // tab is in the background). The first permission ask lives in Settings,
+  // behind a click - never an unprompted browser dialog on load.
+  useEffect(() => {
+    if (!currentUser) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      if (pushPermission() === 'granted') {
+        await enableWebPush(currentUser.uid).catch(() => {});
+      }
+      const u = await listenForegroundPush((title, body) => addToast(title, body, 'info'));
+      if (cancelled) u();
+      else unsub = u;
+    })();
+    return () => { cancelled = true; unsub?.(); };
+  }, [currentUser]);
 
   // 2. Fetch User Profile
   useEffect(() => {
@@ -703,7 +724,11 @@ export default function App() {
   }
   
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    // Stop push delivery to this browser for the account being left. Best
+    // effort: cleanup must never block signing out.
+    const uid = auth.currentUser?.uid;
+    if (uid) await disableWebPush(uid).catch(() => {});
     // Signing out also resets the "keep me signed in" choice, so the next
     // visit always asks for login again instead of silently restoring a
     // session.

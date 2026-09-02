@@ -39,7 +39,13 @@ if (isBetaEnv && firebaseConfig.projectId.startsWith('REPLACE_ME')) {
 
 export const APP_ENV: 'beta' | 'production' = isBetaEnv ? 'beta' : 'production';
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
+
+// Web push (FCM). The VAPID key is the public half of the Web Push
+// certificate from Firebase console -> Project settings -> Cloud Messaging ->
+// Web configuration. Public by design; an empty value disables web push
+// cleanly (src/lib/push.ts treats it as unsupported).
+export const fcmVapidKey: string = (firebaseConfig as any).fcmVapidKey || '';
 
 // App Check must be initialized before any Firestore/Auth traffic so requests
 // carry an attestation token. The site key is a reCAPTCHA *Enterprise* key

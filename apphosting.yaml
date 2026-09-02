@@ -41,3 +41,14 @@ env:
     value: bf32909e-e162-429e-a854-165cb86158ac
     availability:
       - RUNTIME
+
+  # Associated domains (universal links + shared password autofill with the
+  # iOS app). A plain value, not a secret: it is served publicly in the
+  # apple-app-site-association file by design. Uncomment and fill in once
+  # Apple Developer enrollment completes; the Team ID is on
+  # developer.apple.com -> Membership details. Until then the association
+  # route 404s, which Apple reads as "not associated yet".
+  # - variable: APPLE_TEAM_ID
+  #   value: YOUR_TEAM_ID
+  #   availability:
+  #     - RUNTIME

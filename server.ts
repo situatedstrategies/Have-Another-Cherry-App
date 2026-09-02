@@ -87,6 +87,13 @@ async function startServer() {
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
     "/api/apple-notifications",
+    // Apple's CDN fetches this to verify the app/domain association; it
+    // arrives with no cookies and must never see the gate.
+    "/.well-known/apple-app-site-association",
+    "/apple-app-site-association",
+    // The push service worker is fetched by the browser's SW machinery and
+    // must load even when the page itself sits behind the gate.
+    "/firebase-messaging-sw.js",
     "/api/recaptcha-health",
     "/api/beta-signup",
     "/cherry2transparent.png",
@@ -1534,6 +1541,63 @@ async function startServer() {
       // Non-2xx so Apple retries; a deletion request must not be lost silently.
       return res.status(500).json({ error: "Processing failed" });
     }
+  });
+
+  // 16. Associated domains. Apple (via its CDN) fetches this file to verify
+  //     that this domain and the iOS app belong together, which unlocks
+  //     universal links (https links that open the app when installed) and
+  //     shared password autofill between the web app and the iOS app.
+  //
+  //     The app id needs the Apple Team ID prefix, which only exists once
+  //     Developer Program enrollment completes, so it comes from the
+  //     APPLE_TEAM_ID env var (a plain value in apphosting.yaml, not a
+  //     secret: this file is public by design). Until the var is set the
+  //     route 404s, which Apple simply reads as "not associated yet".
+  //
+  //     Universal links deliberately cover ONLY /expense/* for now. Auth
+  //     action links (password reset, verification) must keep opening in the
+  //     browser, where the handler pages live.
+  app.get(
+    ["/.well-known/apple-app-site-association", "/apple-app-site-association"],
+    (_req, res) => {
+      const teamId = process.env.APPLE_TEAM_ID;
+      if (!teamId) return res.status(404).json({ error: "Not configured yet" });
+      const appId = `${teamId}.com.situatedstrategies.haveAnotherCherry`;
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).json({
+        applinks: {
+          details: [{ appIDs: [appId], components: [{ "/": "/expense/*" }] }],
+        },
+        webcredentials: { apps: [appId] },
+      });
+    }
+  );
+
+  // 17. Push service worker. FCM's web SDK registers /firebase-messaging-sw.js
+  //     to display notifications that arrive while the tab is closed or in
+  //     the background. Served dynamically (host-aware) rather than as a
+  //     static file so a beta hostname gets the beta Firebase project's
+  //     config instead of production's - the same reason src/firebase.ts
+  //     picks its config at runtime. Only public identifiers are embedded.
+  app.get("/firebase-messaging-sw.js", (req, res) => {
+    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    const cfg = /^beta[.-]/.test(host) ? betaFirebaseConfig : firebaseConfig;
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(
+      `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");\n` +
+      `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");\n` +
+      `firebase.initializeApp(${JSON.stringify({
+        apiKey: cfg.apiKey,
+        authDomain: cfg.authDomain,
+        projectId: cfg.projectId,
+        messagingSenderId: cfg.messagingSenderId,
+        appId: cfg.appId,
+      })});\n` +
+      // Instantiating messaging is what wires the background handler that
+      // displays incoming notification payloads.
+      `firebase.messaging();\n`
+    );
   });
 
   // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
