@@ -10,7 +10,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules",
-    "test:parity": "tsx scripts/archive-parity.ts"
+    "test:parity": "tsx scripts/archive-parity.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"tsx scripts/rules-test.ts\""
   },
   "overrides": {
     "uuid": "^11.1.1"
@@ -37,6 +38,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/cors": "^2.8.19",
     "@types/crypto-js": "^4.2.2",
     "@types/express": "^4.17.21",
