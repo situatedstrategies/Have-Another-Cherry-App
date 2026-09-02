@@ -22,6 +22,24 @@ export function useGroupLedgerSnapshot({
   const hydratedRef = useRef(false);
   const groupRef = useRef<string | undefined>(undefined);
 
+  // What each archive month contained the last time we read or wrote it.
+  //
+  // The Flutter client drops archived entries from memory, so its split only
+  // ever produces months that genuinely changed. This client keeps them, so
+  // that they can be displayed, which means the split reproduces every old
+  // month on every keystroke. Without this the persist effect would re-encrypt
+  // and rewrite years of cold storage each time an expense is edited.
+  const archiveSigRef = useRef<Record<string, string>>({});
+
+  // Content signature for a month. Sorted by id so list order cannot make an
+  // unchanged month look changed; editedAt and settlement count are what
+  // actually move when an old entry is touched.
+  const signMonth = (entries: Expense[]) =>
+    entries
+      .map((e) => `${e.id}:${(e as any).editedAt ?? ''}:${e.settlements?.length ?? 0}`)
+      .sort()
+      .join('|');
+
   // Bootstrap the ledger when a user/device enters a group.
   useEffect(() => {
     if (!activeUser || !groupId) return;
@@ -29,6 +47,7 @@ export function useGroupLedgerSnapshot({
     let cancelled = false;
     hydratedRef.current = false;
     groupRef.current = groupId;
+    archiveSigRef.current = {};
 
     const hydrate = async () => {
       let localExpenses: Expense[] = [];
@@ -77,7 +96,11 @@ export function useGroupLedgerSnapshot({
             if (!payload) continue;
             const decrypted = await decryptData(payload, groupId);
             if (Array.isArray(decrypted)) {
-              archived = archived.concat(decrypted as Expense[]);
+              const entries = decrypted as Expense[];
+              archived = archived.concat(entries);
+              // Seed the signature from what was read, so the first persist
+              // after hydration does not rewrite months we just loaded.
+              archiveSigRef.current[month.id] = signMonth(entries);
             }
           }
         } catch (error) {
@@ -150,6 +173,12 @@ export function useGroupLedgerSnapshot({
         // itself. The other order loses it outright.
         if (split.hasArchive) {
           for (const [month, entries] of Object.entries(split.byMonth)) {
+            // Unchanged since we last read or wrote it. Skipping here is what
+            // keeps an edit to today's expense from rewriting every month of
+            // cold storage the household has.
+            const signature = signMonth(entries);
+            if (archiveSigRef.current[month] === signature) continue;
+
             const monthRef = doc(db, 'group_ledgers', groupId, 'archive', month);
 
             // Merge with whatever that month already holds: this write only
@@ -175,6 +204,10 @@ export function useGroupLedgerSnapshot({
               { groupId, month, payload: monthPayload, updatedAt: now, updatedBy: activeUser },
               { merge: true }
             );
+            // Record what is now stored, not what we set out to store: the
+            // merge with `existing` may have pulled in entries another device
+            // archived, and re-reading them next time would be pointless.
+            archiveSigRef.current[month] = signMonth(mergedMonth);
           }
         }
 
