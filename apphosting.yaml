@@ -44,11 +44,10 @@ env:
 
   # Associated domains (universal links + shared password autofill with the
   # iOS app). A plain value, not a secret: it is served publicly in the
-  # apple-app-site-association file by design. Uncomment and fill in once
-  # Apple Developer enrollment completes; the Team ID is on
-  # developer.apple.com -> Membership details. Until then the association
-  # route 404s, which Apple reads as "not associated yet".
-  # - variable: APPLE_TEAM_ID
-  #   value: YOUR_TEAM_ID
-  #   availability:
-  #     - RUNTIME
+  # apple-app-site-association file by design. This is the Situated
+  # Strategies LLC Apple Developer Team ID from developer.apple.com ->
+  # Membership details.
+  - variable: APPLE_TEAM_ID
+    value: 4964KRMB5H
+    availability:
+      - RUNTIME
