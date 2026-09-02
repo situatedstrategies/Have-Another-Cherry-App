@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2, Bell } from 'lucide-react';
 import { Group } from '../types';
 import { getFullDefaultSplit } from '../lib/members';
+import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import Modal from './Modal';
 
 interface SettingsModalProps {
@@ -33,6 +34,27 @@ export default function SettingsModal({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
+  // Web push state. 'unavailable' hides the section (no VAPID key configured,
+  // or a browser without push); the first permission ask lives behind this
+  // button so the browser dialog is never unprompted.
+  const [pushState, setPushState] = useState<PushStatus>('unavailable');
+  const [enablingPush, setEnablingPush] = useState(false);
+  useEffect(() => {
+    (async () => {
+      setPushState((await webPushSupported()) ? pushPermission() : 'unavailable');
+    })();
+  }, []);
+
+  const handleEnablePush = async () => {
+    if (!currentUser?.uid || enablingPush) return;
+    setEnablingPush(true);
+    try {
+      setPushState(await enableWebPush(currentUser.uid));
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+
   const hasRealName = userProfile?.name && !RESERVED_NAMES.includes(userProfile.name);
   const displayName = hasRealName ? userProfile.name : (currentUser?.displayName || 'Add your name');
   const fp = userProfile?.financialProfile;
@@ -59,6 +81,39 @@ export default function SettingsModal({
       }
     >
       {extraSection}
+
+      {/* Notifications (web push) */}
+      {pushState !== 'unavailable' && (
+        <div>
+          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Notifications</h3>
+          <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Bell className="h-4 w-4 text-natural-primary mt-0.5 shrink-0" />
+              <p className="text-xs text-natural-muted leading-relaxed">
+                Get an alert in this browser when someone adds to the ledger or sends a
+                gentle reminder. Never any amounts, just who and which group.
+              </p>
+            </div>
+            {pushState === 'granted' ? (
+              <span className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1">
+                <Check className="h-3.5 w-3.5" /> On
+              </span>
+            ) : pushState === 'denied' ? (
+              <span className="shrink-0 text-xs font-semibold text-natural-muted text-right">
+                Blocked in browser settings
+              </span>
+            ) : (
+              <button
+                onClick={handleEnablePush}
+                disabled={enablingPush}
+                className="shrink-0 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-full shadow-sm transition-colors disabled:opacity-60"
+              >
+                {enablingPush ? 'Asking...' : 'Turn on'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* User profile */}
       <div>
