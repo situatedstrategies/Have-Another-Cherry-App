@@ -4,7 +4,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
-import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail } from "./src/lib/resend";
+import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail, sendSupportRequest } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
@@ -1019,6 +1019,46 @@ async function startServer() {
     } catch (err: any) {
       console.error("Conversation Starter Gen Error:", err?.message || err);
       return res.status(200).json({ success: true, starter: fallback });
+    }
+  });
+
+  // 10b. Support requests from inside the app. Delivered to
+  //      help@haveanothercherry.com with replyTo set to the sender, so a reply
+  //      goes straight back to them.
+  //
+  //      Signed in only, and rate limited: this endpoint sends mail to a human
+  //      inbox, which is exactly the shape of thing that gets abused. The body
+  //      is capped because a support form is not a file upload.
+  app.post("/api/support-request", requireAuth, rateLimit("support", 5), async (req, res) => {
+    const { message, context, email, name } = req.body || {};
+
+    if (typeof message !== "string" || message.trim().length < 5) {
+      return res.status(400).json({ error: "Please describe what happened." });
+    }
+    if (message.length > 5000) {
+      return res.status(400).json({ error: "That message is too long to send." });
+    }
+
+    // Prefer the verified address on the token over anything the client sends,
+    // so a reply cannot be aimed somewhere the sender does not control.
+    const fromEmail =
+      (req as any).firebaseUser?.email ||
+      (typeof email === "string" ? email.trim() : "");
+    if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+      return res.status(400).json({ error: "A valid email address is required." });
+    }
+
+    try {
+      await sendSupportRequest({
+        fromEmail,
+        fromName: typeof name === "string" ? name.slice(0, 120) : undefined,
+        message,
+        context: typeof context === "string" ? context.slice(0, 2000) : undefined,
+      });
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("Support request error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send that just now." });
     }
   });
 
