@@ -4,6 +4,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
+import { reminderTargetDate, reminderPayload } from "./src/lib/reminders";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail, sendSupportRequest } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
@@ -1370,6 +1371,11 @@ async function startServer() {
     uids: string[],
     title: string,
     body: string,
+    // Opaque routing hints for a tapped notification (which group, which bill,
+    // which screen). Values must be strings: FCM rejects a data payload that
+    // is not Record<string, string>, and it fails the whole send, not the one
+    // field. Nothing here may carry an amount or a name — see the note above.
+    data?: Record<string, string>,
   ): Promise<number> => {
     if (!uids.length) return 0;
     await ensureAdminApp();
@@ -1390,6 +1396,7 @@ async function startServer() {
     const res = await getMessaging().sendEachForMulticast({
       tokens: tokenOwners.map(t => t.token),
       notification: { title, body },
+      ...(data ? { data } : {}),
       apns: { payload: { aps: { sound: "default" } } },
       // Android icon and accent color come from the app's manifest defaults
       // (the cherry mark and #C41200), so nothing brand-shaped is set here.
@@ -1500,6 +1507,87 @@ async function startServer() {
     } catch (err: any) {
       console.error("Nudge error:", err?.message || err);
       return res.status(500).json({ error: "Could not send the reminder." });
+    }
+  });
+
+  // 12b. Scheduled bill reminders. Hit once a day by Cloud Scheduler, not by
+  //      any client, which is why it authenticates on a shared secret rather
+  //      than a user token.
+  //
+  //      The privacy shape is the whole design: the ledger and the Vault are
+  //      encrypted client-side, so the server cannot work out when anything is
+  //      due. Clients publish a deliberately impoverished index to
+  //      reminder_schedules/{groupId} — a date, an opaque id, and which screen
+  //      to open. The push repeats none of it: the body is fixed and says only
+  //      that something is due. The app fills in the rest after it opens and
+  //      can decrypt.
+  //
+  //      Timezones: due dates are date-only and households are not all in one
+  //      zone, so "tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS (default
+  //      UTC) and the schedule should be set for the early evening of the zone
+  //      most households are in. Per-household zones would mean the server
+  //      learning where people live, which is a worse trade than a reminder
+  //      arriving a few hours off.
+  const REMINDER_BODY =
+    "A household bill is due tomorrow. Open Have Another Cherry to see the details.";
+
+  app.post("/api/send-bill-reminders", async (req, res) => {
+    try {
+      const secret = process.env.REMINDER_CRON_SECRET;
+      // Fail closed. An unset secret must not mean an open endpoint that any
+      // caller can use to push every household on the platform.
+      if (!secret) {
+        console.error("Bill reminders: REMINDER_CRON_SECRET is not set.");
+        return res.status(503).json({ error: "Reminders are not configured." });
+      }
+      const offered = String(req.header("x-cherry-cron") || "");
+      if (!safeEqual(offered, secret)) {
+        return res.status(401).json({ error: "Unauthorized." });
+      }
+
+      await ensureAdminApp();
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const fs = getFirestore();
+
+      const target = reminderTargetDate(
+        new Date(), Number(process.env.REMINDER_TZ_OFFSET_HOURS || 0));
+
+      // Single-field, so no composite index to deploy.
+      const due = await fs.collection("reminder_schedules")
+        .where("dueDates", "array-contains", target)
+        .get();
+
+      let groups = 0;
+      let sent = 0;
+      for (const snap of due.docs) {
+        const data = snap.data() || {};
+        // Idempotent: Cloud Scheduler retries on any non-2xx, and a retry must
+        // not remind the same household twice for the same day.
+        if (data.lastRemindedFor === target) continue;
+
+        const groupSnap = await fs.collection("groups").doc(snap.id).get();
+        const memberIds: string[] = Array.isArray(groupSnap.data()?.memberIds)
+          ? groupSnap.data()!.memberIds : [];
+        if (!memberIds.length) continue;
+
+        const entries: any[] = Array.isArray(data.entries) ? data.entries : [];
+        const dueTomorrow = entries.filter(e => e?.dueDate === target);
+        if (!dueTomorrow.length) continue;
+
+        // One push per household per day, not one per bill: three bills due on
+        // the same day is a reason for one notification, not three.
+        const count = await sendPushToUsers(memberIds, "Due tomorrow", REMINDER_BODY,
+          reminderPayload(snap.id, target, dueTomorrow));
+
+        await snap.ref.update({ lastRemindedFor: target });
+        groups++;
+        sent += count;
+      }
+
+      return res.status(200).json({ success: true, date: target, groups, sent });
+    } catch (err: any) {
+      console.error("Bill reminder error:", err?.message || err);
+      return res.status(500).json({ error: "Could not send reminders." });
     }
   });
 

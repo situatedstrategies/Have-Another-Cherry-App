@@ -55,6 +55,10 @@ async function seed() {
     await setDoc(doc(db, 'group_ledgers', CODE, 'archive', '2025-01'), {
       groupId: CODE, month: '2025-01', payload: 'x',
     });
+    await setDoc(doc(db, 'reminder_schedules', CODE), {
+      groupId: CODE, entries: [{ id: 'bill1', dueDate: '2026-09-10', target: 'bill' }],
+      signature: 'x', updatedAt: '2026-09-05T00:00:00.000Z', updatedBy: OWNER,
+    });
   });
 }
 
@@ -139,6 +143,30 @@ async function main() {
 
   await check('a non-member CANNOT read an archive month', () =>
     assertFails(getDoc(doc(invitee2, 'group_ledgers', CODE, 'archive', '2025-01'))));
+
+  // --- the reminder schedule -------------------------------------------
+  // Unencrypted by necessity, so who can read it matters more here than
+  // anywhere else in this file.
+  await check('a member CAN read the reminder schedule', () =>
+    assertSucceeds(getDoc(doc(owner, 'reminder_schedules', CODE))));
+
+  await check('a non-member CANNOT read the reminder schedule', () =>
+    assertFails(getDoc(doc(invitee2, 'reminder_schedules', CODE))));
+
+  await check('a signed-out visitor CANNOT read the reminder schedule', () =>
+    assertFails(getDoc(doc(anon, 'reminder_schedules', CODE))));
+
+  await check('a member CAN publish the reminder schedule', () =>
+    assertSucceeds(setDoc(doc(owner, 'reminder_schedules', CODE), {
+      groupId: CODE, entries: [], signature: 'y',
+      updatedAt: '2026-09-05T00:00:00.000Z', updatedBy: OWNER,
+    })));
+
+  await check('a non-member CANNOT publish a reminder schedule', () =>
+    assertFails(setDoc(doc(invitee2, 'reminder_schedules', CODE), {
+      groupId: CODE, entries: [], signature: 'z',
+      updatedAt: '2026-09-05T00:00:00.000Z', updatedBy: INVITEE,
+    })));
 
   await check('a member CAN write an archive month', () =>
     assertSucceeds(setDoc(doc(owner, 'group_ledgers', CODE, 'archive', '2025-02'), {

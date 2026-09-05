@@ -52,6 +52,29 @@ env:
     availability:
       - RUNTIME
 
+  # Scheduled bill reminders. Cloud Scheduler POSTs daily to
+  # /api/send-bill-reminders with this value in an x-cherry-cron header. A
+  # SECRET, not a plain value: anyone holding it can push every household on
+  # the platform. Create it with
+  #   firebase apphosting:secrets:set REMINDER_CRON_SECRET
+  # The endpoint fails closed (503) while this is unset, so leaving it out is
+  # safe; reminders simply do not send.
+  - variable: REMINDER_CRON_SECRET
+    secret: REMINDER_CRON_SECRET
+    availability:
+      - RUNTIME
+
+  # Which zone "due tomorrow" is reckoned in, as an offset from UTC. Due dates
+  # carry no time of day by design, so the reminder has to pick an hour, and
+  # the scheduler should be set for the early evening of this zone. Per
+  # household zones would mean the server learning where people live, which is
+  # a worse trade than a reminder landing a few hours off. -4 is US Eastern in
+  # summer; leave unset for UTC.
+  - variable: REMINDER_TZ_OFFSET_HOURS
+    value: "-4"
+    availability:
+      - RUNTIME
+
   # App Store server notifications relay target. Set this to RevenueCat's
   # Apple server-to-server notification URL (RevenueCat dashboard -> the
   # Apple app's settings) so purchase events Apple sends to our domain are

@@ -158,6 +158,20 @@ service cloud.firestore {
       }
     }
 
+    // Reminder schedules: the only household data that is deliberately NOT
+    // encrypted, because the server has to read it in order to schedule
+    // anything at all. It holds a date, an opaque id and which screen to open,
+    // and nothing else — see lib/domain/vault/reminder_index.dart in the
+    // mobile repo, whose test fails if a name or an amount ever reaches it.
+    //
+    // Members only, same as everything else. The scheduled sender runs through
+    // the Admin SDK and bypasses these rules, which is why nothing here has to
+    // grant a service account anything.
+    match /reminder_schedules/{groupId} {
+      allow read, create, update, delete:
+        if isGroupMember(groupId);
+    }
+
     match /group_mismatches/{groupId}/events/{eventId} {
       allow read, create, update, delete:
         if isGroupMember(groupId);
