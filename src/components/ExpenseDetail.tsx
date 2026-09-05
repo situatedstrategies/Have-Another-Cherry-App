@@ -5,6 +5,7 @@ import { isUnclaimed, getRemainingSettlementAmount, isExpenseFullySettled, getNo
 import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban, BellRing } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 import ReflectionsSection from './ReflectionsSection';
+import { intervalLabel } from '../lib/recurring';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -127,7 +128,7 @@ export default function ExpenseDetail({
                 <span className="flex items-center gap-1.5 uppercase tracking-wider"><Tag className="h-3.5 w-3.5" /> {expense.category}</span>
                 {expense.isRecurring && (
                   <span className="flex items-center gap-1 text-natural-primary bg-natural-primary/10 px-1.5 py-0.5 rounded-md border border-natural-primary/20">
-                    <Repeat className="h-3 w-3" /> {expense.recurringInterval}
+                    <Repeat className="h-3 w-3" /> {intervalLabel(expense.recurringInterval || '')}
                   </span>
                 )}
               </div>

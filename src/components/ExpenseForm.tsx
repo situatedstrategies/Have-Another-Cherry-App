@@ -7,6 +7,7 @@ import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } 
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
+import { advanceIntervalStr, parseLocalDate, normalizeInterval, RECURRING_WEEKS, RECURRING_MONTHS } from '../lib/recurring';
 
 interface ExpenseFormProps {
   group: Group;
@@ -115,7 +116,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
   const [notes, setNotes] = useState(editingExpense?.notes || '');
   const [isRecurring, setIsRecurring] = useState(editingExpense?.isRecurring || false);
-  const [recurringInterval, setRecurringInterval] = useState<any>(editingExpense?.recurringInterval || 'monthly');
+  const [recurringInterval, setRecurringInterval] = useState<string>(normalizeInterval(editingExpense?.recurringInterval));
   const [alreadySettled, setAlreadySettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -173,7 +174,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       setSplitType(editingExpense.splitType);
       setNotes(editingExpense.notes || '');
       setIsRecurring(editingExpense.isRecurring || false);
-      setRecurringInterval(editingExpense.recurringInterval || 'monthly');
+      setRecurringInterval(normalizeInterval(editingExpense.recurringInterval));
       setBlindMin(editingExpense.blindMin?.toString() || '');
       setBlindMax(editingExpense.blindMax?.toString() || '');
 
@@ -489,26 +490,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       return;
     }
 
-    const calculateNextDate = (currentDateStr: string, interval: string) => {
-      const d = new Date(currentDateStr);
-      // Adjust timezone offset to avoid jumping days
-      d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
-      
-      switch(interval) {
-        case 'weekly': d.setDate(d.getDate() + 7); break;
-        case 'biweekly': d.setDate(d.getDate() + 14); break;
-        case 'monthly': d.setMonth(d.getMonth() + 1); break;
-        case '2_months': d.setMonth(d.getMonth() + 2); break;
-        case '3_months': d.setMonth(d.getMonth() + 3); break;
-        case '6_months': d.setMonth(d.getMonth() + 6); break;
-        case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
-      }
-      return d.toISOString().split('T')[0];
-    };
-
     let nextRecurDate = editingExpense?.nextRecurringDate || null;
     if (isRecurring && (!editingExpense || !editingExpense.isRecurring || editingExpense.recurringInterval !== recurringInterval)) {
-       nextRecurDate = calculateNextDate(date, recurringInterval);
+      // Anchored on this expense's own day, so a bill set for the 31st lands
+      // on the 30th or the 28th in a short month and returns to the 31st
+      // after. The autopilot and the calendar walk with the same anchor.
+      nextRecurDate = advanceIntervalStr(date, recurringInterval, parseLocalDate(date).getDate());
     }
 
     const payload: any = {
@@ -723,20 +710,51 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 </label>
                 
                 {isRecurring && (
-                  <div className="mt-2 pl-6">
-                    <select
-                      value={recurringInterval}
-                      onChange={(e) => setRecurringInterval(e.target.value)}
-                      className="w-full px-3 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="weekly">Weekly</option>
-                      <option value="biweekly">Bi-weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="2_months">Every 2 Months</option>
-                      <option value="3_months">Every 3 Months</option>
-                      <option value="6_months">Every 6 Months</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                  // Weeks and months are asked separately, matching the mobile
+                  // form: every 4 weeks is not the same as the 1st of every
+                  // month, and one merged list hides that difference at exactly
+                  // the moment someone is choosing.
+                  <div className="mt-3 pl-6 space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">Every so many weeks</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {RECURRING_WEEKS.map((w) => (
+                          <button
+                            key={`w${w}`}
+                            type="button"
+                            onClick={() => setRecurringInterval(`${w}_weeks`)}
+                            aria-pressed={recurringInterval === `${w}_weeks`}
+                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                              recurringInterval === `${w}_weeks`
+                                ? 'bg-natural-primary text-white border-natural-primary'
+                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                            }`}
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">Or every so many months</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {RECURRING_MONTHS.map((m) => (
+                          <button
+                            key={`m${m}`}
+                            type="button"
+                            onClick={() => setRecurringInterval(`${m}_months`)}
+                            aria-pressed={recurringInterval === `${m}_months`}
+                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                              recurringInterval === `${m}_months`
+                                ? 'bg-natural-primary text-white border-natural-primary'
+                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                            }`}
+                          >
+                            {m === 12 ? 'Year' : m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

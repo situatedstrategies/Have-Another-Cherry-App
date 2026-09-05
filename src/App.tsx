@@ -2,6 +2,7 @@ import { getFullMembers } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { mergeExpense } from './lib/merge';
+import { advanceIntervalStr, parseLocalDate } from './lib/recurring';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -62,23 +63,6 @@ const todayLocal = () => {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().split('T')[0];
 };
-
-// Step a recurring date forward by its interval (local, date-only).
-function advanceRecurringDate(dateStr: string, interval?: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  switch (interval) {
-    case 'weekly': d.setDate(d.getDate() + 7); break;
-    case 'biweekly': d.setDate(d.getDate() + 14); break;
-    case '2_months': d.setMonth(d.getMonth() + 2); break;
-    case '3_months': d.setMonth(d.getMonth() + 3); break;
-    case '6_months': d.setMonth(d.getMonth() + 6); break;
-    case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
-    case 'monthly':
-    default: d.setMonth(d.getMonth() + 1); break;
-  }
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().split('T')[0];
-}
 
 // Consistent, branded loading screen - same background as every other screen so
 // switching between them never flashes white or a stale page.
@@ -493,7 +477,10 @@ export default function App() {
             recurringSourceId: exp.id,
           });
         }
-        next = advanceRecurringDate(dueDate, exp.recurringInterval);
+        // Anchored on the definition's own day, so a bill set for the 31st
+        // keeps coming back to the 31st instead of sticking at 28 after one
+        // February. The calendar walks with the same anchor.
+        next = advanceIntervalStr(dueDate, exp.recurringInterval, parseLocalDate(exp.date).getDate());
       }
       if (next !== exp.nextRecurringDate) sourceUpdates.set(exp.id, next);
     }
