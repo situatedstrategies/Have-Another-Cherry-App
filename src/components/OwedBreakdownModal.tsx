@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers } from '../lib/members';
-import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isDarkCherry } from '../lib/money';
+import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isDarkCherry } from '../lib/money';
 import { authHeader } from '../firebase';
 import Modal from './Modal';
 import { CreditCard, TrendingUp, ChevronRight, BellRing, Check, RefreshCcw } from 'lucide-react';
@@ -40,6 +40,9 @@ export default function OwedBreakdownModal({
     const map = new Map<string, { uid: string; total: number; items: { expense: Expense; amount: number }[] }>();
     for (const exp of expenses) {
       if (isDarkCherry(exp)) continue;
+      // Nobody has claimed it, so it belongs to no pair. Keying the map on an
+      // empty payer would invent a person and list a debt owed to them.
+      if (isUnclaimed(exp)) continue;
       if (mode === 'you_owe') {
         if (exp.paidBy === activeUser) continue;
         const remaining = getRemainingSettlementAmount(exp, activeUser, false);

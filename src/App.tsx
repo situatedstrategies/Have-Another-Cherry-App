@@ -451,6 +451,14 @@ export default function App() {
     if (recurringAutopilotRef.current === runKey) return;
 
     const today = todayLocal();
+    // Materialise a cycle two weeks before it is due, so it reaches the
+    // calendar in time to be planned for. It keeps its real future date, so
+    // the ledger files it under upcoming rather than into this month.
+    const horizon = (() => {
+      const d = new Date(today + 'T00:00:00');
+      d.setDate(d.getDate() + 14);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
     const spawned: Expense[] = [];
     const sourceUpdates = new Map<string, string>(); // source id -> new nextRecurringDate
 
@@ -458,7 +466,7 @@ export default function App() {
       if (!exp.isRecurring || !exp.nextRecurringDate || exp.paidBy !== activeUser) continue;
       let next: string = exp.nextRecurringDate;
       let guard = 0;
-      while (next && next <= today && guard < 24) {
+      while (next && next <= horizon && guard < 24) {
         guard++;
         const dueDate = next;
         const dupe =
@@ -469,6 +477,11 @@ export default function App() {
             ...exp,
             id: crypto.randomUUID(),
             date: dueDate,
+            // Unclaimed. Inheriting the definition's payer asserts that
+            // whoever set the bill up also paid it this month, which is a
+            // claim about this month made by a record from last year.
+            // Someone claims it when it is actually paid.
+            paidBy: '',
             createdAt: new Date().toISOString(),
             editedAt: new Date().toISOString(),
             status: 'OPEN',
@@ -1231,6 +1244,30 @@ export default function App() {
     } catch (e: any) {
       console.error(e);
       setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Log expense', detail: String(e?.message || e) });
+    }
+  };
+
+
+  // Claiming an unclaimed expense. Recurring bills arrive with nobody
+  // attached, so this is the step that turns one into a real ledger entry:
+  // until it happens the expense owes nobody and settles nothing.
+  const handleClaimExpense = async (expenseId: string, payerUid: string) => {
+    if (!group) return;
+    const groupId = group.id;
+    const target = expenses.find(e => e.id === expenseId);
+    if (!target) return;
+    const claimed: Expense = { ...target, paidBy: payerUid, editedAt: new Date().toISOString() };
+    setExpenses(prev => {
+      const updated = prev.map(e => (e.id === expenseId ? claimed : e));
+      try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
+      catch (err) { console.error('Failed to persist expenses', err); }
+      return updated;
+    });
+    setSelectedExpense(claimed);
+    try {
+      await broadcastToMembers('UPSERT', claimed);
+    } catch (err) {
+      console.error('Claim broadcast failed', err);
     }
   };
 
@@ -2086,6 +2123,7 @@ export default function App() {
           onVoidSettlement={(settlementId) => handleVoidSettlement(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
           onGentleRemind={() => handleGentleRemind(expenses.find(e => e.id === selectedExpense.id) || selectedExpense)}
+          onClaim={(uid) => handleClaimExpense(selectedExpense.id, uid)}
         />
       )}
 

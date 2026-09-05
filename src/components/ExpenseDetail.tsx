@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
-import { getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
+import { isUnclaimed, getRemainingSettlementAmount, isExpenseFullySettled, getNormalizedExpenseStatus, getExpenseStatusLabel, isDarkCherry, getDarkCherryRemaining, getDarkCherryPotTotal } from '../lib/money';
 import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, AlertCircle, Repeat, Send, EyeOff, Cherry, Ban, BellRing } from 'lucide-react';
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 import ReflectionsSection from './ReflectionsSection';
@@ -18,6 +18,8 @@ interface ExpenseDetailProps {
   onVoidSettlement: (settlementId: string) => void;
   onAddComment: (text: string) => void;
   onGentleRemind?: () => Promise<void> | void;
+  /** Sets the payer on an expense nobody has claimed yet. */
+  onClaim?: (payerUid: string) => void;
 }
 
 export default function ExpenseDetail({
@@ -31,6 +33,7 @@ export default function ExpenseDetail({
   onConfirmReceipt,
   onVoidSettlement,
   onAddComment,
+  onClaim,
   onGentleRemind
 }: ExpenseDetailProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -442,9 +445,37 @@ export default function ExpenseDetail({
             )}
           </div>
           
+
+          {/* Nobody has claimed this yet. Recurring bills arrive unattached,
+              because who paid this month is not something the definition can
+              know. The split stays visible below so the choice is made with
+              its consequences on screen, and nothing can be settled until it
+              is made: there is nobody to pay. */}
+          {isUnclaimed(expense) && (
+            <div className="bg-natural-sidebar/60 border border-natural-border rounded-2xl p-4 mb-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                Nobody has paid this yet
+              </p>
+              <p className="text-sm text-natural-muted mt-1.5 leading-relaxed">
+                This bill came around again. Whoever covered it takes it on, and the
+                split below applies from there.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {members.map(m => (
+                  <button
+                    key={m.uid}
+                    onClick={() => onClaim?.(m.uid)}
+                    className="w-full px-4 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-xl transition-colors cursor-pointer"
+                  >
+                    {m.uid === activeUser ? 'I paid this' : `${m.name} paid this`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {/* State changes (Pay/Confirm) */}
           <div className="flex flex-col sm:flex-row justify-end gap-2 order-1 sm:order-2 w-full sm:w-auto">
-            {!isExpenseFullySettled(expense) && isDebtorActive && (() => {
+            {!isUnclaimed(expense) && !isExpenseFullySettled(expense) && isDebtorActive && (() => {
               if (isDark) {
                 // No numbers on the button - that's the whole point.
                 return (

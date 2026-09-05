@@ -6,6 +6,21 @@ export const roundCurrency = (value: number): number =>
 // Dark Cherry: the blind split. No per-person shares - everyone contributes
 // what they can (within the per-payment bounds) until the pot reaches the
 // expense amount. Participants never see the total or the remainder.
+/**
+ * An expense nobody has claimed as payer yet.
+ *
+ * Recurring instances are spawned unclaimed rather than inheriting the payer
+ * from their definition: who paid the internet bill in March is a fact about
+ * March, not about whoever set the bill up a year ago.
+ *
+ * An unclaimed expense is real and visible, but it is not a debt. You cannot
+ * owe someone who has not been identified, so everything that computes money
+ * skips it until someone claims it. Mirrors isUnclaimed in the Flutter
+ * client's domain/ledger/money.dart.
+ */
+export const isUnclaimed = (expense: Expense): boolean =>
+  !(expense.paidBy || '').trim();
+
 export const isDarkCherry = (expense: Expense): boolean =>
   expense.splitType === 'dark_cherry';
 
@@ -87,6 +102,10 @@ export const getTotalRemainingOwedToPayer = (
   expense: Expense,
   includePending = false
 ): number =>
+  // Nobody has claimed it, so nothing is owed to anybody. Without this the
+  // filter below keeps every share, since none of them equal an empty payer,
+  // and the whole expense is reported as owed to a person who does not exist.
+  isUnclaimed(expense) ? 0 :
   roundCurrency(
     Object.entries(expense.shares || {})
       .filter(([userId]) => userId !== expense.paidBy)
@@ -131,6 +150,10 @@ export const getNormalizedExpenseStatus = (
 };
 
 export const getExpenseStatusLabel = (expense: Expense): string => {
+  // Not "Open": nothing is owed and nothing can be settled until someone
+  // claims it, so it does not belong in the same bucket as a real debt.
+  if (isUnclaimed(expense)) return 'Needs a payer';
+
   const status = getNormalizedExpenseStatus(expense);
 
   if (status === 'CLOSED') return 'Fully Settled';

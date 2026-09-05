@@ -10,7 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules",
-    "test:parity": "tsx scripts/archive-parity.ts",
+    "test:parity": "tsx scripts/archive-parity.ts && tsx scripts/unclaimed-parity.ts",
     "test:rules": "firebase emulators:exec --only firestore \"tsx scripts/rules-test.ts\""
   },
   "overrides": {
