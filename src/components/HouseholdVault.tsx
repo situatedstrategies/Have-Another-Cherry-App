@@ -393,8 +393,8 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <Lock className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-text leading-relaxed">
-                Documents are end-to-end encrypted with your group's key before they leave this
-                device - the lease, the wifi password, insurance cards. Only group members can open them.
+                Documents are encrypted with your group's key before they leave this
+                device - the lease, the wifi password, insurance cards. Security rules restrict them to group members.
               </p>
             </div>
 

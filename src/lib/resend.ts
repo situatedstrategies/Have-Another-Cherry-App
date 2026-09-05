@@ -275,9 +275,9 @@ export async function sendBetaSignupNotification(signup: {
 // point of the feature is that nobody has to send the awkward text.
 // PRIVACY: this email deliberately contains NO amounts, item names, or any
 // financial detail. Everything sent through Resend is visible in the Resend
-// dashboard to the account operator, and this app promises that ledger data
-// stays end-to-end encrypted. The email only says an open balance exists;
-// the details live in the app.
+// dashboard to the account operator, so anything put in an email is readable
+// by anyone with that dashboard, whatever the ledger's own encryption does.
+// The email only says an open balance exists; the details live in the app.
 export async function sendReminderEmail(
   toEmail: string,
   toName: string,
