@@ -1709,6 +1709,13 @@ async function startServer() {
   //     static file so a beta hostname gets the beta Firebase project's
   //     config instead of production's - the same reason src/firebase.ts
   //     picks its config at runtime. Only public identifiers are embedded.
+  // /favicon.ico, which browsers request whether or not the page asks them to.
+  // Without this the SPA catch-all answers it with index.html, the browser gets
+  // HTML where it expected an image, and the tab shows no icon.
+  app.get("/favicon.ico", (_req, res) => {
+    res.redirect(301, "/favicon-32.png");
+  });
+
   app.get("/firebase-messaging-sw.js", (req, res) => {
     const host = String(req.headers.host || "").split(":")[0].toLowerCase();
     const cfg = /^beta[.-]/.test(host) ? betaFirebaseConfig : firebaseConfig;
