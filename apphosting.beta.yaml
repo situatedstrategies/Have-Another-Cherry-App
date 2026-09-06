@@ -26,10 +26,15 @@ env:
   # every beta tester would see a real checkout. Empty puts beta back on the
   # waitlist card, which is what a beta build should show.
   #
-  # Point this at a RevenueCat sandbox key when the web purchase flow itself
-  # needs testing, rather than deleting the override.
+  # The value is "off" rather than an empty string because App Hosting rejects
+  # `value: ""` and fails the whole rollout, which is exactly what it did here.
+  # billing.ts only accepts a key with a real RevenueCat prefix, so any value
+  # that is not one disables selling.
+  #
+  # Point this at a RevenueCat sandbox key (test_...) when the web purchase
+  # flow itself needs testing, rather than deleting the override.
   - variable: VITE_RC_WEB_KEY
-    value: ""
+    value: "off"
     availability:
       - BUILD
 

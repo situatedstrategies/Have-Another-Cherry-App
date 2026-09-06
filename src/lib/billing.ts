@@ -37,7 +37,21 @@ export const PLUS_ENTITLEMENT_ID = 'have_another_cherry';
 // design, like the Firebase client config. Deliberately EMPTY by default:
 // set VITE_RC_WEB_KEY (test_ for sandbox, the live key at launch) to turn
 // web selling on.
-const API_KEY: string = (import.meta as any).env?.VITE_RC_WEB_KEY || '';
+const RAW_KEY: string = ((import.meta as any).env?.VITE_RC_WEB_KEY || '').trim();
+
+// Only a key that looks like a key counts. RevenueCat issues `strp_` for a
+// Stripe app, `rcb_` for Web Billing, and `test_` for sandbox; anything else
+// is a placeholder, a typo, or a deliberate "off" switch.
+//
+// The deliberate case is why this is a prefix check rather than a truthiness
+// check. App Hosting rejects `value: ""` outright and fails the rollout, so a
+// backend that must not sell has to be switched off with a real string, and
+// `off` has to mean off rather than "a key I do not recognise, configure with
+// it anyway".
+const VALID_KEY_PREFIXES = ['strp_', 'rcb_', 'test_'];
+const API_KEY: string = VALID_KEY_PREFIXES.some((p) => RAW_KEY.startsWith(p))
+  ? RAW_KEY
+  : '';
 
 export const isSandboxBilling = API_KEY.startsWith('test_');
 
