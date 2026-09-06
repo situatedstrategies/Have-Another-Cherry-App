@@ -74,6 +74,24 @@ env:
     availability:
       - BUILD
 
+  # Cherry + entitlement webhook. RevenueCat POSTs every subscription event to
+  # /api/revenuecat-webhook with this exact string in its Authorization header,
+  # and the server mirrors the entitlement onto users/{uid}.isPlus. Until it is
+  # set the endpoint answers 503, a web purchase charges the card and unlocks
+  # only the current page load, and nothing durable happens. Same rule as the
+  # rest of this file: it lives in production's Secret Manager, and beta
+  # overrides it with a plain value so the shared declaration still resolves.
+  #
+  #   firebase apphosting:secrets:set REVENUECAT_WEBHOOK_AUTH --project gen-lang-client-0987674990
+  #
+  # Then paste the same value under Authorization header in RevenueCat ->
+  # Integrations -> Webhooks, pointed at
+  # https://app.haveanothercherry.com/api/revenuecat-webhook
+  - variable: REVENUECAT_WEBHOOK_AUTH
+    secret: REVENUECAT_WEBHOOK_AUTH
+    availability:
+      - RUNTIME
+
   # Scheduled bill reminders. Cloud Scheduler POSTs daily to
   # /api/send-bill-reminders with a shared secret in an x-cherry-cron header.
   #

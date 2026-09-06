@@ -1293,8 +1293,10 @@ async function startServer() {
   //     apphosting.yaml, same pattern as RESEND_API_KEY). Configure the same
   //     value under Authorization in RevenueCat's webhook settings.
   app.post("/api/revenuecat-webhook", async (req, res) => {
+    // "disabled" is beta's plain-value override (apphosting.beta.yaml) and
+    // means the same as unset: App Hosting rejects an empty value.
     const expectedAuth = process.env.REVENUECAT_WEBHOOK_AUTH;
-    if (!expectedAuth) {
+    if (!expectedAuth || expectedAuth === "disabled") {
       return res.status(503).json({ error: "Cherry + billing is not configured yet." });
     }
     if (!safeEqual(String(req.headers.authorization || ""), expectedAuth)) {
