@@ -52,6 +52,28 @@ env:
     availability:
       - RUNTIME
 
+  # Cherry + web billing, via RevenueCat Web Billing (Stripe).
+  #
+  # A PUBLIC SDK key, not a secret: RevenueCat issues `strp_` keys for client
+  # code exactly as it issues `appl_` for the iOS app, and it carries no write
+  # access to the account. A plain `value:` rather than a `secret:` for that
+  # reason, and because a `secret:` here would have to resolve in both projects
+  # or fail the rollout, which is a lesson this file already teaches twice.
+  #
+  # It must be BUILD availability: Vite inlines VITE_* at build time, so a
+  # RUNTIME-only variable reaches the server and never the bundle.
+  #
+  # Setting this is what turns web selling ON. With it empty, CherryPlusModal
+  # shows the waitlist and the where-to-buy note; with it set, the same modal
+  # offers the plans through RevenueCat's hosted checkout. See src/lib/billing.ts.
+  #
+  # The iOS app is unaffected and must stay that way: it sells through StoreKit
+  # only and may never mention or link to web purchasing. Apple guideline 3.1.1.
+  - variable: VITE_RC_WEB_KEY
+    value: strp_GBmLXMFpmQLojqqIGsZwCvRYjLT
+    availability:
+      - BUILD
+
   # Scheduled bill reminders. Cloud Scheduler POSTs daily to
   # /api/send-bill-reminders with a shared secret in an x-cherry-cron header.
   #

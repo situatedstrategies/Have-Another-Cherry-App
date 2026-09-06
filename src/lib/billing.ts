@@ -144,11 +144,38 @@ export async function purchasePlus(
  * update payment method, view invoices, cancel. Null when the user has no
  * web subscription to manage.
  */
+/// Stripe's hosted customer portal for this account.
+///
+/// The fallback, not the first choice. RevenueCat returns a managementURL
+/// scoped to the specific subscriber, which lands them on their own
+/// subscription; this one asks for an email and sends a login link. Used only
+/// when RevenueCat gives us nothing AND the subscription could actually be a
+/// Stripe one.
+///
+/// Public by design: it is a login page, and it identifies nobody until an
+/// address is entered and verified by Stripe.
+const STRIPE_PORTAL_URL =
+  'https://billing.stripe.com/p/login/bJe8wR3Xt08M1Ce889d7q00';
+
+/// Stores that manage their own subscriptions. Sending one of their customers
+/// to Stripe's portal is a dead end: their subscription is not there, and the
+/// portal will simply not recognise them.
+const SELF_MANAGED_STORES = ['app_store', 'mac_app_store', 'play_store', 'amazon'];
+
 export async function manageSubscriptionUrl(): Promise<string | null> {
   if (!Purchases.isConfigured()) return null;
   try {
     const info = await Purchases.getSharedInstance().getCustomerInfo();
-    return info.managementURL;
+    if (info.managementURL) return info.managementURL;
+
+    // No managementURL. Only offer the Stripe portal to someone who could
+    // plausibly be in it: an entitlement unlocked by the App Store or Play is
+    // managed there, and returning the portal to them would be a link that
+    // cannot help. Better a disabled button than a confident wrong answer.
+    const active = Object.values(info.entitlements.active);
+    const boughtElsewhere = active.some((e) =>
+      SELF_MANAGED_STORES.includes((e as { store?: string }).store ?? ''));
+    return boughtElsewhere ? null : STRIPE_PORTAL_URL;
   } catch {
     return null;
   }

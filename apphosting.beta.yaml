@@ -19,6 +19,20 @@ env:
       - BUILD
       - RUNTIME
 
+  # Overrides VITE_RC_WEB_KEY from apphosting.yaml, to empty.
+  #
+  # Beta must not take real money. The key in the shared file is the live
+  # Stripe one, and apphosting.yaml applies to both backends, so without this
+  # every beta tester would see a real checkout. Empty puts beta back on the
+  # waitlist card, which is what a beta build should show.
+  #
+  # Point this at a RevenueCat sandbox key when the web purchase flow itself
+  # needs testing, rather than deleting the override.
+  - variable: VITE_RC_WEB_KEY
+    value: ""
+    availability:
+      - BUILD
+
   # Overrides the NOTION_TOKEN secret declared in apphosting.yaml.
   #
   # That file is shared by both backends, so a `secret:` reference there has to
