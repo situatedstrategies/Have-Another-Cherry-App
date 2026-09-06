@@ -1846,11 +1846,20 @@ export default function App() {
                   the mobile apps. On web it opens the waitlist instead of the
                   feature, which is the same treatment every other Cherry +
                   surface here already gets. */}
-              {isPlus ? (
-                <ModuleBoundary label="Balances">
-                  <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
-                </ModuleBoundary>
-              ) : (
+              {/* Balances are not a Cherry + feature and never were. The
+                  paywall sells Dark Cherry, the Vault, thresholds, insights
+                  and rhythm; "You owe / owed to you / settled" is the
+                  splitter itself, and the site promises the free plan is the
+                  whole splitter rather than a trial of it. Gating these four
+                  cards made that promise false and left a free household
+                  unable to see who owed whom, which is the one question the
+                  product exists to answer. */}
+              <ModuleBoundary label="Balances">
+                <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+              </ModuleBoundary>
+              {/* The insights upsell stays for free households, since the
+                  month-over-month chart above really is behind the paywall. */}
+              {!isPlus && (
                 <button
                   type="button"
                   onClick={() => setShowCherryPlus(true)}
