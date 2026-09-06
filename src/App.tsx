@@ -12,6 +12,7 @@ import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
+import ModuleBoundary from './components/ModuleBoundary';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
 import { normalizeAmount } from './lib/limits';
 import { Expense, Group } from './types';
@@ -1821,18 +1822,22 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
                 </div>
-                <ExpenseList
-                  expenses={expenses}
-                  group={group}
-                  activeUser={activeUser}
-                  onExpenseClick={(exp) => setSelectedExpense(exp)}
-                />
+                <ModuleBoundary label="Shared Ledger">
+                  <ExpenseList
+                    expenses={expenses}
+                    group={group}
+                    activeUser={activeUser}
+                    onExpenseClick={(exp) => setSelectedExpense(exp)}
+                  />
+                </ModuleBoundary>
               </div>
               {/* Month-over-month is "Insights and monthly trends" on the
                   paywall, so it is gated with the rest of it rather than
                   being the one Cherry + feature the web gives away. */}
               {isPlus && (
-                <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+                <ModuleBoundary label="Monthly trends">
+                  <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+                </ModuleBoundary>
               )}
             </div>
 
@@ -1842,7 +1847,9 @@ export default function App() {
                   feature, which is the same treatment every other Cherry +
                   surface here already gets. */}
               {isPlus ? (
-                <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+                <ModuleBoundary label="Balances">
+                  <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+                </ModuleBoundary>
               ) : (
                 <button
                   type="button"
@@ -1866,7 +1873,9 @@ export default function App() {
                   </span>
                 </button>
               )}
-              <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
+              <ModuleBoundary label="Rhythm">
+                <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
+              </ModuleBoundary>
             </div>
           </div>
         </div>
