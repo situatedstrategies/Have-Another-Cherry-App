@@ -35,7 +35,7 @@ function PrivacyPolicy() {
 
       <Section title="Information We Collect">
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Account information:</strong> your name and email address. We save your email: it is how you sign in and how we reach you. It is the only contact information we keep, and only a hashed (SHA-256) version sits alongside your ledger data.</li>
+          <li><strong>Account information:</strong> your name and email address. We save your email: it is how you sign in and how we reach you. It is the only contact information we keep. It is stored with your account, and it appears in your household's member list so the people you share with can tell each other apart.</li>
           <li><strong>Financial profile:</strong> your responses to the profile quiz and the income figures you enter, used to tailor split recommendations and insights.</li>
           <li><strong>Expense &amp; ledger data:</strong> the expenses, settlements, and comments you log. Sensitive details are encrypted on your device before being sent to our database.</li>
           <li><strong>Receipt images</strong> you choose to scan, which are processed to extract expense details.</li>
@@ -47,7 +47,7 @@ function PrivacyPolicy() {
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Encrypted before storage:</strong> expense details and ledgers are encrypted on your device with AES-GCM before they are sent, and our database encrypts everything at rest as well.</li>
           <li><strong>Content you submit for AI processing</strong> (receipt scans, Vault organisation) is readable while it is processed, because a model cannot read what only your device can decrypt. Nothing else leaves your device unencrypted.</li>
-          <li><strong>Hashed identifiers:</strong> your email is hashed before storage; we do not store raw emails alongside your ledger data.</li>
+          <li><strong>What is not encrypted:</strong> your household's member list, which holds each member's name and email so the app can show who owes what. Your ledger entries are encrypted; the list of who is in the household is not.</li>
           <li><strong>Group isolation:</strong> security rules restrict data access to members of your own group.</li>
         </ul>
       </Section>
