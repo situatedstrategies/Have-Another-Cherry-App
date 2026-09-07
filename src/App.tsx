@@ -1,4 +1,5 @@
 import { getFullMembers, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
+import { claimSeats } from './lib/seatClaims';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { mergeExpense } from './lib/merge';
@@ -337,6 +338,20 @@ export default function App() {
     expenses,
     setExpenses,
   });
+
+  // Claim placeholder seats in history (lib/seatClaims). An expense logged
+  // before a member joined names their pending seat (ghost_N) rather than
+  // them, so they showed as 0% and the seat as "Unknown" on everything logged
+  // before they redeemed the code. Re-run whenever the ledger or the roster
+  // changes, so the partner's open tab heals the moment the join lands; the
+  // snapshot persist effect above then writes the claimed ledger back.
+  useEffect(() => {
+    if (!group?.id || !memberIdsKey || expenses.length === 0) return;
+    const claimed = claimSeats(expenses, memberIdsKey.split(','));
+    if (!claimed.changed) return;
+    setExpenses(claimed.expenses);
+    try { localStorage.setItem('expenses_' + group.id, JSON.stringify(claimed.expenses)); } catch {}
+  }, [expenses, memberIdsKey, group?.id]);
 
   // Sync Queue Listener
   useEffect(() => {
