@@ -1351,8 +1351,12 @@ export default function App() {
     const expense = expenses.find(e => e.id === selectedExpense.id) || selectedExpense;
 
     const normalizedAmount = roundCurrency(amount);
+    // A pending seat (ghost_N) is a valid debtor: the person who has not
+    // joined yet can still hand over cash, and the claim pass rewrites the
+    // settlement to their real uid the moment they do. Requiring memberIds
+    // here meant a solo creator could never clear a share they had split off.
     const baseValid =
-      group.memberIds.includes(debtorId) &&
+      getFullMembers(group).some(m => m.uid === debtorId) &&
       Number.isFinite(normalizedAmount) &&
       normalizedAmount > 0;
 

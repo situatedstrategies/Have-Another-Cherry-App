@@ -10,6 +10,7 @@ import {
   groupCapacity,
   suggestedSeatPercent,
   MAX_ADDED_SEATS,
+  MIN_GROUP_CAPACITY,
 } from '../src/lib/members';
 
 let bad = 0;
@@ -71,6 +72,16 @@ check('five joined: hard cap refuses a sixth', typeof seatAddBlocker(five), 'str
 // Groups written before targetNumPeople existed fall back to the hard cap, as
 // the join flow always has.
 check('legacy group without a size falls back to five', groupCapacity({ ...couple, targetNumPeople: undefined }), 5);
+
+// One person with one reserved seat, created on a phone with no capacity
+// written. Removing that seat must not lock the group at one: the invite code
+// is still shown and has to work.
+const solo = { ...couple, members: [{ uid: 'a', name: 'A', email: '' }], memberIds: ['a'], defaultSplit: { a: 50 }, availableSplits: [{ name: 'Partner', split: 50 }], targetNumPeople: undefined };
+const soloRemoved = withRemovedSeat(solo, 0);
+check('solo remove: no seats left', soloRemoved.availableSplits, []);
+check('solo remove: the one member holds the whole split', soloRemoved.defaultSplit, { a: 100 });
+check('solo remove: capacity floors at two', soloRemoved.targetNumPeople, MIN_GROUP_CAPACITY);
+check('a capacity of one already written reads as two', groupCapacity({ ...couple, memberIds: ['a'], targetNumPeople: 1 }), MIN_GROUP_CAPACITY);
 
 // Half-joined members (in one list but not the other) count once.
 const drifted = { ...couple, members: [{ uid: 'a', name: 'A', email: '' }], memberIds: ['a', 'b'] };

@@ -93,8 +93,14 @@ export const isExpenseFullySettled = (expense: Expense): boolean => {
     );
   }
 
-  // Legacy / no-debtor records (old settleDetails-only rows, or an expense with
-  // only the payer and nothing owed): fall back to the stored status flag.
+  // No debtors but real shares: the payer is the only person on it, so nothing
+  // is owed to anyone and it is settled the moment it is logged. A one-person
+  // household lives here. Without this, "Fully settled" stayed at zero forever
+  // and every row wore an Open pill, because nothing writes a CLOSED flag now.
+  if (Object.keys(expense.shares || {}).length > 0) return true;
+
+  // Legacy records with no shares at all (old settleDetails-only rows): fall
+  // back to the stored status flag.
   return expense.status === 'settled' || expense.status === 'CLOSED';
 };
 
