@@ -8,6 +8,7 @@ import {
   Vault, CalendarDays, ReceiptText, FileText, Upload, Download, Trash2,
   ChevronLeft, ChevronRight, Plus, RefreshCcw, Repeat, Lock
 } from 'lucide-react';
+import { recurringDaysInMonth } from '../lib/recurring';
 
 interface HouseholdVaultProps {
   groupId: string;
@@ -25,24 +26,6 @@ const EMPTY_VAULT: VaultData = { bills: [], docs: [] };
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-// Step a date forward by a recurring interval (mirrors ExpenseForm's logic).
-function stepDate(d: Date, interval?: string): Date {
-  const next = new Date(d);
-  switch (interval) {
-    case 'weekly': next.setDate(next.getDate() + 7); break;
-    case 'biweekly': next.setDate(next.getDate() + 14); break;
-    case '2_months': next.setMonth(next.getMonth() + 2); break;
-    case '3_months': next.setMonth(next.getMonth() + 3); break;
-    case '6_months': next.setMonth(next.getMonth() + 6); break;
-    case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
-    case 'monthly':
-    default: next.setMonth(next.getMonth() + 1); break;
-  }
-  return next;
-}
-
-const parseLocalDate = (s: string) => new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T00:00:00' : s);
 
 const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -228,16 +211,16 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     }
 
     // Project each recurring ledger expense's occurrences into the viewed month.
-    const monthStart = new Date(viewYear, viewMonth, 1);
-    const monthEnd = new Date(viewYear, viewMonth, daysInMonth, 23, 59, 59);
+    //
+    // Asked per day from the definition's own date, not stepped forward from
+    // `nextRecurringDate`: that field is what the autopilot advances, so
+    // walking from it made a month already past show nothing, even though the
+    // bill certainly fell due in it. This also walks the same arithmetic the
+    // autopilot does, so a bill anchored on the 31st appears on the day the
+    // ledger actually spawns it in a short month.
     for (const exp of expenses) {
-      if (!exp.isRecurring || !exp.nextRecurringDate) continue;
-      let cursor = parseLocalDate(exp.nextRecurringDate);
-      for (let i = 0; i < 40 && cursor <= monthEnd; i++) {
-        if (cursor >= monthStart) {
-          (map[cursor.getDate()] ||= []).push({ label: exp.title, amount: exp.amount, source: 'expense' });
-        }
-        cursor = stepDate(cursor, exp.recurringInterval);
+      for (const day of recurringDaysInMonth(exp, viewYear, viewMonth)) {
+        (map[day] ||= []).push({ label: exp.title, amount: exp.amount, source: 'expense' });
       }
     }
     return map;
@@ -410,8 +393,8 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <Lock className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-text leading-relaxed">
-                Documents are end-to-end encrypted with your group's key before they leave this
-                device - the lease, the wifi password, insurance cards. Only group members can open them.
+                Documents are encrypted with your group's key before they leave this
+                device - the lease, the wifi password, insurance cards. Security rules restrict them to group members.
               </p>
             </div>
 

@@ -3,6 +3,7 @@ import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
 import { Search, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
+import { intervalLabel } from '../lib/recurring';
 
 // Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
 // bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
@@ -268,7 +269,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span role="img" aria-label={`Recurring: ${exp.recurringInterval}`} className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${exp.recurringInterval}`}>
+                        <span role="img" aria-label={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`} className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}>
                           <Repeat size={10} />
                         </span>
                       )}

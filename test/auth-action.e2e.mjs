@@ -11,8 +11,8 @@
 // Running it (needs Java for the emulator, and playwright installed):
 //
 //   npx firebase-tools emulators:start --only auth \
-//     --project have-another-cherry-beta --config test/emulator.firebase.json
-//   VITE_APP_ENV=beta npm run build
+//     --project gen-lang-client-0987674990 --config test/emulator.firebase.json
+//   npm run build
 //   NODE_ENV=production PORT=3111 node dist/server.cjs
 //   node test/auth-action.e2e.mjs
 //
@@ -22,7 +22,7 @@ import { chromium } from 'playwright';
 
 const APP = 'http://localhost:3111';
 const EMU = 'http://127.0.0.1:9099';
-const PROJ = 'have-another-cherry-beta';
+const PROJ = 'gen-lang-client-0987674990';
 const KEY = 'fake-api-key';
 
 let fails = 0;

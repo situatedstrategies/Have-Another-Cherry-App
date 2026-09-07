@@ -275,9 +275,9 @@ export async function sendBetaSignupNotification(signup: {
 // point of the feature is that nobody has to send the awkward text.
 // PRIVACY: this email deliberately contains NO amounts, item names, or any
 // financial detail. Everything sent through Resend is visible in the Resend
-// dashboard to the account operator, and this app promises that ledger data
-// stays end-to-end encrypted. The email only says an open balance exists;
-// the details live in the app.
+// dashboard to the account operator, so anything put in an email is readable
+// by anyone with that dashboard, whatever the ledger's own encryption does.
+// The email only says an open balance exists; the details live in the app.
 export async function sendReminderEmail(
   toEmail: string,
   toName: string,
@@ -317,6 +317,50 @@ export async function sendReminderEmail(
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
     html: withComplianceFooter(html),
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+// Support request from inside the app. Goes to help@haveanothercherry.com with
+// replyTo set to the sender, so answering is a plain reply rather than a
+// copy-paste of an address out of the body.
+//
+// The message is whatever the user typed plus the context the app already
+// knows (platform, version, screen). It must never carry ledger content: the
+// point of a support form is that someone can describe a problem without
+// handing over what they spent money on.
+export async function sendSupportRequest(request: {
+  fromEmail: string;
+  fromName?: string;
+  message: string;
+  context?: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  const resend = new Resend(apiKey);
+  const who = request.fromName?.trim()
+    ? `${request.fromName.trim()} <${request.fromEmail}>`
+    : request.fromEmail;
+
+  const { data, error } = await resend.emails.send({
+    from: "Have Another Cherry <notifications@haveanothercherry.com>",
+    to: "help@haveanothercherry.com",
+    replyTo: request.fromEmail,
+    subject: `[Support] ${request.fromEmail}`,
+    text:
+      `Support request from ${who}\n\n` +
+      `${request.message.trim()}\n\n` +
+      `--- app context ---\n` +
+      `${request.context?.trim() || "(none supplied)"}\n` +
+      `Received ${new Date().toISOString()}`,
   });
 
   if (error) {

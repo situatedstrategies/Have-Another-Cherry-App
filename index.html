@@ -6,6 +6,11 @@
     <title>Go ahead. Have Another Cherry</title>
 
     <!-- Install / home-screen (PWA) -->
+    <!-- PNG first, because a browser that asks for /favicon.ico by default was
+         getting index.html back from the SPA catch-all and showing no icon at
+         all. The SVG stays as the scalable option for browsers that prefer it. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />

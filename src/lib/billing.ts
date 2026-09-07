@@ -37,7 +37,21 @@ export const PLUS_ENTITLEMENT_ID = 'have_another_cherry';
 // design, like the Firebase client config. Deliberately EMPTY by default:
 // set VITE_RC_WEB_KEY (test_ for sandbox, the live key at launch) to turn
 // web selling on.
-const API_KEY: string = (import.meta as any).env?.VITE_RC_WEB_KEY || '';
+const RAW_KEY: string = ((import.meta as any).env?.VITE_RC_WEB_KEY || '').trim();
+
+// Only a key that looks like a key counts. RevenueCat issues `strp_` for a
+// Stripe app, `rcb_` for Web Billing, and `test_` for sandbox; anything else
+// is a placeholder, a typo, or a deliberate "off" switch.
+//
+// The deliberate case is why this is a prefix check rather than a truthiness
+// check. App Hosting rejects `value: ""` outright and fails the rollout, so a
+// backend that must not sell has to be switched off with a real string, and
+// `off` has to mean off rather than "a key I do not recognise, configure with
+// it anyway".
+const VALID_KEY_PREFIXES = ['strp_', 'rcb_', 'test_'];
+const API_KEY: string = VALID_KEY_PREFIXES.some((p) => RAW_KEY.startsWith(p))
+  ? RAW_KEY
+  : '';
 
 export const isSandboxBilling = API_KEY.startsWith('test_');
 
@@ -144,11 +158,38 @@ export async function purchasePlus(
  * update payment method, view invoices, cancel. Null when the user has no
  * web subscription to manage.
  */
+/// Stripe's hosted customer portal for this account.
+///
+/// The fallback, not the first choice. RevenueCat returns a managementURL
+/// scoped to the specific subscriber, which lands them on their own
+/// subscription; this one asks for an email and sends a login link. Used only
+/// when RevenueCat gives us nothing AND the subscription could actually be a
+/// Stripe one.
+///
+/// Public by design: it is a login page, and it identifies nobody until an
+/// address is entered and verified by Stripe.
+const STRIPE_PORTAL_URL =
+  'https://billing.stripe.com/p/login/bJe8wR3Xt08M1Ce889d7q00';
+
+/// Stores that manage their own subscriptions. Sending one of their customers
+/// to Stripe's portal is a dead end: their subscription is not there, and the
+/// portal will simply not recognise them.
+const SELF_MANAGED_STORES = ['app_store', 'mac_app_store', 'play_store', 'amazon'];
+
 export async function manageSubscriptionUrl(): Promise<string | null> {
   if (!Purchases.isConfigured()) return null;
   try {
     const info = await Purchases.getSharedInstance().getCustomerInfo();
-    return info.managementURL;
+    if (info.managementURL) return info.managementURL;
+
+    // No managementURL. Only offer the Stripe portal to someone who could
+    // plausibly be in it: an entitlement unlocked by the App Store or Play is
+    // managed there, and returning the portal to them would be a link that
+    // cannot help. Better a disabled button than a confident wrong answer.
+    const active = Object.values(info.entitlements.active);
+    const boughtElsewhere = active.some((e) =>
+      SELF_MANAGED_STORES.includes((e as { store?: string }).store ?? ''));
+    return boughtElsewhere ? null : STRIPE_PORTAL_URL;
   } catch {
     return null;
   }

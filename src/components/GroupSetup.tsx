@@ -4,6 +4,7 @@ import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firest
 import { signOut } from 'firebase/auth';
 import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
+import { groupCapacity } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
@@ -252,7 +253,9 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           return snap.id;
         }
 
-        const capacity = groupData.targetNumPeople || 5;
+        // Sized by the creator, and grown afterwards through Settings when the
+        // group adds a seat (lib/members.withAddedSeat bumps targetNumPeople).
+        const capacity = groupCapacity(groupData);
         // Count joined people by unique uid so a stale duplicate can't make a
         // group with a free seat look full.
         const joinedCount = new Set([
@@ -260,7 +263,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           ...existingMembers.map(m => m?.uid).filter(Boolean),
         ]).size;
         if (joinedCount >= capacity) {
-          throw new Error(`This group is already full (${capacity} members).`);
+          throw new Error(`This group is already full (${capacity} people). A member can add a seat for you from Settings.`);
         }
 
         // Take the next available split slot, or fall back to the even remainder.

@@ -25,13 +25,14 @@ export default function PrivacyModal({ onClose, onOpenLegal, onExportData, onDel
         </h3>
         <div className="bg-natural-sage/20 p-5 rounded-2xl border border-natural-sage/30 text-sm text-natural-text leading-relaxed space-y-4">
           <p>
-            Your privacy is our top priority. We have implemented robust technical controls to ensure your financial ledgers and personal information are completely confidential and unreadable by anyone outside your group, including our own developers.
+            Here is what actually protects your ledger, described as plainly as we can manage. The full detail is in the Privacy Policy below.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-natural-muted">
-            <li><strong>End-to-End Encryption (E2EE):</strong> All expense details and ledgers are fully encrypted on your device (using AES-GCM) before being sent to our database. They can only be decrypted using your group's invite code. Even if our backend developers try to view your database records, they will only see unreadable ciphertext.</li>
-            <li><strong>Minimal contact data:</strong> We save your email address to sign you in and send you service emails - it's the only contact information we keep, and we never sell it or share it. Only a hashed (SHA-256) version sits alongside your ledger data, and our emails never contain your amounts or expense details.</li>
-            <li><strong>Strict Cloud Isolation:</strong> We use strict Firestore backend security rules that physically block cross-group data queries. Groups are completely isolated from one another.</li>
-            <li><strong>Profile Controls:</strong> You can leave your current group and clear the profile information stored by the app. Full sign-in account deletion is not yet available in Alpha Lite and will be implemented before public release.</li>
+            <li><strong>Encrypted before it is stored:</strong> Sensitive expense details are encrypted on your device with AES-GCM before they are sent to our database, and the database encrypts everything at rest as well. Your ledger is not sitting in a table anyone can read at a glance.</li>
+            <li><strong>Minimal contact data:</strong> We save your email address to sign you in and send you service emails - it's the only contact information we keep, and we never sell it or share it beyond the service providers listed in our Privacy Policy. It is stored with your account so you can sign in, and it appears in your household's member list so the people you share with can tell each other apart. Our emails never contain your amounts or expense details.</li>
+            <li><strong>Group isolation:</strong> Firestore security rules restrict every group's data to the members of that group, and we run an automated test suite against those rules so a change cannot quietly loosen them.</li>
+            <li><strong>Notifications say very little:</strong> A notification tells you that something happened or that a bill is due tomorrow. It never carries an amount, a balance, or the name of an expense, because it passes through Apple's and Google's delivery services and lands on your lock screen.</li>
+            <li><strong>You can delete all of it:</strong> deleting your account removes you from your households, hands your share of each split to whoever is left, and deletes your profile and your sign-in. A household you share with other people keeps its ledger, because it is theirs too; a household where you were the last member is deleted with you.</li>
           </ul>
           <div className="bg-white/60 p-4 rounded-xl border border-natural-border/60 text-sm text-natural-dark italic mt-4 shadow-sm">
             We made the math take care of itself, so all that's left is the conversation. And money talk, had gently and honestly, can be the start of something sweet.

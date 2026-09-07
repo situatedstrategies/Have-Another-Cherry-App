@@ -59,6 +59,9 @@ export interface Group {
   defaultSplit: Record<string, number>; // uid -> percentage
   targetNumPeople?: number;
   availableSplits?: { name: string; split: number }[] | number[];
+  // How many seats members have added since the group was created (see
+  // lib/members MAX_ADDED_SEATS). Absent on groups that never grew.
+  addedSeats?: number;
   categories: string[];
   memberIncomes?: Record<string, string>;
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)
@@ -157,7 +160,11 @@ export interface Expense {
   // recurring expense that spawned this one (used to prevent duplicates).
   recurringSourceId?: string;
   isRecurring?: boolean;
-  recurringInterval?: 'weekly' | 'biweekly' | 'monthly' | '2_months' | '3_months' | '6_months' | 'yearly';
+  // `<n>_weeks` for 1..12 and `<n>_months` for 1, 2, 3, 6 and 12, which is what
+  // the picker writes now. The four legacy spellings are still read from
+  // records written before the list grew; see lib/recurring.ts, which is the
+  // only place that interprets any of them.
+  recurringInterval?: string;
   nextRecurringDate?: string;
   status: 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED' | 'unsettled' | 'pending_confirmation' | 'settled'; // legacy values retained for existing records
   settleDetails?: SettleDetails; // legacy

@@ -10,34 +10,11 @@ import {
   browserPopupRedirectResolver,
 } from 'firebase/auth';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
-import prodConfig from '../firebase-applet-config.json';
-import betaConfig from '../firebase-applet-config.beta.json';
+import firebaseConfig from '../firebase-applet-config.json';
 
-// Which Firebase project this build talks to. Beta runs in a separate project so
-// testers get their own Firestore and their own Auth user pool - a beta account
-// is never a production account, and a beta bug can never touch a real ledger.
-//
-// Selected two ways, because the two deploy paths differ. `VITE_APP_ENV=beta` is
-// the explicit switch (set it for local beta work or a build-time override). The
-// hostname check is the fallback, so a single build artifact serves whichever
-// backend it lands on without needing per-backend build config.
-const isBetaEnv =
-  import.meta.env.VITE_APP_ENV === 'beta' ||
-  (typeof window !== 'undefined' && /^beta[.-]/.test(window.location.hostname));
-
-const firebaseConfig = isBetaEnv ? betaConfig : prodConfig;
-
-// Fail loudly rather than fall back to production. Silently pointing beta
-// testers at the real database is the one outcome this whole split exists to
-// prevent, so an unconfigured beta build must not start at all.
-if (isBetaEnv && firebaseConfig.projectId.startsWith('REPLACE_ME')) {
-  throw new Error(
-    'Beta environment selected but firebase-applet-config.beta.json still contains ' +
-    'placeholder values. Fill it in from the beta Firebase project before deploying.'
-  );
-}
-
-export const APP_ENV: 'beta' | 'production' = isBetaEnv ? 'beta' : 'production';
+// One Firebase project. There used to be a separate beta project selected by
+// VITE_APP_ENV or a beta.* hostname; it was retired because it split the user
+// base in two and people signed up on the wrong one.
 
 export const app = initializeApp(firebaseConfig);
 

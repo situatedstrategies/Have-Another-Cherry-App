@@ -1,5 +1,5 @@
 import { Expense, Group } from '../types';
-import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
+import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
 import { CreditCard, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
 
 interface StatsSectionProps {
@@ -30,6 +30,12 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
   let othersOwePending = 0;
 
   expenses.forEach(exp => {
+    // Unclaimed: nobody has said they paid it, so it is owed by nobody to
+    // nobody. Without this it falls to the else branch below, where the
+    // current user's share is counted as something they owe, inflating You Owe
+    // with a debt to a person who has not been identified.
+    if (isUnclaimed(exp)) return;
+
     const isFullySettled = isExpenseFullySettled(exp);
 
     if (exp.paidBy === activeUser) {

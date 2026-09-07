@@ -10,11 +10,9 @@
 
 // Where our handler lives for the request that came in.
 //
-// Derived from the incoming request rather than hardcoded, because the same
-// build serves both environments. A reset started on beta.haveanothercherry.com
-// has to stay on beta: its oobCode belongs to the beta Firebase project, and the
-// production app would validate it against the production project and reject it
-// as invalid. AUTH_ACTION_URL overrides this if a backend ever needs to pin it.
+// Derived from the incoming request rather than hardcoded, so the same build
+// answers correctly on the custom domain, on the raw App Hosting URL, and in
+// local dev. AUTH_ACTION_URL overrides this if a backend ever needs to pin it.
 export function actionHandlerBase(
   headers: Record<string, string | string[] | undefined>,
   override?: string

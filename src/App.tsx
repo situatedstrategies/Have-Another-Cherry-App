@@ -1,16 +1,18 @@
-import { getFullMembers } from './lib/members';
+import { getFullMembers, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { mergeExpense } from './lib/merge';
+import { advanceIntervalStr, parseLocalDate } from './lib/recurring';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, OAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
+import ModuleBoundary from './components/ModuleBoundary';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
 import { normalizeAmount } from './lib/limits';
 import { Expense, Group } from './types';
@@ -62,23 +64,6 @@ const todayLocal = () => {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().split('T')[0];
 };
-
-// Step a recurring date forward by its interval (local, date-only).
-function advanceRecurringDate(dateStr: string, interval?: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  switch (interval) {
-    case 'weekly': d.setDate(d.getDate() + 7); break;
-    case 'biweekly': d.setDate(d.getDate() + 14); break;
-    case '2_months': d.setMonth(d.getMonth() + 2); break;
-    case '3_months': d.setMonth(d.getMonth() + 3); break;
-    case '6_months': d.setMonth(d.getMonth() + 6); break;
-    case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
-    case 'monthly':
-    default: d.setMonth(d.getMonth() + 1); break;
-  }
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().split('T')[0];
-}
 
 // Consistent, branded loading screen - same background as every other screen so
 // switching between them never flashes white or a stale page.
@@ -187,6 +172,13 @@ export default function App() {
         // key it to the Firebase uid (same rule as the mobile apps) so a
         // purchase maps to users/{uid} via the webhook.
         configureBilling(user.uid).catch(console.error);
+        // Promo allowlist (owner, review accounts): the server decides from
+        // the verified token and writes the entitlement; the profile
+        // listener picks it up. Silent on failure: nothing is lost, the
+        // paywall simply stays where it is until the next sign-in.
+        authHeader()
+          .then((h) => fetch('/api/plus-promo-sync', { method: 'POST', headers: h }))
+          .catch(() => {});
       }
     });
     return () => unsubscribe();
@@ -451,6 +443,14 @@ export default function App() {
     if (recurringAutopilotRef.current === runKey) return;
 
     const today = todayLocal();
+    // Materialise a cycle two weeks before it is due, so it reaches the
+    // calendar in time to be planned for. It keeps its real future date, so
+    // the ledger files it under upcoming rather than into this month.
+    const horizon = (() => {
+      const d = new Date(today + 'T00:00:00');
+      d.setDate(d.getDate() + 14);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
     const spawned: Expense[] = [];
     const sourceUpdates = new Map<string, string>(); // source id -> new nextRecurringDate
 
@@ -458,7 +458,7 @@ export default function App() {
       if (!exp.isRecurring || !exp.nextRecurringDate || exp.paidBy !== activeUser) continue;
       let next: string = exp.nextRecurringDate;
       let guard = 0;
-      while (next && next <= today && guard < 24) {
+      while (next && next <= horizon && guard < 24) {
         guard++;
         const dueDate = next;
         const dupe =
@@ -469,6 +469,11 @@ export default function App() {
             ...exp,
             id: crypto.randomUUID(),
             date: dueDate,
+            // Unclaimed. Inheriting the definition's payer asserts that
+            // whoever set the bill up also paid it this month, which is a
+            // claim about this month made by a record from last year.
+            // Someone claims it when it is actually paid.
+            paidBy: '',
             createdAt: new Date().toISOString(),
             editedAt: new Date().toISOString(),
             status: 'OPEN',
@@ -480,7 +485,10 @@ export default function App() {
             recurringSourceId: exp.id,
           });
         }
-        next = advanceRecurringDate(dueDate, exp.recurringInterval);
+        // Anchored on the definition's own day, so a bill set for the 31st
+        // keeps coming back to the 31st instead of sticking at 28 after one
+        // February. The calendar walks with the same anchor.
+        next = advanceIntervalStr(dueDate, exp.recurringInterval, parseLocalDate(exp.date).getDate());
       }
       if (next !== exp.nextRecurringDate) sourceUpdates.set(exp.id, next);
     }
@@ -973,13 +981,20 @@ export default function App() {
   };
 
   // Re-authenticate the current user when Firebase requires a recent login before
-  // a sensitive operation (account deletion). Handles both Google and email/password.
+  // a sensitive operation (account deletion). Handles Google, Apple and
+  // email/password; an Apple account used to be told to sign out and back in,
+  // which never satisfied the recent-login check, so it could not be deleted.
   const reauthenticate = async () => {
     const user = auth.currentUser;
     if (!user) throw new Error("No signed-in user");
     const providerId = user.providerData[0]?.providerId;
     if (providerId === 'google.com') {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    } else if (providerId === 'apple.com') {
+      const apple = new OAuthProvider('apple.com');
+      apple.addScope('email');
+      apple.addScope('name');
+      await reauthenticateWithPopup(user, apple);
     } else if (providerId === 'password') {
       const pw = window.prompt("For your security, please re-enter your password to permanently delete your account:");
       if (!pw) throw new Error("cancelled");
@@ -1231,6 +1246,30 @@ export default function App() {
     } catch (e: any) {
       console.error(e);
       setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Log expense', detail: String(e?.message || e) });
+    }
+  };
+
+
+  // Claiming an unclaimed expense. Recurring bills arrive with nobody
+  // attached, so this is the step that turns one into a real ledger entry:
+  // until it happens the expense owes nobody and settles nothing.
+  const handleClaimExpense = async (expenseId: string, payerUid: string) => {
+    if (!group) return;
+    const groupId = group.id;
+    const target = expenses.find(e => e.id === expenseId);
+    if (!target) return;
+    const claimed: Expense = { ...target, paidBy: payerUid, editedAt: new Date().toISOString() };
+    setExpenses(prev => {
+      const updated = prev.map(e => (e.id === expenseId ? claimed : e));
+      try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
+      catch (err) { console.error('Failed to persist expenses', err); }
+      return updated;
+    });
+    setSelectedExpense(claimed);
+    try {
+      await broadcastToMembers('UPSERT', claimed);
+    } catch (err) {
+      console.error('Claim broadcast failed', err);
     }
   };
 
@@ -1523,6 +1562,43 @@ export default function App() {
     }
   };
 
+  // Grow the group by one pending seat. Written as a whole-field update rather
+  // than dotted paths because every share changes at once, and read back
+  // through the group snapshot listener.
+  const handleAddSeat = async (name: string, percent: number) => {
+    if (!group) return;
+    const next = withAddedSeat(group, name, percent);
+    await updateDoc(doc(db, 'groups', group.id), {
+      defaultSplit: next.defaultSplit,
+      availableSplits: next.availableSplits,
+      targetNumPeople: next.targetNumPeople,
+      addedSeats: next.addedSeats,
+    });
+    addToast('Seat Added', `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`, 'success');
+    // Offer to email the invite right away; cancelling the prompt is fine.
+    await handleResendInvite(name.trim());
+  };
+
+  const handleRemoveSeat = async (index: number) => {
+    if (!group) return;
+    const seat = pendingSeats(group)[index];
+    if (!seat) return;
+    if (!window.confirm(`Remove the pending seat for ${seat.name}? Their ${seat.split}% goes back to everyone else.`)) return;
+    try {
+      const next = withRemovedSeat(group, index);
+      await updateDoc(doc(db, 'groups', group.id), {
+        defaultSplit: next.defaultSplit,
+        availableSplits: next.availableSplits,
+        targetNumPeople: next.targetNumPeople,
+        addedSeats: next.addedSeats,
+      });
+      addToast('Seat Removed', `${seat.name} is no longer pending.`, 'success');
+    } catch (e) {
+      console.error('Failed to remove seat', e);
+      addToast('Error', 'Could not remove that seat. Please try again.', 'error');
+    }
+  };
+
   const handleRecalculateSplit = async () => {
     if (!group) return;
     const uids = Object.keys(groupUsers);
@@ -1797,18 +1873,22 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
                 </div>
-                <ExpenseList
-                  expenses={expenses}
-                  group={group}
-                  activeUser={activeUser}
-                  onExpenseClick={(exp) => setSelectedExpense(exp)}
-                />
+                <ModuleBoundary label="Shared Ledger">
+                  <ExpenseList
+                    expenses={expenses}
+                    group={group}
+                    activeUser={activeUser}
+                    onExpenseClick={(exp) => setSelectedExpense(exp)}
+                  />
+                </ModuleBoundary>
               </div>
               {/* Month-over-month is "Insights and monthly trends" on the
                   paywall, so it is gated with the rest of it rather than
                   being the one Cherry + feature the web gives away. */}
               {isPlus && (
-                <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+                <ModuleBoundary label="Monthly trends">
+                  <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+                </ModuleBoundary>
               )}
             </div>
 
@@ -1817,9 +1897,20 @@ export default function App() {
                   the mobile apps. On web it opens the waitlist instead of the
                   feature, which is the same treatment every other Cherry +
                   surface here already gets. */}
-              {isPlus ? (
+              {/* Balances are not a Cherry + feature and never were. The
+                  paywall sells Dark Cherry, the Vault, thresholds, insights
+                  and rhythm; "You owe / owed to you / settled" is the
+                  splitter itself, and the site promises the free plan is the
+                  whole splitter rather than a trial of it. Gating these four
+                  cards made that promise false and left a free household
+                  unable to see who owed whom, which is the one question the
+                  product exists to answer. */}
+              <ModuleBoundary label="Balances">
                 <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
-              ) : (
+              </ModuleBoundary>
+              {/* The insights upsell stays for free households, since the
+                  month-over-month chart above really is behind the paywall. */}
+              {!isPlus && (
                 <button
                   type="button"
                   onClick={() => setShowCherryPlus(true)}
@@ -1842,7 +1933,9 @@ export default function App() {
                   </span>
                 </button>
               )}
-              <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
+              <ModuleBoundary label="Rhythm">
+                <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
+              </ModuleBoundary>
             </div>
           </div>
         </div>
@@ -1882,6 +1975,8 @@ export default function App() {
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}
+          onAddSeat={handleAddSeat}
+          onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}
           onOpenBackup={() => {
             // Backups & export are Cherry + (site feature list): free users
@@ -2086,6 +2181,7 @@ export default function App() {
           onVoidSettlement={(settlementId) => handleVoidSettlement(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
           onGentleRemind={() => handleGentleRemind(expenses.find(e => e.id === selectedExpense.id) || selectedExpense)}
+          onClaim={(uid) => handleClaimExpense(selectedExpense.id, uid)}
         />
       )}
 
