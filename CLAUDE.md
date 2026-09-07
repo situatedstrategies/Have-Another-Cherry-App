@@ -105,6 +105,10 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 
 ## Data model note (the "split")
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
+- Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
+
+## Beta data reset
+- `npm run wipe:beta -- --dry-run` then `npm run wipe:beta -- --yes` (after `gcloud auth application-default login`) empties the beta project: every Firestore collection AND every Authentication user. Deleting the Firestore database in the console leaves the Auth users behind, and an Auth user with no `users/{uid}` doc is what "the account already exists" / a ghost account looks like.
 
 ## Design system (match this for UI work)
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).

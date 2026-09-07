@@ -59,6 +59,9 @@ export interface Group {
   defaultSplit: Record<string, number>; // uid -> percentage
   targetNumPeople?: number;
   availableSplits?: { name: string; split: number }[] | number[];
+  // How many seats members have added since the group was created (see
+  // lib/members MAX_ADDED_SEATS). Absent on groups that never grew.
+  addedSeats?: number;
   categories: string[];
   memberIncomes?: Record<string, string>;
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)

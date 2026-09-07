@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2, Bell } from 'lucide-react';
+import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2, Bell, UserPlus } from 'lucide-react';
 import { Group } from '../types';
-import { getFullDefaultSplit } from '../lib/members';
+import {
+  getFullDefaultSplit,
+  joinedUids,
+  pendingSeats,
+  seatAddBlocker,
+  suggestedSeatPercent,
+  withAddedSeat,
+  MAX_ADDED_SEATS,
+} from '../lib/members';
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import Modal from './Modal';
 
@@ -15,6 +23,10 @@ interface SettingsModalProps {
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => void;
   onResendInvite: (memberName: string) => void;
+  /** Add a pending seat (name + percentage); everyone else is rescaled. */
+  onAddSeat: (name: string, percent: number) => Promise<void>;
+  /** Remove the pending seat at this index in availableSplits. */
+  onRemoveSeat: (index: number) => Promise<void>;
   onLeaveGroup: () => void;
   onOpenBackup: () => void;
   onOpenPrivacy: () => void;
@@ -28,11 +40,78 @@ const RESERVED_NAMES = ['Anonymous', 'Unknown'];
 export default function SettingsModal({
   onClose, userProfile, currentUser, group, groupUsers,
   onSaveName, onRetakeQuiz, onRecalculateSplit, onResendInvite,
+  onAddSeat, onRemoveSeat,
   onLeaveGroup, onOpenBackup, onOpenPrivacy, onSignOut,
   extraSection,
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+
+  // Growing the group: a couple can bring in up to two more people without
+  // starting a new group. The form takes a name and the newcomer's share and
+  // previews how everyone else's share shrinks to make room.
+  const [addingSeat, setAddingSeat] = useState(false);
+  const [seatName, setSeatName] = useState('');
+  const [seatPercent, setSeatPercent] = useState('');
+  const [seatBusy, setSeatBusy] = useState(false);
+  const [seatError, setSeatError] = useState('');
+  const [removingSeat, setRemovingSeat] = useState<number | null>(null);
+  const seatBlocker = seatAddBlocker(group);
+  const growthLeft = MAX_ADDED_SEATS - Math.max(0, Number(group?.addedSeats) || 0);
+
+  const openSeatForm = () => {
+    setSeatName('');
+    setSeatPercent(String(suggestedSeatPercent(group)));
+    setSeatError('');
+    setAddingSeat(true);
+  };
+
+  let seatPreview: { name: string; pct: number }[] | null = null;
+  if (addingSeat && group) {
+    try {
+      const next = withAddedSeat(group, seatName || 'New person', parseFloat(seatPercent));
+      seatPreview = [
+        ...joinedUids(group).map(uid => ({
+          name: groupUsers[uid]?.name || group.members?.find(m => m.uid === uid)?.name || 'Member',
+          pct: next.defaultSplit[uid],
+        })),
+        ...next.availableSplits.map(p => ({ name: p.name, pct: p.split })),
+      ];
+    } catch {
+      seatPreview = null;
+    }
+  }
+
+  const submitSeat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (seatBusy) return;
+    setSeatError('');
+    try {
+      withAddedSeat(group, seatName, parseFloat(seatPercent));
+    } catch (err: any) {
+      setSeatError(err.message);
+      return;
+    }
+    setSeatBusy(true);
+    try {
+      await onAddSeat(seatName, parseFloat(seatPercent));
+      setAddingSeat(false);
+    } catch (err: any) {
+      setSeatError(err?.message || 'Could not add that person. Please try again.');
+    } finally {
+      setSeatBusy(false);
+    }
+  };
+
+  const removeSeat = async (index: number) => {
+    if (removingSeat !== null) return;
+    setRemovingSeat(index);
+    try {
+      await onRemoveSeat(index);
+    } finally {
+      setRemovingSeat(null);
+    }
+  };
 
   // Web push state. 'unavailable' hides the section (no VAPID key configured,
   // or a browser without push); the first permission ask lives behind this
@@ -205,6 +284,14 @@ export default function SettingsModal({
                         <div className="flex items-center gap-2">
                           <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">Pending</span>
                           <button onClick={() => onResendInvite(memberName)} className="text-xs uppercase font-bold text-natural-primary hover:underline">Resend Invite</button>
+                          <button
+                            onClick={() => removeSeat(Number(uid.slice('ghost_'.length)))}
+                            disabled={removingSeat !== null}
+                            className="text-xs uppercase font-bold text-natural-muted hover:text-natural-primary hover:underline disabled:opacity-50"
+                            title="Remove this pending seat and give its share back to everyone else"
+                          >
+                            {removingSeat === Number(uid.slice('ghost_'.length)) ? 'Removing...' : 'Remove'}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -212,13 +299,87 @@ export default function SettingsModal({
                 );
               })}
             </div>
-            {Object.keys(groupUsers).length === 2 && (
+            {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && (
               <button
                 className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
                 onClick={onRecalculateSplit}
               >
                 Recalculate Using Reported Incomes
               </button>
+            )}
+
+            {/* Grow the group. Every member may add a seat; the split is rescaled
+                so the newcomer's share comes out of everyone proportionally. */}
+            {!addingSeat ? (
+              <div className="mt-3">
+                <button
+                  className="w-full flex items-center justify-center gap-2 text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-50 disabled:hover:border-natural-border"
+                  onClick={openSeatForm}
+                  disabled={!!seatBlocker}
+                >
+                  <UserPlus size={14} /> Add a Person
+                </button>
+                <p className="text-xs text-natural-muted mt-1.5 text-center">
+                  {seatBlocker
+                    ? seatBlocker
+                    : `Bring in up to ${growthLeft === 1 ? 'one more person' : 'two more people'}. Everyone's share is rescaled to make room.`}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={submitSeat} className="mt-3 bg-white border border-natural-border rounded-lg p-3 space-y-3">
+                <div className="grid grid-cols-[1fr_5.5rem] gap-2">
+                  <input
+                    autoFocus
+                    value={seatName}
+                    onChange={e => setSeatName(e.target.value)}
+                    placeholder="Their name"
+                    maxLength={40}
+                    className="px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
+                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={seatPercent}
+                      onChange={e => setSeatPercent(e.target.value)}
+                      className="w-full pl-3 pr-7 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
+                      aria-label="Their share of the split"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">%</span>
+                  </div>
+                </div>
+                {seatPreview && (
+                  <div className="text-xs text-natural-muted space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-[10px]">New split</p>
+                    {seatPreview.map((row, i) => (
+                      <div key={i} className="flex justify-between font-mono">
+                        <span className="font-sans">{row.name}</span>
+                        <span>{row.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {seatError && <p className="text-xs text-natural-primary font-medium">{seatError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddingSeat(false)}
+                    className="flex-1 text-sm font-bold text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={seatBusy}
+                    className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg disabled:opacity-60"
+                  >
+                    {seatBusy ? 'Adding...' : 'Add & Invite'}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
 
