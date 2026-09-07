@@ -21,4 +21,4 @@ See `CLAUDE.md` for the full project reference (stack, deploy flow, environments
 
 ## Deploy
 
-Push to `development/web-production`. Firebase App Hosting builds and deploys automatically (about 4-5 minutes). Firestore rules deploy separately via `.github/workflows/deploy-firestore-rules.yml`.
+Push to `main`. Firebase App Hosting builds and deploys automatically (about 4-5 minutes). Firestore rules deploy separately via `.github/workflows/deploy-firestore-rules.yml`.

@@ -1,4 +1,4 @@
-import { getFullMembers } from './lib/members';
+import { getFullMembers, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { mergeExpense } from './lib/merge';
@@ -7,7 +7,7 @@ import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, OAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
@@ -172,6 +172,13 @@ export default function App() {
         // key it to the Firebase uid (same rule as the mobile apps) so a
         // purchase maps to users/{uid} via the webhook.
         configureBilling(user.uid).catch(console.error);
+        // Promo allowlist (owner, review accounts): the server decides from
+        // the verified token and writes the entitlement; the profile
+        // listener picks it up. Silent on failure: nothing is lost, the
+        // paywall simply stays where it is until the next sign-in.
+        authHeader()
+          .then((h) => fetch('/api/plus-promo-sync', { method: 'POST', headers: h }))
+          .catch(() => {});
       }
     });
     return () => unsubscribe();
@@ -974,13 +981,20 @@ export default function App() {
   };
 
   // Re-authenticate the current user when Firebase requires a recent login before
-  // a sensitive operation (account deletion). Handles both Google and email/password.
+  // a sensitive operation (account deletion). Handles Google, Apple and
+  // email/password; an Apple account used to be told to sign out and back in,
+  // which never satisfied the recent-login check, so it could not be deleted.
   const reauthenticate = async () => {
     const user = auth.currentUser;
     if (!user) throw new Error("No signed-in user");
     const providerId = user.providerData[0]?.providerId;
     if (providerId === 'google.com') {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    } else if (providerId === 'apple.com') {
+      const apple = new OAuthProvider('apple.com');
+      apple.addScope('email');
+      apple.addScope('name');
+      await reauthenticateWithPopup(user, apple);
     } else if (providerId === 'password') {
       const pw = window.prompt("For your security, please re-enter your password to permanently delete your account:");
       if (!pw) throw new Error("cancelled");
@@ -1548,6 +1562,43 @@ export default function App() {
     }
   };
 
+  // Grow the group by one pending seat. Written as a whole-field update rather
+  // than dotted paths because every share changes at once, and read back
+  // through the group snapshot listener.
+  const handleAddSeat = async (name: string, percent: number) => {
+    if (!group) return;
+    const next = withAddedSeat(group, name, percent);
+    await updateDoc(doc(db, 'groups', group.id), {
+      defaultSplit: next.defaultSplit,
+      availableSplits: next.availableSplits,
+      targetNumPeople: next.targetNumPeople,
+      addedSeats: next.addedSeats,
+    });
+    addToast('Seat Added', `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`, 'success');
+    // Offer to email the invite right away; cancelling the prompt is fine.
+    await handleResendInvite(name.trim());
+  };
+
+  const handleRemoveSeat = async (index: number) => {
+    if (!group) return;
+    const seat = pendingSeats(group)[index];
+    if (!seat) return;
+    if (!window.confirm(`Remove the pending seat for ${seat.name}? Their ${seat.split}% goes back to everyone else.`)) return;
+    try {
+      const next = withRemovedSeat(group, index);
+      await updateDoc(doc(db, 'groups', group.id), {
+        defaultSplit: next.defaultSplit,
+        availableSplits: next.availableSplits,
+        targetNumPeople: next.targetNumPeople,
+        addedSeats: next.addedSeats,
+      });
+      addToast('Seat Removed', `${seat.name} is no longer pending.`, 'success');
+    } catch (e) {
+      console.error('Failed to remove seat', e);
+      addToast('Error', 'Could not remove that seat. Please try again.', 'error');
+    }
+  };
+
   const handleRecalculateSplit = async () => {
     if (!group) return;
     const uids = Object.keys(groupUsers);
@@ -1924,6 +1975,8 @@ export default function App() {
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}
+          onAddSeat={handleAddSeat}
+          onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}
           onOpenBackup={() => {
             // Backups & export are Cherry + (site feature list): free users

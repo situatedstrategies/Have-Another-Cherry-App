@@ -9,7 +9,6 @@ import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNot
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
-import betaFirebaseConfig from "./firebase-applet-config.beta.json";
 
 async function startServer() {
   const app = express();
@@ -70,13 +69,28 @@ async function startServer() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: false }));
 
+  // ---- Retired beta host -----------------------------------------------------
+  // beta.haveanothercherry.com used to be a second deployment on its own
+  // Firebase project. It is gone: anyone who still has the old link, a saved
+  // bookmark, or an invite email that names it lands on the real app instead
+  // of a dead host or, worse, a stale copy with its own user pool. Permanent
+  // so browsers and crawlers stop asking.
+  app.use((req, res, next) => {
+    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    if (/^beta[.-]/.test(host)) {
+      return res.redirect(301, "https://app.haveanothercherry.com" + req.originalUrl);
+    }
+    return next();
+  });
+
   // ---- Production view gate ------------------------------------------------
-  // app.haveanothercherry.com is not publicly viewable: every request must
-  // carry the gate cookie, set by entering the site password. Only the
-  // password's SHA-256 hash lives here (never the password itself). Beta and
-  // local dev are not gated, and the RevenueCat webhook is exempt because it
-  // arrives without cookies. Override the hash with SITE_GATE_PASSWORD_HASH,
-  // or set SITE_GATE_DISABLED=1 to drop the wall without a code change.
+  // An optional password wall for app.haveanothercherry.com. OFF by default:
+  // the app is live and open, and every request goes straight through. Set
+  // SITE_GATE_ENABLED=1 in apphosting.yaml to put the wall back (for example
+  // before a launch), and SITE_GATE_PASSWORD_HASH to change the password; only
+  // the password's SHA-256 hash ever lives here, never the password itself.
+  // Local dev is never gated, and webhooks are exempt because they arrive
+  // without cookies.
   const GATE_COOKIE = "hac_gate";
   const gateHash =
     process.env.SITE_GATE_PASSWORD_HASH ||
@@ -146,19 +160,19 @@ async function startServer() {
   <div class="card">
     <img src="/cherry2transparent.png" alt="Have Another Cherry">
     <h1>You're early. Sweet.</h1>
-    <p>Have Another Cherry is growing in a private beta. If you have the site password, come on in.</p>
+    <p>Have Another Cherry isn't open to everyone just yet. If you have the site password, come on in.</p>
     ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ""}
     <form method="POST" action="/gate/unlock">
       <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">
       <button type="submit">Come on in</button>
     </form>
-    <p class="foot">Don't have a password yet? We'd love to have you: <a href="https://www.haveanothercherry.com/beta">join our beta</a>.</p>
+    <p class="foot">Don't have a password yet? We'd love to have you: <a href="https://www.haveanothercherry.com">get on the list</a>.</p>
   </div>
 </body>
 </html>`;
 
   app.use((req, res, next) => {
-    if (process.env.SITE_GATE_DISABLED === "1") return next();
+    if (process.env.SITE_GATE_ENABLED !== "1") return next();
     const host = String(req.headers.host || "").split(":")[0].toLowerCase();
     if (!GATE_HOSTS.has(host)) return next();
     if (GATE_EXEMPT_PATHS.has(req.path)) return next();
@@ -194,14 +208,10 @@ async function startServer() {
   // sign-in popup opens https://<our domain>/__/auth/handler. Firebase Hosting
   // serves those helper pages automatically but App Hosting (Cloud Run) does
   // not, so proxy the reserved /__/auth namespace to the Firebase project's
-  // own domain. Host-aware so a beta hostname proxies to the beta project.
+  // own domain.
   app.use("/__/auth", async (req, res) => {
     try {
-      const host = String(req.headers.host || "").split(":")[0].toLowerCase();
-      const upstreamOrigin =
-        host.startsWith("beta.") || host.startsWith("beta-")
-          ? "https://have-another-cherry-beta.firebaseapp.com"
-          : "https://gen-lang-client-0987674990.firebaseapp.com";
+      const upstreamOrigin = "https://gen-lang-client-0987674990.firebaseapp.com";
       const upstream = await fetch(upstreamOrigin + req.originalUrl, {
         method: req.method,
         headers: { accept: String(req.headers.accept || "*/*") },
@@ -268,12 +278,6 @@ async function startServer() {
   const ensureAdminApp = async () => {
     const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
     if (!getApps().length) {
-      // No hardcoded project fallback. This used to default to the production
-      // project, so a beta backend that does not set GOOGLE_CLOUD_PROJECT would
-      // look beta users up in production, find nothing, and - because the reset
-      // endpoint deliberately hides whether an account exists - report success
-      // while sending no email at all.
-      //
       // With projectId omitted, ADC resolves the project the service is actually
       // running in, which is always the correct one.
       const projectId =
@@ -580,11 +584,8 @@ async function startServer() {
       scopes: ["https://www.googleapis.com/auth/cloud-platform"],
     });
     const client = await auth.getClient();
-    // Each environment assesses with its own project and site key: the beta
-    // backend runs in the beta Firebase project (App Hosting sets
-    // GOOGLE_CLOUD_PROJECT), whose clients mint tokens with the beta key.
     const project = process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
-    const rcConfig = project === betaFirebaseConfig.projectId ? betaFirebaseConfig : firebaseConfig;
+    const rcConfig = firebaseConfig;
 
     return client.request({
       url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
@@ -644,15 +645,9 @@ async function startServer() {
   // confirm the Enterprise API, IAM role, and site key are wired up without
   // needing a real browser token. Reports status only, never user data.
   app.get("/api/recaptcha-health", rateLimit("recaptcha-health", 10), async (_req, res) => {
-    // Report the key and project this environment actually uses. Reporting
-    // firebaseConfig unconditionally made a beta misconfiguration look like a
-    // production key problem.
     const healthProject =
       process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
-    const healthConfig =
-      healthProject === betaFirebaseConfig.projectId
-        ? betaFirebaseConfig
-        : firebaseConfig;
+    const healthConfig = firebaseConfig;
     try {
       const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
       const props = assessment.data?.tokenProperties;
@@ -1067,6 +1062,69 @@ async function startServer() {
   //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
   //     env vars are configured, the address is also subscribed to that
   //     audience directly.
+  // 11c. Cherry + promo allowlist. PLUS_PROMO_EMAILS (apphosting.yaml) is a
+  //      comma-separated list of sign-in emails that get Cherry + without
+  //      paying: the owner, review accounts for Apple and Google, a friend.
+  //      Every client calls this once after sign-in. The email comes from the
+  //      verified ID token, never the request body, and the write goes through
+  //      the Admin SDK because the rules forbid clients from touching
+  //      isPlus / plusEntitlement at all. Removing an address from the list
+  //      revokes on the next sign-in; a paid entitlement is never touched.
+  const PROMO_PRODUCT = "promo_allowlist";
+  const promoEmails = () =>
+    new Set(
+      String(process.env.PLUS_PROMO_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+  app.post("/api/plus-promo-sync", requireAuth, rateLimit("plus-promo", 20), async (req, res) => {
+    try {
+      const uid = (req as any).uid as string;
+      const email = String((req as any).firebaseUser?.email || "").toLowerCase();
+      const listed = !!email && promoEmails().has(email);
+
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const ref = getFirestore().collection("users").doc(uid);
+      const snap = await ref.get();
+      const data = snap.data() || {};
+      const current = data.plusEntitlement || {};
+      const heldByPromo = current.source === "promo" && current.productId === PROMO_PRODUCT;
+
+      if (listed) {
+        // Never downgrade a paid entitlement to a promo one; only fill a gap.
+        if (!data.isPlus || heldByPromo) {
+          await ref.set(
+            {
+              isPlus: true,
+              plusEntitlement: {
+                source: "promo",
+                productId: PROMO_PRODUCT,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+            { merge: true }
+          );
+        }
+        return res.json({ isPlus: true, source: data.isPlus && !heldByPromo ? current.source : "promo" });
+      }
+
+      if (heldByPromo) {
+        const { FieldValue } = await import("firebase-admin/firestore");
+        await ref.set(
+          { isPlus: false, plusEntitlement: FieldValue.delete() },
+          { merge: true }
+        );
+        return res.json({ isPlus: false, revoked: true });
+      }
+      return res.json({ isPlus: !!data.isPlus });
+    } catch (err: any) {
+      console.error("Promo sync error:", err?.message || err);
+      return res.status(500).json({ error: "Could not check Cherry + status." });
+    }
+  });
+
   app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
     const { email } = req.body || {};
     if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1111,7 +1169,7 @@ async function startServer() {
         email,
         formType: "Waitlist",
         source: "cherry-plus (web app)",
-        notes: "Asked for a Cherry+ feature in the web app",
+        notes: "Asked for a Cherry + feature in the web app",
         consent: true,
         device: deviceFromUserAgent(req.get("user-agent"), {
           platform: req.get("sec-ch-ua-platform"),
@@ -1293,8 +1351,8 @@ async function startServer() {
   //     apphosting.yaml, same pattern as RESEND_API_KEY). Configure the same
   //     value under Authorization in RevenueCat's webhook settings.
   app.post("/api/revenuecat-webhook", async (req, res) => {
-    // "disabled" is beta's plain-value override (apphosting.beta.yaml) and
-    // means the same as unset: App Hosting rejects an empty value.
+    // "disabled" means the same as unset: App Hosting rejects an empty value,
+    // so a named sentinel is how the webhook is switched off in config.
     const expectedAuth = process.env.REVENUECAT_WEBHOOK_AUTH;
     if (!expectedAuth || expectedAuth === "disabled") {
       return res.status(503).json({ error: "Cherry + billing is not configured yet." });
@@ -1707,10 +1765,9 @@ async function startServer() {
 
   // 17. Push service worker. FCM's web SDK registers /firebase-messaging-sw.js
   //     to display notifications that arrive while the tab is closed or in
-  //     the background. Served dynamically (host-aware) rather than as a
-  //     static file so a beta hostname gets the beta Firebase project's
-  //     config instead of production's - the same reason src/firebase.ts
-  //     picks its config at runtime. Only public identifiers are embedded.
+  //     the background. Served dynamically rather than as a static file so
+  //     the Firebase config is written once, in firebase-applet-config.json.
+  //     Only public identifiers are embedded.
   // /favicon.ico, which browsers request whether or not the page asks them to.
   // Without this the SPA catch-all answers it with index.html, the browser gets
   // HTML where it expected an image, and the tab shows no icon.
@@ -1718,9 +1775,8 @@ async function startServer() {
     res.redirect(301, "/favicon-32.png");
   });
 
-  app.get("/firebase-messaging-sw.js", (req, res) => {
-    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
-    const cfg = /^beta[.-]/.test(host) ? betaFirebaseConfig : firebaseConfig;
+  app.get("/firebase-messaging-sw.js", (_req, res) => {
+    const cfg = firebaseConfig;
     res.setHeader("Content-Type", "application/javascript");
     res.setHeader("Cache-Control", "no-cache");
     res.send(
@@ -1743,7 +1799,7 @@ async function startServer() {
   //     refunds, billing issues). Apple POSTs { signedPayload: <JWS> } to the
   //     URL configured in App Store Connect. This endpoint is a RELAY, not a
   //     second entitlement pipeline: RevenueCat stays the system of record
-  //     for Cherry+ (Apple -> here -> RevenueCat -> /api/revenuecat-webhook
+  //     for Cherry + (Apple -> here -> RevenueCat -> /api/revenuecat-webhook
   //     -> users/{uid}.isPlus). Owning the URL means Apple's config points
   //     at our domain, we get a log line per event, and the processor behind
   //     it can change without touching App Store Connect.

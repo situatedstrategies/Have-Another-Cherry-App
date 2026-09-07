@@ -22,7 +22,7 @@ eq('data: BLOCKED', sanitizeContinueUrl('data:text/html,<script>alert(1)</script
 eq('protocol-relative BLOCKED', sanitizeContinueUrl('//evil.example.com/pwn', ORIGIN), null);
 eq('userinfo spoof BLOCKED', sanitizeContinueUrl('https://app.haveanothercherry.com@evil.example.com/', ORIGIN), null);
 eq('suffix spoof BLOCKED', sanitizeContinueUrl('https://haveanothercherry.com.evil.example.com/', ORIGIN), null);
-eq('subdomain not allowlisted BLOCKED', sanitizeContinueUrl('https://beta.haveanothercherry.com/x', ORIGIN), null);
+eq('subdomain not allowlisted BLOCKED', sanitizeContinueUrl('https://other.haveanothercherry.com/x', ORIGIN), null);
 // Garbage resolves as a relative path against our own origin, so it stays
 // same-origin. Harmless, and not a redirect off the site.
 eq('garbage stays same-origin', sanitizeContinueUrl('ht!tp://[[[', ORIGIN)?.startsWith(ORIGIN + '/'), true);
@@ -48,12 +48,20 @@ eq('non-error input still friendly', /auth\//.test(describeCodeError('boom')), f
 eq('undefined input still friendly', /auth\//.test(describeCodeError(undefined)), false);
 
 console.log('\n--- password policy parity with signup ---');
+// Mirrors the Firebase project's server-side policy exactly: 8-15 chars,
+// lower + upper + number + one of Firebase's allowed specials.
 eq('too short', isPasswordValid('Ab1!'), false);
+eq('too long (16)', isPasswordValid('Abcdefghijkl1!!!'), false);
+eq('15 is the ceiling', isPasswordValid('Abcdefghijkl1!!'), true);
 eq('no special', isPasswordValid('Abcdefg1'), false);
 eq('no number', isPasswordValid('Abcdefg!'), false);
 eq('no letter', isPasswordValid('12345678!'), false);
+eq('no uppercase', isPasswordValid('abcdefg1!'), false);
+eq('no lowercase', isPasswordValid('ABCDEFG1!'), false);
+eq('plus is not an allowed special', isPasswordValid('Abcdefg1+'), false);
+eq('demo password shape passes', isPasswordValid('Haveanother1?!!'), true);
 eq('valid', isPasswordValid('Abcdefg1!'), true);
-eq('checks shape', checkPassword('Abcdefg1!'), { length: true, letter: true, number: true, special: true });
+eq('checks shape', checkPassword('Abcdefg1!'), { length: true, lowercase: true, uppercase: true, number: true, special: true });
 
 console.log(fails === 0 ? '\nALL PASSED' : `\n${fails} FAILURES`);
 process.exit(fails === 0 ? 0 : 1);

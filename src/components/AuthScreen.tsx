@@ -28,7 +28,8 @@ function friendlyAuthError(err: any): string {
     case 'auth/email-already-in-use':
       return 'An account already exists for this email. Try logging in instead.';
     case 'auth/weak-password':
-      return 'Please choose a stronger password.';
+    case 'auth/password-does-not-meet-requirements':
+      return PASSWORD_POLICY_MESSAGE;
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
       return 'Sign-in was cancelled.';

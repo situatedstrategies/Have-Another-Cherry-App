@@ -1,17 +1,16 @@
 # Firebase App Hosting configuration
 # https://firebase.google.com/docs/app-hosting/configure
 #
-# Beta-only variables live in apphosting.beta.yaml.
+# One backend, one project (gen-lang-client-0987674990). A `secret:` reference
+# added here must already exist in that project's Secret Manager, because App
+# Hosting resolves every declared secret at build time and a missing one fails
+# the whole rollout rather than being skipped.
 #
-# THIS FILE IS SHARED BY BOTH BACKENDS. A `secret:` reference added here has to
-# resolve in production AND in have-another-cherry-beta, because App Hosting
-# resolves every declared secret at build time and a missing one fails the
-# whole rollout rather than being skipped.
-#
-# So when you add a secret here, do one of two things:
-#   1. create it in both projects, or
-#   2. override it in apphosting.beta.yaml with a plain value.
-# NOTION_TOKEN is an example of the second; it took beta's build down first.
+# The password wall in server.ts is off by default. To put it back:
+#   - variable: SITE_GATE_ENABLED
+#     value: "1"
+#     availability:
+#       - RUNTIME
 
 env:
   - variable: RESEND_API_KEY
@@ -57,8 +56,7 @@ env:
   # A PUBLIC SDK key, not a secret: RevenueCat issues `strp_` keys for client
   # code exactly as it issues `appl_` for the iOS app, and it carries no write
   # access to the account. A plain `value:` rather than a `secret:` for that
-  # reason, and because a `secret:` here would have to resolve in both projects
-  # or fail the rollout, which is a lesson this file already teaches twice.
+  # reason, and because a missing `secret:` fails the rollout.
   #
   # It must be BUILD availability: Vite inlines VITE_* at build time, so a
   # RUNTIME-only variable reaches the server and never the bundle.
@@ -74,13 +72,23 @@ env:
     availability:
       - BUILD
 
+  # Cherry + promo allowlist: sign-in emails that get Cherry + without paying.
+  # The owner, the App Store and Play review accounts, and anyone else the
+  # owner names. Read by /api/plus-promo-sync in server.ts, which every client
+  # calls after sign-in; removing an address here revokes on their next
+  # sign-in. Everyone not on this list sees the paywall. A plain value: these
+  # are addresses, not credentials.
+  - variable: PLUS_PROMO_EMAILS
+    value: "mata.olivias@gmail.com,bcallahan121@gmail.com,demo+apple@haveanothercherry.com,demo+google@haveanothercherry.com,demo+two@haveanothercherry.com"
+    availability:
+      - RUNTIME
+
   # Cherry + entitlement webhook. RevenueCat POSTs every subscription event to
   # /api/revenuecat-webhook with this exact string in its Authorization header,
   # and the server mirrors the entitlement onto users/{uid}.isPlus. Until it is
   # set the endpoint answers 503, a web purchase charges the card and unlocks
-  # only the current page load, and nothing durable happens. Same rule as the
-  # rest of this file: it lives in production's Secret Manager, and beta
-  # overrides it with a plain value so the shared declaration still resolves.
+  # only the current page load, and nothing durable happens. It lives in
+  # Secret Manager, like every other secret in this file.
   #
   #   firebase apphosting:secrets:set REVENUECAT_WEBHOOK_AUTH --project gen-lang-client-0987674990
   #
@@ -96,19 +104,15 @@ env:
   # /api/send-bill-reminders with a shared secret in an x-cherry-cron header.
   #
   # REMINDER_CRON_SECRET is deliberately NOT declared here. Declaring it as a
-  # `secret:` in this shared file failed the rollout, exactly as the warning at
-  # the top of this file says it would: App Hosting resolves every declared
-  # secret at build time, in both projects, and a missing one fails the build
-  # rather than leaving the variable unset. The endpoint's own fail-closed
+  # `secret:` before it existed failed the rollout, exactly as the warning at
+  # the top of this file says it would. The endpoint's own fail-closed
   # behaviour, a 503 while the secret is absent, is about runtime and does not
   # help here.
   #
   # To turn reminders on, do it in this order:
   #   1. firebase apphosting:secrets:set REMINDER_CRON_SECRET --project gen-lang-client-0987674990
-  #   2. either create it in have-another-cherry-beta too, or override it in
-  #      apphosting.beta.yaml with a plain value
-  #   3. only then add the `secret:` block back here
-  # Until step 3, the endpoint answers 503 and no reminder is sent, which is
+  #   2. only then add the `secret:` block back here
+  # Until step 2, the endpoint answers 503 and no reminder is sent, which is
   # the intended state while the schedule is not live.
 
   # Which zone "due tomorrow" is reckoned in, as an offset from UTC. Due dates
