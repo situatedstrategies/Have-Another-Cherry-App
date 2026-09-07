@@ -1516,6 +1516,25 @@ export default function App() {
     }
   };
 
+  // Marketing email is opt-in and this is the only client writer. An update
+  // rather than a merge set, so it cannot recreate a profile that an account
+  // deletion just removed. Same-value calls are dropped so a double click
+  // cannot move the consent timestamp.
+  const handleSaveMarketingOptIn = async (optIn: boolean) => {
+    if (!!userProfile?.marketingOptIn === optIn) return;
+    const at = new Date().toISOString();
+    const patch = optIn
+      ? { marketingOptIn: true, marketingOptInAt: at }
+      : { marketingOptIn: false, marketingOptOutAt: at };
+    try {
+      await updateDoc(doc(db, 'users', activeUser), patch);
+      setUserProfile((prev: any) => ({ ...(prev || {}), ...patch }));
+    } catch (e) {
+      console.error('Failed to save marketing preference', e);
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - email' });
+    }
+  };
+
   // Spending threshold: the most this user wants to owe on a single shared
   // expense. Synced to their profile so other members' forms can warn early.
   const handleSaveThreshold = async () => {
@@ -1987,6 +2006,7 @@ export default function App() {
           group={group}
           groupUsers={groupUsers}
           onSaveName={handleSaveName}
+          onSaveMarketingOptIn={handleSaveMarketingOptIn}
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           onResendInvite={handleResendInvite}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2, Bell, UserPlus } from 'lucide-react';
+import { Settings, LogOut, Copy, Cloud, Shield, Check, X, Edit2, Bell, UserPlus, Mail } from 'lucide-react';
 import { Group } from '../types';
 import {
   getFullDefaultSplit,
@@ -20,6 +20,8 @@ interface SettingsModalProps {
   group: Group;
   groupUsers: Record<string, any>;
   onSaveName: (name: string) => void;
+  /** Newsletters and offers. Off by default; this switch is the only place it is asked. */
+  onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => void;
   onResendInvite: (memberName: string) => void;
@@ -39,13 +41,19 @@ const RESERVED_NAMES = ['Anonymous', 'Unknown'];
 
 export default function SettingsModal({
   onClose, userProfile, currentUser, group, groupUsers,
-  onSaveName, onRetakeQuiz, onRecalculateSplit, onResendInvite,
+  onSaveName, onSaveMarketingOptIn, onRetakeQuiz, onRecalculateSplit, onResendInvite,
   onAddSeat, onRemoveSeat,
   onLeaveGroup, onOpenBackup, onOpenPrivacy, onSignOut,
   extraSection,
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [marketingBusy, setMarketingBusy] = useState(false);
+  const handleMarketingChange = async (optIn: boolean) => {
+    if (marketingBusy) return;
+    setMarketingBusy(true);
+    try { await onSaveMarketingOptIn(optIn); } finally { setMarketingBusy(false); }
+  };
 
   // Growing the group: a couple can bring in up to two more people without
   // starting a new group. The form takes a name and the newcomer's share and
@@ -193,6 +201,32 @@ export default function SettingsModal({
           </div>
         </div>
       )}
+
+      {/* Email. Marketing email is opt-in and this is the only place it is
+          asked: signup carries no pre-ticked box, because agreeing to the
+          terms is not agreeing to a newsletter. The privacy policy points
+          people here to change their mind. */}
+      <div>
+        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">Email</h3>
+        <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!userProfile?.marketingOptIn}
+              disabled={marketingBusy || !userProfile}
+              onChange={(e) => handleMarketingChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+            />
+            <span className="text-xs text-natural-muted leading-relaxed">
+              <span className="font-semibold text-natural-text flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-natural-primary" /> Newsletters and offers
+              </span>
+              Off unless you turn it on. Change it here any time. Emails the app has to
+              send, such as invites and password resets, are not affected.
+            </span>
+          </label>
+        </div>
+      </div>
 
       {/* User profile */}
       <div>
