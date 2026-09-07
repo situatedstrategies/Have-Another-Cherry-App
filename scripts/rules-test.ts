@@ -173,6 +173,27 @@ async function main() {
       groupId: CODE, month: '2025-02', payload: 'x',
     })));
 
+  // --- the Cherry + entitlement is server-owned --------------------------
+  const self = env.authenticatedContext(OWNER).firestore();
+  await check('a user CAN create their own profile', () =>
+    assertSucceeds(setDoc(doc(self, 'users', OWNER), { name: 'Owner' })));
+
+  await check('a user CANNOT create a profile that already has Cherry +', () =>
+    assertFails(setDoc(doc(env.authenticatedContext(INVITEE).firestore(), 'users', INVITEE), {
+      name: 'Invitee', isPlus: true,
+    })));
+
+  await check('a user CAN update their own name', () =>
+    assertSucceeds(updateDoc(doc(self, 'users', OWNER), { name: 'Renamed' })));
+
+  await check('a user CANNOT grant themselves Cherry + (this was possible)', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), { isPlus: true })));
+
+  await check('a user CANNOT write a plusEntitlement either', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), {
+      plusEntitlement: { source: 'promo', updatedAt: 'now' },
+    })));
+
   await env.cleanup();
   console.log(failures === 0 ? '\nALL RULES CHECKS PASSED' : `\n${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);

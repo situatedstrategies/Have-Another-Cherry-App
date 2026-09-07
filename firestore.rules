@@ -81,8 +81,27 @@ service cloud.firestore {
              ]);
     }
 
+    // The Cherry + entitlement (isPlus, plusEntitlement) is written ONLY by the
+    // server: the RevenueCat webhook and the promo allowlist sync, both through
+    // the Admin SDK, which bypasses these rules. A client that could write it
+    // could grant itself Cherry + from the browser console, which is exactly
+    // what used to be possible.
+    function touchesEntitlement() {
+      return request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny(['isPlus', 'plusEntitlement']);
+    }
+
+    function createsEntitlement() {
+      return request.resource.data.keys().hasAny(['isPlus', 'plusEntitlement']);
+    }
+
     match /users/{userId} {
-      allow create, update, delete:
+      allow create:
+        if signedIn() && request.auth.uid == userId && !createsEntitlement();
+      allow update:
+        if signedIn() && request.auth.uid == userId && !touchesEntitlement();
+      allow delete:
         if signedIn() && request.auth.uid == userId;
 
       // A user can read their own doc, or the doc of someone with whom they share

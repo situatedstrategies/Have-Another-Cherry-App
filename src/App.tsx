@@ -172,6 +172,13 @@ export default function App() {
         // key it to the Firebase uid (same rule as the mobile apps) so a
         // purchase maps to users/{uid} via the webhook.
         configureBilling(user.uid).catch(console.error);
+        // Promo allowlist (owner, review accounts): the server decides from
+        // the verified token and writes the entitlement; the profile
+        // listener picks it up. Silent on failure: nothing is lost, the
+        // paywall simply stays where it is until the next sign-in.
+        authHeader()
+          .then((h) => fetch('/api/plus-promo-sync', { method: 'POST', headers: h }))
+          .catch(() => {});
       }
     });
     return () => unsubscribe();

@@ -1062,6 +1062,69 @@ async function startServer() {
   //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
   //     env vars are configured, the address is also subscribed to that
   //     audience directly.
+  // 11c. Cherry + promo allowlist. PLUS_PROMO_EMAILS (apphosting.yaml) is a
+  //      comma-separated list of sign-in emails that get Cherry + without
+  //      paying: the owner, review accounts for Apple and Google, a friend.
+  //      Every client calls this once after sign-in. The email comes from the
+  //      verified ID token, never the request body, and the write goes through
+  //      the Admin SDK because the rules forbid clients from touching
+  //      isPlus / plusEntitlement at all. Removing an address from the list
+  //      revokes on the next sign-in; a paid entitlement is never touched.
+  const PROMO_PRODUCT = "promo_allowlist";
+  const promoEmails = () =>
+    new Set(
+      String(process.env.PLUS_PROMO_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+  app.post("/api/plus-promo-sync", requireAuth, rateLimit("plus-promo", 20), async (req, res) => {
+    try {
+      const uid = (req as any).uid as string;
+      const email = String((req as any).firebaseUser?.email || "").toLowerCase();
+      const listed = !!email && promoEmails().has(email);
+
+      const { getFirestore } = await import("firebase-admin/firestore");
+      const ref = getFirestore().collection("users").doc(uid);
+      const snap = await ref.get();
+      const data = snap.data() || {};
+      const current = data.plusEntitlement || {};
+      const heldByPromo = current.source === "promo" && current.productId === PROMO_PRODUCT;
+
+      if (listed) {
+        // Never downgrade a paid entitlement to a promo one; only fill a gap.
+        if (!data.isPlus || heldByPromo) {
+          await ref.set(
+            {
+              isPlus: true,
+              plusEntitlement: {
+                source: "promo",
+                productId: PROMO_PRODUCT,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+            { merge: true }
+          );
+        }
+        return res.json({ isPlus: true, source: data.isPlus && !heldByPromo ? current.source : "promo" });
+      }
+
+      if (heldByPromo) {
+        const { FieldValue } = await import("firebase-admin/firestore");
+        await ref.set(
+          { isPlus: false, plusEntitlement: FieldValue.delete() },
+          { merge: true }
+        );
+        return res.json({ isPlus: false, revoked: true });
+      }
+      return res.json({ isPlus: !!data.isPlus });
+    } catch (err: any) {
+      console.error("Promo sync error:", err?.message || err);
+      return res.status(500).json({ error: "Could not check Cherry + status." });
+    }
+  });
+
   app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
     const { email } = req.body || {};
     if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

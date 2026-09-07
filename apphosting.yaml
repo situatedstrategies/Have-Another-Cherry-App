@@ -72,6 +72,17 @@ env:
     availability:
       - BUILD
 
+  # Cherry + promo allowlist: sign-in emails that get Cherry + without paying.
+  # The owner, the App Store and Play review accounts, and anyone else the
+  # owner names. Read by /api/plus-promo-sync in server.ts, which every client
+  # calls after sign-in; removing an address here revokes on their next
+  # sign-in. Everyone not on this list sees the paywall. A plain value: these
+  # are addresses, not credentials.
+  - variable: PLUS_PROMO_EMAILS
+    value: "mata.olivias@gmail.com,bcallahan121@gmail.com,demo+apple@haveanothercherry.com,demo+google@haveanothercherry.com,demo+two@haveanothercherry.com"
+    availability:
+      - RUNTIME
+
   # Cherry + entitlement webhook. RevenueCat POSTs every subscription event to
   # /api/revenuecat-webhook with this exact string in its Authorization header,
   # and the server mirrors the entitlement onto users/{uid}.isPlus. Until it is
