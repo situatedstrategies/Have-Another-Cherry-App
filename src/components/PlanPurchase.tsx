@@ -81,6 +81,11 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
     [expenses, activeUser, otherUid]
   );
 
+  // Nobody else has joined yet. There is no balance to weigh, so the verdict
+  // is simply what it costs; the modal still works rather than sitting on an
+  // empty prompt however much is typed.
+  const solo = others.length === 0;
+
   const result = useMemo(() => {
     if (!otherUid || numericAmount <= 0) return null;
 
@@ -125,7 +130,9 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
 
         <div className="p-6 space-y-4 overflow-y-auto">
           <p className="text-xs text-natural-muted">
-            Thinking about a big shared purchase? See if it's a good moment to bring it up - based on your real balances.
+            {solo
+              ? 'Thinking about a big purchase? See what it would cost you. Once someone joins, this weighs the balance between you too.'
+              : "Thinking about a big shared purchase? See if it's a good moment to bring it up - based on your real balances."}
           </p>
 
           <div>
@@ -165,7 +172,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           </div>
 
           {/* Balance snapshot */}
-          <div className="grid grid-cols-3 gap-2 text-center">
+          {!solo && <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
               <span className="block text-xs font-bold text-natural-muted uppercase">They owe you</span>
               <span className="block text-sm font-bold text-natural-text mt-0.5">${theyOweYou.toFixed(2)}</span>
@@ -178,7 +185,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
               <span className="block text-xs font-bold text-natural-muted uppercase">Net</span>
               <span className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}>{net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
             </div>
-          </div>
+          </div>}
 
           {result && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
@@ -207,10 +214,22 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
             </div>
           )}
 
-          {!result && (
+          {solo && numericAmount > 0 && (
+            <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">Your share (100%)</span>
+                <span className="text-lg font-display font-semibold text-natural-text">${numericAmount.toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-natural-muted">
+                Nobody has joined yet, so this is all yours for now. Invite someone from Settings and this turns into a split and a conversation starter.
+              </p>
+            </div>
+          )}
+
+          {!result && !(solo && numericAmount > 0) && (
             <div className="text-center text-xs text-natural-muted py-4 flex flex-col items-center gap-2">
               <Sparkles className="h-5 w-5 text-natural-primary/40" />
-              Enter a price to see whether it's a juicy time to ask.
+              {solo ? 'Enter a price to see what it would cost you.' : "Enter a price to see whether it's a juicy time to ask."}
             </div>
           )}
         </div>

@@ -210,6 +210,9 @@ export interface VaultDocMeta {
   size: number; // original byte size
   uploadedBy: string;
   uploadedAt: string;
+  // Optional, set after upload so the file can be found by what it is for
+  // rather than by whatever the scanner called it. Same field in the iOS app.
+  category?: string;
 }
 
 export interface VaultData {

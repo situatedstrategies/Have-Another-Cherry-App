@@ -68,10 +68,19 @@ export const joinedUids = (group: Partial<Group> | null | undefined): string[] =
   return Array.from(ids);
 };
 
+/** The smallest capacity a group is ever written with. A group of one is a
+ *  person keeping their own ledger, and the invite code they are still shown
+ *  has to work when someone uses it. */
+export const MIN_GROUP_CAPACITY = 2;
+
 /** How many people the group is sized for: the join flow refuses anyone past
- *  this. Groups written before the field existed fall back to the hard cap. */
-export const groupCapacity = (group: Partial<Group> | null | undefined): number =>
-  Number(group?.targetNumPeople) || MAX_GROUP_MEMBERS;
+ *  this. Groups written before the field existed fall back to the hard cap;
+ *  a group written with a capacity of one reads as two. */
+export const groupCapacity = (group: Partial<Group> | null | undefined): number => {
+  const n = Number(group?.targetNumPeople) || 0;
+  if (n <= 0) return MAX_GROUP_MEMBERS;
+  return Math.max(MIN_GROUP_CAPACITY, n);
+};
 
 /** Joined members plus pending seats: every seat that is spoken for. */
 export const seatsInUse = (group: Partial<Group> | null | undefined): number =>
@@ -189,7 +198,10 @@ export const withRemovedSeat = (group: Partial<Group>, index: number): SeatUpdat
   return {
     defaultSplit,
     availableSplits,
-    targetNumPeople: Math.max(1, seats),
+    // Floors at two rather than at the seats that exist: removing the last
+    // pending seat used to write a capacity of one, after which every invite
+    // was refused as "already full" while Settings still showed the code.
+    targetNumPeople: Math.max(MIN_GROUP_CAPACITY, seats),
     addedSeats: Math.max(0, addedSeats(group) - 1),
   };
 };

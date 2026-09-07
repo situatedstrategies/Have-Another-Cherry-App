@@ -6,7 +6,7 @@ import { Expense, VaultBill, VaultDocMeta, VaultData, DEFAULT_CATEGORIES } from 
 import Modal from './Modal';
 import {
   Vault, CalendarDays, ReceiptText, FileText, Upload, Download, Trash2,
-  ChevronLeft, ChevronRight, Plus, RefreshCcw, Repeat, Lock
+  ChevronLeft, ChevronRight, Plus, RefreshCcw, Repeat, Lock, Search, Pencil, X
 } from 'lucide-react';
 import { recurringDaysInMonth } from '../lib/recurring';
 
@@ -46,11 +46,39 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
 
-  // Bill form
+  // Bill form. With editingBillId set, the same form saves over that bill
+  // instead of adding a new one: before, the only way to fix a typo in a bill
+  // was to remove it and type it again.
   const [billName, setBillName] = useState('');
   const [billAmount, setBillAmount] = useState('');
   const [billDueDay, setBillDueDay] = useState('1');
   const [billCategory, setBillCategory] = useState(DEFAULT_CATEGORIES[1] || 'Utilities');
+  const [billNotes, setBillNotes] = useState('');
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
+
+  // Document editor: name and category, inline in the row.
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [docName, setDocName] = useState('');
+  const [docCategory, setDocCategory] = useState('');
+
+  // Search and category chips apply to bills and documents alike, because a
+  // household asking "what do we have on insurance" means both.
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const q = search.trim().toLowerCase();
+  const inCategory = (c?: string) => categoryFilter === null || c === categoryFilter;
+  const filteredBills = vault.bills
+    .filter(b => inCategory(b.category))
+    .filter(b => !q || [b.name, b.category || '', b.notes || ''].join(' ').toLowerCase().includes(q))
+    .sort((a, b) => a.dueDay - b.dueDay);
+  const filteredDocs = vault.docs
+    .filter(d => inCategory(d.category))
+    .filter(d => !q || [d.name, d.category || ''].join(' ').toLowerCase().includes(q));
+  // Only categories in use: a chip that filters down to nothing is noise.
+  const categoriesInUse = Array.from(new Set(
+    [...vault.bills.map(b => b.category), ...vault.docs.map(d => d.category)].filter((c): c is string => !!c)
+  )).sort();
+  const filtering = !!q || categoryFilter !== null;
 
   // ---- Load / persist (E2E-encrypted with the group key, like the ledger) ----
   useEffect(() => {
@@ -94,24 +122,64 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   };
 
   // ---- Bills ----
-  const addBill = async (e: React.FormEvent) => {
+  const resetBillForm = () => {
+    setBillName(''); setBillAmount(''); setBillDueDay('1'); setBillNotes('');
+    setBillCategory(DEFAULT_CATEGORIES[1] || 'Utilities');
+    setEditingBillId(null);
+  };
+
+  const startEditBill = (bill: VaultBill) => {
+    setEditingBillId(bill.id);
+    setBillName(bill.name);
+    setBillAmount(bill.amount != null ? String(bill.amount) : '');
+    setBillDueDay(String(bill.dueDay));
+    setBillCategory(bill.category || DEFAULT_CATEGORIES[1] || 'Utilities');
+    setBillNotes(bill.notes || '');
+  };
+
+  const saveBill = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     const dueDay = Math.min(31, Math.max(1, Math.round(Number(billDueDay) || 1)));
     if (!billName.trim()) { setError('Give the bill a name.'); return; }
     const bill: VaultBill = {
-      id: crypto.randomUUID(),
+      id: editingBillId || crypto.randomUUID(),
       name: billName.trim(),
       dueDay,
       category: billCategory,
       ...(Number(billAmount) > 0 ? { amount: Math.round(Number(billAmount) * 100) / 100 } : {}),
+      ...(billNotes.trim() ? { notes: billNotes.trim() } : {}),
     };
-    await persistVault({ ...vault, bills: [...vault.bills, bill] });
-    setBillName(''); setBillAmount(''); setBillDueDay('1');
+    const bills = editingBillId
+      ? vault.bills.map(b => (b.id === editingBillId ? bill : b))
+      : [...vault.bills, bill];
+    await persistVault({ ...vault, bills });
+    resetBillForm();
   };
 
   const removeBill = async (id: string) => {
+    if (editingBillId === id) resetBillForm();
     await persistVault({ ...vault, bills: vault.bills.filter(b => b.id !== id) });
+  };
+
+  // ---- Document name and category ----
+  const startEditDoc = (meta: VaultDocMeta) => {
+    setEditingDocId(meta.id);
+    setDocName(meta.name);
+    setDocCategory(meta.category || '');
+  };
+
+  const saveDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDocId) return;
+    const name = docName.trim();
+    if (!name) { setError('Give the document a name.'); return; }
+    setError('');
+    const docs = vault.docs.map(d => d.id === editingDocId
+      ? { ...d, name, ...(docCategory ? { category: docCategory } : { category: undefined }) }
+      : d);
+    await persistVault({ ...vault, docs });
+    setEditingDocId(null);
   };
 
   // ---- Documents (encrypted, one Firestore doc per file) ----
@@ -271,6 +339,47 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
           <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">{error}</div>
         )}
 
+        {!loading && tab !== 'calendar' && (
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
+              <input
+                type="text"
+                placeholder={tab === 'bills' ? 'Search bills, categories, notes' : 'Search documents'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-9 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted hover:text-natural-text">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {categoriesInUse.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter(null)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all ${categoryFilter === null ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'}`}
+                >
+                  Everything
+                </button>
+                {categoriesInUse.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCategoryFilter(categoryFilter === c ? null : c)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all ${categoryFilter === c ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'}`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-natural-muted text-xs font-mono">
             <RefreshCcw className="h-4 w-4 animate-spin" /> Opening the vault...
@@ -326,8 +435,15 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
           </div>
         ) : tab === 'bills' ? (
           <div className="space-y-4">
-            <form onSubmit={addBill} className="bg-natural-bg/50 border border-natural-border rounded-2xl p-4 space-y-3">
-              <span className="text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5"><Plus size={14} /> Catalog a Recurring Bill</span>
+            <form onSubmit={saveBill} className="bg-natural-bg/50 border border-natural-border rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
+                  {editingBillId ? <><Pencil size={14} /> Edit Bill</> : <><Plus size={14} /> Catalog a Recurring Bill</>}
+                </span>
+                {editingBillId && (
+                  <button type="button" onClick={resetBillForm} className="text-xs font-semibold text-natural-muted hover:text-natural-text">Cancel</button>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text" value={billName} onChange={e => setBillName(e.target.value)}
@@ -354,31 +470,40 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
                 >
                   {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {billCategory && !DEFAULT_CATEGORIES.includes(billCategory) && <option value={billCategory}>{billCategory}</option>}
                 </select>
+                <input
+                  type="text" value={billNotes} onChange={e => setBillNotes(e.target.value)}
+                  placeholder="Notes (optional, e.g. the account it comes out of)"
+                  className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                />
               </div>
               <button type="submit" className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors">
-                Add to Vault
+                {editingBillId ? 'Save Changes' : 'Add to Vault'}
               </button>
             </form>
 
-            {vault.bills.length === 0 ? (
-              <p className="text-center text-xs text-natural-muted py-4">No recurring bills catalogued yet.</p>
+            {filteredBills.length === 0 ? (
+              <p className="text-center text-xs text-natural-muted py-4">
+                {filtering ? 'No bills match that.' : 'No recurring bills catalogued yet.'}
+              </p>
             ) : (
               <div className="space-y-2">
-                {vault.bills
-                  .slice()
-                  .sort((a, b) => a.dueDay - b.dueDay)
-                  .map(bill => (
-                    <div key={bill.id} className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5">
-                      <div>
+                {filteredBills.map(bill => (
+                    <div key={bill.id} className={`flex items-center justify-between bg-white border rounded-xl px-4 py-2.5 ${editingBillId === bill.id ? 'border-natural-primary' : 'border-natural-border'}`}>
+                      <div className="min-w-0">
                         <span className="text-sm font-semibold text-natural-text">{bill.name}</span>
                         <span className="block text-xs text-natural-muted">
                           Due the {ordinal(bill.dueDay)}
                           {bill.category ? ` · ${bill.category}` : ''}
+                          {bill.notes ? ` · ${bill.notes}` : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         {bill.amount != null && <span className="text-sm font-mono font-bold text-natural-text">${bill.amount.toFixed(2)}</span>}
+                        <button onClick={() => startEditBill(bill)} className="text-natural-muted hover:text-natural-primary" title="Edit">
+                          <Pencil size={14} />
+                        </button>
                         <button onClick={() => removeBill(bill.id)} className="text-natural-muted hover:text-natural-primary" title="Remove">
                           <Trash2 size={14} />
                         </button>
@@ -407,19 +532,45 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               <Upload size={14} /> {busy ? 'Working…' : `Upload a Document (up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB)`}
             </button>
 
-            {vault.docs.length === 0 ? (
-              <p className="text-center text-xs text-natural-muted py-4">Nothing in the vault yet.</p>
+            {filteredDocs.length === 0 ? (
+              <p className="text-center text-xs text-natural-muted py-4">
+                {filtering ? 'No documents match that.' : 'Nothing in the vault yet.'}
+              </p>
             ) : (
               <div className="space-y-2">
-                {vault.docs.map(d => (
+                {filteredDocs.map(d => (
+                  editingDocId === d.id ? (
+                    <form key={d.id} onSubmit={saveDoc} className="bg-white border border-natural-primary rounded-xl px-4 py-3 space-y-2">
+                      <input
+                        type="text" value={docName} onChange={e => setDocName(e.target.value)} autoFocus
+                        className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                      />
+                      <select
+                        value={docCategory} onChange={e => setDocCategory(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
+                      >
+                        <option value="">No category</option>
+                        {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        {docCategory && !DEFAULT_CATEGORIES.includes(docCategory) && <option value={docCategory}>{docCategory}</option>}
+                      </select>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setEditingDocId(null)} className="px-3 py-1.5 text-xs font-semibold text-natural-muted hover:text-natural-text">Cancel</button>
+                        <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl">Save</button>
+                      </div>
+                    </form>
+                  ) : (
                   <div key={d.id} className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5 gap-3">
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-natural-text truncate block">{d.name}</span>
                       <span className="block text-xs text-natural-muted">
                         {(d.size / 1024).toFixed(0)}KB · {memberNames[d.uploadedBy] || 'A member'} · {new Date(d.uploadedAt).toLocaleDateString()}
+                        {d.category ? ` · ${d.category}` : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => startEditDoc(d)} disabled={busy} className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50" title="Rename or set a category">
+                        <Pencil size={14} />
+                      </button>
                       <button onClick={() => handleDownload(d)} disabled={busy} className="p-1.5 text-natural-primary hover:bg-natural-sage/40 rounded-lg border border-natural-border disabled:opacity-50" title="Download">
                         <Download size={14} />
                       </button>
@@ -428,6 +579,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                       </button>
                     </div>
                   </div>
+                  )
                 ))}
               </div>
             )}

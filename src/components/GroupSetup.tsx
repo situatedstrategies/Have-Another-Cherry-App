@@ -176,7 +176,11 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
         members: [currentUser],
         memberIds: [currentUser.uid],
         defaultSplit,
-        targetNumPeople: numPeople,
+        // Someone starting alone gets no capacity written: it is a hard cap
+        // both clients enforce, and pinning it to one would refuse the very
+        // invite code the dashboard keeps showing them. Unset falls back to
+        // the maximum, and a later joiner takes an even cut of what is free.
+        ...(numPeople > 1 ? { targetNumPeople: numPeople } : {}),
         availableSplits,
         categories: [...DEFAULT_CATEGORIES]
       };
@@ -496,10 +500,10 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
                   How many people are in this group?
                 </label>
-                <p className="text-xs text-natural-muted mb-4 font-medium">You can add up to 5 people total.</p>
+                <p className="text-xs text-natural-muted mb-4 font-medium">You can add up to 5 people total. Starting alone is fine: invite someone whenever you like and they take a share when they join.</p>
                 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {[2, 3, 4, 5].map(num => (
+                  {[1, 2, 3, 4, 5].map(num => (
                     <button
                       key={num}
                       type="button"
@@ -516,7 +520,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                           : 'border-natural-border text-natural-muted hover:border-natural-primary/50 hover:bg-natural-bg'
                       }`}
                     >
-                      You + {num - 1} {num - 1 === 1 ? 'other' : 'others'}
+                      {num === 1 ? 'Just me for now' : `You + ${num - 1} ${num - 1 === 1 ? 'other' : 'others'}`}
                     </button>
                   ))}
                 </div>
