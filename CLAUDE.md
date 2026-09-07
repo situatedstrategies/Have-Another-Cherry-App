@@ -11,7 +11,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - Data/auth: Firebase (Auth + Firestore, client SDK). `firebase-admin` is a dependency but the server currently uses ADC, not the Admin SDK.
 - AI: Google Gemini via **Vertex AI** (`@google/genai`), authenticated with Application Default Credentials (ADC) - no API key.
 - Email: Resend (`resend`), sending from a verified domain.
-- Deploy: Firebase App Hosting (Cloud Run under the hood), auto-deploys from GitHub `development/web-production` (NOT `main`).
+- Deploy: Firebase App Hosting (Cloud Run under the hood), auto-deploys from GitHub `main`.
 
 ## Repo layout
 - `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry).
@@ -19,7 +19,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `src/lib/*.ts` - helpers (resend, crypto, members, profiles, accounting, mismatch).
 - `src/types.ts` - data model (Group, User, Expense, Settlement, etc.).
 - `src/templates/inviteEmail.html` - Resend invite email template.
-- `src/firebase.ts` - Firebase init; picks `firebase-applet-config.json` or `...beta.json`.
+- `src/firebase.ts` - Firebase init from `firebase-applet-config.json`.
 - `server.ts` - Express API + static serving.
 - `public/` - static assets served at site root (e.g. `/cherry2transparent.png`).
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).
@@ -68,26 +68,15 @@ returns the actual build failure, including a Cloud Build log link.
 - Firestore: `(default)` database (nam5). Security rules in `firestore.rules`.
 - App Hosting backend: `have-another-cherry`, region `us-east4`.
 - Live URL: https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/
-- Custom domain (finishing DNS): app.haveanothercherry.com. Marketing site: haveanothercherry.com (Squarespace).
+- Custom domain: app.haveanothercherry.com. Marketing site: haveanothercherry.com (Squarespace).
+- The site password wall in `server.ts` is OFF by default (the app is public). `SITE_GATE_ENABLED=1` in `apphosting.yaml` turns it back on.
 
-## Beta environment
-Beta runs in a **separate Firebase project** so testers get their own Firestore and
-their own Auth user pool - a beta account is never a production account, and a beta
-bug can never reach a real ledger.
-- Client config lives in `firebase-applet-config.beta.json` (public identifiers, not
-  secrets), filled in from the `have-another-cherry-beta` Firebase project.
-  `src/firebase.ts` throws on startup if a beta build still has `REPLACE_ME_*`
-  placeholders, rather than falling back to production.
-- The environment is picked in `src/firebase.ts`: `VITE_APP_ENV=beta` is the explicit
-  switch, and a `beta.`/`beta-` hostname prefix is the fallback, so one build artifact
-  can serve either backend. `APP_ENV` is exported if code ever needs to branch.
-- Beta needs its **own reCAPTCHA v3 site key** (App Check is bound to a domain), its
-  **own OAuth client**, and its domain added to Auth -> Settings -> Authorized domains.
-- `firestore.rules` auto-deploys to **both projects** via
-  `.github/workflows/deploy-firestore-rules.yml`: beta through Workload Identity
-  Federation, production through WIF (`GCP_WIF_PROVIDER_PROD` + `GCP_SERVICE_ACCOUNT_PROD`
-  repo variables) or the `FIREBASE_SERVICE_ACCOUNT` secret as a fallback. A project
-  whose credentials are missing is skipped with a warning.
+## Retired beta environment
+There is no beta any more. It was a second App Hosting backend on its own Firebase
+project (`have-another-cherry-beta`) at beta.haveanothercherry.com, and it split the
+user base in two. `server.ts` now 301-redirects any `beta.*` host to
+app.haveanothercherry.com. Do not reintroduce `firebase-applet-config.beta.json`,
+`apphosting.beta.yaml`, or a `VITE_APP_ENV` switch; one project, one backend.
 
 ## AI (Gemini via Vertex) - important
 This project's Google Cloud org blocks standalone Gemini API keys (they must be service-account-bound and don't work with the Developer API). So the app uses **Vertex AI + ADC** and needs **no API key**.
@@ -107,24 +96,23 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
 - Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
 
-## Beta data reset
-- `npm run wipe:beta -- --dry-run` then `npm run wipe:beta -- --yes` (after `gcloud auth application-default login`) empties the beta project: every Firestore collection AND every Authentication user. Deleting the Firestore database in the console leaves the Auth users behind, and an Auth user with no `users/{uid}` doc is what "the account already exists" / a ghost account looks like.
-
 ## Design system (match this for UI work)
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).
 - Palette (Tailwind `natural-*` tokens defined in `src/index.css`): cherry red `#C41200` (primary accent), text `#18181B`, background `#F4F4F5`, borders `#D4D4D8`, muted `#52525B`. Aesthetic: minimal, high-contrast.
 - Logo: `/cherry2transparent.png` (in `public/`). The old Squarespace logo URL is dead - do not use it.
 
 ## Deploy flow
-- **`main` is NOT what gets deployed.** `development/web-production` is the deployed branch. Always push work there.
-- Push to `development/web-production` -> Firebase App Hosting builds and deploys automatically (~4-5 min).
+- **`main` is the deployed branch.** Push (or merge) to `main` -> Firebase App Hosting builds and deploys automatically (~4-5 min). `development/web-production` is retired; do not push there.
+- The backend's live branch is set in the Firebase console (App Hosting -> backend -> settings). If a push to `main` does not roll out, check that setting first (see the hard rule above about querying live state).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
 - Runtime env/secrets are controlled by `apphosting.yaml` (availability: RUNTIME). Cloud Run injects `PORT` (server uses `Number(process.env.PORT) || 3000`).
 - **Firestore rules deploy separately from the app.** App Hosting never reads
-  `firestore.rules`. `.github/workflows/deploy-firestore-rules.yml` publishes them to
-  **production and beta** on any push to `development/web-production` that touches the
-  file (see the Beta section for the credentials each leg needs; an unconfigured leg is
-  skipped with a warning, so check the Actions run after changing rules). Manual
+  `firestore.rules`. `.github/workflows/deploy-firestore-rules.yml` publishes them on
+  any push to `main` that touches the file, through Workload
+  Identity Federation (`GCP_WIF_PROVIDER_PROD` + `GCP_SERVICE_ACCOUNT_PROD` repo
+  variables) or the `FIREBASE_SERVICE_ACCOUNT` secret as a fallback; if neither is
+  configured the job skips with a warning, so check the Actions run after changing
+  rules. Manual
   fallback: `npm run rules:deploy` (needs `npx firebase-tools login` once). If rules and
   app ever disagree, users hit "Missing or insufficient permissions".
 
@@ -148,7 +136,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   in place when adding new AI endpoints.
 
 ## Conventions / gotchas
-- Source of truth is GitHub `development/web-production` - that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
+- Source of truth is GitHub `main` - that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.
 - Keep `PORT` as `Number(process.env.PORT) || 3000` in `server.ts`.

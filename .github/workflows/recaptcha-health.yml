@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - development/web-production
+      - main
     paths:
       - ".github/workflows/recaptcha-health.yml"
 
@@ -32,6 +32,6 @@ jobs:
           echo "--- first 300 bytes (should be Firebase's handler page, not the site gate):"
           head -c 300 handler.html || true
           echo
-      # The custom domains (app./beta.haveanothercherry.com) sit behind
+      # The custom domain (app.haveanothercherry.com) sits behind
       # Cloudflare, which challenges curl with a 403 "Just a moment" page, so
       # probing the branded hosts from CI is inconclusive. Real browsers pass.

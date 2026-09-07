@@ -22,7 +22,7 @@ eq('data: BLOCKED', sanitizeContinueUrl('data:text/html,<script>alert(1)</script
 eq('protocol-relative BLOCKED', sanitizeContinueUrl('//evil.example.com/pwn', ORIGIN), null);
 eq('userinfo spoof BLOCKED', sanitizeContinueUrl('https://app.haveanothercherry.com@evil.example.com/', ORIGIN), null);
 eq('suffix spoof BLOCKED', sanitizeContinueUrl('https://haveanothercherry.com.evil.example.com/', ORIGIN), null);
-eq('subdomain not allowlisted BLOCKED', sanitizeContinueUrl('https://beta.haveanothercherry.com/x', ORIGIN), null);
+eq('subdomain not allowlisted BLOCKED', sanitizeContinueUrl('https://other.haveanothercherry.com/x', ORIGIN), null);
 // Garbage resolves as a relative path against our own origin, so it stays
 // same-origin. Harmless, and not a redirect off the site.
 eq('garbage stays same-origin', sanitizeContinueUrl('ht!tp://[[[', ORIGIN)?.startsWith(ORIGIN + '/'), true);

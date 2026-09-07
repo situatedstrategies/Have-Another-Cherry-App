@@ -9,7 +9,6 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "wipe:beta": "tsx scripts/wipe-beta.ts",
     "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules",
     "test:parity": "tsx scripts/archive-parity.ts && tsx scripts/unclaimed-parity.ts && tsx scripts/recurring-parity.ts && tsx scripts/reminder-parity.ts && tsx scripts/entitlement-check.ts && tsx scripts/seats-check.ts",
     "test:rules": "firebase emulators:exec --only firestore \"tsx scripts/rules-test.ts\""

@@ -1,7 +1,8 @@
 # Moving production onto `main`
 
-Decided, and deliberately deferred until the iOS review clears, so that a
-build under review is never the moment the web deploy branch changes.
+Decided on 7 September 2026. The repository side is done: both workflows
+trigger on `main`, and `CLAUDE.md` and `README.md` name `main` as the deploy
+branch. Steps 1, 2, 4 and 5 below are the owner's to run, in that order.
 
 Today `app.haveanothercherry.com` deploys from `development/web-production`.
 That is not obvious from the repository, which is half the reason to change
@@ -66,16 +67,13 @@ not reached anyone.
 
 **6. Decide what `development/web-production` is for afterwards.**
 
-Either delete it, or keep it as the branch beta deploys from, which would give
-the two environments two branches and make "ship to beta first" a real
-workflow rather than a description. Deleting it while beta still points at it
-would break beta's deploys. Check which branch the beta backend uses before
-touching it.
+Delete it once the production backend is confirmed to deploy from `main`.
+Nothing else deploys from it: the beta backend that once did has been retired.
 
 ## Afterwards
 
-- `apphosting.yaml` and `apphosting.beta.yaml` are unchanged by any of this.
-  They are per-backend configuration, not per-branch.
+- `apphosting.yaml` is unchanged by any of this. It is per-backend
+  configuration, not per-branch.
 - Update `CLAUDE.md` if it names the deploy branch anywhere.
-- The rule that a `secret:` in `apphosting.yaml` must resolve in both projects
-  still applies, and has taken two rollouts down. Nothing here changes it.
+- The rule that a `secret:` in `apphosting.yaml` must already exist in Secret
+  Manager still applies, and has taken two rollouts down. Nothing here changes it.
