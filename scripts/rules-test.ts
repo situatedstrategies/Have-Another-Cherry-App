@@ -194,6 +194,28 @@ async function main() {
       plusEntitlement: { source: 'promo', updatedAt: 'now' },
     })));
 
+  // --- marketing email is opt-in, and the flag has to be a real boolean ----
+  await check('a user CAN opt in to marketing email with a boolean', () =>
+    assertSucceeds(updateDoc(doc(self, 'users', OWNER), {
+      marketingOptIn: true, marketingOptInAt: '2026-09-07T12:00:00.000Z',
+    })));
+
+  await check('a user CAN opt out again', () =>
+    assertSucceeds(updateDoc(doc(self, 'users', OWNER), {
+      marketingOptIn: false, marketingOptOutAt: '2026-09-08T12:00:00.000Z',
+    })));
+
+  await check('a user CANNOT write marketingOptIn as a string', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), { marketingOptIn: 'true' })));
+
+  await check('a user CANNOT write marketingOptIn as a number', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), { marketingOptIn: 1 })));
+
+  await check('a user CANNOT write a non-string opt-in timestamp', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), {
+      marketingOptIn: true, marketingOptInAt: 1757246400,
+    })));
+
   await env.cleanup();
   console.log(failures === 0 ? '\nALL RULES CHECKS PASSED' : `\n${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);

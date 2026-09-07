@@ -48,6 +48,16 @@ export interface User {
     text: string;
     key: string;
   };
+  // Newsletters and offers. Off unless the person turned it on in Settings;
+  // the only client writers are the Email switch here and in the iOS app.
+  // Not part of the signup consent fields: agreeing to the terms is not
+  // agreeing to marketing email. Anything that sends marketing email must
+  // read marketingOptIn === true and nothing else, and must write false on
+  // an unsubscribe. Timestamps are UTC ISO strings for the last time it was
+  // turned on and the last time it was turned off; both are kept.
+  marketingOptIn?: boolean;
+  marketingOptInAt?: string;
+  marketingOptOutAt?: string;
 }
 
 export interface Group {

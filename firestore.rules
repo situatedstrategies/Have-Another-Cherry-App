@@ -96,11 +96,28 @@ service cloud.firestore {
       return request.resource.data.keys().hasAny(['isPlus', 'plusEntitlement']);
     }
 
+    // Marketing email is opt-in and whatever sends it will read
+    // users/{uid}.marketingOptIn straight from Firestore, so the field has to
+    // be a real boolean. The string "true" would show as opted out in the apps
+    // (they test for a literal true) and could read as opted in to a loose
+    // server check. The timestamps are ISO strings like every other timestamp
+    // on the document.
+    function marketingFieldsWellTyped() {
+      return (!('marketingOptIn' in request.resource.data)
+              || request.resource.data.marketingOptIn is bool)
+        && (!('marketingOptInAt' in request.resource.data)
+              || request.resource.data.marketingOptInAt is string)
+        && (!('marketingOptOutAt' in request.resource.data)
+              || request.resource.data.marketingOptOutAt is string);
+    }
+
     match /users/{userId} {
       allow create:
-        if signedIn() && request.auth.uid == userId && !createsEntitlement();
+        if signedIn() && request.auth.uid == userId && !createsEntitlement()
+        && marketingFieldsWellTyped();
       allow update:
-        if signedIn() && request.auth.uid == userId && !touchesEntitlement();
+        if signedIn() && request.auth.uid == userId && !touchesEntitlement()
+        && marketingFieldsWellTyped();
       allow delete:
         if signedIn() && request.auth.uid == userId;
 
