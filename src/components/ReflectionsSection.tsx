@@ -30,10 +30,13 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  // The one line of feedback for a save, share, or delete that did not go
+  // through. Cleared on the next attempt.
+  const [error, setError] = useState('');
 
   const members = getFullMembers(group);
   const nameOf = (uid: string) =>
-    uid === activeUser ? 'You' : members.find(m => m.uid === uid)?.name || 'A member';
+    uid === activeUser ? 'You' : members.find(m => m.uid === uid)?.name || 'Someone';
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +50,7 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
     e.preventDefault();
     if (!text.trim() || saving) return;
     setSaving(true);
+    setError('');
     try {
       const entry = await saveReflection({
         uid: activeUser,
@@ -62,6 +66,7 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
       setShareWithGroup(false);
     } catch (err) {
       console.error('Reflection save failed', err);
+      setError('Could not save that reflection. Your words are still in the box; try again in a moment.');
     } finally {
       setSaving(false);
     }
@@ -69,11 +74,13 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
 
   const handleShare = async (r: Reflection) => {
     setSharingId(r.id);
+    setError('');
     try {
       await shareReflection(r);
       setEntries(prev => prev.map(x => (x.id === r.id ? { ...x, shared: true } : x)));
     } catch (err) {
       console.error('Reflection share failed', err);
+      setError('Could not share that reflection. It is still private to you; try again in a moment.');
     } finally {
       setSharingId(null);
     }
@@ -81,11 +88,13 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
 
   const handleDelete = async (r: Reflection) => {
     setConfirmingDelete(null);
+    setError('');
     try {
       await deleteReflection(r);
       setEntries(prev => prev.filter(x => x.id !== r.id));
     } catch (err) {
       console.error('Reflection delete failed', err);
+      setError('Could not delete that reflection. Try again in a moment.');
     }
   };
 
@@ -102,6 +111,10 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
           <Lock className="h-3 w-3" /> Private to you unless you share
         </span>
       </div>
+
+      {error && (
+        <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">{error}</div>
+      )}
 
       <form onSubmit={handleSave} className="bg-natural-sidebar/30 border border-natural-border/60 rounded-2xl p-3.5 space-y-3">
         <p className="text-xs font-semibold text-natural-text">How did splitting this one feel?</p>
@@ -129,7 +142,8 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
           onChange={e => setText(e.target.value)}
           rows={2}
           maxLength={2000}
-          placeholder="A sentence or two, just for you..."
+          placeholder="Reflection"
+          aria-label="Reflection"
           className="w-full text-xs px-3.5 py-2.5 bg-white border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary resize-y"
         />
 

@@ -15,6 +15,8 @@ type Question = {
   placeholder?: string;
   help?: string;
   options?: Option[];
+  /** May be left blank. Someone keeping a ledger alone has no second income to report. */
+  optional?: boolean;
 };
 type Step = { title: string; subtitle?: string; questions: Question[] };
 
@@ -25,8 +27,8 @@ const STEPS: Step[] = [
     title: 'Income & instincts',
     subtitle: "Let's start with the big picture.",
     questions: [
-      { key: 'income', type: 'number', label: 'Your approximate annual income', placeholder: 'e.g. 75000' },
-      { key: 'partnerIncome', type: 'number', label: "Your partner's / housemate's approximate annual income", placeholder: 'e.g. 60000' },
+      { key: 'income', type: 'number', label: 'Your approximate annual income', placeholder: 'Amount' },
+      { key: 'partnerIncome', type: 'number', label: 'Income of the person you share with (if any)', placeholder: 'Amount', optional: true, help: 'Leave it blank if you are keeping this ledger on your own.' },
       {
         key: 'spendingStyle',
         type: 'select',
@@ -50,7 +52,7 @@ const STEPS: Step[] = [
         label: 'Who reaches for a credit card more often?',
         options: [
           { value: 'me', label: 'Me, almost always' },
-          { value: 'partner', label: 'My partner / housemate' },
+          { value: 'partner', label: 'Someone I share with' },
           { value: 'equal', label: 'We use them about equally' },
           { value: 'neither', label: 'We mostly use cash / debit' },
         ],
@@ -63,7 +65,7 @@ const STEPS: Step[] = [
         options: [
           { value: 'none', label: 'No, none are' },
           { value: 'mine', label: 'Yes, mine are' },
-          { value: 'partners', label: "Yes, my partner's are" },
+          { value: 'partners', label: "Yes, someone I share with has one" },
           { value: 'some_not_all', label: 'Some cards are, but not all' },
           { value: 'not_sure', label: 'Not sure' },
         ],
@@ -71,7 +73,7 @@ const STEPS: Step[] = [
       {
         key: 'creditComfort',
         type: 'select',
-        label: 'When a credit card statement arrives, you usually…',
+        label: 'When a credit card statement arrives, you usually...',
         options: [
           { value: 'pay_in_full', label: 'Pay it in full, always' },
           { value: 'carry_sometimes', label: 'Carry a balance sometimes' },
@@ -102,7 +104,7 @@ const STEPS: Step[] = [
         label: 'Who tends to be lower on liquid cash?',
         options: [
           { value: 'me', label: 'Me' },
-          { value: 'partner', label: 'My partner / housemate' },
+          { value: 'partner', label: 'Someone I share with' },
           { value: 'fluctuates', label: 'It fluctuates evenly' },
         ],
       },
@@ -112,9 +114,9 @@ const STEPS: Step[] = [
         label: 'Who usually pays for groceries or does the shopping?',
         options: [
           { value: 'me', label: 'Mostly me' },
-          { value: 'partner', label: 'Mostly my partner / housemate' },
+          { value: 'partner', label: 'Mostly someone I share with' },
           { value: 'split', label: 'We take turns evenly' },
-          { value: 'together', label: 'We shop and pay together' },
+          { value: 'together', label: 'We shop and pay as a household' },
         ],
       },
       {
@@ -137,7 +139,7 @@ const STEPS: Step[] = [
       {
         key: 'moneyFeeling',
         type: 'select',
-        label: 'When you think about money, it mostly represents…',
+        label: 'When you think about money, it mostly represents...',
         options: [
           { value: 'security', label: 'Security & peace of mind' },
           { value: 'freedom', label: 'Freedom & options' },
@@ -178,7 +180,7 @@ const STEPS: Step[] = [
       {
         key: 'conflictStyle',
         type: 'select',
-        label: 'When you and a partner disagree about money, you tend to…',
+        label: 'When you and the person or people you share with disagree about money, you tend to...',
         options: [
           { value: 'compromise', label: 'Look for a middle-ground compromise' },
           { value: 'data', label: 'Pull up the numbers and get specific' },
@@ -194,7 +196,7 @@ const STEPS: Step[] = [
         options: [
           { value: 'conversations', label: 'Improving conversations about money' },
           { value: 'fairness', label: 'Creating more fairness in spending' },
-          { value: 'transparency', label: 'Being more transparent with each other' },
+          { value: 'transparency', label: 'Being more transparent with everyone' },
           { value: 'detailed', label: 'Detailed spending tracking' },
           { value: 'accountable', label: 'Keeping everyone accountable' },
         ],
@@ -211,6 +213,7 @@ const INITIAL_ANSWERS: Record<string, string> = STEPS.flatMap(s => s.questions).
 export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>(INITIAL_ANSWERS);
 
   const setAnswer = (key: string, value: string) => setAnswers(prev => ({ ...prev, [key]: value }));
@@ -218,7 +221,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
   const currentStep = STEPS[step];
   const isStepComplete = currentStep.questions.every(q => {
     const raw = (answers[q.key] ?? '').toString().trim();
-    if (raw === '') return false;
+    if (raw === '') return !!q.optional;
     // Numeric answers (income) must be a sane, non-negative number.
     if (q.type === 'number') {
       const n = Number(raw);
@@ -230,6 +233,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
 
   const handleSubmit = async () => {
     setLoading(true);
+    setSubmitError('');
     const fallbackProfile = {
       type: 'The Pragmatic Planner',
       description: 'You prefer stable financial boundaries and clear, kind communication.',
@@ -281,6 +285,11 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         );
         onComplete();
       } catch (innerErr) {
+        // Both the profile generation and the plain save failed, so the
+        // answers never reached the account. Say so rather than dropping
+        // back to the quiz as if nothing happened.
+        console.error('Profile save failed', innerErr);
+        setSubmitError('Your answers could not be saved. Check your connection and try again; nothing you entered has been lost.');
         setLoading(false);
       }
     }
@@ -291,7 +300,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-natural-border border-t-natural-text rounded-full animate-spin mx-auto"></div>
-          <h2 className="text-xl font-display font-semibold text-natural-text">Crafting your financial style…</h2>
+          <h2 className="text-xl font-display font-semibold text-natural-text">Crafting your financial style...</h2>
           <p className="text-sm text-natural-muted">Reading between the lines of your answers.</p>
         </div>
       </div>
@@ -314,6 +323,13 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
             Step {step + 1} of {STEPS.length} · {currentStep.title}
           </p>
         </div>
+
+        {submitError && (
+          <div className="mb-4 bg-natural-primary/5 text-natural-primary p-3 rounded-md text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
+            <span className="shrink-0">⚠️</span>
+            <span>{submitError}</span>
+          </div>
+        )}
 
         <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
           {currentStep.questions.map(q => (
@@ -339,7 +355,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                   onChange={e => setAnswer(q.key, e.target.value)}
                   className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                 >
-                  <option value="">Select…</option>
+                  <option value="">Select...</option>
                   {q.options?.map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}

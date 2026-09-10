@@ -15,6 +15,8 @@ function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
 
 const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 
+const INVITE_FALLBACK_ERROR = 'Could not send the email. Share the code directly instead.';
+
 export default function GroupSetup({ onComplete, onCancel }: { onComplete: (groupId: string) => void; onCancel?: () => void }) {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
@@ -31,6 +33,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
   const [copied, setCopied] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [inviteError, setInviteError] = useState('');
   const [partnerIncome, setPartnerIncome] = useState('');
   const [myIncome, setMyIncome] = useState('');
   const [recMessage, setRecMessage] = useState('');
@@ -58,17 +61,20 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
     loadIncome();
   }, []);
 
-  // Recommend a split proportional to the two annual incomes.
+  // Recommend a split proportional to the two annual incomes. Only offered
+  // for a group of two, so the second person is whoever was named in the
+  // split list, or "the other person" until they are.
   const recommendSplit = () => {
     const myVal = parseFloat(myIncome);
     const partnerVal = parseFloat(partnerIncome);
+    const otherName = memberNames[1]?.trim() || 'the other person';
 
     if (!myVal || myVal <= 0) {
       setRecMessage('Enter your income first to calculate a split.');
       return;
     }
     if (!partnerVal || partnerVal <= 0) {
-      setRecMessage("Enter the other person's income first to calculate a split.");
+      setRecMessage(`Enter ${otherName === 'the other person' ? "the other person's" : `${otherName}'s`} income first to calculate a split.`);
       return;
     }
 
@@ -77,7 +83,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
     const partnerPct = 100 - myPct;
 
     setSplits([String(myPct), String(partnerPct)]);
-    setRecMessage(`Recommended: you ${myPct}% / them ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
+    setRecMessage(`Recommended: you ${myPct}% / ${otherName} ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -94,19 +100,26 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           inviteCode: createdGroupInfo.inviteCode,
           recipientName: inviteName,
           fromName: (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'A friend'),
-          split: splits.map((s, i) => ({ name: i === 0 ? (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'You') : (memberNames[i]?.trim() || ('Person ' + (i + 1))), split: parseFloat(s) || 0 }))
+          // A solo group has no split to show yet: the creator holds 100%
+          // until someone joins, so the email uses its "set up together" row.
+          split: numPeople > 1
+            ? splits.map((s, i) => ({ name: i === 0 ? (auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'You') : (memberNames[i]?.trim() || ('Person ' + (i + 1))), split: parseFloat(s) || 0 }))
+            : undefined
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send invite');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || INVITE_FALLBACK_ERROR);
       setInviteStatus('success');
       setInviteEmail('');
       setInviteName('');
       setTimeout(() => setInviteStatus('idle'), 3000);
     } catch (err: any) {
       console.error(err);
+      // A fetch that never reached the server rejects with a TypeError and a
+      // message meant for developers, not the person reading the screen.
+      setInviteError(err instanceof TypeError ? INVITE_FALLBACK_ERROR : (err?.message || INVITE_FALLBACK_ERROR));
       setInviteStatus('error');
-      setTimeout(() => setInviteStatus('idle'), 3000);
+      setTimeout(() => setInviteStatus('idle'), 5000);
     }
   };
 
@@ -165,7 +178,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
       };
       
       const availableSplits = splits.slice(1).map((s, idx) => ({
-        name: memberNames[idx + 1] || `Cherry ${NUMBER_WORDS[idx + 1] || idx + 2}`,
+        name: memberNames[idx + 1]?.trim() || `Cherry ${NUMBER_WORDS[idx + 1] || idx + 2}`,
         split: parseFloat(s) || 0
       }));
 
@@ -338,9 +351,12 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(createdGroupInfo?.inviteCode || '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(createdGroupInfo?.inviteCode || '')
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
   };
 
   if (createdGroupInfo) {
@@ -357,7 +373,9 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 Group Created!
               </h1>
               <p className="text-natural-muted font-medium">
-                You can invite up to {createdGroupInfo.numCodes} people to join.
+                {createdGroupInfo.numCodes > 0
+                  ? `You can invite up to ${createdGroupInfo.numCodes} ${createdGroupInfo.numCodes === 1 ? 'person' : 'people'} to join.`
+                  : 'Share this code whenever you want someone to join.'}
               </p>
             </div>
 
@@ -371,7 +389,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark transition-colors"
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied!' : 'Copy to Clipboard'}
+                {copied ? 'Copied' : 'Copy to Clipboard'}
               </button>
             </div>
 
@@ -382,21 +400,22 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 <input 
                   type="email"
                   required
-                  placeholder="Enter email address"
+                  placeholder="Email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
                 />
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={inviteStatus === 'sending'}
+                  aria-label="Send invite"
                   className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
                 >
                   {inviteStatus === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
                 </button>
               </div>
               {inviteStatus === 'success' && <p className="text-xs text-natural-primary font-medium mt-2">Invite sent successfully!</p>}
-              {inviteStatus === 'error' && <p className="text-xs text-natural-primary font-medium mt-2">Failed to send invite. Check settings.</p>}
+              {inviteStatus === 'error' && <p className="text-xs text-natural-primary font-medium mt-2">{inviteError || INVITE_FALLBACK_ERROR}</p>}
             </form>
 
             <button
@@ -513,7 +532,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                   type="text"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="e.g. The Cool Apartment"
+                  placeholder="Group name"
                   className="w-full px-4 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all mb-4"
                   required
                 />
@@ -556,7 +575,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">Want an income-based split recommendation?</p>
-                    <p className="text-xs text-natural-muted">Enter both annual incomes and we'll suggest a split proportional to income. You can still adjust the percentages below.</p>
+                    <p className="text-xs text-natural-muted">Enter both incomes and we'll suggest a split proportional to income. You can still adjust the percentages below.</p>
                     <div className="space-y-2">
                       <div>
                         <label className="block text-xs font-semibold text-natural-muted mb-1">Your annual income</label>
@@ -567,13 +586,13 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                             min="0"
                             value={myIncome}
                             onChange={(e) => { setMyIncome(e.target.value); setRecMessage(''); }}
-                            placeholder="e.g. 75000"
+                            placeholder="Amount"
                             className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-natural-muted mb-1">The other person's annual income</label>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">{memberNames[1]?.trim() ? `${memberNames[1].trim()}'s annual income` : "The other person's annual income"}</label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
                           <input
@@ -581,7 +600,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                             min="0"
                             value={partnerIncome}
                             onChange={(e) => { setPartnerIncome(e.target.value); setRecMessage(''); }}
-                            placeholder="e.g. 60000"
+                            placeholder="Amount"
                             className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                           />
                         </div>
@@ -657,7 +676,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                 disabled={loading || !splitBalanced}
                 className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
-                {loading ? 'Creating...' : `Create & Get Invite Code${numPeople > 2 ? 's' : ''}`}
+                {loading ? 'Creating...' : 'Create & Get Invite Code'}
               </button>
             </form>
           ) : (

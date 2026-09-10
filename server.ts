@@ -737,9 +737,15 @@ async function startServer() {
   // delivers it via Resend from reset@haveanothercherry.com. An address with no
   // account gets a 404 that says so (see /api/account-lookup for why).
   app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
-    const { email } = req.body || {};
-    if (!email || typeof email !== "string") {
+    const rawEmail = req.body?.email;
+    const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
+    if (!email) {
       return res.status(400).json({ error: "Email is required" });
+    }
+    // Same shape check as send-invite, before the Admin SDK sees it: a
+    // malformed address should be a 400 here, not an opaque SDK error.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
     }
 
     try {
@@ -854,7 +860,7 @@ async function startServer() {
         "traits (an array of 3-5 short descriptive phrases), " +
         "strengths (one encouraging sentence), " +
         "watchouts (one gentle, constructive sentence), " +
-        "communicationStyle (one sentence about how this person likely prefers to discuss money with a partner/housemate), " +
+        "communicationStyle (one sentence about how this person likely prefers to discuss money with the people they share a home with), " +
         "greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous). " +
         "Never use em dashes in any field; use commas, periods, or hyphens instead.";
 
@@ -987,7 +993,7 @@ async function startServer() {
       severityPct >= 50
         ? "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
         : severityPct >= 25
-        ? "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers - want to swap real ones so our split feels fair to both of us?\""
+        ? "The pictures of the incomes don't quite line up. A gentle way in: \"Our pictures of the incomes don't line up. Can we compare notes so the split feels fair to everyone?\""
         : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 
     try {

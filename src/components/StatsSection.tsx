@@ -1,5 +1,6 @@
 import { Expense, Group } from '../types';
 import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
+import { joinedUids } from '../lib/members';
 import { CreditCard, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
 
 interface StatsSectionProps {
@@ -28,6 +29,11 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
   // agree with the settle screen (which reserves pending payments).
   let youOwePending = 0;
   let othersOwePending = 0;
+
+  // A household of one has nobody to owe, so every settled item's member
+  // debt is zero and "Total settled spend" would read $0.00 beside a count.
+  // For them the settled spend is simply what those items cost.
+  const solo = joinedUids(group).length <= 1;
 
   expenses.forEach(exp => {
     // Unclaimed: nobody has said they paid it, so it is owed by nobody to
@@ -62,9 +68,11 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
       // Count only what non-payer MEMBERS owed (the tracked, settleable debt).
       // Using amount - payerShare wrongly folded in guest / third-party portions
       // that are part of the amount but never actually settled to the payer.
-      const memberDebt = Object.entries(exp.shares || {})
-        .filter(([uid]) => uid !== exp.paidBy)
-        .reduce((total, [, share]) => total + (Number(share) || 0), 0);
+      const memberDebt = solo
+        ? (Number(exp.amount) || 0)
+        : Object.entries(exp.shares || {})
+            .filter(([uid]) => uid !== exp.paidBy)
+            .reduce((total, [, share]) => total + (Number(share) || 0), 0);
       settledTotalAmount = roundCurrency(settledTotalAmount + memberDebt);
     }
   });
