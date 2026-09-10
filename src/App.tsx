@@ -1192,7 +1192,7 @@ export default function App() {
       let finalExpense: Expense;
       if (editingExpense) {
         // Build on the freshest copy of the expense, not the snapshot taken when
-        // the form opened — a settlement logged or confirmed while the form was
+        // the form opened, a settlement logged or confirmed while the form was
         // open must survive the save. `editedAt` marks this content revision so
         // merges elsewhere know these fields are the newest.
         const latest = expenses.find(ex => ex.id === editingExpense.id) || editingExpense;
@@ -1346,7 +1346,7 @@ export default function App() {
     if (!selectedExpense || !group) return;
 
     // Work from the freshest copy of the expense, not the snapshot captured
-    // when the detail modal opened — an edit or confirmation may have synced in
+    // when the detail modal opened, an edit or confirmation may have synced in
     // since, and validating against stale shares is how duplicates get logged.
     const expense = expenses.find(e => e.id === selectedExpense.id) || selectedExpense;
 
@@ -2201,7 +2201,7 @@ export default function App() {
       )}
 
       {/* Render the live copy of the selected expense, not the snapshot taken
-          when it was opened — confirmations and edits synced from other members
+          when it was opened: confirmations and edits synced from other members
           must show up (and be validated against) immediately. */}
       {selectedExpense && (
         <ExpenseDetail

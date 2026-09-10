@@ -314,7 +314,7 @@ export default function ExpenseDetail({
                     </p>
                     {isVoided && (
                       <p className="text-xs text-natural-muted mt-0.5">
-                        Removed{voidedByName ? <> by <span className="font-semibold capitalize">{voidedByName}</span></> : ''}{s.voidedAt ? ` on ${formatDateTime(s.voidedAt)}` : ''} — no longer counts toward the balance.
+                        Removed{voidedByName ? <> by <span className="font-semibold capitalize">{voidedByName}</span></> : ''}{s.voidedAt ? ` on ${formatDateTime(s.voidedAt)}` : ''}. No longer counts toward the balance.
                       </p>
                     )}
                     <span className="text-xs text-natural-muted font-mono mt-1 block">

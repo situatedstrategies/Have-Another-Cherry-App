@@ -5,7 +5,7 @@ import { getNormalizedExpenseStatus } from './money';
 // in two places: the transfer_queue (member-to-member UPSERTs) and the shared
 // group_ledgers snapshot (whole-ledger backfill). Both MUST merge with the same
 // rules, or a stale copy from one path can rewind what the other path already
-// applied — e.g. a snapshot written before an edit reverting the split, which
+// applied, e.g. a snapshot written before an edit reverting the split, which
 // then makes a paid-up debt look open again and invites a duplicate payment.
 // This module is that single set of rules.
 
@@ -85,7 +85,7 @@ export function mergeExpense(local: Expense, incoming: Expense): Expense {
 }
 
 // Merge two whole ledgers (used by the group snapshot backfill), newest-dated
-// expense first — same ordering the app keeps everywhere else.
+// expense first, same ordering the app keeps everywhere else.
 export function mergeExpenseLists(
   local: Expense[] = [],
   remote: Expense[] = []
