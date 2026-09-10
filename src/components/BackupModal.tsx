@@ -231,7 +231,7 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
                 type="text"
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="e.g. cherry-orbit-willow-quartz"
+                placeholder="Group key"
                 autoComplete="off"
                 spellCheck={false}
                 className="w-full px-4 py-3 bg-natural-bg/50 border border-natural-border rounded-xl text-natural-text text-sm outline-none focus:border-natural-primary font-mono"

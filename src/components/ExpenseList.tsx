@@ -122,7 +122,8 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder="Search"
+              aria-label="Search expenses"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
@@ -192,7 +193,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
         ) : (
           filteredExpenses.slice(0, visibleCount).map((exp) => {
             const payerMember = members.find(m => m.uid === exp.paidBy);
-            const payerName = payerMember?.name || 'Unknown';
+            const payerName = payerMember?.name || 'Someone';
             const isPayerActive = exp.paidBy === activeUser;
             const isFullySettled = isExpenseFullySettled(exp);
             const myRemainingBalance = getRemainingSettlementAmount(exp, activeUser, false);
@@ -234,8 +235,17 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
             return (
               <div
                 key={exp.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${exp.title}`}
                 onClick={() => onExpenseClick(exp)}
-                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 cursor-pointer transition-all group"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onExpenseClick(exp);
+                  }
+                }}
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 focus-visible:bg-natural-sidebar/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-natural-primary/40 cursor-pointer transition-all group"
                 id={`expense-row-${exp.id}`}
               >
                 <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">

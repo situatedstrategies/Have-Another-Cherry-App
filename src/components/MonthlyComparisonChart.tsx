@@ -64,7 +64,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
     const currentMonth = now.getMonth();
     const withYear = months >= 12;
 
-    const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Unknown';
+    const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Someone';
 
     // Build `months` monthly buckets ending this month, shifted back by periodOffset periods.
     const buildBuckets = (periodOffset: number) =>

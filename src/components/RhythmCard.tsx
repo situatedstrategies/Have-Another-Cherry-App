@@ -77,11 +77,11 @@ export function computeRhythm(expenses: Expense[]): Rhythm | null {
     const years = monthsTogether / 12;
     celebration = `Ledger anniversary - ${years} ${years === 1 ? 'year' : 'years'} of sharing. Have another cherry on us.`;
   } else if (monthsTogether > 0 && monthsTogether % 6 === 0) {
-    celebration = `${monthsTogether} months of sharing this ledger together.`;
+    celebration = `${monthsTogether} months of keeping this ledger.`;
   } else if (streakMonths >= 3) {
-    celebration = `${streakMonths} straight months with everything settled. You two are in rhythm.`;
+    celebration = `${streakMonths} straight months with everything settled. You're in rhythm.`;
   } else if ([25, 50, 100, 250, 500].includes(settled.length)) {
-    celebration = `${settled.length} expenses settled together - sweet milestone.`;
+    celebration = `${settled.length} expenses settled. Sweet milestone.`;
   }
 
   return { monthsTogether, settledCount: settled.length, settledPct, medianSettleDays, streakMonths, celebration };

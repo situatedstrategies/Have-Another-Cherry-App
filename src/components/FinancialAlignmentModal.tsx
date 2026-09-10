@@ -24,7 +24,7 @@ const fallbackStarter = (severityPct: number) => {
     return "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\"";
   }
   if (severityPct >= 25) {
-    return "Your pictures of each other's income don't quite line up. A gentle way in: \"I realized I might be guessing wrong about your numbers - want to swap real ones so our split feels fair to both of us?\"";
+    return "The pictures of the incomes don't quite line up. A gentle way in: \"Our pictures of the incomes don't line up. Can we compare notes so the split feels fair to everyone?\"";
   }
   return "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 };
@@ -49,7 +49,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
           body: JSON.stringify({
             severityPct: Math.round(severityPct),
             styles: members.map(m => ({
-              name: m.name || 'A member',
+              name: m.name || 'Someone',
               type: m.financialProfile?.type || '',
               communicationStyle: m.financialProfile?.communicationStyle || '',
             })),
@@ -83,7 +83,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
               <div key={m.uid} className="bg-natural-bg/50 border border-natural-border rounded-xl p-4">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-bold text-natural-text capitalize">
-                    {m.uid === activeUser ? 'You' : (m.name || 'A member')}
+                    {m.uid === activeUser ? 'You' : (m.name || 'Someone')}
                   </span>
                   {m.financialProfile?.type && (
                     <span className="text-xs font-semibold text-natural-primary text-right">{m.financialProfile.type}</span>
@@ -111,7 +111,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
             {members.map(m => {
               const own = currency(m.income);
               const estimate = currency(m.partnerIncome);
-              const label = m.uid === activeUser ? 'You' : (m.name || 'A member');
+              const label = m.uid === activeUser ? 'You' : (m.name || 'Someone');
               return (
                 <div key={m.uid} className="text-sm border-b border-natural-border/40 pb-2 last:border-0 last:pb-0">
                   <span className="font-semibold text-natural-text capitalize">{label}</span>
@@ -121,7 +121,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
                       <span className="font-mono font-semibold text-natural-text">{own || 'Not shared'}</span>
                     </div>
                     <div className="flex justify-between text-natural-muted">
-                      <span>Their estimated income</span>
+                      <span>{members.length <= 2 ? "Estimate of the other person's income" : "Estimate of others' income"}</span>
                       <span className="font-mono font-semibold text-natural-text">{estimate || 'No estimate'}</span>
                     </div>
                   </div>
@@ -141,7 +141,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
             <MessageCircleHeart className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             {loadingStarter ? (
               <div className="flex items-center gap-2 text-sm text-natural-muted">
-                <RefreshCcw className="h-4 w-4 animate-spin" /> Writing a starter for you…
+                <RefreshCcw className="h-4 w-4 animate-spin" /> Writing a starter for you...
               </div>
             ) : (
               <p className="text-sm text-natural-text leading-relaxed italic">{starter}</p>
