@@ -16,7 +16,32 @@ import {
 // permission required under 18), and signup now records an age attestation.
 const TERMS_VERSION = '2026-09-02';
 
-// Turn Firebase's internal auth error codes into friendly, non-enumerating text.
+const NO_ACCOUNT_MESSAGE = 'We could not find an account for that email. Check the spelling, or create one.';
+
+// Firebase folds an unknown address and a wrong password into one error on
+// purpose. The product decision (10 September 2026) is to tell people which
+// it was, so a failed sign-in asks the server whether the address has an
+// account at all. Null means the check itself failed, and the generic message
+// stands.
+async function accountExists(email: string): Promise<boolean | null> {
+  try {
+    const res = await fetch('/api/account-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.exists === 'boolean' ? data.exists : null;
+  } catch {
+    return null;
+  }
+}
+
+const isCredentialMismatch = (code: unknown) =>
+  code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found';
+
+// Turn Firebase's internal auth error codes into friendly text.
 function friendlyAuthError(err: any): string {
   switch (err?.code) {
     case 'auth/invalid-credential':
@@ -238,7 +263,8 @@ export default function AuthScreen() {
 
   // Request a password reset email. This hits our server endpoint, which mints a
   // Firebase reset link and delivers it via Resend from reset@haveanothercherry.com.
-  // Uses a generic confirmation so we don't reveal whether an email is registered.
+  // An address with no account gets told so; the server answers 404 with the
+  // message to show.
   const handleResetPassword = async () => {
     setError('');
     setInfo('');
@@ -257,7 +283,7 @@ export default function AuthScreen() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Unable to send reset email. Please try again later.');
       }
-      setInfo(`If an account exists for ${email}, a password reset link is on its way. Check your inbox (and your spam folder).`);
+      setInfo(`A password reset link is on its way to ${email}. Check your inbox and your spam folder.`);
     } catch (err: any) {
       setError(err.message || 'Unable to send reset email. Please try again later.');
     } finally {
@@ -328,7 +354,11 @@ export default function AuthScreen() {
         void sendVerificationEmail(userCred.user, name.trim());
       }
     } catch (err: any) {
-      setError(friendlyAuthError(err));
+      let message = friendlyAuthError(err);
+      if (isLogin && isCredentialMismatch(err?.code) && (await accountExists(email)) === false) {
+        message = NO_ACCOUNT_MESSAGE;
+      }
+      setError(message);
       setEmailLoading(false);
     }
   };

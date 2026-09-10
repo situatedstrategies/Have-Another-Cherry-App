@@ -702,10 +702,40 @@ async function startServer() {
     }
   });
 
+  // Whether an account exists for an address. Product decision, 10 September
+  // 2026: someone typing an address that has no account is told so, on sign-in
+  // and on reset, rather than being left with "doesn't match" or a reset email
+  // that never comes. That is a deliberate trade against address enumeration,
+  // so it is rate limited like the other unauthenticated endpoints.
+  const NO_ACCOUNT_MESSAGE =
+    "We could not find an account for that email. Check the spelling, or create one.";
+
+  app.post("/api/account-lookup", rateLimit("lookup", 20), async (req, res) => {
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ error: "Email is required" });
+    }
+    try {
+      await ensureAdminApp();
+      const { getAuth } = await import("firebase-admin/auth");
+      const user = await getAuth().getUserByEmail(email.trim());
+      return res.status(200).json({
+        exists: true,
+        providers: (user.providerData || []).map((p) => p.providerId),
+      });
+    } catch (err: any) {
+      if (err?.code === "auth/user-not-found" || err?.code === "auth/email-not-found") {
+        return res.status(200).json({ exists: false });
+      }
+      console.error("Account lookup error:", err?.message || err);
+      return res.status(500).json({ error: "Could not check that address right now." });
+    }
+  });
+
   // 6b. Password Reset Endpoint (Resend + Firebase Admin SDK)
   // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
-  // delivers it via Resend from reset@haveanothercherry.com. Responds generically
-  // so we never reveal whether an email is registered.
+  // delivers it via Resend from reset@haveanothercherry.com. An address with no
+  // account gets a 404 that says so (see /api/account-lookup for why).
   app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
     const { email } = req.body || {};
     if (!email || typeof email !== "string") {
@@ -723,9 +753,8 @@ async function startServer() {
           actionHandlerBase(req.headers, process.env.AUTH_ACTION_URL)
         );
       } catch (linkErr: any) {
-        // Don't reveal whether the account exists.
         if (linkErr?.code === "auth/user-not-found" || linkErr?.code === "auth/email-not-found") {
-          return res.status(200).json({ success: true });
+          return res.status(404).json({ error: NO_ACCOUNT_MESSAGE, code: "no-account" });
         }
         throw linkErr;
       }
