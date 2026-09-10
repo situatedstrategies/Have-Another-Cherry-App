@@ -8,15 +8,23 @@
 // host is ours to choose, and the app stops depending on a console setting that
 // has to be kept in sync by hand for every project.
 
-// Where our handler lives for the request that came in.
+// The one public address of the app. Every link we put in an email points
+// here, whatever host the request that triggered it came in on.
 //
-// Derived from the incoming request rather than hardcoded, so the same build
-// answers correctly on the custom domain, on the raw App Hosting URL, and in
-// local dev. AUTH_ACTION_URL overrides this if a backend ever needs to pin it.
+// It used to be derived from the incoming request, so the same build answered
+// correctly on the custom domain, on the raw App Hosting URL, and in local dev.
+// That also meant a reset requested through the raw App Hosting URL mailed a
+// raw App Hosting link, and one requested through the old beta host mailed a
+// beta link that stopped resolving the day beta was retired. A link in
+// someone's inbox has to outlive whichever host minted it, so it is pinned.
+// Local dev keeps its own origin so the handler can be exercised offline, and
+// AUTH_ACTION_URL still overrides everything if a backend ever needs to.
+export const PUBLIC_APP_ORIGIN = 'https://app.haveanothercherry.com';
+
 export function actionHandlerBase(
   headers: Record<string, string | string[] | undefined>,
   override?: string
-): string | null {
+): string {
   if (override) return override;
 
   const first = (v: string | string[] | undefined): string | undefined => {
@@ -25,13 +33,10 @@ export function actionHandlerBase(
   };
 
   const host = first(headers['x-forwarded-host']) || first(headers.host);
-  if (!host) return null;
-
-  const proto =
-    first(headers['x-forwarded-proto']) ||
-    (/^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host) ? 'http' : 'https');
-
-  return `${proto}://${host}/auth/action`;
+  if (host && /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host)) {
+    return `http://${host}/auth/action`;
+  }
+  return `${PUBLIC_APP_ORIGIN}/auth/action`;
 }
 
 // Move a Firebase-minted link onto our handler, preserving the query string

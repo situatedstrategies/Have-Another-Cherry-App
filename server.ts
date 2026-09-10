@@ -468,7 +468,7 @@ async function startServer() {
         : [];
 
       if (!text && !image) {
-        return res.status(400).json({ error: "Nothing to organise — add a note or a photo." });
+        return res.status(400).json({ error: "Nothing to organise. Add a note or a photo." });
       }
 
       const parts: any[] = [];
@@ -487,7 +487,7 @@ async function startServer() {
       }
       parts.push(
         "Turn this into one structured household record. Write `body` as clean, readable prose " +
-        "— keep every fact, drop filler, do not invent anything. " +
+        "Keep every fact, drop filler, do not invent anything. " +
         "Only fill a field if the source actually supports it; leave it out otherwise. " +
         "Set confidence to `high` only when the value is stated outright, `medium` when it is " +
         "strongly implied, and `low` when you are guessing. Dates must be YYYY-MM-DD. " +
@@ -502,7 +502,7 @@ async function startServer() {
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "Short title, e.g. 'Con Ed — August'" },
+              title: { type: Type.STRING, description: "Short title, e.g. 'Con Ed, August'" },
               body: { type: Type.STRING, description: "The note itself, cleaned up. Never invent facts." },
               vendor: { type: Type.STRING, description: "Who it is with, e.g. 'Con Edison'" },
               amount: { type: Type.NUMBER, description: "Amount due, if stated" },
@@ -1434,7 +1434,7 @@ async function startServer() {
     // Opaque routing hints for a tapped notification (which group, which bill,
     // which screen). Values must be strings: FCM rejects a data payload that
     // is not Record<string, string>, and it fails the whole send, not the one
-    // field. Nothing here may carry an amount or a name — see the note above.
+    // field. Nothing here may carry an amount or a name; see the note above.
     data?: Record<string, string>,
   ): Promise<number> => {
     if (!uids.length) return 0;
@@ -1577,7 +1577,7 @@ async function startServer() {
   //      The privacy shape is the whole design: the ledger and the Vault are
   //      encrypted client-side, so the server cannot work out when anything is
   //      due. Clients publish a deliberately impoverished index to
-  //      reminder_schedules/{groupId} — a date, an opaque id, and which screen
+  //      reminder_schedules/{groupId}: a date, an opaque id, and which screen
   //      to open. The push repeats none of it: the body is fixed and says only
   //      that something is due. The app fills in the rest after it opens and
   //      can decrypt.

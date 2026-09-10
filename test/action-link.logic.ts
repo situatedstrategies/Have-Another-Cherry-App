@@ -15,11 +15,13 @@ const VERIFY_LINK =
 console.log('--- which host does a request map to? ---');
 eq('production host', actionHandlerBase({ host: 'app.haveanothercherry.com' }),
   'https://app.haveanothercherry.com/auth/action');
-eq('raw App Hosting host', actionHandlerBase({ host: 'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app' }),
-  'https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/auth/action');
-eq('behind a proxy (x-forwarded-host wins)',
+eq('raw App Hosting host is pinned to the public domain', actionHandlerBase({ host: 'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app' }),
+  'https://app.haveanothercherry.com/auth/action');
+eq('a retired host is pinned to the public domain too', actionHandlerBase({ host: 'beta.haveanothercherry.com' }),
+  'https://app.haveanothercherry.com/auth/action');
+eq('behind a proxy, still the public domain',
   actionHandlerBase({ host: 'internal-run.a.run.app', 'x-forwarded-host': 'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app', 'x-forwarded-proto': 'https' }),
-  'https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/auth/action');
+  'https://app.haveanothercherry.com/auth/action');
 eq('comma-joined forwarded headers take the first',
   actionHandlerBase({ 'x-forwarded-host': 'app.haveanothercherry.com, internal', 'x-forwarded-proto': 'https,http' }),
   'https://app.haveanothercherry.com/auth/action');
@@ -27,7 +29,7 @@ eq('localhost stays http', actionHandlerBase({ host: 'localhost:3000' }),
   'http://localhost:3000/auth/action');
 eq('explicit override wins', actionHandlerBase({ host: 'anything' }, 'https://pinned.example.com/auth/action'),
   'https://pinned.example.com/auth/action');
-eq('no host at all -> null', actionHandlerBase({}), null);
+eq('no host at all -> the public domain', actionHandlerBase({}), 'https://app.haveanothercherry.com/auth/action');
 
 console.log('\n--- retargeting keeps every parameter ---');
 const prodOut = retargetActionLink(PROD_LINK, 'https://app.haveanothercherry.com/auth/action');
@@ -41,10 +43,13 @@ const verifyOut = retargetActionLink(VERIFY_LINK, 'https://have-another-cherry--
 eq('a link answered on the raw host stays on that host', new URL(verifyOut).host, 'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app');
 eq('  verifyEmail mode survived', new URL(verifyOut).searchParams.get('mode'), 'verifyEmail');
 
-console.log('\n--- the cross-environment mistake this exists to prevent ---');
-eq('a link is never retargeted onto a host the request did not come from',
+console.log('\n--- the mistake this exists to prevent: a link that dies with its host ---');
+eq('a link minted through the raw host still lands on the public domain',
   new URL(retargetActionLink(VERIFY_LINK, actionHandlerBase({ host: 'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app' }))).host,
-  'have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app');
+  'app.haveanothercherry.com');
+eq('a link minted through a retired host still lands on the public domain',
+  new URL(retargetActionLink(PROD_LINK, actionHandlerBase({ host: 'beta.haveanothercherry.com' }))).host,
+  'app.haveanothercherry.com');
 
 console.log('\n--- never break the email ---');
 eq('no base -> original untouched', retargetActionLink(PROD_LINK, null), PROD_LINK);
