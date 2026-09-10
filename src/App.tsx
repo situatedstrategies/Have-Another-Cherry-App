@@ -2201,7 +2201,7 @@ export default function App() {
       )}
 
       {/* Render the live copy of the selected expense, not the snapshot taken
-          when it was opened — confirmations and edits synced from other members
+          when it was opened: confirmations and edits synced from other members
           must show up (and be validated against) immediately. */}
       {selectedExpense && (
         <ExpenseDetail

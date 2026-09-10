@@ -40,13 +40,13 @@ function friendlyAuthError(err: any): string {
     case 'auth/operation-not-allowed':
       return "That sign-in method isn't switched on for this app yet. Please try another way to sign in.";
     case 'auth/network-request-failed':
-      return 'Couldn’t reach the sign-in service. Check your connection — VPNs, ad blockers, or strict privacy settings can block it — and try again.';
+      return 'Couldn’t reach the sign-in service. Check your connection. VPNs, ad blockers, or strict privacy settings can block it. Then try again.';
     case 'auth/popup-blocked':
       return 'Your browser blocked the Google sign-in window. Allow popups for this site and try again.';
     case 'auth/unauthorized-domain':
       return 'Sign-in isn’t authorized on this domain. Please use the official app link.';
     case 'auth/ui-timeout':
-      return 'Sign-in is taking too long. If a Google window opened and closed without signing you in, your browser may be blocking cross-site sign-in — try email and password, or a different browser.';
+      return 'Sign-in is taking too long. If a Google window opened and closed without signing you in, your browser may be blocking cross-site sign-in. Try email and password, or a different browser.';
     default:
       return 'Something went wrong. Please try again.';
   }
