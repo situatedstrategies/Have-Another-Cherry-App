@@ -249,6 +249,8 @@ export default function App() {
     if (!currentUser || !activeGroupId) return;
     const gid = activeGroupId;
     const groupUnsubscribe = onSnapshot(doc(db, 'groups', gid), (groupSnapshot) => {
+      // Read before exists(): that guard narrows the snapshot type to never.
+      const fromCache = groupSnapshot.metadata.fromCache;
       if (groupSnapshot.exists()) {
         setGroup(groupSnapshot.data() as Group);
         return;
@@ -258,7 +260,7 @@ export default function App() {
       // event from cache while offline). The server has not said the group is
       // gone, so wait for a synced snapshot. Treating it as deleted here
       // scrubbed a real group from the profile on every offline launch.
-      if (groupSnapshot.metadata.fromCache) return;
+      if (fromCache) return;
       // The group is gone (its last member left and it was deleted, or the
       // id on the profile is stale). The leave path also deletes the doc and
       // this fires once more with the same writes, which is harmless. Left alone, the profile still points at
