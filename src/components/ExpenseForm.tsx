@@ -7,7 +7,7 @@ import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } 
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
-import { advanceIntervalStr, parseLocalDate, normalizeInterval, RECURRING_WEEKS, RECURRING_MONTHS } from '../lib/recurring';
+import { advanceIntervalStr, parseLocalDate, normalizeInterval, todayLocal, RECURRING_WEEKS, RECURRING_MONTHS } from '../lib/recurring';
 
 interface ExpenseFormProps {
   group: Group;
@@ -34,7 +34,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCategory(e.target.value);
   };
-    const [date, setDate] = useState(editingExpense?.date || new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(editingExpense?.date || todayLocal());
   const [paidBy, setPaidBy] = useState<string>(editingExpense?.paidBy || activeUser);
   const [instrumentType, setInstrumentType] = useState<PaymentInstrument | undefined>(
     editingExpense?.contributions?.[0]?.instrumentType
@@ -212,10 +212,12 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         setThirdPartyPct(pcts);
       }
     } else {
-      // Default initial states for custom pct
+      // Default initial states for custom pct. The full split includes the
+      // pending seats (ghost_N), which group.defaultSplit alone leaves at 0.
+      const fullSplit = getFullDefaultSplit(group);
       const initPct: Record<string, string> = {};
       members.forEach(m => {
-        initPct[m.uid] = (group.defaultSplit[m.uid] || 0).toString();
+        initPct[m.uid] = (fullSplit[m.uid] || 0).toString();
       });
       setCustomPct(initPct);
     }
@@ -260,7 +262,6 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       previewShares[m.uid] = numericAmount * ((getFullDefaultSplit(group)[m.uid] || 0) / 100);
     });
   } else if (splitType === 'equal') {
-    // wait, it should be equal split among all members
     members.forEach(m => {
       previewShares[m.uid] = numericAmount / members.length;
     });
@@ -587,7 +588,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
               disabled={scanning}
               className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
             >
-              <Camera size={16} /> {scanning ? 'Scanning…' : 'Scan Receipt'}
+              <Camera size={16} /> {scanning ? 'Scanning...' : 'Scan Receipt'}
             </button>
           </div>
 
@@ -655,7 +656,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Rent, electric bill, wifi, groceries..."
+                placeholder="Title"
                 className="w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all"
                 id="expense-title-input"
               />
@@ -787,7 +788,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     type="text"
                     value={instrumentLabel}
                     onChange={(e) => setInstrumentLabel(e.target.value)}
-                    placeholder="e.g., Chase Sapphire"
+                    placeholder="Card name"
+                    aria-label="Card or account name"
                     className="w-full pl-3 pr-3 py-2 text-xs bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text outline-none transition-all"
                   />
                 </div>
@@ -807,7 +809,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   type="text"
                   value={category}
                   onChange={handleCategoryChange}
-                  placeholder="Type or pick a category"
+                  placeholder="Category"
                   list="category-options"
                   className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
                   id="expense-category-input"
@@ -1017,7 +1019,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                       min="0"
                       value={blindMin}
                       onChange={(e) => setBlindMin(e.target.value)}
-                      placeholder="e.g. 5"
+                      placeholder="Amount"
                       className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                     />
                   </div>
@@ -1032,7 +1034,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                       min="0"
                       value={blindMax}
                       onChange={(e) => setBlindMax(e.target.value)}
-                      placeholder="e.g. 50"
+                      placeholder="Amount"
                       className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                     />
                   </div>
@@ -1079,7 +1081,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                         type="text"
                         value={g.name}
                         onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
-                        placeholder="Name (e.g. weekend guest)"
+                        placeholder="Name"
+                        aria-label="Guest name"
                         className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
                       />
                       <div className="relative w-24 shrink-0">
@@ -1094,7 +1097,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                         />
                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
                       </div>
-                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0" title="Remove">
+                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0" title="Remove" aria-label={`Remove ${g.name.trim() || 'this guest'}`}>
                         <X className="h-4 w-4" />
                       </button>
                     </div>
@@ -1161,7 +1164,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     value={thirdPersonName}
                     onChange={(e) => setThirdPersonName(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                    placeholder="E.g. Sarah"
+                    placeholder="Name"
                     id="third-person-name-input"
                   />
                 </div>
@@ -1172,7 +1175,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                     value={thirdPersonEmail}
                     onChange={(e) => setThirdPersonEmail(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                    placeholder="sarah@example.com"
+                    placeholder="Email"
                     id="third-person-email-input"
                   />
                 </div>
@@ -1274,7 +1277,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add payment reminders, split notes, or utility breakdown details..."
+              placeholder="Notes"
               rows={2}
               className="w-full p-3 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all resize-none"
               id="expense-notes-input"

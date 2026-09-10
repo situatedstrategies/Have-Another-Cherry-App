@@ -30,7 +30,10 @@ export default function OwedBreakdownModal({
   mode, expenses, group, activeUser, isPlus, onSelectExpense, onCherryPlus, onToast, onClose,
 }: OwedBreakdownModalProps) {
   const members = useMemo(() => getFullMembers(group), [group]);
-  const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Unknown';
+  const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Someone';
+  // A reminder is an email to a real account. A pending seat (ghost_N) has
+  // no address on file, so the button is only offered for people who joined.
+  const hasJoined = (uid: string) => (group.memberIds || []).includes(uid);
   const [sendingTo, setSendingTo] = useState<string | null>(null);
   const [remindedUids, setRemindedUids] = useState<string[]>([]);
 
@@ -132,7 +135,7 @@ export default function OwedBreakdownModal({
                     {person.items.length} open {person.items.length === 1 ? 'item' : 'items'} · {fmt(person.total)}
                   </span>
                 </div>
-                {mode === 'owed_to_you' && (
+                {mode === 'owed_to_you' && hasJoined(person.uid) && (
                   remindedUids.includes(person.uid) ? (
                     <span className="text-xs font-bold text-natural-primary flex items-center gap-1">
                       <Check size={12} /> Reminder sent

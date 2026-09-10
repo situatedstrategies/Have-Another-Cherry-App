@@ -85,7 +85,7 @@ export async function sendInviteEmail(
       return '<tr><td style="' + rowStyleName + '">' + escapeHtml(s.name) + '</td><td style="' + rowStylePct + '">' + pct + '%</td></tr>';
     }).join("");
   } else {
-    splitRows = '<tr><td style="padding:11px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;color:#52525B;">You will set up the split together in the app.</td></tr>';
+    splitRows = '<tr><td style="padding:11px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;color:#52525B;">The split gets set up in the app.</td></tr>';
   }
 
   const htmlContent = htmlTemplate

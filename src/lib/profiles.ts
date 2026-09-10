@@ -16,7 +16,7 @@ export const FINANCIAL_PROFILES = [
   },
   {
     type: "Present-Biased Consumer",
-    description: "You prioritize immediate utility and experiences over deferred consumption. While you enjoy the present moment, you may benefit from structural boundaries or a partner who balances the long-term view.",
+    description: "You prioritize immediate utility and experiences over deferred consumption. While you enjoy the present moment, you may benefit from structural boundaries or someone you share with who balances the long-term view.",
     quote: "\"Money is like muck, not good except it be spread.\" - Francis Bacon"
   },
   {
@@ -26,7 +26,7 @@ export const FINANCIAL_PROFILES = [
   },
   {
     type: "Autonomy Seeker",
-    description: "To you, money represents independence and freedom from obligation. You prefer separate accounts and clear financial boundaries to avoid feeling beholden to a partner.",
+    description: "To you, money represents independence and freedom from obligation. You prefer separate accounts and clear financial boundaries to avoid feeling beholden to someone you share with.",
     quote: "\"Money is only a tool. It will take you wherever you wish, but it will not replace you as the driver.\" - Ayn Rand"
   },
   {
@@ -46,7 +46,7 @@ export const FINANCIAL_PROFILES = [
   },
   {
     type: "Passive Delegator",
-    description: "You find financial management stressful or uninteresting and prefer to automate your finances or delegate tracking to a willing partner, focusing your energy elsewhere.",
+    description: "You find financial management stressful or uninteresting and prefer to automate your finances or delegate tracking to someone you share with who is happy to do it, focusing your energy elsewhere.",
     quote: "\"The goal of retirement is to live off your assets, not on them.\" - Frank Congilose"
   },
   {

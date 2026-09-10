@@ -191,10 +191,16 @@ export default function AuthActionHandler() {
         throw new Error(data.error || 'Unable to send reset email. Please try again later.');
       }
       setNewLinkInfo(
-        `If an account exists for ${newLinkEmail}, a new reset link is on its way. Check your inbox (and your spam folder).`
+        `A password reset link is on its way to ${newLinkEmail}. Check your inbox and your spam folder.`
       );
     } catch (err: any) {
-      setNewLinkError(err?.message || 'Unable to send reset email. Please try again later.');
+      // A fetch that never reached the server rejects with a TypeError whose
+      // message is written for developers ("Failed to fetch").
+      setNewLinkError(
+        err instanceof TypeError
+          ? 'Could not reach the server. Check your connection and try again.'
+          : (err?.message || 'Unable to send reset email. Please try again later.')
+      );
     } finally {
       setSendingNewLink(false);
     }
