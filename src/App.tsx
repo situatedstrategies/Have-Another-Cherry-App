@@ -1,9 +1,9 @@
-import { getFullMembers, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
+import { getFullMembers, joinedUids, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
 import { claimSeats } from './lib/seatClaims';
 import { computeMismatchForSettlement } from './lib/mismatch';
 import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
 import { mergeExpense } from './lib/merge';
-import { advanceIntervalStr, parseLocalDate } from './lib/recurring';
+import { advanceIntervalStr, parseLocalDate, todayLocal } from './lib/recurring';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -59,16 +59,9 @@ function getGreetingKey(memberCount: number): string {
   return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
 }
 
-// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
-const todayLocal = () => {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().split('T')[0];
-};
-
 // Consistent, branded loading screen - same background as every other screen so
 // switching between them never flashes white or a stale page.
-function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
+function LoadingScreen({ label = 'Loading...' }: { label?: string }) {
   return (
     <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center animate-in fade-in duration-300">
       <RefreshCcw className="h-8 w-8 text-natural-primary animate-spin mb-3" />
@@ -91,6 +84,10 @@ export default function App() {
   const groupIds: string[] = Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
     ? userProfile.groupIds
     : (userProfile?.groupId ? [userProfile.groupId] : []);
+  // Latest membership for listeners that must not re-subscribe on every
+  // profile change (the group snapshot below).
+  const groupIdsRef = useRef<string[]>([]);
+  groupIdsRef.current = groupIds;
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,6 +120,8 @@ export default function App() {
   const [thresholdInput, setThresholdInput] = useState('');
   const [venmoInput, setVenmoInput] = useState('');
   const [zelleInput, setZelleInput] = useState('');
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [savingHandles, setSavingHandles] = useState(false);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -248,10 +247,34 @@ export default function App() {
   // 2b. Listen to the active Group
   useEffect(() => {
     if (!currentUser || !activeGroupId) return;
-    const groupUnsubscribe = onSnapshot(doc(db, 'groups', activeGroupId), (groupSnapshot) => {
+    const gid = activeGroupId;
+    const groupUnsubscribe = onSnapshot(doc(db, 'groups', gid), (groupSnapshot) => {
+      // Read before exists(): that guard narrows the snapshot type to never.
+      const fromCache = groupSnapshot.metadata.fromCache;
       if (groupSnapshot.exists()) {
         setGroup(groupSnapshot.data() as Group);
+        return;
       }
+      // A miss served from cache only means the document is not cached (the
+      // memory cache is empty on a cold start, and Firestore raises the first
+      // event from cache while offline). The server has not said the group is
+      // gone, so wait for a synced snapshot. Treating it as deleted here
+      // scrubbed a real group from the profile on every offline launch.
+      if (fromCache) return;
+      // The group is gone (its last member left and it was deleted, or the
+      // id on the profile is stale). The leave path also deletes the doc and
+      // this fires once more with the same writes, which is harmless. Left alone, the profile still points at
+      // it and the app sits on "Loading your group" forever. Drop it locally
+      // so GroupSetup renders, and scrub it from the user doc best effort.
+      const remaining = groupIdsRef.current.filter(id => id !== gid);
+      const nextActive = remaining[0] || null;
+      setGroup(null);
+      setUserProfile((prev: any) => (prev ? { ...prev, groupIds: remaining, activeGroupId: nextActive, groupId: nextActive } : prev));
+      updateDoc(doc(db, 'users', currentUser.uid), {
+        groupIds: arrayRemove(gid),
+        activeGroupId: nextActive ?? deleteField(),
+        groupId: nextActive ?? deleteField(),
+      }).catch(() => {});
     }, (error) => {
       // Sign-out cancels live listeners with permission-denied before the
       // effect cleanup runs. That is teardown noise, not a rules problem.
@@ -666,7 +689,7 @@ export default function App() {
   }
 
   if (isLoading) {
-    return <LoadingScreen label="Loading your ledger…" />;
+    return <LoadingScreen label="Loading your ledger..." />;
   }
 
   if (userProfile && !userProfile.financialProfile) {
@@ -680,7 +703,7 @@ export default function App() {
   // The user belongs to a group but its data hasn't arrived yet - show a loading
   // screen, NOT the create/join screen, so we never flash the wrong page.
   if (activeGroupId && !group) {
-    return <LoadingScreen label="Loading your group…" />;
+    return <LoadingScreen label="Loading your group..." />;
   }
 
   if (!activeGroupId) {
@@ -774,9 +797,12 @@ export default function App() {
       timestamp: new Date().toISOString()
     };
     const updatedExp = { ...expense, comments: [...(expense.comments || []), newComment] };
-    await syncExpenseUpdate(updatedExp);
-      
-      
+    try {
+      await syncExpenseUpdate(updatedExp);
+    } catch (e: any) {
+      console.error('Comment sync failed', e);
+      setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Expense comment', detail: String(e?.message || e) });
+    }
   };
 
   const handleExportData = () => {
@@ -969,9 +995,15 @@ export default function App() {
     if (!activeGroupId) return;
     const remaining = groupIds.filter(id => id !== activeGroupId);
     const nextActive = remaining[0] || null;
-    const message = nextActive
-      ? "Leave this group? You'll be removed from its member list and switched to another of your groups. Your account and your other groups stay intact."
-      : "Leave this group? You'll be removed from the member list and returned to the group setup screen. Your account stays active and you can create or join another group.";
+    // The last joined member out deletes the group (removeSelfFromGroupById),
+    // and with it the shared ledger, so the confirmation has to say so.
+    const lastOne = !!group && joinedUids(group).length <= 1;
+    const afterwards = nextActive
+      ? "You'll be switched to another of your groups. Your account and your other groups stay intact."
+      : "You'll be returned to the group setup screen. Your account stays active and you can create or join another group.";
+    const message = lastOne
+      ? `Leave this group? You're the only member, so leaving deletes the group and its ledger for good. ${afterwards}`
+      : `Leave this group? You'll be removed from its member list. ${afterwards}`;
     if (!window.confirm(message)) return;
     try {
       await removeSelfFromGroupById(activeGroupId);
@@ -1420,7 +1452,7 @@ export default function App() {
       instrumentType: instrumentType,
       label: label,
       timestamp: new Date().toISOString(),
-      paymentDate: paymentDate || new Date().toISOString().split('T')[0],
+      paymentDate: paymentDate || todayLocal(),
       status: isCreditor ? 'confirmed' : 'pending',
       mismatchType: computeMismatchForSettlement(expense, instrumentType)
     };
@@ -1434,8 +1466,10 @@ export default function App() {
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       setShowSettleModal(false);
-      addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
       await syncExpenseUpdate(updatedExp);
+      // Toast only once the write has gone through: a "logged" message over
+      // a failed save is how a payment gets sent twice.
+      addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
       notifyLedgerEvent('payment_logged');
 
       // Write mismatch to protected collection
@@ -1452,8 +1486,9 @@ export default function App() {
           timestamp: newSettlement.timestamp
         }).catch(e => console.error("Data write failed", e));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Settle up', detail: String(e?.message || e) });
     }
   };
 
@@ -1468,8 +1503,13 @@ export default function App() {
 
     const updatedExp: Expense = { ...expense, settlements };
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
-    await syncExpenseUpdate(updatedExp);
-    addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+    try {
+      await syncExpenseUpdate(updatedExp);
+      addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+    } catch (e: any) {
+      console.error('Confirm receipt failed', e);
+      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Confirm receipt', detail: String(e?.message || e) });
+    }
   };
 
   // Remove a payment entry that was logged in error (e.g. the same real-world
@@ -1492,8 +1532,13 @@ export default function App() {
 
     const updatedExp: Expense = { ...expense, settlements };
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
-    await syncExpenseUpdate(updatedExp);
-    addToast('Payment Removed', 'The payment entry was removed and the balance updated.', 'success');
+    try {
+      await syncExpenseUpdate(updatedExp);
+      addToast('Payment Removed', 'The payment entry was removed and the balance updated.', 'success');
+    } catch (e: any) {
+      console.error('Void settlement failed', e);
+      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Remove payment entry', detail: String(e?.message || e) });
+    }
   };
 
   // Let the user set/change their display name regardless of how they signed in.
@@ -1542,7 +1587,9 @@ export default function App() {
   // Spending threshold: the most this user wants to owe on a single shared
   // expense. Synced to their profile so other members' forms can warn early.
   const handleSaveThreshold = async () => {
+    if (savingThreshold) return;
     const val = Math.max(0, Number(thresholdInput) || 0);
+    setSavingThreshold(true);
     try {
       await updateDoc(doc(db, 'users', activeUser), { recurringThreshold: val });
       setUserProfile((prev: any) => ({ ...(prev || {}), recurringThreshold: val }));
@@ -1550,6 +1597,8 @@ export default function App() {
     } catch (e) {
       console.error('Failed to save threshold', e);
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - spending threshold' });
+    } finally {
+      setSavingThreshold(false);
     }
   };
 
@@ -1558,10 +1607,12 @@ export default function App() {
   // plaintext copy is deleted on save. Handles never enter cloud backups
   // either: backups contain only the expense ledger.
   const handleSavePaymentHandles = async () => {
+    if (savingHandles) return;
     const handles = {
       venmo: venmoInput.trim().replace(/^@/, ''),
       zelle: zelleInput.trim(),
     };
+    setSavingHandles(true);
     try {
       const enc = await encryptData(handles, activeUser);
       await updateDoc(doc(db, 'users', activeUser), {
@@ -1574,6 +1625,8 @@ export default function App() {
     } catch (e) {
       console.error('Failed to save payment handles', e);
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - payment handles' });
+    } finally {
+      setSavingHandles(false);
     }
   };
 
@@ -1584,16 +1637,24 @@ export default function App() {
     } catch (e) { console.error('Failed to reset profile', e); }
   };
 
-  const handleResendInvite = async (memberName: string) => {
-    const email = window.prompt(`Enter email address to send invite to ${memberName}:`);
-    if (!email || !group) return;
+  // Email the invite code to someone holding a pending seat. The address
+  // comes from an inline field in Settings (the seat form or the roster row).
+  const handleResendInvite = async (memberName: string, email: string) => {
+    const to = email.trim();
+    if (!to || !group) return;
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-        body: JSON.stringify({ email, groupName: group.name, inviteCode: group.inviteCode }),
+        body: JSON.stringify({
+          email: to,
+          groupName: group.name,
+          inviteCode: group.inviteCode,
+          recipientName: memberName,
+          fromName: (userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name) ? userProfile.name : currentUser?.displayName) || undefined,
+        }),
       });
-      if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${email}`, 'success');
+      if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${to}.`, 'success');
       else setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
     } catch {
       setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
@@ -1602,8 +1663,9 @@ export default function App() {
 
   // Grow the group by one pending seat. Written as a whole-field update rather
   // than dotted paths because every share changes at once, and read back
-  // through the group snapshot listener.
-  const handleAddSeat = async (name: string, percent: number) => {
+  // through the group snapshot listener. With an email, the invite goes out
+  // right after the seat is written.
+  const handleAddSeat = async (name: string, percent: number, email?: string) => {
     if (!group) return;
     const next = withAddedSeat(group, name, percent);
     await updateDoc(doc(db, 'groups', group.id), {
@@ -1613,8 +1675,7 @@ export default function App() {
       addedSeats: next.addedSeats,
     });
     addToast('Seat Added', `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`, 'success');
-    // Offer to email the invite right away; cancelling the prompt is fine.
-    await handleResendInvite(name.trim());
+    if (email?.trim()) await handleResendInvite(name.trim(), email);
   };
 
   const handleRemoveSeat = async (index: number) => {
@@ -1643,7 +1704,7 @@ export default function App() {
     const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
     const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
     if (inc1 <= 0 || inc2 <= 0) {
-      addToast('Cannot Recalculate', 'Both users need valid numerical incomes to calculate.', 'error');
+      addToast('Cannot Recalculate', 'Everyone needs an income on their profile before the split can be recalculated.', 'error');
       return;
     }
     const total = inc1 + inc2;
@@ -1694,7 +1755,7 @@ export default function App() {
                 <h3 className="text-sm font-bold text-natural-text">Conversation Starter: Financial Alignment</h3>
                 <p className="text-sm text-natural-muted mt-1">
                   It looks like there's a discrepancy between what you reported as your income and what someone else in the group estimated (or vice versa).
-                  Money conversations can be tough, but clarity is the first step to fairness!
+                  Money conversations can be tough, but clarity is the first step to fairness.
                 </p>
                 <button
                   onClick={() => setShowAlignmentModal(true)}
@@ -1887,7 +1948,7 @@ export default function App() {
                 <div className="mt-2 space-y-0.5">
                   {missingProfiles.map(id => (
                     <div key={id} className="text-xs font-medium text-natural-primary">
-                      {groupUsers[id]?.name || 'A member'} hasn't completed setup yet.
+                      {groupUsers[id]?.name || 'Someone'} hasn't completed setup yet.
                     </div>
                   ))}
                 </div>
@@ -1896,6 +1957,7 @@ export default function App() {
                 onClick={() => setDismissedWaiting(true)}
                 className="text-natural-primary hover:text-natural-dark bg-white/60 p-1 rounded-full border border-natural-primary/25 shrink-0"
                 title="Dismiss"
+                aria-label="Dismiss"
               >
                 <X size={14} />
               </button>
@@ -2043,21 +2105,30 @@ export default function App() {
                     Spending threshold
                     {!isPlus && <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
                   </label>
-                  <p className="text-xs text-natural-muted mb-2">The most you want to owe on a single shared expense. Both sides get a heads-up when a split goes over it.</p>
+                  <p className="text-xs text-natural-muted mb-2">The most you want to owe on a single shared expense. Everyone on the expense gets a heads-up when a split goes over it.</p>
                   {isPlus ? (
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={thresholdInput}
-                          onChange={(e) => setThresholdInput(e.target.value)}
-                          placeholder="e.g. 60 (0 = off)"
-                          className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-                        />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={thresholdInput}
+                            onChange={(e) => setThresholdInput(e.target.value)}
+                            placeholder="Amount"
+                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                          />
+                        </div>
+                        <button
+                          onClick={handleSaveThreshold}
+                          disabled={savingThreshold}
+                          className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg shrink-0 disabled:opacity-60"
+                        >
+                          {savingThreshold ? 'Saving...' : 'Save'}
+                        </button>
                       </div>
-                      <button onClick={handleSaveThreshold} className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg shrink-0">Save</button>
+                      <p className="text-xs text-natural-muted mt-1.5">0 turns it off.</p>
                     </div>
                   ) : (
                     <button
@@ -2090,7 +2161,13 @@ export default function App() {
                       placeholder="Zelle email or phone"
                       className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                     />
-                    <button onClick={handleSavePaymentHandles} className="w-full text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg">Save Payment Info</button>
+                    <button
+                      onClick={handleSavePaymentHandles}
+                      disabled={savingHandles}
+                      className="w-full text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg disabled:opacity-60"
+                    >
+                      {savingHandles ? 'Saving...' : 'Save Payment Info'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2166,6 +2243,7 @@ export default function App() {
           activeUser={activeUser}
           expenses={expenses}
           memberNames={Object.fromEntries(getFullMembers(group).map(m => [m.uid, m.name]))}
+          categories={group.categories}
           onClose={() => setShowVault(false)}
         />
       )}

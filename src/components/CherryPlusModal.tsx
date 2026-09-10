@@ -167,7 +167,7 @@ export default function CherryPlusModal({
             </p>
           </div>
         ) : plans === null ? (
-          <p className="text-sm text-natural-muted">Loading plans…</p>
+          <p className="text-sm text-natural-muted">Loading plans...</p>
         ) : (
           <>
             <div>

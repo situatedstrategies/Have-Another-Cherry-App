@@ -17,13 +17,15 @@ import {
 const TERMS_VERSION = '2026-09-02';
 
 const NO_ACCOUNT_MESSAGE = 'We could not find an account for that email. Check the spelling, or create one.';
+const OTHER_PROVIDER_MESSAGE = 'This email signs in with Google or Apple. Use that button instead.';
+const OFFLINE_MESSAGE = 'Could not reach the server. Check your connection and try again.';
 
 // Firebase folds an unknown address and a wrong password into one error on
 // purpose. The product decision (10 September 2026) is to tell people which
 // it was, so a failed sign-in asks the server whether the address has an
-// account at all. Null means the check itself failed, and the generic message
-// stands.
-async function accountExists(email: string): Promise<boolean | null> {
+// account at all, and which sign-in methods it has. Null means the check
+// itself failed, and the generic message stands.
+async function accountLookup(email: string): Promise<{ exists: boolean; providers: string[] } | null> {
   try {
     const res = await fetch('/api/account-lookup', {
       method: 'POST',
@@ -32,7 +34,11 @@ async function accountExists(email: string): Promise<boolean | null> {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return typeof data.exists === 'boolean' ? data.exists : null;
+    if (typeof data.exists !== 'boolean') return null;
+    return {
+      exists: data.exists,
+      providers: Array.isArray(data.providers) ? data.providers.filter((p: unknown) => typeof p === 'string') : [],
+    };
   } catch {
     return null;
   }
@@ -194,11 +200,6 @@ export default function AuthScreen() {
   const passwordChecks = checkPassword(password);
   const passwordValid = isPasswordValid(password);
 
-  
-  // Mobile integration placeholders
-  // const handleAppleAuth = async () => { ... }
-  // const handleGoogleAuthMobile = async () => { ... }
-
   // One popup/redirect dance shared by every federated provider (Google,
   // Apple), so their behavior can never drift apart.
   const handleProviderAuth = async (
@@ -211,15 +212,17 @@ export default function AuthScreen() {
       return;
     }
     setError('');
-    // Store and apply the "keep me signed in" choice before anything happens,
-    // especially before the redirect flow navigates away from the app.
-    await applyKeepSignedIn(keepSignedIn);
     // Mobile browsers (and home-screen installs) handle popups poorly or not at
     // all; the full-page redirect flow is the reliable path there. The popup
     // stays for desktop, where redirect would lose in-page state unnecessarily.
     const preferRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     try {
       setBusy(true);
+      // Store and apply the "keep me signed in" choice before anything
+      // happens, especially before the redirect flow navigates away from the
+      // app. Inside the try so a persistence failure (private browsing, a
+      // browser that blocks storage) reports instead of wedging the button.
+      await applyKeepSignedIn(keepSignedIn);
       if (preferRedirect) {
         // Navigates away from the app; the watchdog only matters if the
         // pre-redirect handshake stalls, so the button can't stick forever.
@@ -285,7 +288,9 @@ export default function AuthScreen() {
       }
       setInfo(`A password reset link is on its way to ${email}. Check your inbox and your spam folder.`);
     } catch (err: any) {
-      setError(err.message || 'Unable to send reset email. Please try again later.');
+      // A fetch that never reached the server rejects with a TypeError whose
+      // message is written for developers ("Failed to fetch").
+      setError(err instanceof TypeError ? OFFLINE_MESSAGE : (err?.message || 'Unable to send reset email. Please try again later.'));
     } finally {
       setEmailLoading(false);
     }
@@ -355,8 +360,16 @@ export default function AuthScreen() {
       }
     } catch (err: any) {
       let message = friendlyAuthError(err);
-      if (isLogin && isCredentialMismatch(err?.code) && (await accountExists(email)) === false) {
-        message = NO_ACCOUNT_MESSAGE;
+      if (isLogin && isCredentialMismatch(err?.code)) {
+        const account = await accountLookup(email);
+        if (account && !account.exists) {
+          message = NO_ACCOUNT_MESSAGE;
+        } else if (account && account.exists && !account.providers.includes('password')) {
+          // The address is real but was created through Google or Apple, so
+          // there is no password to match: "doesn't match" would send them
+          // off to reset a password they never had.
+          message = OTHER_PROVIDER_MESSAGE;
+        }
       }
       setError(message);
       setEmailLoading(false);
@@ -454,7 +467,7 @@ export default function AuthScreen() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
-                    placeholder="Your Name"
+                    placeholder="Name"
                   />
                 </div>
               </div>

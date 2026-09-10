@@ -23,17 +23,19 @@ interface SettingsModalProps {
   /** Newsletters and offers. Off by default; this switch is the only place it is asked. */
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
-  onRecalculateSplit: () => void;
-  onResendInvite: (memberName: string) => void;
-  /** Add a pending seat (name + percentage); everyone else is rescaled. */
-  onAddSeat: (name: string, percent: number) => Promise<void>;
+  onRecalculateSplit: () => Promise<void> | void;
+  /** Email the invite code to the person holding a pending seat. */
+  onResendInvite: (memberName: string, email: string) => Promise<void> | void;
+  /** Add a pending seat (name + percentage); everyone else is rescaled. With
+   *  an email, the invite is sent right away. */
+  onAddSeat: (name: string, percent: number, email?: string) => Promise<void>;
   /** Remove the pending seat at this index in availableSplits. */
   onRemoveSeat: (index: number) => Promise<void>;
   onLeaveGroup: () => void;
   onOpenBackup: () => void;
   onOpenPrivacy: () => void;
   onSignOut: () => void;
-  /** Optional extra block (thresholds, payment handles, …) rendered up top. */
+  /** Optional extra block (thresholds, payment handles, and so on) rendered up top. */
   extraSection?: React.ReactNode;
 }
 
@@ -61,17 +63,57 @@ export default function SettingsModal({
   const [addingSeat, setAddingSeat] = useState(false);
   const [seatName, setSeatName] = useState('');
   const [seatPercent, setSeatPercent] = useState('');
+  const [seatEmail, setSeatEmail] = useState('');
   const [seatBusy, setSeatBusy] = useState(false);
   const [seatError, setSeatError] = useState('');
   const [removingSeat, setRemovingSeat] = useState<number | null>(null);
   const seatBlocker = seatAddBlocker(group);
   const growthLeft = MAX_ADDED_SEATS - Math.max(0, Number(group?.addedSeats) || 0);
 
+  // Re-sending an invite for a pending seat: an inline email field on the
+  // roster row rather than a browser prompt.
+  const [resendFor, setResendFor] = useState<string | null>(null);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendBusy, setResendBusy] = useState(false);
+
+  // Copy feedback for the invite code button.
+  const [copied, setCopied] = useState(false);
+  const copyInviteCode = () => {
+    navigator.clipboard.writeText(group?.inviteCode || '')
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  };
+
+  const [recalcBusy, setRecalcBusy] = useState(false);
+  const recalculate = async () => {
+    if (recalcBusy) return;
+    setRecalcBusy(true);
+    try { await onRecalculateSplit(); } finally { setRecalcBusy(false); }
+  };
+
   const openSeatForm = () => {
     setSeatName('');
     setSeatPercent(String(suggestedSeatPercent(group)));
+    setSeatEmail('');
     setSeatError('');
     setAddingSeat(true);
+  };
+
+  const submitResend = async (e: React.FormEvent, memberName: string) => {
+    e.preventDefault();
+    const email = resendEmail.trim();
+    if (!email || resendBusy) return;
+    setResendBusy(true);
+    try {
+      await onResendInvite(memberName, email);
+      setResendFor(null);
+      setResendEmail('');
+    } finally {
+      setResendBusy(false);
+    }
   };
 
   let seatPreview: { name: string; pct: number }[] | null = null;
@@ -102,7 +144,7 @@ export default function SettingsModal({
     }
     setSeatBusy(true);
     try {
-      await onAddSeat(seatName, parseFloat(seatPercent));
+      await onAddSeat(seatName, parseFloat(seatPercent), seatEmail.trim() || undefined);
       setAddingSeat(false);
     } catch (err: any) {
       setSeatError(err?.message || 'Could not add that person. Please try again.');
@@ -145,7 +187,6 @@ export default function SettingsModal({
   const hasRealName = userProfile?.name && !RESERVED_NAMES.includes(userProfile.name);
   const displayName = hasRealName ? userProfile.name : (currentUser?.displayName || 'Add your name');
   const fp = userProfile?.financialProfile;
-  const multiPerson = (group?.targetNumPeople || 0) > 2;
 
   const saveName = () => {
     onSaveName(nameInput.trim());
@@ -244,8 +285,8 @@ export default function SettingsModal({
                   placeholder="Your name"
                   className="w-36 px-2 py-1 text-sm text-right border border-natural-border focus:border-natural-primary rounded-md outline-none"
                 />
-                <button onClick={saveName} className="text-natural-primary hover:text-natural-dark p-1" title="Save"><Check size={16} /></button>
-                <button onClick={() => setEditingName(false)} className="text-natural-muted hover:text-natural-text p-1" title="Cancel"><X size={16} /></button>
+                <button onClick={saveName} className="text-natural-primary hover:text-natural-dark p-1" title="Save" aria-label="Save name"><Check size={16} /></button>
+                <button onClick={() => setEditingName(false)} className="text-natural-muted hover:text-natural-text p-1" title="Cancel" aria-label="Cancel editing name"><X size={16} /></button>
               </div>
             ) : (
               <button
@@ -303,42 +344,71 @@ export default function SettingsModal({
               {group && Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
                 const isGhost = uid.startsWith('ghost_');
                 const memberName = isGhost
-                  ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name || 'Unknown'
-                  : groupUsers[uid]?.name || 'Unknown';
+                  ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name || 'Someone'
+                  : groupUsers[uid]?.name || 'Someone';
                 return (
-                  <div key={uid} className="flex justify-between items-center text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0">
-                    <div>
-                      <span className="text-natural-text font-semibold">{memberName}</span>
-                      <span className="ml-2 text-xs font-mono text-natural-muted">{Number(pct)}% split</span>
+                  <div key={uid} className="text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-natural-text font-semibold">{memberName}</span>
+                        <span className="ml-2 text-xs font-mono text-natural-muted">{Number(pct)}% split</span>
+                      </div>
+                      <div>
+                        {!isGhost ? (
+                          <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">Joined</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">Pending</span>
+                            <button
+                              onClick={() => { setResendFor(resendFor === uid ? null : uid); setResendEmail(''); }}
+                              className="text-xs uppercase font-bold text-natural-primary hover:underline"
+                            >
+                              {resendFor === uid ? 'Cancel' : 'Resend Invite'}
+                            </button>
+                            <button
+                              onClick={() => removeSeat(Number(uid.slice('ghost_'.length)))}
+                              disabled={removingSeat !== null}
+                              className="text-xs uppercase font-bold text-natural-muted hover:text-natural-primary hover:underline disabled:opacity-50"
+                              title="Remove this pending seat and give its share back to everyone else"
+                            >
+                              {removingSeat === Number(uid.slice('ghost_'.length)) ? 'Removing...' : 'Remove'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      {!isGhost ? (
-                        <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">Joined</span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">Pending</span>
-                          <button onClick={() => onResendInvite(memberName)} className="text-xs uppercase font-bold text-natural-primary hover:underline">Resend Invite</button>
-                          <button
-                            onClick={() => removeSeat(Number(uid.slice('ghost_'.length)))}
-                            disabled={removingSeat !== null}
-                            className="text-xs uppercase font-bold text-natural-muted hover:text-natural-primary hover:underline disabled:opacity-50"
-                            title="Remove this pending seat and give its share back to everyone else"
-                          >
-                            {removingSeat === Number(uid.slice('ghost_'.length)) ? 'Removing...' : 'Remove'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {isGhost && resendFor === uid && (
+                      <form onSubmit={(e) => submitResend(e, memberName)} className="mt-2 flex gap-2">
+                        <input
+                          type="email"
+                          required
+                          autoFocus
+                          value={resendEmail}
+                          onChange={e => setResendEmail(e.target.value)}
+                          placeholder="Email"
+                          aria-label={`Email address for ${memberName}`}
+                          className="flex-1 px-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={resendBusy || !resendEmail.trim()}
+                          className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
+                        >
+                          {resendBusy ? 'Sending...' : 'Send'}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 );
               })}
             </div>
             {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && (
               <button
-                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
-                onClick={onRecalculateSplit}
+                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
+                onClick={recalculate}
+                disabled={recalcBusy}
               >
-                Recalculate Using Reported Incomes
+                {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
               </button>
             )}
 
@@ -385,6 +455,17 @@ export default function SettingsModal({
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">%</span>
                   </div>
                 </div>
+                <div>
+                  <input
+                    type="email"
+                    value={seatEmail}
+                    onChange={e => setSeatEmail(e.target.value)}
+                    placeholder="Email"
+                    aria-label="Their email address (optional)"
+                    className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
+                  />
+                  <p className="text-xs text-natural-muted mt-1">Optional. With an email, the invite goes out as soon as the seat is added.</p>
+                </div>
                 {seatPreview && (
                   <div className="text-xs text-natural-muted space-y-1">
                     <p className="font-bold uppercase tracking-wider text-[10px]">New split</p>
@@ -410,7 +491,7 @@ export default function SettingsModal({
                     disabled={seatBusy}
                     className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg disabled:opacity-60"
                   >
-                    {seatBusy ? 'Adding...' : 'Add & Invite'}
+                    {seatBusy ? 'Adding...' : (seatEmail.trim() ? 'Add & Invite' : 'Add')}
                   </button>
                 </div>
               </form>
@@ -418,19 +499,21 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <span className="text-sm text-natural-muted block mb-2">Invite Code{multiPerson ? 's' : ''}</span>
+            <span className="text-sm text-natural-muted block mb-2">Invite Code</span>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
                 {group?.inviteCode}
               </div>
               <button
-                onClick={() => navigator.clipboard.writeText(group?.inviteCode || '')}
+                onClick={copyInviteCode}
                 className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
-                title="Copy to clipboard"
+                title={copied ? 'Copied' : 'Copy to clipboard'}
+                aria-label={copied ? 'Invite code copied' : 'Copy invite code'}
               >
-                <Copy size={18} />
+                {copied ? <Check size={18} className="text-natural-primary" /> : <Copy size={18} />}
               </button>
             </div>
+            {copied && <p className="text-xs text-natural-primary font-medium mt-1.5 text-right">Copied</p>}
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">

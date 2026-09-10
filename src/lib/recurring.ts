@@ -52,6 +52,10 @@ export const parseLocalDate = (s: string): Date =>
 export const toLocalIso = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/** Today as a local YYYY-MM-DD. `toISOString()` gives the UTC date, which
+ *  is tomorrow's or yesterday's date for part of every day outside UTC. */
+export const todayLocal = (): string => toLocalIso(new Date());
+
 /** The last day the month containing [d] actually has. */
 const lastDayOf = (year: number, monthIndex: number): number =>
   new Date(year, monthIndex + 1, 0).getDate();

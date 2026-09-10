@@ -70,8 +70,15 @@ export default function ExpenseDetail({
 
   const members = useMemo(() => getFullMembers(group), [group]);
   const payerMember = members.find(m => m.uid === expense.paidBy);
-  const payerName = payerMember?.name || 'Unknown';
+  const payerName = payerMember?.name || 'Someone';
   const isPayerActive = expense.paidBy === activeUser;
+  // A nudge is a push to a real account. A pending seat (ghost_N) has no
+  // device to reach, so the button only shows when someone who has actually
+  // joined still owes on this expense.
+  const joinedIds = group.memberIds || [];
+  const hasRemindableDebtor = Object.keys(expense.shares || {}).some(uid =>
+    uid !== expense.paidBy && joinedIds.includes(uid) && getRemainingSettlementAmount(expense, uid, false) > 0.01
+  );
   
   const myShare = expense.shares?.[activeUser] || 0;
   const isDark = isDarkCherry(expense);
@@ -235,7 +242,7 @@ export default function ExpenseDetail({
                 return (
                   <div key={uid} className={`p-3 rounded-xl border ${isMe ? 'bg-natural-sidebar border-natural-border shadow-sm' : 'bg-transparent border-natural-border/50'}`}>
                     <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">
-                      {isMe ? 'My Share' : (m?.name || 'Unknown')}
+                      {isMe ? 'My Share' : (m?.name || 'Someone')}
                     </span>
                     <span className={`text-lg font-semibold font-display mt-1 block ${isMe ? 'text-natural-primary' : 'text-natural-text'}`}>
                       ${shareAmt.toFixed(2)}
@@ -290,7 +297,7 @@ export default function ExpenseDetail({
                 const isVoided = s.status === 'voided';
                 // Either party to the payment can remove an entry logged in error.
                 const canVoid = !isVoided && (activeUser === s.paidBy || activeUser === s.receivedBy);
-                const voidedByName = s.voidedBy ? (members.find(m => m.uid === s.voidedBy)?.name || 'a member') : null;
+                const voidedByName = s.voidedBy ? (members.find(m => m.uid === s.voidedBy)?.name || 'someone') : null;
                 return (
                 <div key={s.id} className="relative">
                   <div className={`absolute -left-[27px] top-0 bg-white border-2 ${isVoided ? 'border-natural-border/50 text-natural-muted' : s.status === 'confirmed' ? 'border-natural-primary text-natural-primary' : 'border-natural-border/50 text-natural-text'} p-1 rounded-full flex items-center justify-center`}>
@@ -377,12 +384,14 @@ export default function ExpenseDetail({
                 type="text"
                 value={commentText}
                 onChange={e => setCommentText(e.target.value)}
-                placeholder="Add a comment..."
+                placeholder="Comment"
+                aria-label="Add a comment"
                 className="w-full text-xs px-3.5 py-2.5 bg-natural-sidebar/50 border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary pr-10"
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={!commentText.trim()}
+                aria-label="Send comment"
                 className="absolute right-2 text-natural-primary hover:text-natural-dark disabled:opacity-50 disabled:cursor-not-allowed p-1 cursor-pointer"
               >
                 <Send className="w-4 h-4" />
@@ -398,7 +407,7 @@ export default function ExpenseDetail({
                     </div>
                     <div className="bg-natural-sidebar/30 p-3 rounded-xl rounded-tl-none border border-natural-border/50 flex-1">
                       <div className="flex justify-between items-baseline mb-1">
-                        <span className="text-xs font-bold text-natural-text capitalize">{members.find(m => m.uid === c.userId)?.name || 'Unknown'}</span>
+                        <span className="text-xs font-bold text-natural-text capitalize">{members.find(m => m.uid === c.userId)?.name || 'Someone'}</span>
                         <span className="text-xs text-natural-muted">{formatDateTime(c.timestamp)}</span>
                       </div>
                       <p className="text-xs text-natural-text">{c.text}</p>
@@ -503,7 +512,7 @@ export default function ExpenseDetail({
             
             {!isExpenseFullySettled(expense) && isCreditorActive && (
               <>
-                {onGentleRemind && (
+                {onGentleRemind && hasRemindableDebtor && (
                   <button
                     onClick={async () => {
                       if (nudging) return;

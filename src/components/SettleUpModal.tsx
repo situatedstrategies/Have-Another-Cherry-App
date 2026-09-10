@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { todayLocal } from '../lib/recurring';
 import { Expense, Group, PaymentInstrument } from '../types';
 import { Check, Cherry, ExternalLink, Copy } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
@@ -15,13 +16,6 @@ interface SettleUpModalProps {
   onClose: () => void;
   onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
 }
-
-// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
-const todayLocal = () => {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().split('T')[0];
-};
 
 export default function SettleUpModal({ expense, group, activeUser, paymentHandlesByUid, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
@@ -150,7 +144,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                   className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-natural-text text-sm font-semibold outline-none"
                 >
                   {debtors.map(uid => (
-                    <option key={uid} value={uid}>{members.find(m => m.uid === uid)?.name || 'Unknown'}</option>
+                    <option key={uid} value={uid}>{members.find(m => m.uid === uid)?.name || 'Someone'}</option>
                   ))}
                 </select>
                 {/* Logging a payment the debtor already logged creates a duplicate,
@@ -165,7 +159,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
               <div className="flex justify-between items-center pt-2 border-t border-natural-border/60">
                 <span className="text-xs text-natural-muted font-medium">Paying To:</span>
                 <span className="text-xs font-bold text-natural-text bg-natural-sidebar px-2 py-0.5 rounded-lg capitalize tracking-wider">
-                  {members.find(m => m.uid === expense.paidBy)?.name || 'Unknown'}
+                  {members.find(m => m.uid === expense.paidBy)?.name || 'Someone'}
                 </span>
               </div>
             )}
@@ -267,7 +261,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                       Their Zelle: <span className="font-bold text-natural-text break-all">{zelle.handle}</span>
                     </p>
                     <button type="button" onClick={copyZelleHandle} className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline">
-                      <Copy size={12} /> {copiedZelle ? 'Copied!' : 'Copy'}
+                      <Copy size={12} /> {copiedZelle ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                 ) : (
@@ -294,7 +288,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Venmo confirmation code..."
+              placeholder="Note"
               className="w-full px-3.5 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all"
             />
           </div>

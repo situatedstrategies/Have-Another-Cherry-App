@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
@@ -48,11 +48,11 @@ const STARTERS: Record<string, string[]> = {
   ],
   careful: [
     "No pressure at all, but I've been considering {item} (~${theirShare} for your share). Is now an okay time, or should we plan for later?",
-    "I'd love to get {item} eventually. Your share would be about ${theirShare} - want to talk through timing so it's comfortable for both of us?",
+    "I'd love to get {item} eventually. Your share would be about ${theirShare} - want to talk through timing so it's comfortable for everyone?",
   ],
   hold: [
     "I've been wanting {item}, but I know things are a bit tight - no rush. Maybe we revisit it next month?",
-    "Thinking ahead to {item} (~${theirShare} each side). Totally fine to wait - want to set a target date together instead?",
+    "Thinking ahead to {item} (~${theirShare} for your part). Totally fine to wait. Want to set a target date instead?",
   ],
 };
 
@@ -63,6 +63,14 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
   const [otherUid, setOtherUid] = useState(others[0]?.uid || '');
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
+
+  // The roster can arrive after the modal opens (a join landing, or the
+  // group snapshot catching up), in which case the initial pick was empty and
+  // the verdict would never appear. Seed it once someone is there.
+  const firstOtherUid = others[0]?.uid || '';
+  useEffect(() => {
+    if (!otherUid && firstOtherUid) setOtherUid(firstOtherUid);
+  }, [otherUid, firstOtherUid]);
 
   const defaultSplit = getFullDefaultSplit(group);
   const theirPct = Math.round(defaultSplit[otherUid] ?? (others.length ? 100 / (others.length + 1) : 50));
@@ -123,7 +131,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-natural-primary" /> Plan a Purchase
           </h2>
-          <button onClick={onClose} className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -141,7 +149,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
               type="text"
               value={item}
               onChange={e => setItem(e.target.value)}
-              placeholder="e.g. a new couch"
+              placeholder="Item"
               className="w-full px-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-xl text-sm outline-none"
             />
           </div>
