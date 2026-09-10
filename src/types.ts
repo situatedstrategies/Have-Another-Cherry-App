@@ -117,7 +117,7 @@ export interface Settlement {
   timestamp: string;        // when the settlement was logged in-app
   paymentDate?: string;     // the actual date the payment was made (user-provided)
   // Status only ever moves forward: pending -> confirmed -> voided. A voided
-  // settlement is a tombstone for an entry logged in error — it stays in the
+  // settlement is a tombstone for an entry logged in error, it stays in the
   // audit trail (so merges can't resurrect it) but no longer counts toward
   // anyone's balance.
   status: 'pending' | 'confirmed' | 'voided';
@@ -182,7 +182,7 @@ export interface Expense {
   comments?: Comment[];
   createdAt: string;
   // Bumped only when the expense *content* (title/amount/shares/split/...)
-  // changes — never by settlements or comments. Merges use it to decide whose
+  // changes, never by settlements or comments. Merges use it to decide whose
   // content fields win, so a device that hasn't seen the latest edit can't
   // revert it when it broadcasts a settlement confirmation.
   editedAt?: string;

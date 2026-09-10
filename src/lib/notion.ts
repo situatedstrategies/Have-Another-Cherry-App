@@ -20,7 +20,7 @@ export type WaitlistLead = {
 
 // Derived from request headers rather than sent by the client: a
 // client-supplied value is trivially spoofed and would mean another field on
-// the form for no benefit. Coarse on purpose — we only want to know whether
+// the form for no benefit. Coarse on purpose, we only want to know whether
 // someone asking for Android is browsing on an iPhone.
 //
 // User-Agent is the primary signal but it is not guaranteed. Chrome's UA

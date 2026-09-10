@@ -20,7 +20,7 @@
 // this module so the entitlement source can change without a hunt.
 
 // The features behind Cherry +. Keep in sync with the store product copy and
-// the feature list on haveanothercherry.com/features.html — the site is the
+// the feature list on haveanothercherry.com/features.html, the site is the
 // stated product, so every Cherry + row there must appear here and be gated.
 export const PLUS_FEATURES = [
   'dark_cherry',
