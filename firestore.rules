@@ -22,7 +22,7 @@ service cloud.firestore {
     }
 
     // Member lists read defensively. Reading `resource.data.memberIds` directly
-    // does not evaluate to false when the field is absent — it raises an
+    // does not evaluate to false when the field is absent, it raises an
     // evaluation error, and an errored rule denies. A group document written
     // before these fields existed, or one whose two member lists have drifted
     // apart, therefore locks its own members out with "Missing or insufficient
@@ -197,7 +197,7 @@ service cloud.firestore {
     // Reminder schedules: the only household data that is deliberately NOT
     // encrypted, because the server has to read it in order to schedule
     // anything at all. It holds a date, an opaque id and which screen to open,
-    // and nothing else — see lib/domain/vault/reminder_index.dart in the
+    // and nothing else, see lib/domain/vault/reminder_index.dart in the
     // mobile repo, whose test fails if a name or an amount ever reaches it.
     //
     // Members only, same as everything else. The scheduled sender runs through

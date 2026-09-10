@@ -1693,7 +1693,7 @@ export default function App() {
               <div>
                 <h3 className="text-sm font-bold text-natural-text">Conversation Starter: Financial Alignment</h3>
                 <p className="text-sm text-natural-muted mt-1">
-                  It looks like there's a discrepancy between what you reported as your income and what your partner estimated (or vice versa).
+                  It looks like there's a discrepancy between what you reported as your income and what someone else in the group estimated (or vice versa).
                   Money conversations can be tough, but clarity is the first step to fairness!
                 </p>
                 <button

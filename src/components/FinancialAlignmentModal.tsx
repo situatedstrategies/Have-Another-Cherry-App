@@ -121,7 +121,7 @@ export default function FinancialAlignmentModal({ members, activeUser, severityP
                       <span className="font-mono font-semibold text-natural-text">{own || 'Not shared'}</span>
                     </div>
                     <div className="flex justify-between text-natural-muted">
-                      <span>Estimated partner's income</span>
+                      <span>Their estimated income</span>
                       <span className="font-mono font-semibold text-natural-text">{estimate || 'No estimate'}</span>
                     </div>
                   </div>
