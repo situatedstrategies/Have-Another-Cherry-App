@@ -305,7 +305,10 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
           // it). Joining at 0% would put the newcomer on every household
           // default expense for nothing, so they take an even share of the
           // roster they are joining and everyone else is scaled down to fit.
-          if (!Number.isFinite(mySplit) || mySplit <= 0) {
+          // The same test the iOS client uses: less than a twentieth of a
+          // point free covers an exact 100, a float sum of thirds at
+          // 99.999, and an over-assigned map alike.
+          if (!Number.isFinite(mySplit) || 100 - currentSplitSum < 0.05) {
             mySplit = Math.round((100 / (joinedCount + 1)) * 10) / 10;
             const scaled = scalePercents(
               joinedUidList.map(uid => Number(currentSplit[uid]) || 0),
