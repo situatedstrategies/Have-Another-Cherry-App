@@ -4,7 +4,7 @@ import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firest
 import { signOut } from 'firebase/auth';
 import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
-import { groupCapacity } from '../lib/members';
+import { groupCapacity, scalePercents } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 
 function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
@@ -179,7 +179,8 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
         // Someone starting alone gets no capacity written: it is a hard cap
         // both clients enforce, and pinning it to one would refuse the very
         // invite code the dashboard keeps showing them. Unset falls back to
-        // the maximum, and a later joiner takes an even cut of what is free.
+        // the maximum. The creator holds 100% until someone joins; the join
+        // flow then gives the newcomer an even share and scales the rest down.
         ...(numPeople > 1 ? { targetNumPeople: numPeople } : {}),
         availableSplits,
         categories: [...DEFAULT_CATEGORIES]
@@ -262,34 +263,56 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
         const capacity = groupCapacity(groupData);
         // Count joined people by unique uid so a stale duplicate can't make a
         // group with a free seat look full.
-        const joinedCount = new Set([
+        const joinedUidList = Array.from(new Set([
           ...existingMemberIds,
-          ...existingMembers.map(m => m?.uid).filter(Boolean),
-        ]).size;
+          ...existingMembers.map(m => m?.uid).filter((uid): uid is string => !!uid),
+        ]));
+        const joinedCount = joinedUidList.length;
         if (joinedCount >= capacity) {
           throw new Error(`This group is already full (${capacity} people). A member can add a seat for you from Settings.`);
         }
 
         // Take the next available split slot, or fall back to the even remainder.
         const newAvailable = [...(groupData.availableSplits || [])];
+        const currentSplit: Record<string, number> = { ...(groupData.defaultSplit || {}) };
         let mySplit = 0;
+        // Set when the joined roster has to shrink to make room; written as
+        // the whole map because every share changes at once.
+        let rescaledSplit: Record<string, number> | null = null;
         if (newAvailable.length > 0) {
           const nextSplit = newAvailable.shift();
           mySplit = typeof nextSplit === 'number' ? nextSplit : (nextSplit?.split || 0);
         } else {
-          const currentSplitSum = Object.values(groupData.defaultSplit || {})
+          const currentSplitSum = Object.values(currentSplit)
             .reduce((a: number, b) => a + (Number(b) || 0), 0);
           const membersLeft = capacity - joinedCount;
           mySplit = membersLeft > 0 ? (100 - currentSplitSum) / membersLeft : 0;
+          // Nothing is free: the joined roster already adds up to 100 (a
+          // group started with "Just me for now" gives its creator all of
+          // it). Joining at 0% would put the newcomer on every household
+          // default expense for nothing, so they take an even share of the
+          // roster they are joining and everyone else is scaled down to fit.
+          if (!Number.isFinite(mySplit) || mySplit <= 0) {
+            mySplit = Math.round((100 / (joinedCount + 1)) * 10) / 10;
+            const scaled = scalePercents(
+              joinedUidList.map(uid => Number(currentSplit[uid]) || 0),
+              100 - mySplit
+            );
+            rescaledSplit = {};
+            joinedUidList.forEach((uid, i) => { rescaledSplit![uid] = scaled[i]; });
+          }
         }
         // A malformed split map must not write NaN into the group document.
         if (!Number.isFinite(mySplit)) mySplit = 0;
+        const myShare = Math.max(0, Math.round(mySplit * 10) / 10);
 
         tx.update(groupRef, {
           members: [...existingMembers, currentUser],
           memberIds: [...existingMemberIds, currentUser.uid],
           availableSplits: newAvailable,
-          [`defaultSplit.${currentUser.uid}`]: Math.max(0, Math.round(mySplit * 10) / 10),
+          ...(rescaledSplit
+            ? { defaultSplit: { ...rescaledSplit, [currentUser.uid]: myShare } }
+            : { [`defaultSplit.${currentUser.uid}`]: myShare }),
         });
         return snap.id;
       });

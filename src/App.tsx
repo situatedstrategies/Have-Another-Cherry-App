@@ -91,6 +91,10 @@ export default function App() {
   const groupIds: string[] = Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
     ? userProfile.groupIds
     : (userProfile?.groupId ? [userProfile.groupId] : []);
+  // Latest membership for listeners that must not re-subscribe on every
+  // profile change (the group snapshot below).
+  const groupIdsRef = useRef<string[]>([]);
+  groupIdsRef.current = groupIds;
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -248,10 +252,25 @@ export default function App() {
   // 2b. Listen to the active Group
   useEffect(() => {
     if (!currentUser || !activeGroupId) return;
-    const groupUnsubscribe = onSnapshot(doc(db, 'groups', activeGroupId), (groupSnapshot) => {
+    const gid = activeGroupId;
+    const groupUnsubscribe = onSnapshot(doc(db, 'groups', gid), (groupSnapshot) => {
       if (groupSnapshot.exists()) {
         setGroup(groupSnapshot.data() as Group);
+        return;
       }
+      // The group is gone (its last member left and it was deleted, or the
+      // id on the profile is stale). Left alone, the profile still points at
+      // it and the app sits on "Loading your group" forever. Drop it locally
+      // so GroupSetup renders, and scrub it from the user doc best effort.
+      const remaining = groupIdsRef.current.filter(id => id !== gid);
+      const nextActive = remaining[0] || null;
+      setGroup(null);
+      setUserProfile((prev: any) => (prev ? { ...prev, groupIds: remaining, activeGroupId: nextActive, groupId: nextActive } : prev));
+      updateDoc(doc(db, 'users', currentUser.uid), {
+        groupIds: arrayRemove(gid),
+        activeGroupId: nextActive ?? deleteField(),
+        groupId: nextActive ?? deleteField(),
+      }).catch(() => {});
     }, (error) => {
       // Sign-out cancels live listeners with permission-denied before the
       // effect cleanup runs. That is teardown noise, not a rules problem.

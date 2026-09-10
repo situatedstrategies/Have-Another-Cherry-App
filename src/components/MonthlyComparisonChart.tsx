@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Expense, User } from '../types';
+import { parseLocalDate } from '../lib/recurring';
 
 interface MonthlyComparisonChartProps {
   expenses: Expense[];
@@ -88,31 +89,38 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
     const prev = prevBuckets.map(b => ({ ...b, spending: 0, lending: 0 }));
 
     expenses.forEach(exp => {
-      const d = new Date(exp.date);
+      // Date-only strings parse as UTC midnight, which lands the 1st of a
+      // month in the previous month anywhere west of Greenwich.
+      const d = parseLocalDate(exp.date);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       const amount = exp.amount || 0;
+      // Unclaimed (nobody has said they paid it yet) still counts as spending,
+      // but nobody lent anything: there is no payer to owe.
+      const claimed = !!exp.paidBy;
       const payerShare = exp.shares?.[exp.paidBy] || 0;
-      const lent = Math.max(0, round2(amount - payerShare)); // what everyone else owes the payer
+      const lent = claimed ? Math.max(0, round2(amount - payerShare)) : 0; // what everyone else owes the payer
 
       if (curMap.has(key)) {
         const b = cur[curMap.get(key)!];
         b.spending += amount;
         b.lending += lent;
-        const payerName = nameOf(exp.paidBy);
-        if (lent > 0) b.lentBy[payerName] = round2((b.lentBy[payerName] || 0) + lent);
-        Object.entries(exp.shares || {}).forEach(([uid, s]) => {
-          if (uid !== exp.paidBy && (s || 0) > 0) {
-            const n = nameOf(uid);
-            b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + (s || 0));
+        if (claimed) {
+          const payerName = nameOf(exp.paidBy);
+          if (lent > 0) b.lentBy[payerName] = round2((b.lentBy[payerName] || 0) + lent);
+          Object.entries(exp.shares || {}).forEach(([uid, s]) => {
+            if (uid !== exp.paidBy && (s || 0) > 0) {
+              const n = nameOf(uid);
+              b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + (s || 0));
+            }
+          });
+          if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
+            const n = exp.thirdPersonName || 'Third person';
+            b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
           }
-        });
-        if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
-          const n = exp.thirdPersonName || 'Third person';
-          b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
+          (exp.extraParticipants || []).forEach(g => {
+            b.borrowedBy[g.name] = round2((b.borrowedBy[g.name] || 0) + g.share);
+          });
         }
-        (exp.extraParticipants || []).forEach(g => {
-          b.borrowedBy[g.name] = round2((b.borrowedBy[g.name] || 0) + g.share);
-        });
       } else if (prevMap.has(key)) {
         const b = prev[prevMap.get(key)!];
         b.spending += amount;
