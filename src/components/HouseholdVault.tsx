@@ -68,8 +68,8 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   const [docName, setDocName] = useState('');
   const [docCategory, setDocCategory] = useState('');
 
-  // Search and category chips carry across the bills and documents tabs, so
-  // a household asking "what do we have on insurance" sees both answers.
+  // Search carries across the bills and documents tabs. The category chips
+  // are per tab and reset on switch, so a chip never filters to nothing.
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const q = search.trim().toLowerCase();

@@ -253,8 +253,15 @@ export default function App() {
         setGroup(groupSnapshot.data() as Group);
         return;
       }
+      // A miss served from cache only means the document is not cached (the
+      // memory cache is empty on a cold start, and Firestore raises the first
+      // event from cache while offline). The server has not said the group is
+      // gone, so wait for a synced snapshot. Treating it as deleted here
+      // scrubbed a real group from the profile on every offline launch.
+      if (groupSnapshot.metadata.fromCache) return;
       // The group is gone (its last member left and it was deleted, or the
-      // id on the profile is stale). Left alone, the profile still points at
+      // id on the profile is stale). The leave path also deletes the doc and
+      // this fires once more with the same writes, which is harmless. Left alone, the profile still points at
       // it and the app sits on "Loading your group" forever. Drop it locally
       // so GroupSetup renders, and scrub it from the user doc best effort.
       const remaining = groupIdsRef.current.filter(id => id !== gid);
@@ -1642,7 +1649,7 @@ export default function App() {
           groupName: group.name,
           inviteCode: group.inviteCode,
           recipientName: memberName,
-          fromName: userProfile?.name || currentUser?.displayName || undefined,
+          fromName: (userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name) ? userProfile.name : currentUser?.displayName) || undefined,
         }),
       });
       if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${to}.`, 'success');

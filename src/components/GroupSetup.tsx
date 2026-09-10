@@ -414,7 +414,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                   {inviteStatus === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
                 </button>
               </div>
-              {inviteStatus === 'success' && <p className="text-xs text-natural-primary font-medium mt-2">Invite sent successfully!</p>}
+              {inviteStatus === 'success' && <p className="text-xs text-natural-primary font-medium mt-2">Invite sent.</p>}
               {inviteStatus === 'error' && <p className="text-xs text-natural-primary font-medium mt-2">{inviteError || INVITE_FALLBACK_ERROR}</p>}
             </form>
 

@@ -24,7 +24,7 @@ const fallbackStarter = (severityPct: number) => {
     return "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\"";
   }
   if (severityPct >= 25) {
-    return "The pictures of the incomes don't quite line up. A gentle way in: \"Our pictures of the incomes don't line up. Can we compare notes so the split feels fair to everyone?\"";
+    return "The income estimates don't quite line up. A gentle way in: \"I think I have been guessing at your numbers. Can we compare notes so the split feels fair to everyone?\"";
   }
   return "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 };

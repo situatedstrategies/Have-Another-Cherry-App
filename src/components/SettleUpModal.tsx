@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { todayLocal } from '../lib/recurring';
 import { Expense, Group, PaymentInstrument } from '../types';
 import { Check, Cherry, ExternalLink, Copy } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
@@ -15,13 +16,6 @@ interface SettleUpModalProps {
   onClose: () => void;
   onSubmit: (paymentInstrument: PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate: string) => void;
 }
-
-// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString()).
-const todayLocal = () => {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().split('T')[0];
-};
 
 export default function SettleUpModal({ expense, group, activeUser, paymentHandlesByUid, onClose, onSubmit }: SettleUpModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
@@ -267,7 +261,7 @@ export default function SettleUpModal({ expense, group, activeUser, paymentHandl
                       Their Zelle: <span className="font-bold text-natural-text break-all">{zelle.handle}</span>
                     </p>
                     <button type="button" onClick={copyZelleHandle} className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline">
-                      <Copy size={12} /> {copiedZelle ? 'Copied!' : 'Copy'}
+                      <Copy size={12} /> {copiedZelle ? 'Copied' : 'Copy'}
                     </button>
                   </div>
                 ) : (
