@@ -72,7 +72,7 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
   const theirShare = roundCurrency((numericAmount * theirPct) / 100);
 
   const other = groupUsers[otherUid] || {};
-  const otherName = members.find(m => m.uid === otherUid)?.name || 'Your partner';
+  const otherName = members.find(m => m.uid === otherUid)?.name || 'The other person';
   const otherIncome = Number(other.income) || 0;
   const otherThreshold = Number(other.recurringThreshold) || 0;
 

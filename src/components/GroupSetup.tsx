@@ -68,7 +68,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
       return;
     }
     if (!partnerVal || partnerVal <= 0) {
-      setRecMessage("Enter your partner's income first to calculate a split.");
+      setRecMessage("Enter the other person's income first to calculate a split.");
       return;
     }
 
@@ -77,7 +77,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
     const partnerPct = 100 - myPct;
 
     setSplits([String(myPct), String(partnerPct)]);
-    setRecMessage(`Recommended: you ${myPct}% / partner ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
+    setRecMessage(`Recommended: you ${myPct}% / them ${partnerPct}%, proportional to income. Adjust below if you'd like.`);
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -550,7 +550,7 @@ export default function GroupSetup({ onComplete, onCancel }: { onComplete: (grou
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-natural-muted mb-1">Partner's annual income</label>
+                        <label className="block text-xs font-semibold text-natural-muted mb-1">The other person's annual income</label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
                           <input

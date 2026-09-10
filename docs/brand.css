@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Have Another Cherry — Brand Style Sheet v1.0
+   Have Another Cherry, Brand Style Sheet v1.0
    A simpler, sweeter way to share household expenses.
 
    Drop-in CSS for ads, landing pages, and marketing HTML.
@@ -12,7 +12,7 @@
    1. Design tokens
    -------------------------------------------------------------------------- */
 :root {
-  /* Color — cherry red is the ONLY hue. Everything else is a zinc neutral. */
+  /* Color, cherry red is the ONLY hue. Everything else is a zinc neutral. */
   --hac-cherry:       #C41200;  /* primary accent: CTAs, tick bar, highlights */
   --hac-cherry-ink:   #A00E00;  /* deep cherry: hover state of solid red buttons */
   --hac-cherry-wash:  #FBEAE7;  /* pale cherry tint: soft washes and highlights  */
@@ -24,19 +24,19 @@
   --hac-muted:        #52525B;  /* secondary text                             */
   --hac-faint:        #71717A;  /* tertiary text, fine print                  */
 
-  /* Type — three faces, three jobs. Never substitute. */
+  /* Type, three faces, three jobs. Never substitute. */
   --hac-font-display: "Lora", Georgia, serif;                    /* headlines, wordmark */
   --hac-font-body:    "Inter", Helvetica, Arial, sans-serif;     /* everything else     */
   --hac-font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; /* money, codes, % */
 
-  /* Shape — soft but precise */
+  /* Shape, soft but precise */
   --hac-radius-sm:   8px;    /* inputs, small chips        */
   --hac-radius-md:   10px;   /* buttons                    */
   --hac-radius-lg:   12px;   /* inner panels, code boxes   */
   --hac-radius-xl:   16px;   /* cards, containers          */
   --hac-radius-pill: 999px;  /* pill CTAs, the tick bar    */
 
-  /* Elevation — barely there */
+  /* Elevation, barely there */
   --hac-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
   --hac-shadow-md: 0 4px 12px rgba(24, 24, 27, 0.08);
 }
@@ -70,7 +70,7 @@
 .hac a     { color: var(--hac-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
 .hac a:hover { color: var(--hac-cherry); }
 
-/* Money, percentages, invite codes — always mono, always tabular */
+/* Money, percentages, invite codes, always mono, always tabular */
 .hac-num {
   font-family: var(--hac-font-mono);
   font-variant-numeric: tabular-nums;
@@ -87,7 +87,7 @@
   color: var(--hac-muted);
 }
 
-/* The tick — the brand's signature underline device */
+/* The tick, the brand's signature underline device */
 .hac-tick {
   display: block;
   width: 44px;
@@ -156,7 +156,7 @@
   padding: 32px;
 }
 
-/* Dashed container — reserved for codes and "cut here" moments */
+/* Dashed container, reserved for codes and "cut here" moments */
 .hac-code-box {
   background: var(--hac-paper);
   border: 1px dashed var(--hac-border);
@@ -172,7 +172,7 @@
   color: var(--hac-ink);
 }
 
-/* Callout — soft panel with a 4px cherry spine */
+/* Callout, soft panel with a 4px cherry spine */
 .hac-callout {
   background: var(--hac-sidebar);
   border-left: 4px solid var(--hac-cherry);
