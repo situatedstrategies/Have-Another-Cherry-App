@@ -1745,7 +1745,7 @@ export default function App() {
       {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-natural-sidebar w-full" />
 
-      <main className="max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
+      <main className="max-w-6xl lg:max-w-7xl 2xl:max-w-[100rem] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
         
         {hasIncomeDiscrepancy && (
           <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
