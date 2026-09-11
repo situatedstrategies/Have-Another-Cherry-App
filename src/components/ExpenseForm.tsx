@@ -253,7 +253,6 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
   // Perform split calculations on the fly for UI previews
   const previewShares: Record<string, number> = {};
-  let previewThirdPersonShare = 0;
 
   members.forEach(m => previewShares[m.uid] = 0);
 
@@ -275,8 +274,6 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       previewShares[m.uid] = parseFloat(customAmt[m.uid]) || 0;
     });
   } else if (splitType === 'third_party') {
-    const tPct = parseFloat(thirdPartyPct['third_party']) || 0;
-    previewThirdPersonShare = (numericAmount * tPct) / 100;
     members.forEach(m => {
       const pct = parseFloat(thirdPartyPct[m.uid]) || 0;
       previewShares[m.uid] = (numericAmount * pct) / 100;
@@ -333,7 +330,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       if (!ok) return;
     }
 
-    let finalShares: Record<string, number> = {};
+    const finalShares: Record<string, number> = {};
     let finalThirdPersonShare: number | undefined = undefined;
     let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
 
@@ -484,7 +481,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       });
     }
 
-    let finalCategory = category.trim();
+    const finalCategory = category.trim();
     if (!finalCategory) {
       setError('Please enter a category.');
       return;
@@ -781,7 +778,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
                   </button>
                 ))}
               </div>
-              {['CREDIT', 'DEBIT', 'OTHER'].includes(instrumentType) && (
+              {['CREDIT', 'DEBIT', 'OTHER'].includes(instrumentType as string) && (
                 <div className="mt-2 relative">
                   <input
                     type="text"

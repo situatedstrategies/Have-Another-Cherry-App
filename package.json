@@ -7,8 +7,12 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "lint": "eslint . && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "tsx test/action-link.logic.ts && tsx test/auth-action.logic.ts && npm run test:parity",
     "rules:deploy": "npx --yes firebase-tools@14 deploy --only firestore:rules",
     "test:parity": "tsx scripts/archive-parity.ts && tsx scripts/unclaimed-parity.ts && tsx scripts/recurring-parity.ts && tsx scripts/reminder-parity.ts && tsx scripts/entitlement-check.ts && tsx scripts/seats-check.ts && tsx scripts/seat-claims-check.ts && tsx scripts/settled-check.ts",
     "test:rules": "firebase emulators:exec --only firestore \"tsx scripts/rules-test.ts\""
@@ -19,8 +23,6 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@revenuecat/purchases-js": "^1.55.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
@@ -34,20 +36,26 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.9.2",
-    "resend": "^6.17.0",
-    "vite": "^6.2.3"
+    "resend": "^6.17.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
+    "@tailwindcss/vite": "^4.1.14",
     "@types/cors": "^2.8.19",
     "@types/crypto-js": "^4.2.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
     "esbuild": "^0.25.0",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.9.6",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^6.2.3"
   }
 }

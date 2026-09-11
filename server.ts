@@ -3,7 +3,6 @@ import { createHash, timingSafeEqual } from "crypto";
 import express from "express";
 import path from "path";
 import cors from "cors";
-import { createServer as createViteServer } from "vite";
 import { reminderTargetDate, reminderPayload } from "./src/lib/reminders";
 import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail, sendSupportRequest } from "./src/lib/resend";
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
@@ -1718,6 +1717,7 @@ async function startServer() {
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
 
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
@@ -1735,7 +1735,7 @@ async function startServer() {
         }
       },
     }));
-    app.get("*", (req, res) => {
+    app.get("*", (_req, res) => {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.sendFile(path.join(distPath, "index.html"));
     });

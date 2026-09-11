@@ -6,7 +6,7 @@ import { mergeExpense } from './lib/merge';
 import { advanceIntervalStr, parseLocalDate, todayLocal } from './lib/recurring';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, OAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
@@ -29,7 +29,6 @@ import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
-import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import FinancialAlignmentModal from './components/FinancialAlignmentModal';
@@ -40,7 +39,7 @@ import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { hasPlus } from './lib/entitlements';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
+import { Plus, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
 
 // ISO week plus member count, so the cached greeting refreshes weekly or when membership changes.
 function getGreetingKey(memberCount: number): string {
@@ -379,7 +378,7 @@ export default function App() {
         if (newExps.length === 0 && deletedIds.length === 0) return;
 
         setExpenses(prev => {
-          let updated = prev.filter(
+          const updated = prev.filter(
             expense => !deletedIds.includes(expense.id)
           );
 
@@ -641,13 +640,13 @@ export default function App() {
     }} /></div>;
   }
 
-  // Group data not here yet: a loading screen, never the create/join screen.
-  if (activeGroupId && !group) {
-    return <LoadingScreen label="Loading your group..." />;
-  }
-
   if (!activeGroupId) {
     return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={applyJoinedGroup} /></div>;
+  }
+
+  // Group data not here yet: a loading screen, never the create/join screen.
+  if (!group) {
+    return <LoadingScreen label="Loading your group..." />;
   }
 
   // Members who have not finished their quiz. Non-blocking: a dismissible banner.
@@ -1054,7 +1053,7 @@ export default function App() {
   // Manual push to this expense's outstanding debtors.
   const handleGentleRemind = async (expense: Expense) => {
     if (!group) return;
-    const debtors = group.memberIds.filter(uid =>
+    const debtors = group.memberIds!.filter(uid =>
       uid !== expense.paidBy && getRemainingSettlementAmount(expense, uid, false) > 0.01
     );
     try {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers, nameOf } from '../lib/members';
 import { formatAmount, formatShortDate } from '../lib/format';

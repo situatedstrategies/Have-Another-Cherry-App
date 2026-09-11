@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
@@ -44,7 +44,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       return matchesSearch && matchesStatus && matchesCategory;
     })
     .sort((a, b) => {
-      let multiplier = sortOrder === 'desc' ? -1 : 1;
+      const multiplier = sortOrder === 'desc' ? -1 : 1;
       
       if (sortField === 'date') {
         return multiplier * (new Date(a.date).getTime() - new Date(b.date).getTime());

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';

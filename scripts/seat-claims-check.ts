@@ -53,7 +53,9 @@ check('comment author remapped', richOut.comments![0].userId, 'liv');
 
 // Ledger pass reports whether anything moved.
 check('ledger pass: changed', claimSeats([before, after], ['rob', 'liv']).changed, true);
-check('ledger pass: unchanged returns the same array', claimSeats([after], ['rob', 'liv']).expenses === [after][0] ? false : claimSeats([after], ['rob', 'liv']).changed, false);
+const unchanged = [after];
+check('ledger pass: unchanged returns the same array', claimSeats(unchanged, ['rob', 'liv']).expenses === unchanged, true);
+check('ledger pass: unchanged is not flagged as changed', claimSeats(unchanged, ['rob', 'liv']).changed, false);
 check('ledger pass: no roster, no change', claimSeats([before], undefined).changed, false);
 
 console.log(bad ? `\n${bad} FAILURES` : '\nall seat claim rules hold');

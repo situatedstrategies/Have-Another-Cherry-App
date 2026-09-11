@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Expense, User } from '../types';
 import { parseLocalDate } from '../lib/recurring';
@@ -190,7 +190,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} tickFormatter={(val) => `$${val}`} width={45} />
                 <Tooltip
                   contentStyle={{ borderRadius: '8px', border: '1px solid #E4E4E7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number, name: string) => [`$${Number(value).toFixed(2)}`, name === 'prevSpending' ? 'Previous' : 'This period']}
+                  formatter={(value: any, name: any) => [`$${Number(value).toFixed(2)}`, name === 'prevSpending' ? 'Previous' : 'This period']}
                 />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
                 <Line type="monotone" dataKey="spending" name="This period" stroke="#C41200" strokeWidth={3} dot={{ r: 4, fill: '#C41200' }} activeDot={{ r: 6 }} />

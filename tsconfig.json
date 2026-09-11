@@ -21,7 +21,17 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "strict": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "server.ts",
+    "scripts",
+    "test",
+    "vite.config.ts"
+  ]
 }

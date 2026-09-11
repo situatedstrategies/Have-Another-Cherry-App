@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Expense } from '../types';
 import { isExpenseFullySettled } from '../lib/money';
 import { HeartHandshake, Cherry, Sparkles } from 'lucide-react';
