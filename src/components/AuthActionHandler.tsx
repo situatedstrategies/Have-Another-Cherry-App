@@ -11,16 +11,10 @@ import {
 import { SUPPORT_EMAIL, describeCodeError, sanitizeContinueUrl } from '../lib/authAction';
 import CherryLogo from './CherryLogo';
 
-// Handles the Firebase Auth email action links that used to land on
-// <project>.firebaseapp.com/__/auth/action. App Hosting is Cloud Run based and
-// does not serve Firebase's built-in handler, so we implement it ourselves and
-// point Authentication -> Templates -> "Customize action URL" here.
-//
-// That console setting is global across every email template, so this page has
-// to cope with every mode Firebase might send, not just password resets.
-//
-// The oobCode in the query string is a single-use credential. It is never
-// logged, never put in an error message, and never forwarded anywhere.
+// The Firebase Auth email action handler. App Hosting does not serve
+// Firebase's built-in one, so this page is what Authentication -> Templates ->
+// "Customize action URL" points at. That setting is global across every email
+// template, so this page copes with every mode Firebase might send.
 
 type Phase =
   | { kind: 'loading' }

@@ -1,15 +1,7 @@
-// Direct-payment integration layer.
-//
-// Neither Venmo nor Zelle offers a public server API for third-party payment
-// initiation, so "integration" today means: store each member's handles on
-// their own user doc, and hand the payer a prefilled path into the app they
-// already have. Venmo supports a documented deep link that opens the payment
-// screen with recipient/amount/note filled in. Zelle lives inside each bank's
-// app with no universal deep link, so the best possible flow is surfacing the
-// recipient's enrolled email/phone with one-tap copy.
-//
-// If either network ever ships a real API, this module is the seam: callers
-// only know about PaymentTarget, not about URLs.
+// Direct-payment handoff. Neither Venmo nor Zelle has a public API for
+// third-party payment initiation, so the payer gets a prefilled path into the
+// app they already have: Venmo's documented deep link, or the recipient's
+// enrolled Zelle handle to copy. Callers only know about PaymentTarget.
 
 export interface PaymentTarget {
   method: 'venmo' | 'zelle';

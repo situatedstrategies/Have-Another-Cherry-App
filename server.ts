@@ -17,31 +17,25 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Behind App Hosting / Cloud Run every request arrives via Google's front-end
-  // proxy; trust it so req.ip reflects the real client (X-Forwarded-For) and the
-  // rate limiter buckets per user instead of collapsing to one global bucket.
-  //
-  // Exactly ONE hop, not `true`: Google's proxy appends the real client IP as
-  // the last X-Forwarded-For entry, so trusting one hop reads that entry.
-  // Trusting every hop would read the FIRST entry, which the client writes
-  // itself, letting an abuser rotate fake IPs past the per-IP rate limits.
+  // Behind App Hosting every request arrives through Google's proxy. Trust
+  // exactly one hop: that reads the client IP Google appends to
+  // X-Forwarded-For. Trusting every hop would read the first entry, which the
+  // client writes itself and could use to dodge the per-IP rate limits.
   app.set("trust proxy", 1);
 
-  // Constant-time string comparison for secrets (gate password, webhook auth),
-  // so a mismatch reveals nothing about how much of the value was right.
+  // Constant-time comparison for secrets, so a mismatch leaks nothing.
   const safeEqual = (a: string, b: string) => {
     const ab = Buffer.from(a);
     const bb = Buffer.from(b);
     return ab.length === bb.length && timingSafeEqual(ab, bb);
   };
 
-  // Baseline security headers on every response. No Content-Security-Policy
-  // here yet: the SPA pulls Firebase, reCAPTCHA and Google Fonts, so a CSP
-  // must be introduced deliberately and tested, not bolted on.
+  // ---- Middleware ----
+  // No Content-Security-Policy yet: the SPA pulls Firebase, reCAPTCHA and
+  // Google Fonts, so a CSP has to be introduced deliberately and tested.
   app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
-    // The Firebase auth helper pages under /__/ render inside our own iframe
-    // during sign-in, so they are the one place framing must stay allowed.
+    // The Firebase auth helper pages under /__/ render inside our own iframe.
     if (!req.path.startsWith("/__/")) {
       res.setHeader("X-Frame-Options", "DENY");
     }
@@ -51,18 +45,16 @@ async function startServer() {
     next();
   });
 
-  // Restrict cross-origin browser access to our own app origins (the SPA is
-  // same-origin, so this doesn't affect it - it just blocks other sites).
+  // Cross-origin browser access is limited to our own origins plus the
+  // marketing site, whose beta form posts to /api/beta-signup.
   const allowedOrigins = (
     process.env.ALLOWED_ORIGINS ||
     `https://app.haveanothercherry.com,https://have-another-cherry--${PROJECT_ID}.us-east4.hosted.app,http://localhost:3000,` +
-    // Marketing site origins: the beta signup form on these pages posts to
-    // /api/beta-signup cross-origin.
     "https://haveanothercherry.com,https://www.haveanothercherry.com,https://have-another-cherry-marketing.pages.dev"
   ).split(",").map(o => o.trim()).filter(Boolean);
   app.use(cors({
     origin: (origin, cb) => {
-      // Allow same-origin / non-browser requests (no Origin header) and our list.
+      // No Origin header means same-origin or a non-browser client.
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
       return cb(null, false);
     },
@@ -72,12 +64,8 @@ async function startServer() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: false }));
 
-  // ---- Retired beta host -----------------------------------------------------
-  // beta.haveanothercherry.com used to be a second deployment on its own
-  // Firebase project. It is gone: anyone who still has the old link, a saved
-  // bookmark, or an invite email that names it lands on the real app instead
-  // of a dead host or, worse, a stale copy with its own user pool. Permanent
-  // so browsers and crawlers stop asking.
+  // beta.haveanothercherry.com was a second deployment. Old links, bookmarks
+  // and invite emails that name it land on the real app.
   app.use((req, res, next) => {
     const host = String(req.headers.host || "").split(":")[0].toLowerCase();
     if (/^beta[.-]/.test(host)) {
@@ -86,13 +74,10 @@ async function startServer() {
     return next();
   });
 
-  // ---- Production view gate ------------------------------------------------
-  // An optional password wall for app.haveanothercherry.com. OFF by default:
-  // the app is live and open, and every request goes straight through. Set
-  // SITE_GATE_ENABLED=1 in apphosting.yaml to put the wall back (for example
-  // before a launch), and SITE_GATE_PASSWORD_HASH to change the password; only
-  // the password's SHA-256 hash ever lives here, never the password itself.
-  // Local dev is never gated, and webhooks are exempt because they arrive
+  // ---- Site gate ----
+  // Optional password wall, off by default. SITE_GATE_ENABLED=1 turns it on
+  // and SITE_GATE_PASSWORD_HASH is the SHA-256 of the password. Local dev is
+  // never gated; webhooks and Apple's CDN are exempt because they arrive
   // without cookies.
   const GATE_COOKIE = "hac_gate";
   const gateHash =
@@ -105,14 +90,9 @@ async function startServer() {
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
     "/api/apple-notifications",
-    // Apple's CDN fetches this to verify the app/domain association; it
-    // arrives with no cookies and must never see the gate.
     "/.well-known/apple-app-site-association",
     "/apple-app-site-association",
-    // The push service worker is fetched by the browser's SW machinery and
-    // must load even when the page itself sits behind the gate.
     "/firebase-messaging-sw.js",
-    // App Store server notifications arrive from Apple with no cookies.
     "/api/apple-purchase-notifications",
     "/api/recaptcha-health",
     "/api/beta-signup",
@@ -179,8 +159,7 @@ async function startServer() {
     const host = String(req.headers.host || "").split(":")[0].toLowerCase();
     if (!GATE_HOSTS.has(host)) return next();
     if (GATE_EXEMPT_PATHS.has(req.path)) return next();
-    // Firebase reserved namespace: the sign-in popup and iframe load
-    // /__/auth/* on our domain (authDomain), which must never see the gate.
+    // The Firebase sign-in popup and iframe load /__/auth/* on our domain.
     if (req.path.startsWith("/__/")) return next();
 
     const cookieHeader = req.headers.cookie || "";
@@ -205,13 +184,11 @@ async function startServer() {
 
     return res.status(401).send(gatePage(false));
   });
-  // ---- end production view gate -------------------------------------------
 
-  // Firebase auth helpers. With authDomain set to our own domain, the Google
-  // sign-in popup opens https://<our domain>/__/auth/handler. Firebase Hosting
-  // serves those helper pages automatically but App Hosting (Cloud Run) does
-  // not, so proxy the reserved /__/auth namespace to the Firebase project's
-  // own domain.
+  // ---- Firebase auth helper proxy ----
+  // With authDomain set to our own domain the sign-in popup opens
+  // /__/auth/handler here. Firebase Hosting serves those pages itself; App
+  // Hosting does not, so proxy the reserved namespace to the project domain.
   app.use("/__/auth", async (req, res) => {
     try {
       const upstreamOrigin = `https://${PROJECT_ID}.firebaseapp.com`;
@@ -233,14 +210,12 @@ async function startServer() {
   });
 
 
-  // Lightweight Alpha Lite abuse protection for public email endpoints.
-  // App Hosting instances may have separate memory, so production launch
-  // should eventually use managed rate limiting.
+  // ---- Shared helpers ----
+  // In-memory per-instance rate limiting. App Hosting instances do not share
+  // it, so this is abuse protection rather than a hard quota.
   const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
-  // House style: no em dashes anywhere, including AI-generated copy. The
-  // prompts also forbid them, but the model slips sometimes, so every parsed
-  // response is scrubbed before it reaches a client.
+  // House style forbids em dashes. The prompts say so too, but the model slips.
   const stripEmDashes = (value: string): string => value.replace(/\s*[\u2014\u2013]\s*/g, " - ");
   let lastSweep = 0;
 
@@ -251,8 +226,7 @@ async function startServer() {
     for (const [k, b] of requestBuckets) if (now >= b.resetAt) requestBuckets.delete(k);
   };
 
-  // Per-endpoint rate limiter, keyed on the real client IP so one abuser is
-  // isolated instead of throttling everyone. Each `name` gets its own quota.
+  // Per-endpoint limiter keyed on client IP, so one abuser is isolated.
   const rateLimit = (name: string, maxRequests = 5, windowMs = 15 * 60 * 1000) =>
     (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const now = Date.now();
@@ -270,9 +244,7 @@ async function startServer() {
       next();
     };
 
-  // Only the image types phones and browsers actually produce. Anything else
-  // (an SVG, a PDF, a made-up type) collapses to JPEG rather than being passed
-  // through to the model verbatim.
+  // Anything but the image types phones produce collapses to JPEG.
   const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
   const cleanImageMime = (v: unknown): string =>
     typeof v === "string" && ALLOWED_IMAGE_MIME.has(v.toLowerCase()) ? v.toLowerCase() : "image/jpeg";
@@ -302,8 +274,7 @@ async function startServer() {
   const ensureAdminApp = async () => {
     const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
     if (!getApps().length) {
-      // With projectId omitted, ADC resolves the project the service is actually
-      // running in, which is always the correct one.
+      // With projectId omitted, ADC resolves the project the service runs in.
       const projectId =
         process.env.GOOGLE_CLOUD_PROJECT ||
         process.env.GCLOUD_PROJECT ||
@@ -321,8 +292,7 @@ async function startServer() {
     }
   };
 
-  // Require a valid Firebase ID token. Protects the billed AI endpoints and the
-  // authenticated email endpoint from anonymous abuse.
+  // Requires a valid Firebase ID token; guards the billed AI and email routes.
   const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       const header = req.headers.authorization || "";
@@ -340,10 +310,10 @@ async function startServer() {
     }
   };
 
-  // Once profile_log reaches CATALOG_TARGET entries, the catalog is "frozen":
-  // stop generating new AI profiles and always serve from that finite set.
-  // Before then, AI failures fall back to a random logged profile once the log
-  // has at least MIN_LOG_FALLBACK entries (else the curated list).
+  // Once profile_log holds CATALOG_TARGET entries the catalog is frozen and
+  // profiles are served from it instead of generated. Before then, an AI
+  // failure falls back to a logged profile once the log has MIN_LOG_FALLBACK
+  // entries, else to the curated list.
   const CATALOG_TARGET = 250;
   const MIN_LOG_FALLBACK = 20;
 
@@ -384,7 +354,7 @@ async function startServer() {
     return { ...f, greetingTone: "harmonious" };
   };
 
-  // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
+  // ---- AI: receipt scan and vault extract ----
   app.post("/api/scan-receipt", requireAuth, rateLimit("scan", 60), async (req, res) => {
     try {
       const { ai, Type } = await getVertexClient();
@@ -452,7 +422,6 @@ async function startServer() {
         }
       }
 
-      // The model returned nothing usable.
       return res.status(422).json({ error: "Could not read the receipt. Please enter the details manually." });
     } catch (err: any) {
       console.error("Receipt Scan Error:", err);
@@ -460,21 +429,15 @@ async function startServer() {
     }
   });
 
-  // 4b. Household Vault extraction. Turns a free-form note, or a photo of a
-  // bill/statement, into structured fields the client can confirm and save.
-  //
-  // Privacy contract (see privacy.html section 7): this endpoint is STATELESS.
-  // The submitted text/image is used to produce the extraction and is never
-  // written to a database, never logged as content, and never used for
-  // training. The client encrypts the result before storing it, so nothing
-  // readable is persisted anywhere by this request.
+  // Stateless by contract (privacy policy, section 7): the submitted text or
+  // image is never stored, never logged as content and never used for
+  // training. The client encrypts the result before saving it.
   app.post("/api/vault-extract", requireAuth, rateLimit("vault", 30), async (req, res) => {
     try {
       const { ai, Type } = await getVertexClient();
 
       const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
       const image = typeof req.body?.image === "string" ? req.body.image : "";
-      // What the user said they want kept, e.g. "just the due date and amount".
       const intent = typeof req.body?.intent === "string" ? req.body.intent.trim().slice(0, 400) : "";
       const categories: string[] = Array.isArray(req.body?.categories)
         ? req.body.categories.filter((c: any) => typeof c === "string").slice(0, 40)
@@ -590,7 +553,7 @@ async function startServer() {
     }
   });
 
-  // 5. reCAPTCHA Enterprise assessment via ADC (no API key - org policy).
+  // ---- reCAPTCHA (Enterprise, via ADC) ----
   const createRecaptchaAssessment = async (token: string, action?: string) => {
     const { GoogleAuth } = await import("google-auth-library");
     const auth = new GoogleAuth({
@@ -613,9 +576,7 @@ async function startServer() {
     }) as Promise<any>;
   };
 
-  // Rate limited: each call is a billed Enterprise assessment, and this runs
-  // pre-auth by nature, so per-IP quota is the only thing between the endpoint
-  // and someone burning assessment quota for sport.
+  // Pre-auth by nature and every call is billed, so the per-IP quota is all there is.
   app.post("/api/verify-recaptcha", rateLimit("recaptcha", 30), async (req, res) => {
     try {
       const { token, action } = req.body;
@@ -629,10 +590,8 @@ async function startServer() {
       const score = assessment.data?.riskAnalysis?.score;
       const valid = props?.valid === true;
       const actionMatches = !action || props?.action === action;
-      // Google's recommended default threshold is 0.5.
-      // Authentication must not be hard-blocked solely by the risk score.
-      // Require a valid reCAPTCHA token and matching action; retain the score
-      // for monitoring while the Enterprise key establishes a reliable baseline.
+      // Only token validity and action are enforced. The score is returned for
+      // monitoring while the Enterprise key builds a baseline.
       const allowed = valid && actionMatches;
 
       if (!allowed) {
@@ -654,9 +613,7 @@ async function startServer() {
     }
   });
 
-  // 5b. reCAPTCHA health check: runs a dummy assessment so operators can
-  // confirm the Enterprise API, IAM role, and site key are wired up without
-  // needing a real browser token. Reports status only, never user data.
+  // Runs a dummy assessment so operators can confirm the API, IAM role and site key. Status only, never user data.
   app.get("/api/recaptcha-health", rateLimit("recaptcha-health", 10), async (_req, res) => {
     const healthProject =
       process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
@@ -664,8 +621,7 @@ async function startServer() {
     try {
       const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
       const props = assessment.data?.tokenProperties;
-      // A dummy token is expected to be invalid. Reaching this line means the
-      // assessment API accepted the call, so auth and IAM are working.
+      // A dummy token is expected to be invalid; reaching here means auth and IAM work.
       res.status(200).json({
         ok: true,
         assessmentApi: "reachable",
@@ -685,16 +641,14 @@ async function startServer() {
     }
   });
 
-  // 6. Resend Invite Endpoint
+  // ---- Auth: invites, account lookup, password reset, verification ----
   app.post("/api/send-invite", requireAuth, rateLimit("invite"), async (req, res) => {
     try {
       const { email, groupName, inviteCode, recipientName, fromName, split } = req.body || {};
       if (!isValidEmail(email)) {
         return res.status(400).json({ error: "A valid recipient email is required." });
       }
-      // The template escapes HTML, so these caps are about size, not markup:
-      // an authenticated caller should not be able to mail a megabyte of text
-      // to an arbitrary address under our sending domain.
+      // The template escapes HTML; the caps bound size, not markup.
       const cap = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
       if (split && JSON.stringify(split).length > 4000) {
         return res.status(400).json({ error: "Split details are too large." });
@@ -715,11 +669,8 @@ async function startServer() {
     }
   });
 
-  // Whether an account exists for an address. Product decision, 10 September
-  // 2026: someone typing an address that has no account is told so, on sign-in
-  // and on reset, rather than being left with "doesn't match" or a reset email
-  // that never comes. That is a deliberate trade against address enumeration,
-  // so it is rate limited like the other unauthenticated endpoints.
+  // Saying that an address has no account is a deliberate trade against
+  // enumeration, so the endpoint is rate limited like the other anonymous ones.
   const NO_ACCOUNT_MESSAGE =
     "We could not find an account for that email. Check the spelling, or create one.";
 
@@ -745,18 +696,13 @@ async function startServer() {
     }
   });
 
-  // 6b. Password Reset Endpoint (Resend + Firebase Admin SDK)
-  // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
-  // delivers it via Resend from reset@haveanothercherry.com. An address with no
-  // account gets a 404 that says so (see /api/account-lookup for why).
+  // An address with no account gets a 404 that says so (see account-lookup).
   app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
     const rawEmail = req.body?.email;
     const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
-    // Same shape check as send-invite, before the Admin SDK sees it: a
-    // malformed address should be a 400 here, not an opaque SDK error.
     if (!isValidEmail(email)) {
       return res.status(400).json({ error: "Please enter a valid email address." });
     }
@@ -786,15 +732,9 @@ async function startServer() {
     }
   });
 
-  // 6c. Email Verification Endpoint (Resend + Firebase Admin SDK)
-  // Generates a Firebase verification link server-side and delivers it via Resend
-  // from verify@haveanothercherry.com, so Firebase never sends its own copy.
-  //
-  // Authenticated on purpose, and the address comes from the caller's own ID
-  // token rather than the request body. Taking it from the body would turn this
-  // into an open relay for mailing arbitrary strangers a Have Another Cherry
-  // email. Password reset can be anonymous because it only ever mails an address
-  // that already has an account; this one cannot.
+  // Authenticated on purpose: the address comes from the caller's ID token,
+  // never the body, so this cannot mail arbitrary strangers. Reset can be
+  // anonymous because it only ever mails an address that has an account.
   app.post("/api/send-verification", requireAuth, rateLimit("verify"), async (req, res) => {
     try {
       const decoded = (req as any).firebaseUser;
@@ -827,19 +767,15 @@ async function startServer() {
     }
   });
 
-  // 8. Financial Profile Generation API - generates a UNIQUE, bespoke profile
-  //    from the quiz answers, analyzed holistically/interconnected.
+  // ---- AI: profile, greeting, conversation starter ----
   app.post("/api/generate-profile", requireAuth, rateLimit("profile", 30), async (req, res) => {
     const { answers } = req.body || {};
-    // Cap the user-supplied answers that get embedded in the AI prompt, to bound
-    // token usage and limit prompt-injection surface.
+    // Bounds token usage and the prompt-injection surface.
     if (answers && JSON.stringify(answers).length > 4000) {
       return res.status(400).json({ error: "Quiz answers are too large." });
     }
     const logCount = await getLogCount();
 
-    // Catalog frozen at CATALOG_TARGET entries: stop generating and always
-    // serve a random profile from the finite log.
     if (logCount >= CATALOG_TARGET) {
       const catalogProfile = await getRandomFromLog();
       if (catalogProfile) {
@@ -910,17 +846,14 @@ async function startServer() {
     }
   });
 
-  // 9. Weekly Dashboard Greeting - a short, warm, cherry-themed, relationship-
-  //    focused line tailored to group size and the user's profile tone.
   app.post("/api/generate-greeting", requireAuth, rateLimit("greeting", 60), async (req, res) => {
     const { memberCount, profileType: rawProfileType, greetingTone: rawTone } = req.body || {};
     const count = Number(memberCount) || 1;
-    // Validate/sanitize the user-influenced fields before they enter the prompt.
     const ALLOWED_TONES = ["playful", "pragmatic", "nurturing", "analytical", "adventurous", "harmonious", "thrifty", "generous"];
     const greetingTone = ALLOWED_TONES.includes(rawTone) ? rawTone : "harmonious";
     const profileType = typeof rawProfileType === "string" ? rawProfileType.slice(0, 60) : "";
 
-    // Curated fallback lines (used if the AI call fails).
+    // Used when the AI call fails.
     const fallbackBySize: Record<string, string> = {
       solo: "A cherry's sweeter shared - but savoring your own bowl today is just as ripe. 🍒",
       pair: "Two cherries on one stem: share the sweet, split the pits, and keep it fair. 🍒",
@@ -975,13 +908,9 @@ async function startServer() {
     }
   });
 
-  // 10. Financial-Alignment Conversation Starter - a short, warm opener for the
-  //     "your reported income and your partner's estimate disagree" check-in,
-  //     tuned to how large the gap is and to each person's money-talk style.
   app.post("/api/generate-conversation-starter", requireAuth, rateLimit("starter", 30), async (req, res) => {
     const { severityPct: rawSeverity, styles: rawStyles } = req.body || {};
 
-    // Sanitize user-influenced fields before they enter the prompt.
     const severityPct = Math.min(500, Math.max(0, Math.round(Number(rawSeverity) || 0)));
     const styles = (Array.isArray(rawStyles) ? rawStyles : [])
       .slice(0, 5)
@@ -991,7 +920,7 @@ async function startServer() {
         communicationStyle: typeof s?.communicationStyle === "string" ? s.communicationStyle.slice(0, 200) : "",
       }));
 
-    // Curated fallbacks by severity, used if the AI call fails.
+    // Used when the AI call fails.
     const fallback =
       severityPct >= 50
         ? "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
@@ -1051,13 +980,9 @@ async function startServer() {
     }
   });
 
-  // 10b. Support requests from inside the app. Delivered to
-  //      help@haveanothercherry.com with replyTo set to the sender, so a reply
-  //      goes straight back to them.
-  //
-  //      Signed in only, and rate limited: this endpoint sends mail to a human
-  //      inbox, which is exactly the shape of thing that gets abused. The body
-  //      is capped because a support form is not a file upload.
+  // ---- Support ----
+  // Mails a human inbox with replyTo set to the sender, so it is signed-in
+  // only, rate limited and capped.
   app.post("/api/support-request", requireAuth, rateLimit("support", 5), async (req, res) => {
     const { message, context, email, name } = req.body || {};
 
@@ -1068,8 +993,7 @@ async function startServer() {
       return res.status(400).json({ error: "That message is too long to send." });
     }
 
-    // Prefer the verified address on the token over anything the client sends,
-    // so a reply cannot be aimed somewhere the sender does not control.
+    // The verified token address wins, so a reply cannot be aimed elsewhere.
     const fromEmail =
       (req as any).firebaseUser?.email ||
       (typeof email === "string" ? email.trim() : "");
@@ -1091,18 +1015,11 @@ async function startServer() {
     }
   });
 
-  // 11. Cherry + Waitlist - signups from the coming-soon page. Every signup is
-  //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
-  //     env vars are configured, the address is also subscribed to that
-  //     audience directly.
-  // 11c. Cherry + promo allowlist. PLUS_PROMO_EMAILS (apphosting.yaml) is a
-  //      comma-separated list of sign-in emails that get Cherry + without
-  //      paying: the owner, review accounts for Apple and Google, a friend.
-  //      Every client calls this once after sign-in. The email comes from the
-  //      verified ID token, never the request body, and the write goes through
-  //      the Admin SDK because the rules forbid clients from touching
-  //      isPlus / plusEntitlement at all. Removing an address from the list
-  //      revokes on the next sign-in; a paid entitlement is never touched.
+  // ---- Cherry + promo allowlist ----
+  // PLUS_PROMO_EMAILS lists sign-in emails that get Cherry + without paying.
+  // The email comes from the verified token and the write goes through the
+  // Admin SDK because the rules forbid clients from touching isPlus. Removing
+  // an address revokes on the next sign-in; a paid entitlement is never touched.
   const PROMO_PRODUCT = "promo_allowlist";
   const promoEmails = () =>
     new Set(
@@ -1126,7 +1043,7 @@ async function startServer() {
       const heldByPromo = current.source === "promo" && current.productId === PROMO_PRODUCT;
 
       if (listed) {
-        // Never downgrade a paid entitlement to a promo one; only fill a gap.
+        // Only fills a gap; a paid entitlement is never replaced by promo.
         if (!data.isPlus || heldByPromo) {
           await ref.set(
             {
@@ -1158,6 +1075,8 @@ async function startServer() {
     }
   });
 
+  // ---- Waitlist and beta signup ----
+
   app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
     const { email } = req.body || {};
     if (!isValidEmail(email)) {
@@ -1165,8 +1084,7 @@ async function startServer() {
     }
 
     let subscribed = false;
-    // Optional Mailchimp subscribe (set MAILCHIMP_API_KEY, MAILCHIMP_SERVER_PREFIX
-    // e.g. "us21", and MAILCHIMP_AUDIENCE_ID in Secret Manager / apphosting.yaml).
+    // Optional: MAILCHIMP_API_KEY, MAILCHIMP_SERVER_PREFIX and MAILCHIMP_AUDIENCE_ID.
     const mcKey = process.env.MAILCHIMP_API_KEY;
     const mcServer = process.env.MAILCHIMP_SERVER_PREFIX;
     const mcAudience = process.env.MAILCHIMP_AUDIENCE_ID;
@@ -1193,10 +1111,7 @@ async function startServer() {
       }
     }
 
-    // Same Notion database as the marketing site's waitlist, so there is one
-    // list of people waiting on the mobile apps rather than two. Best-effort
-    // for the same reason as the site form: a Notion outage must never cost
-    // the lead, and the email is the system of record.
+    // Same Notion database as the site form. Best effort; the email is the record.
     try {
       await addWaitlistLeadToNotion({
         email,
@@ -1218,17 +1133,13 @@ async function startServer() {
       return res.status(200).json({ success: true, subscribed });
     } catch (err: any) {
       console.error("Waitlist Error:", err?.message || err);
-      // If Mailchimp got them, the signup still succeeded.
+      // Mailchimp having them still counts as a signup.
       if (subscribed) return res.status(200).json({ success: true, subscribed });
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
   });
 
-  // 11a2. Beta signup (public). The marketing site's beta form posts here
-  //      cross-origin (see the marketing origins in ALLOWED_ORIGINS and the
-  //      gate exemption above). No auth: visitors are anonymous. Each signup
-  //      is forwarded to the poolside@ inbox via Resend. Rate limited per IP
-  //      to keep the public endpoint from being abused.
+  // Public: the marketing site posts here cross-origin, so no auth, but rate limited.
   app.post("/api/beta-signup", rateLimit("beta-signup", 5), async (req, res) => {
     const body = req.body || {};
     const clean = (v: unknown, max: number) =>
@@ -1242,23 +1153,16 @@ async function startServer() {
       return res.status(400).json({ error: "Consent is required so we know we can email you." });
     }
 
-    // Bot filters. Both must run here, not in the browser: a scripted post
-    // never executes our JS, so a client-side check catches nothing that
-    // matters.
-    //
-    // Answer 200 rather than 4xx. A bot that gets an error learns which field
-    // betrayed it and retries without it; one that gets a success moves on. The
-    // visitor sees the normal confirmation either way, and no lead is written.
+    // Bot filters answer 200 rather than 4xx: a bot that gets an error learns
+    // which field betrayed it. The visitor sees the normal confirmation and
+    // no lead is written.
     const honeypot = typeof body.company === "string" ? body.company.trim() : "";
     if (honeypot) {
       console.warn("[signup] honeypot filled, dropped");
       return res.status(200).json({ success: true });
     }
 
-    // Humans do not read, type and submit in under two seconds. Missing or
-    // unparseable elapsed time is allowed through: it means an older cached
-    // page, not necessarily a bot, and silently dropping real people is worse
-    // than letting a few through.
+    // Missing or unparseable timing is let through: an older cached page, not a bot.
     const elapsedMs = Number(body.elapsedMs);
     if (Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs < 2000) {
       console.warn("[signup] submitted in " + elapsedMs + "ms, dropped");
@@ -1283,9 +1187,7 @@ async function startServer() {
       return res.status(500).json({ error: "Could not save your signup. Please try again." });
     }
 
-    // Mirror into Notion after the email has gone. The email is the system of
-    // record; a Notion outage must not cost us the lead or show the visitor an
-    // error for something already saved.
+    // After the email has gone; a Notion outage must not cost the lead.
     try {
       await addWaitlistLeadToNotion({
         email,
@@ -1308,12 +1210,9 @@ async function startServer() {
     return res.status(200).json({ success: true });
   });
 
-  // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
-  //     tartcherry@haveanothercherry.com to a group member who still owes the
-  //     caller money. Server-enforced: the caller must hold the Cherry +
-  //     entitlement and both parties must be members of the same group. The
-  //     amount and item titles come from the caller's own (E2E-encrypted)
-  //     ledger: sending them in a reminder is the sender's deliberate choice.
+  // ---- Payment reminder email (Cherry +) ----
+  // Server-enforced: the caller must hold Cherry + and both people must be
+  // members of the group.
   app.post("/api/send-reminder", requireAuth, rateLimit("remind", 10), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
@@ -1330,7 +1229,6 @@ async function startServer() {
       const { getAuth } = await import("firebase-admin/auth");
       const fs = getFirestore();
 
-      // Cherry + enforcement: reminders are a premium feature.
       const callerDoc = await fs.collection("users").doc(callerUid).get();
       const caller = callerDoc.data() || {};
       const entExpiry = caller?.plusEntitlement?.expiresAt;
@@ -1339,7 +1237,6 @@ async function startServer() {
         return res.status(403).json({ error: "Payment reminders are a Cherry + feature." });
       }
 
-      // Both people must belong to the group.
       const groupDoc = await fs.collection("groups").doc(groupId).get();
       const groupData = groupDoc.data() || {};
       const memberIds: string[] = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
@@ -1356,9 +1253,7 @@ async function startServer() {
       const nameOf = (uid: string) =>
         (Array.isArray(groupData.members) ? groupData.members : []).find((m: any) => m?.uid === uid)?.name || "A member";
 
-      // PRIVACY: no amounts or item details are accepted or emailed. The
-      // ledger is E2E-encrypted and Resend's logs are operator-visible, so
-      // the reminder only says an open balance exists.
+      // No amounts or item details: the email only says an open balance exists.
       await sendReminderEmail(
         debtorAuth.email,
         nameOf(debtorUid),
@@ -1373,19 +1268,14 @@ async function startServer() {
     }
   });
 
-  // 12. Cherry + entitlement webhook (RevenueCat) - THE activation point for
-  //     paid subscriptions. The iOS/Android apps (not yet built) will sell the
-  //     "plus" entitlement through RevenueCat with appUserID = Firebase uid;
-  //     RevenueCat then calls this endpoint on every subscription event and we
-  //     mirror the entitlement onto users/{uid}, which every client reads via
-  //     lib/entitlements.hasPlus().
-  //
-  //     Dormant until REVENUECAT_WEBHOOK_AUTH is set (Secret Manager +
-  //     apphosting.yaml, same pattern as RESEND_API_KEY). Configure the same
-  //     value under Authorization in RevenueCat's webhook settings.
+  // ---- Billing: RevenueCat webhook ----
+  // The activation point for paid subscriptions. RevenueCat calls this with
+  // appUserID = Firebase uid and the entitlement is mirrored onto users/{uid},
+  // which every client reads through hasPlus(). Dormant until
+  // REVENUECAT_WEBHOOK_AUTH is set; the same value goes in RevenueCat's
+  // webhook settings.
   app.post("/api/revenuecat-webhook", async (req, res) => {
-    // "disabled" means the same as unset: App Hosting rejects an empty value,
-    // so a named sentinel is how the webhook is switched off in config.
+    // App Hosting rejects an empty value, so "disabled" is the off switch.
     const expectedAuth = process.env.REVENUECAT_WEBHOOK_AUTH;
     if (!expectedAuth || expectedAuth === "disabled") {
       return res.status(503).json({ error: "Cherry + billing is not configured yet." });
@@ -1398,8 +1288,7 @@ async function startServer() {
       const event = req.body?.event;
       const uid = event?.app_user_id;
       if (!uid || typeof uid !== "string" || uid.startsWith("$RCAnonymousID")) {
-        // Anonymous purchasers can't be mapped to an account; RevenueCat will
-        // resend once the app aliases the user. Acknowledge so it doesn't retry forever.
+        // Not mappable to an account; acknowledge so RevenueCat stops retrying.
         return res.status(200).json({ received: true, ignored: "no mappable app_user_id" });
       }
 
@@ -1407,7 +1296,7 @@ async function startServer() {
       const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"];
       const DEACTIVATING = ["EXPIRATION"];
       if (!ACTIVATING.includes(type) && !DEACTIVATING.includes(type)) {
-        // CANCELLATION etc. leave the entitlement active until EXPIRATION fires.
+        // CANCELLATION and the rest leave the entitlement active until EXPIRATION.
         return res.status(200).json({ received: true, ignored: type });
       }
 
@@ -1449,25 +1338,17 @@ async function startServer() {
     }
   });
 
-  // ---- Push notifications (FCM via the Admin SDK, ADC - no keys) ----------
-  //
-  // Same privacy rule as email (see CLAUDE.md): a push lands on a lock screen
-  // and travels through FCM, so it must NEVER contain amounts, balances, or
-  // expense titles. First names and the group name only; the details stay
-  // behind the app's encryption.
-  //
-  // Clients register FCM device tokens on their own user doc as a map
-  // `fcmTokens: { [token]: updatedAtIso }`. Sends fan out to every token a
-  // recipient has; tokens FCM reports dead are pruned so the map cannot fill
-  // with corpses.
+  // ---- Push notifications ----
+  // Same privacy rule as email: a push lands on a lock screen, so it never
+  // carries amounts, balances or expense titles. Clients register FCM tokens
+  // on their user doc as fcmTokens: { [token]: updatedAtIso }; dead tokens
+  // are pruned on send.
   const sendPushToUsers = async (
     uids: string[],
     title: string,
     body: string,
-    // Opaque routing hints for a tapped notification (which group, which bill,
-    // which screen). Values must be strings: FCM rejects a data payload that
-    // is not Record<string, string>, and it fails the whole send, not the one
-    // field. Nothing here may carry an amount or a name; see the note above.
+    // Routing hints for a tapped notification. FCM rejects any non-string
+    // value, and nothing here may carry an amount or a name.
     data?: Record<string, string>,
   ): Promise<number> => {
     if (!uids.length) return 0;
@@ -1491,8 +1372,6 @@ async function startServer() {
       notification: { title, body },
       ...(data ? { data } : {}),
       apns: { payload: { aps: { sound: "default" } } },
-      // Android icon and accent color come from the app's manifest defaults
-      // (the cherry mark and #C41200), so nothing brand-shaped is set here.
     });
 
     // Prune tokens FCM says are gone (uninstalled app, rotated token).
@@ -1509,8 +1388,7 @@ async function startServer() {
     return res.successCount;
   };
 
-  // A little variety so the lock screen does not read like a robot, but a
-  // small, fixed pool so the voice stays consistent. No amounts, no titles.
+  // A small fixed pool of copy, so the voice stays consistent.
   const LEDGER_PUSH_COPY: Record<string, ((name: string, group: string) => { title: string; body: string })[]> = {
     expense_logged: [
       (n, g) => ({ title: "New on the ledger", body: `${n} logged a shared expense in ${g}.` }),
@@ -1532,9 +1410,7 @@ async function startServer() {
 
   const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  // Loads the group, confirms the caller belongs to it, and returns what the
-  // notification copy needs. Membership is enforced HERE, not trusted from
-  // the client, so nobody can push-spam a group they are not in.
+  // Membership is enforced here, not trusted from the client.
   const loadGroupForNotify = async (groupId: string, callerUid: string) => {
     await ensureAdminApp();
     const { getFirestore } = await import("firebase-admin/firestore");
@@ -1547,10 +1423,7 @@ async function startServer() {
     return { memberIds, callerName, groupName: String(data.name || "your group") };
   };
 
-  // 14. Ledger event push: called by a client right after it logs an expense
-  //     or a payment, so the rest of the group hears about it. Deliberately
-  //     content-free (see the privacy note above); the event kind is all the
-  //     server ever learns.
+  // Called by a client after it logs an expense or payment. The event kind is all the server learns.
   app.post("/api/notify-ledger-event", requireAuth, rateLimit("notify", 60), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
@@ -1571,9 +1444,7 @@ async function startServer() {
     }
   });
 
-  // 15. Gently remind: a member manually nudges specific group members (or
-  //     everyone else) that the ledger could use a look. Tightly rate limited
-  //     because a nudge someone can spam stops being gentle.
+  // Tightly rate limited: a nudge that can be spammed stops being gentle.
   app.post("/api/send-nudge", requireAuth, rateLimit("nudge", 10), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
@@ -1603,32 +1474,20 @@ async function startServer() {
     }
   });
 
-  // 12b. Scheduled bill reminders. Hit once a day by Cloud Scheduler, not by
-  //      any client, which is why it authenticates on a shared secret rather
-  //      than a user token.
-  //
-  //      The privacy shape is the whole design: the ledger and the Vault are
-  //      encrypted client-side, so the server cannot work out when anything is
-  //      due. Clients publish a deliberately impoverished index to
-  //      reminder_schedules/{groupId}: a date, an opaque id, and which screen
-  //      to open. The push repeats none of it: the body is fixed and says only
-  //      that something is due. The app fills in the rest after it opens and
-  //      can decrypt.
-  //
-  //      Timezones: due dates are date-only and households are not all in one
-  //      zone, so "tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS (default
-  //      UTC) and the schedule should be set for the early evening of the zone
-  //      most households are in. Per-household zones would mean the server
-  //      learning where people live, which is a worse trade than a reminder
-  //      arriving a few hours off.
+  // ---- Scheduled bill reminders ----
+  // Hit once a day by Cloud Scheduler on a shared secret. The ledger and the
+  // Vault are encrypted client-side, so clients publish a minimal index to
+  // reminder_schedules/{groupId} (a date, an opaque id, a target screen) and
+  // the push body is fixed. "Tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS
+  // for everyone: per-household zones would mean the server learning where
+  // people live.
   const REMINDER_BODY =
     "A household bill is due tomorrow. Open Have Another Cherry to see the details.";
 
   app.post("/api/send-bill-reminders", async (req, res) => {
     try {
       const secret = process.env.REMINDER_CRON_SECRET;
-      // Fail closed. An unset secret must not mean an open endpoint that any
-      // caller can use to push every household on the platform.
+      // Fail closed: an unset secret must not mean an open endpoint.
       if (!secret) {
         console.error("Bill reminders: REMINDER_CRON_SECRET is not set.");
         return res.status(503).json({ error: "Reminders are not configured." });
@@ -1654,8 +1513,7 @@ async function startServer() {
       let sent = 0;
       for (const snap of due.docs) {
         const data = snap.data() || {};
-        // Idempotent: Cloud Scheduler retries on any non-2xx, and a retry must
-        // not remind the same household twice for the same day.
+        // Idempotent across Cloud Scheduler retries.
         if (data.lastRemindedFor === target) continue;
 
         const groupSnap = await fs.collection("groups").doc(snap.id).get();
@@ -1667,8 +1525,7 @@ async function startServer() {
         const dueTomorrow = entries.filter(e => e?.dueDate === target);
         if (!dueTomorrow.length) continue;
 
-        // One push per household per day, not one per bill: three bills due on
-        // the same day is a reason for one notification, not three.
+        // One push per household per day, not one per bill.
         const count = await sendPushToUsers(memberIds, "Due tomorrow", REMINDER_BODY,
           reminderPayload(snap.id, target, dueTomorrow));
 
@@ -1684,24 +1541,13 @@ async function startServer() {
     }
   });
 
-  // 13. Sign in with Apple server-to-server notifications. Configured in the
-  //     Apple Developer portal (Identifiers -> the App ID -> Sign in with
-  //     Apple -> Edit -> Server-to-Server Notification Endpoint) as
-  //     https://app.haveanothercherry.com/api/apple-notifications
-  //
-  //     Apple POSTs { payload: <JWT> } signed with its published keys whenever
-  //     a user changes the relationship: revokes consent for the app, deletes
-  //     their Apple ID outright, or toggles Hide My Email forwarding. Nothing
-  //     in the request is trusted until the JWT verifies against Apple's JWKS
-  //     with the right issuer and one of our client ids as audience.
-  //
-  //     Data handling on consent-revoked / account-delete: if Apple was the
-  //     account's ONLY sign-in method, the account is wiped (the Auth user and
-  //     the users/{uid} profile document). If the account can still sign in
-  //     another way (password, Google), only the Apple link is removed and all
-  //     sessions are revoked, so the person keeps the account they still have
-  //     access to. Group documents and the E2E-encrypted ledger are shared
-  //     data and are not touched from here.
+  // ---- Apple: Sign in with Apple notifications, associated domains ----
+  // Apple POSTs { payload: <JWT> } when a user revokes consent, deletes their
+  // Apple ID or toggles Hide My Email. Nothing is trusted until the JWT
+  // verifies against Apple's JWKS with our client ids as audience. If Apple
+  // was the only sign-in method the account is wiped (Auth user and profile
+  // doc); otherwise only the Apple link is removed and sessions are revoked.
+  // Shared group data and the encrypted ledger are never touched from here.
   const APPLE_NOTIFICATION_AUDIENCES = (
     process.env.APPLE_CLIENT_IDS ||
     "com.situatedstrategies.haveAnotherCherry,com.situatedstrategies.haveAnotherCherry.web"
@@ -1728,8 +1574,7 @@ async function startServer() {
 
     const type = String(event?.type || "");
     const appleSub = String(event?.sub || "");
-    // email-disabled / email-enabled need no action; acknowledge so Apple
-    // stops retrying.
+    // email-disabled and email-enabled need no action.
     if (!appleSub || (type !== "consent-revoked" && type !== "account-delete")) {
       return res.status(200).json({ received: true, ignored: type || "no event" });
     }
@@ -1764,20 +1609,11 @@ async function startServer() {
     }
   });
 
-  // 16. Associated domains. Apple (via its CDN) fetches this file to verify
-  //     that this domain and the iOS app belong together, which unlocks
-  //     universal links (https links that open the app when installed) and
-  //     shared password autofill between the web app and the iOS app.
-  //
-  //     The app id needs the Apple Team ID prefix, which only exists once
-  //     Developer Program enrollment completes, so it comes from the
-  //     APPLE_TEAM_ID env var (a plain value in apphosting.yaml, not a
-  //     secret: this file is public by design). Until the var is set the
-  //     route 404s, which Apple simply reads as "not associated yet".
-  //
-  //     Universal links deliberately cover ONLY /expense/* for now. Auth
-  //     action links (password reset, verification) must keep opening in the
-  //     browser, where the handler pages live.
+  // Apple fetches this to verify the domain and app belong together, which
+  // unlocks universal links and shared password autofill. APPLE_TEAM_ID is a
+  // plain env var; until it is set the route 404s, which Apple reads as "not
+  // associated". Universal links cover only /expense/* so auth action links
+  // keep opening in the browser, where the handler pages live.
   app.get(
     ["/.well-known/apple-app-site-association", "/apple-app-site-association"],
     (_req, res) => {
@@ -1794,18 +1630,16 @@ async function startServer() {
     }
   );
 
-  // 17. Push service worker. FCM's web SDK registers /firebase-messaging-sw.js
-  //     to display notifications that arrive while the tab is closed or in
-  //     the background. Served dynamically rather than as a static file so
-  //     the Firebase config is written once, in firebase-applet-config.json.
-  //     Only public identifiers are embedded.
-  // /favicon.ico, which browsers request whether or not the page asks them to.
-  // Without this the SPA catch-all answers it with index.html, the browser gets
-  // HTML where it expected an image, and the tab shows no icon.
+  // ---- Service worker and favicon ----
+  // Browsers request /favicon.ico unasked; without this the SPA catch-all
+  // answers with index.html.
   app.get("/favicon.ico", (_req, res) => {
     res.redirect(301, "/favicon-32.png");
   });
 
+  // Registered by FCM's web SDK to show notifications while the tab is in
+  // the background. Served dynamically so the Firebase config lives in one
+  // place; only public identifiers are embedded.
   app.get("/firebase-messaging-sw.js", (_req, res) => {
     const cfg = firebaseConfig;
     res.setHeader("Content-Type", "application/javascript");
@@ -1820,38 +1654,25 @@ async function startServer() {
         messagingSenderId: cfg.messagingSenderId,
         appId: cfg.appId,
       })});\n` +
-      // Instantiating messaging is what wires the background handler that
-      // displays incoming notification payloads.
+      // Instantiating messaging wires the background handler.
       `firebase.messaging();\n`
     );
   });
 
-  // 18. App Store server notifications (in-app purchase events: renewals,
-  //     refunds, billing issues). Apple POSTs { signedPayload: <JWS> } to the
-  //     URL configured in App Store Connect. This endpoint is a RELAY, not a
-  //     second entitlement pipeline: RevenueCat stays the system of record
-  //     for Cherry + (Apple -> here -> RevenueCat -> /api/revenuecat-webhook
-  //     -> users/{uid}.isPlus). Owning the URL means Apple's config points
-  //     at our domain, we get a log line per event, and the processor behind
-  //     it can change without touching App Store Connect.
-  //
-  //     Set APPLE_ASN_FORWARD_URL to RevenueCat's Apple server notification
-  //     URL (RevenueCat dashboard -> the Apple app's settings). RevenueCat
-  //     verifies the JWS signature itself, so the relay forwards the payload
-  //     untouched; the decode below is for logging only and trusts nothing.
-  //
-  //     Reachable two ways, same handler: the path on any of our hosts, and
-  //     the bare root of the purchasestatus. subdomain so the URL given to
-  //     Apple can be simply https://purchasestatus.haveanothercherry.com/
-  //     once that custom domain is attached to this backend.
+  // ---- App Store server notifications ----
+  // A relay, not a second entitlement pipeline: RevenueCat stays the system of
+  // record (Apple -> here -> RevenueCat -> /api/revenuecat-webhook). Set
+  // APPLE_ASN_FORWARD_URL to RevenueCat's Apple notification URL; RevenueCat
+  // verifies the JWS itself, so the payload is forwarded untouched. Reachable
+  // at the path on any host and at the bare root of the purchasestatus.
+  // subdomain.
   const handleApplePurchaseNotification = async (req: express.Request, res: express.Response) => {
     const signedPayload = req.body?.signedPayload;
     if (typeof signedPayload !== "string" || !signedPayload) {
       return res.status(400).json({ error: "Missing signedPayload" });
     }
 
-    // Best-effort peek at the notification type for the log line. Unverified
-    // by design: nothing here acts on it.
+    // Unverified peek at the type, for the log line only.
     let notificationType = "unknown";
     try {
       const claims = JSON.parse(Buffer.from(signedPayload.split(".")[1], "base64url").toString("utf8"));
@@ -1861,9 +1682,7 @@ async function startServer() {
 
     const forwardUrl = process.env.APPLE_ASN_FORWARD_URL;
     if (!forwardUrl) {
-      // Not wired to a processor yet. Acknowledge so Apple does not mark the
-      // endpoint as failing; RevenueCat still learns about purchases through
-      // receipt validation, just without the instant nudge.
+      // Acknowledge so Apple does not mark the endpoint as failing.
       console.warn(`App Store notification received (${notificationType}) but APPLE_ASN_FORWARD_URL is not set; acknowledged without forwarding.`);
       return res.status(200).json({ received: true, forwarded: false });
     }
@@ -1894,7 +1713,8 @@ async function startServer() {
     return handleApplePurchaseNotification(req, res);
   });
 
-  // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
+  // ---- Static serving ----
+  // Unknown API routes get a JSON 404 rather than the SPA HTML.
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
 
   if (process.env.NODE_ENV !== "production") {
@@ -1910,9 +1730,7 @@ async function startServer() {
           // Only Vite's content-hashed bundles are safe to cache forever.
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         } else {
-          // Un-hashed public/ files (logo.svg, icons, manifest) keep their
-          // names when their content changes, so cap how long a stale copy
-          // can outlive a deploy.
+          // Un-hashed public/ files keep their names across deploys.
           res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
         }
       },

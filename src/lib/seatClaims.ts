@@ -1,23 +1,11 @@
-// Claiming a pending seat's history.
-//
-// An expense logged while a seat is still pending splits against the seat's
-// placeholder id (`ghost_<index>`, see lib/members.getFullMembers). When the
-// person then redeems the invite code they get a real uid, but every expense
-// written before that moment still names the placeholder: they show as owing
-// 0% and the placeholder shows as "Unknown". Nothing else rewrites history,
-// so this does.
-//
-// The mapping is by order: placeholder seats are taken lowest index first, and
-// members join in memberIds order (creator first, then each joiner), so the
-// members who have no share on an expense line up, in join order, with the
-// placeholder ids that expense still carries, in index order. A placeholder
-// with nobody to take it is left alone: that seat is genuinely still pending.
-//
-// Pure and deterministic, so every client converges on the same ledger without
-// coordinating: the web applies it whenever the ledger or the roster changes,
-// and the Flutter client runs the same function (domain/ledger/seat_claims).
-// editedAt is deliberately not bumped: two devices applying this to the same
-// entry produce the same bytes, and a bump would make them fight.
+// Claiming a pending seat's history. An expense logged while a seat is pending
+// splits against the placeholder id (`ghost_<index>`); when the person joins,
+// every earlier expense still names the placeholder. Placeholders map to
+// members by order: seats are taken lowest index first and members join in
+// memberIds order, so members with no share on an expense line up with the
+// placeholders it carries. A placeholder with nobody to take it stays pending.
+// Pure and deterministic, so every client converges without coordinating,
+// and editedAt is not bumped so two devices produce the same bytes.
 
 import { Expense } from '../types';
 

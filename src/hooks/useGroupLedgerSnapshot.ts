@@ -162,21 +162,11 @@ export function useGroupLedgerSnapshot({
     const persist = async () => {
       try {
         // Never write an empty ledger over a remote one that has content.
-        //
-        // Hydration can finish empty for reasons that have nothing to do with
-        // the household deleting anything: one failed Firestore read, one
-        // payload that does not decrypt, an offline first load. Persist is
-        // gated on hydration having happened, not on it having found
-        // anything, so an empty result used to be written straight over the
-        // good snapshot. That is unrecoverable: the ciphertext it replaced is
-        // gone, and every device that syncs afterwards agrees the ledger is
-        // empty.
-        //
-        // The cost of this guard is the one case it cannot tell apart:
-        // deleting the very last expense in a household leaves a stale entry
-        // in the remote snapshot until the next write. That self-heals the
-        // moment anything else is logged. Losing a household's entire history
-        // does not self-heal.
+        // Hydration can finish empty for reasons unrelated to deletion (a
+        // failed read, a payload that does not decrypt, an offline first
+        // load), and overwriting the snapshot is unrecoverable. The cost is
+        // that deleting the very last expense leaves a stale remote entry
+        // until the next write, which self-heals.
         if (expenses.length === 0) {
           const existingSnap = await getDoc(doc(db, 'group_ledgers', groupId));
           if (existingSnap.data()?.payload) {

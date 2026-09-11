@@ -1,24 +1,11 @@
-// Firebase mints auth action links pointing at
-// <project>.firebaseapp.com/__/auth/action, which is Google's own generic page.
-// We serve our own handler at /auth/action, so we retarget the link before
-// emailing it.
-//
-// Doing it here rather than through the console's "custom action URL" setting is
-// deliberate: we generate these links ourselves and send them ourselves, so the
-// host is ours to choose, and the app stops depending on a console setting that
-// has to be kept in sync by hand for every project.
+// Firebase mints auth action links pointing at <project>.firebaseapp.com's
+// generic page. We generate and send these links ourselves, so we retarget
+// them to our own handler at /auth/action rather than depending on a console
+// setting that has to be kept in sync by hand.
 
-// The one public address of the app. Every link we put in an email points
-// here, whatever host the request that triggered it came in on.
-//
-// It used to be derived from the incoming request, so the same build answered
-// correctly on the custom domain, on the raw App Hosting URL, and in local dev.
-// That also meant a reset requested through the raw App Hosting URL mailed a
-// raw App Hosting link, and one requested through the old beta host mailed a
-// beta link that stopped resolving the day beta was retired. A link in
-// someone's inbox has to outlive whichever host minted it, so it is pinned.
-// Local dev keeps its own origin so the handler can be exercised offline, and
-// AUTH_ACTION_URL still overrides everything if a backend ever needs to.
+// Every emailed link points at the public origin whatever host the request
+// came in on: a link in someone's inbox has to outlive the host that minted
+// it. Local dev keeps its own origin; AUTH_ACTION_URL overrides everything.
 const PUBLIC_APP_ORIGIN = 'https://app.haveanothercherry.com';
 
 export function actionHandlerBase(
@@ -39,12 +26,9 @@ export function actionHandlerBase(
   return `${PUBLIC_APP_ORIGIN}/auth/action`;
 }
 
-// Move a Firebase-minted link onto our handler, preserving the query string
-// exactly - mode, oobCode, apiKey and lang all have to survive untouched.
-//
-// Returns the original link unchanged if anything looks wrong. A cosmetically
-// imperfect link that still works beats an email that never arrives, or one
-// carrying a link we mangled.
+// Moves a Firebase-minted link onto our handler, preserving the query string
+// exactly (mode, oobCode, apiKey, lang). Returns the link unchanged if
+// anything looks wrong: a working ugly link beats a mangled one.
 export function retargetActionLink(link: string, base: string | null): string {
   if (!base) return link;
   try {

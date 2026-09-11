@@ -203,9 +203,7 @@ export const withRemovedSeat = (group: Partial<Group>, index: number): SeatUpdat
   return {
     defaultSplit,
     availableSplits,
-    // Floors at two rather than at the seats that exist: removing the last
-    // pending seat used to write a capacity of one, after which every invite
-    // was refused as "already full" while Settings still showed the code.
+    // Floors at two: a capacity of one refuses every invite while Settings still shows the code.
     targetNumPeople: Math.max(MIN_GROUP_CAPACITY, seats),
     addedSeats: Math.max(0, addedSeats(group) - 1),
   };

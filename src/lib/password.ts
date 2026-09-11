@@ -1,27 +1,14 @@
-// Password policy for account passwords. This MIRRORS the Firebase project's
-// own policy (Authentication -> Settings -> Password policy, enforced server
-// side), read from GET identitytoolkit.googleapis.com/v2/passwordPolicy:
-//
-//   8 to 15 characters, with a lowercase letter, an uppercase letter, a
-//   number, and one of the allowed special characters below.
-//
-// The two have to agree exactly. When this checker was looser than the server
-// (up to 128 characters, no uppercase required) a user could satisfy every
-// item on the on-screen checklist and still be refused with a server error.
-// If the policy in the console changes, change this file the same day.
-//
-// It lives here rather than inline in a component because two separate flows
-// have to agree on it: signup (AuthScreen) and the password-reset form
-// (AuthActionHandler). If they drift, a user can be handed a reset form that
-// accepts a password their account could never have been created with.
-//
-// Mirrored in the Flutter app's `lib/core/password_policy.dart`.
+// Mirrors the Firebase project's password policy (Authentication -> Settings),
+// which is enforced server side: 8 to 15 characters with a lowercase letter,
+// an uppercase letter, a number and one allowed special character. The two
+// have to agree exactly or the on-screen checklist passes a password the
+// server refuses. Shared by signup and the reset form so they cannot drift.
+// Mirrored in the Flutter app's lib/core/password_policy.dart.
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 15;
 
-// Exactly the set Firebase reports as allowedNonAlphanumericCharacters. Note
-// that + and = are NOT in it, so "Pass1+" style passwords are refused.
+// Exactly Firebase's allowedNonAlphanumericCharacters; + and = are not in it.
 const SPECIAL_RE = /[\^$*.[\]{}()?"!@#%&/\\,><':;|_~`-]/;
 
 export interface PasswordChecks {

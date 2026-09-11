@@ -12,9 +12,7 @@ import {
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// One Firebase project. There used to be a separate beta project selected by
-// VITE_APP_ENV or a beta.* hostname; it was retired because it split the user
-// base in two and people signed up on the wrong one.
+// One Firebase project, one backend. Do not reintroduce a beta config or a VITE_APP_ENV switch.
 
 export const app = initializeApp(firebaseConfig);
 

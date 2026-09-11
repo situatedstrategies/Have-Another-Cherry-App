@@ -13,19 +13,16 @@ import {
 } from '../lib/password';
 import CherryLogo from './CherryLogo';
 
-// Bumped 2026-09-02: eligibility lowered from 18+ to 13+ (parent or guardian
-// permission required under 18), and signup now records an age attestation.
+// Eligibility is 13+ (parent or guardian permission under 18) and signup records an age attestation.
 const TERMS_VERSION = '2026-09-02';
 
 const NO_ACCOUNT_MESSAGE = 'We could not find an account for that email. Check the spelling, or create one.';
 const OTHER_PROVIDER_MESSAGE = 'This email signs in with Google or Apple. Use that button instead.';
 const OFFLINE_MESSAGE = 'Could not reach the server. Check your connection and try again.';
 
-// Firebase folds an unknown address and a wrong password into one error on
-// purpose. The product decision (10 September 2026) is to tell people which
-// it was, so a failed sign-in asks the server whether the address has an
-// account at all, and which sign-in methods it has. Null means the check
-// itself failed, and the generic message stands.
+// Firebase folds an unknown address and a wrong password into one error, so a
+// failed sign-in asks the server whether the address has an account and which
+// sign-in methods it has. Null means the check itself failed.
 async function accountLookup(email: string): Promise<{ exists: boolean; providers: string[] } | null> {
   try {
     const res = await fetch('/api/account-lookup', {

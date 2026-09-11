@@ -123,8 +123,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [scanning, setScanning] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // Read the chosen receipt photo, send it to the AI scan endpoint, and prefill
-  // the form from the result. Replaces the old mock that always returned $84.50.
+  // Send the chosen receipt photo to the scan endpoint and prefill the form.
   const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file later

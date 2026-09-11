@@ -1,6 +1,4 @@
-// Display formatting shared by the ledger screens. Every function here is
-// en-US on purpose: the app prices in USD and the mobile client formats the
-// same way.
+// Display formatting shared by the ledger screens; en-US on purpose, like the mobile client.
 
 // A date-only string (YYYY-MM-DD) parsed as UTC midnight shows the previous
 // day anywhere west of Greenwich, so those are parsed as local midnight.
