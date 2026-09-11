@@ -392,7 +392,7 @@ export default function AuthScreen() {
       </nav>
 
       <div className="flex-1 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-sm overflow-hidden relative">
+      <div className={`bg-white rounded-lg shadow-sm border border-natural-border w-full overflow-hidden relative ${isReset ? 'max-w-sm' : 'max-w-sm sm:max-w-3xl'}`}>
         <div className="p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
@@ -403,6 +403,12 @@ export default function AuthScreen() {
             </h1>
           </div>
 
+          {/* Wide and short rather than narrow and tall: on anything larger
+              than a phone the email form sits in the left column and the
+              Apple and Google buttons in the right, with the divider standing
+              between them. On a phone it stacks as before. */}
+          <div className={isReset ? '' : 'sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-8 sm:items-start'}>
+          <div>
           {/* Both ways in, side by side, in the same shape the marketing site
               uses. The old version put "Sign up" in a small text link below the
               fold of a phone screen, so arriving from a "Create an account"
@@ -449,7 +455,7 @@ export default function AuthScreen() {
             </div>
           )}
 
-          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6">
+          <form onSubmit={handleEmailAuth} className="space-y-4 mb-6 sm:mb-0">
             {isReset && (
               <p className="text-sm text-natural-muted -mt-1">
                 Enter the email address for your account and we'll send you a link to create a new password.
@@ -571,18 +577,20 @@ export default function AuthScreen() {
               {emailLoading ? 'Please wait...' : (isReset ? 'Send reset link' : (isLogin ? 'Log In' : 'Sign Up'))}
             </button>
           </form>
+          </div>
 
           {!isReset && (
           <>
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-natural-border"></div>
+          <div className="relative mb-6 sm:mb-0 sm:h-full sm:min-h-[16rem] sm:w-px sm:flex sm:justify-center">
+            <div className="absolute inset-0 flex items-center sm:items-stretch sm:justify-center">
+              <div className="w-full border-t border-natural-border sm:w-px sm:border-t-0 sm:border-l"></div>
             </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-natural-muted">or</span>
+            <div className="relative flex justify-center text-xs sm:items-center sm:h-full">
+              <span className="px-2 bg-white text-natural-muted sm:py-2">or</span>
             </div>
           </div>
 
+          <div className="sm:pt-1">
           <button
             onClick={handleAppleAuth}
             type="button"
@@ -624,8 +632,10 @@ export default function AuthScreen() {
             </svg>
             {googleLoading ? 'Waiting for Google...' : 'Continue with Google'}
           </button>
+          </div>
           </>
           )}
+          </div>
 
           {isReset ? (
             <p className="text-center text-sm text-natural-muted mt-6">
