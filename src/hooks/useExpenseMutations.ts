@@ -65,6 +65,7 @@ export function useExpenseMutations({
   const handleAddOrEditExpense = async (
     formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>
   ) => {
+    if (!group) return;
     const normalizedAmount = normalizeAmount(Number(formData.amount));
     if (!normalizedAmount) {
       setSupportError({ error: CHERRY_ERRORS.amountTooLarge, screen: 'Log expense' });
@@ -98,7 +99,6 @@ export function useExpenseMutations({
         'info'
       );
     }
-    if (!group) return;
     try {
       if (!group.categories?.includes(formData.category)) {
         const groupRef = doc(db, 'groups', group.id);

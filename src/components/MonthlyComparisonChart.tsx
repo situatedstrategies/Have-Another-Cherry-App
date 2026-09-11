@@ -64,7 +64,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
         Total lent: ${Number(d.lending || 0).toFixed(2)}
       </p>
       {compare && (
-        <p style={{ color: '#A1A1AA' }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
+        <p style={{ color: colors.subtle }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
       )}
       {Object.keys(lentBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
@@ -260,17 +260,17 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors.sidebar} />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: colors.accent }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: colors.accent }}
                   tickFormatter={(val) => `$${val}`}
                   width={45}
                 />
@@ -280,7 +280,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                     border: `1px solid ${colors.sidebar}`,
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                   }}
-                  formatter={(value: any, name: any) => [
+                  formatter={(value, name) => [
                     `$${Number(value).toFixed(2)}`,
                     name === 'prevSpending' ? 'Previous' : 'This period',
                   ]}
@@ -290,9 +290,9 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                   type="monotone"
                   dataKey="spending"
                   name="This period"
-                  stroke="#C41200"
+                  stroke={colors.primary}
                   strokeWidth={3}
-                  dot={{ r: 4, fill: '#C41200' }}
+                  dot={{ r: 4, fill: colors.primary }}
                   activeDot={{ r: 6 }}
                 />
                 {compare && (
@@ -300,7 +300,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                     type="monotone"
                     dataKey="prevSpending"
                     name="Previous"
-                    stroke="#C41200"
+                    stroke={colors.primary}
                     strokeDasharray="4 4"
                     strokeWidth={2}
                     dot={{ r: 3 }}
@@ -320,17 +320,17 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors.sidebar} />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: colors.accent }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tick={{ fontSize: 12, fill: colors.accent }}
                   tickFormatter={(val) => `$${val}`}
                   width={45}
                 />
@@ -340,9 +340,9 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                   type="monotone"
                   dataKey="lending"
                   name="This period"
-                  stroke="#18181B"
+                  stroke={colors.text}
                   strokeWidth={3}
-                  dot={{ r: 4, fill: '#18181B' }}
+                  dot={{ r: 4, fill: colors.text }}
                   activeDot={{ r: 6 }}
                 />
                 {compare && (
@@ -350,7 +350,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                     type="monotone"
                     dataKey="prevLending"
                     name="Previous"
-                    stroke="#18181B"
+                    stroke={colors.text}
                     strokeDasharray="4 4"
                     strokeWidth={2}
                     dot={{ r: 3 }}

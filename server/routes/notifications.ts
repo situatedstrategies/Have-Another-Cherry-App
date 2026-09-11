@@ -4,6 +4,7 @@ import type { GroupInfo, GroupLoader } from '../middleware';
 import { ensureAdminApp } from '../shared';
 import { sendReminderEmail } from '../resend';
 import { reminderPayload, reminderTargetDate } from '../reminders';
+import { hasPlus } from '../../src/lib/entitlements';
 
 const router = express.Router();
 
@@ -27,11 +28,7 @@ router.post('/api/send-reminder', requireAuth, rateLimit('remind', 10), async (r
     const fs = getFirestore();
 
     const callerDoc = await fs.collection('users').doc(callerUid).get();
-    const caller = callerDoc.data() || {};
-    const entExpiry = caller?.plusEntitlement?.expiresAt;
-    const callerHasPlus =
-      !!caller.isPlus && (!entExpiry || new Date(entExpiry).getTime() > Date.now());
-    if (!callerHasPlus) {
+    if (!hasPlus(callerDoc.data())) {
       return res.status(403).json({ error: 'Payment reminders are a Cherry + feature.' });
     }
 
@@ -188,7 +185,7 @@ router.post(
   rateLimit('notify', 60),
   (req, res, next) => {
     const { groupId, kind } = req.body || {};
-    if (typeof groupId !== 'string' || !LEDGER_PUSH_COPY[kind]) {
+    if (typeof groupId !== 'string' || !Object.hasOwn(LEDGER_PUSH_COPY, String(kind))) {
       return res.status(400).json({ error: 'Missing group or unknown event kind.' });
     }
     next();

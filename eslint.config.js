@@ -33,7 +33,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['**/server/**', '**/server'],
+              regex: '^(\\.\\.?/)+server(/|$)',
               message: 'src/ must not import from server/. Move shared code to src/lib.',
             },
           ],

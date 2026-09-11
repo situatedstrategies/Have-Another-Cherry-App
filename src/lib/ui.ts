@@ -12,4 +12,5 @@ export const colors = {
   primary: '#C41200',
   accent: '#71717A',
   muted: '#52525B',
+  subtle: '#A1A1AA',
 } as const;

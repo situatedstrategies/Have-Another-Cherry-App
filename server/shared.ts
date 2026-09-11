@@ -1,7 +1,9 @@
 import { timingSafeEqual } from 'crypto';
 import type { GoogleGenAI, Type } from '@google/genai';
 
-export const PROJECT_ID = 'gen-lang-client-0987674990';
+import firebaseConfig from '../firebase-applet-config.json';
+
+export const PROJECT_ID: string = firebaseConfig.projectId;
 
 // Constant-time comparison for secrets, so a mismatch leaks nothing.
 export const safeEqual = (a: string, b: string) => {

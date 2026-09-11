@@ -90,13 +90,14 @@ export type GroupLoader = (groupId: string, callerUid: string) => Promise<GroupI
 export const requireGroupMember =
   (loader: GroupLoader, failure: { log: string; message: string }) =>
   async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    let groupInfo: GroupInfo | null;
     try {
-      const groupInfo = await loader(String(req.body?.groupId), (req as any).uid as string);
-      if (!groupInfo) return res.status(403).json({ error: 'Not a member of this group.' });
-      (req as any).groupInfo = groupInfo;
-      next();
+      groupInfo = await loader(String(req.body?.groupId), (req as any).uid as string);
     } catch (err: any) {
       console.error(failure.log, err?.message || err);
       return res.status(500).json({ error: failure.message });
     }
+    if (!groupInfo) return res.status(403).json({ error: 'Not a member of this group.' });
+    (req as any).groupInfo = groupInfo;
+    next();
   };

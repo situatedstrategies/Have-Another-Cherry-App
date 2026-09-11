@@ -308,8 +308,8 @@ async function startServer() {
   app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (res.headersSent) return next(err);
     console.error('Unhandled error:', err?.message || err);
-    const status =
-      typeof err?.status === 'number' && err.status >= 400 && err.status < 600 ? err.status : 500;
+    const given = err?.status ?? err?.statusCode;
+    const status = typeof given === 'number' && given >= 400 && given < 600 ? given : 500;
     res.status(status).json({ error: 'Something went wrong' });
   });
 

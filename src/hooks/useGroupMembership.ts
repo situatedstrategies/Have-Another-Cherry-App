@@ -77,27 +77,41 @@ export function useGroupMembership({
 
   // After creating or joining a group (GroupSetup already wrote the docs):
   // make it active locally and clear the previous group's view state.
-  const applyJoinedGroup = useCallback((gid: string) => {
-    setUserProfile((prev: any) => {
-      const prevIds: string[] =
-        Array.isArray(prev?.groupIds) && prev.groupIds.length
-          ? prev.groupIds
-          : prev?.groupId
-            ? [prev.groupId]
-            : [];
-      const gids = Array.from(new Set([...prevIds, gid]));
-      return { ...(prev || {}), groupId: gid, activeGroupId: gid, groupIds: gids };
-    });
-    setSelectedExpense(null);
-    setEditingExpense(null);
-    setExpenses([]);
-    setGroup(null);
-    setGroupUsers({});
-    setShowAddGroup(false);
-    setShowSettings(false);
-    setShowGroupMenu(false);
-    setDismissedWaiting(false);
-  }, []);
+  const applyJoinedGroup = useCallback(
+    (gid: string) => {
+      setUserProfile((prev: any) => {
+        const prevIds: string[] =
+          Array.isArray(prev?.groupIds) && prev.groupIds.length
+            ? prev.groupIds
+            : prev?.groupId
+              ? [prev.groupId]
+              : [];
+        const gids = Array.from(new Set([...prevIds, gid]));
+        return { ...(prev || {}), groupId: gid, activeGroupId: gid, groupIds: gids };
+      });
+      setSelectedExpense(null);
+      setEditingExpense(null);
+      setExpenses([]);
+      setGroup(null);
+      setGroupUsers({});
+      setShowAddGroup(false);
+      setShowSettings(false);
+      setShowGroupMenu(false);
+      setDismissedWaiting(false);
+    },
+    [
+      setUserProfile,
+      setSelectedExpense,
+      setEditingExpense,
+      setExpenses,
+      setGroup,
+      setGroupUsers,
+      setShowAddGroup,
+      setShowSettings,
+      setShowGroupMenu,
+      setDismissedWaiting,
+    ]
+  );
 
   useEffect(() => {
     if (!currentUser || !activeGroupId) return;

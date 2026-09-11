@@ -249,9 +249,11 @@ router.post('/api/apple-notifications', async (req, res) => {
     if (hasOtherSignIn) {
       await adminAuth.updateUser(user.uid, { providersToUnlink: ['apple.com'] });
       await adminAuth.revokeRefreshTokens(user.uid);
+      console.log(`Apple ${type}: unlinked apple.com, sessions revoked`);
     } else {
       await getFirestore().collection('users').doc(user.uid).delete();
       await adminAuth.deleteUser(user.uid);
+      console.log(`Apple ${type}: account wiped`);
     }
     return res.status(200).json({ received: true });
   } catch (err: any) {

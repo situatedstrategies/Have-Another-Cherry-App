@@ -3,7 +3,7 @@ import { collection, query, onSnapshot, deleteDoc, doc, setDoc, where } from 'fi
 import { db } from '../firebase';
 import { claimSeats } from '../lib/seatClaims';
 import { mergeExpense } from '../lib/merge';
-import { advanceIntervalStr, parseLocalDate, todayLocal } from '../lib/recurring';
+import { advanceIntervalStr, parseLocalDate, todayLocal, toLocalIso } from '../lib/recurring';
 import { encryptData, decryptData } from '../lib/crypto';
 import { useGroupLedgerSnapshot } from './useGroupLedgerSnapshot';
 import type { Dispatch, SetStateAction } from 'react';
@@ -154,7 +154,7 @@ export function useLedgerSync({
     const horizon = (() => {
       const d = new Date(today + 'T00:00:00');
       d.setDate(d.getDate() + 14);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return toLocalIso(d);
     })();
     const spawned: Expense[] = [];
     const sourceUpdates = new Map<string, string>(); // source id -> new nextRecurringDate
