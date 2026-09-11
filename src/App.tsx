@@ -13,6 +13,7 @@ import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
+import CherryLogo from './components/CherryLogo';
 import ModuleBoundary from './components/ModuleBoundary';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
 import { normalizeAmount } from './lib/limits';
@@ -40,12 +41,6 @@ import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { hasPlus } from './lib/entitlements';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { Plus, Cloud, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
-
-function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
 
 // A key that changes weekly (ISO week) and when the group size changes, so the
 // cached greeting refreshes at most once per week (or when membership changes).

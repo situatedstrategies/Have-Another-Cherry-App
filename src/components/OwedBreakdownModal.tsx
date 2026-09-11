@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Expense, Group } from '../types';
-import { getFullMembers } from '../lib/members';
+import { getFullMembers, nameOf } from '../lib/members';
+import { formatAmount, formatShortDate } from '../lib/format';
 import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isDarkCherry } from '../lib/money';
 import { authHeader } from '../firebase';
 import Modal from './Modal';
@@ -18,19 +19,12 @@ interface OwedBreakdownModalProps {
   onClose: () => void;
 }
 
-const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmtDate = (dateStr: string) => {
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
-
 // Opened from the balance cards in the rail: the transactions still owed,
 // grouped per person, with a Cherry + option to email them a gentle reminder.
 export default function OwedBreakdownModal({
   mode, expenses, group, activeUser, isPlus, onSelectExpense, onCherryPlus, onToast, onClose,
 }: OwedBreakdownModalProps) {
   const members = useMemo(() => getFullMembers(group), [group]);
-  const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Someone';
   // A reminder is an email to a real account. A pending seat (ghost_N) has
   // no address on file, so the button is only offered for people who joined.
   const hasJoined = (uid: string) => (group.memberIds || []).includes(uid);
@@ -90,7 +84,7 @@ export default function OwedBreakdownModal({
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
         setRemindedUids(prev => [...prev, debtorUid]);
-        onToast('Reminder Sent', `A gentle nudge is on its way to ${nameOf(debtorUid)}.`, 'success');
+        onToast('Reminder Sent', `A gentle nudge is on its way to ${nameOf(debtorUid, members)}.`, 'success');
       } else {
         onToast('Error', data?.error || 'Could not send the reminder. Please try again.', 'error');
       }
@@ -116,7 +110,7 @@ export default function OwedBreakdownModal({
           <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
             {mode === 'you_owe' ? 'Total you owe' : 'Total owed to you'}
           </span>
-          <span className="text-2xl font-display font-semibold text-natural-text">{fmt(grandTotal)}</span>
+          <span className="text-2xl font-display font-semibold text-natural-text">{formatAmount(grandTotal)}</span>
         </div>
 
         {byPerson.length === 0 ? (
@@ -129,10 +123,10 @@ export default function OwedBreakdownModal({
               <div className="flex items-center justify-between gap-3 px-4 py-3 bg-natural-bg/60 border-b border-natural-border">
                 <div>
                   <span className="text-sm font-bold text-natural-text capitalize">
-                    {mode === 'you_owe' ? `You owe ${nameOf(person.uid)}` : nameOf(person.uid)}
+                    {mode === 'you_owe' ? `You owe ${nameOf(person.uid, members)}` : nameOf(person.uid, members)}
                   </span>
                   <span className="block text-xs text-natural-muted">
-                    {person.items.length} open {person.items.length === 1 ? 'item' : 'items'} · {fmt(person.total)}
+                    {person.items.length} open {person.items.length === 1 ? 'item' : 'items'} · {formatAmount(person.total)}
                   </span>
                 </div>
                 {mode === 'owed_to_you' && hasJoined(person.uid) && (
@@ -164,10 +158,10 @@ export default function OwedBreakdownModal({
                   >
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-natural-text truncate block">{expense.title}</span>
-                      <span className="text-xs text-natural-muted font-mono">{fmtDate(expense.date)} · {expense.category}</span>
+                      <span className="text-xs text-natural-muted font-mono">{formatShortDate(expense.date)} · {expense.category}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-mono font-bold text-natural-text">{fmt(amount)}</span>
+                      <span className="text-sm font-mono font-bold text-natural-text">{formatAmount(amount)}</span>
                       <ChevronRight size={14} className="text-natural-border group-hover:text-natural-primary transition-colors" />
                     </div>
                   </button>

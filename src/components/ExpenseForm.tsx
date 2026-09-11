@@ -7,6 +7,7 @@ import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } 
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
+import { roundCurrency } from '../lib/money';
 import { advanceIntervalStr, parseLocalDate, normalizeInterval, todayLocal, RECURRING_WEEKS, RECURRING_MONTHS } from '../lib/recurring';
 
 interface ExpenseFormProps {
@@ -336,11 +337,10 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     let finalShares: Record<string, number> = {};
     let finalThirdPersonShare: number | undefined = undefined;
     let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
-    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
     // Dark Cherry: no per-person shares - just the pot target and payment bounds.
-    const blindMinNum = round2(parseFloat(blindMin) || 0);
-    const blindMaxNum = round2(parseFloat(blindMax) || 0);
+    const blindMinNum = roundCurrency(parseFloat(blindMin) || 0);
+    const blindMaxNum = roundCurrency(parseFloat(blindMax) || 0);
     if (splitType === 'dark_cherry') {
       if (blindMinNum <= 0) {
         setError('Set a minimum per payment greater than zero.');
@@ -362,10 +362,10 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         const pct = splitType === 'household_default'
           ? (getFullDefaultSplit(group)[m.uid] || 0)
           : (100 / members.length);
-        const share = round2((numericAmount * pct) / 100);
+        const share = roundCurrency((numericAmount * pct) / 100);
         // Adjust the last member's share to account for rounding errors
         if (index === members.length - 1) {
-          finalShares[m.uid] = round2(numericAmount - runningTotal);
+          finalShares[m.uid] = roundCurrency(numericAmount - runningTotal);
         } else {
           finalShares[m.uid] = share;
           runningTotal += share;
@@ -407,25 +407,25 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       // so the parts sum exactly to what the percentages call for.
       let running = 0;
       members.forEach(m => {
-        const share = round2((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
+        const share = roundCurrency((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
         finalShares[m.uid] = share;
         running += share;
       });
       const guestShares = guestEntries.map(g => {
-        const share = round2((numericAmount * g.pct) / 100);
+        const share = roundCurrency((numericAmount * g.pct) / 100);
         running += share;
         return { name: g.name, share };
       });
       // The reconciliation target is what the percentages call for - equal to
       // the amount at exactly 100%, above it when interest is in play.
-      const pctTarget = round2((numericAmount * totalPct) / 100);
-      const diff = round2(pctTarget - running);
+      const pctTarget = roundCurrency((numericAmount * totalPct) / 100);
+      const diff = roundCurrency(pctTarget - running);
       if (Math.abs(diff) >= 0.01) {
         if (guestShares.length) {
-          guestShares[guestShares.length - 1].share = round2(guestShares[guestShares.length - 1].share + diff);
+          guestShares[guestShares.length - 1].share = roundCurrency(guestShares[guestShares.length - 1].share + diff);
         } else if (members.length) {
           const lastUid = members[members.length - 1].uid;
-          finalShares[lastUid] = round2(finalShares[lastUid] + diff);
+          finalShares[lastUid] = roundCurrency(finalShares[lastUid] + diff);
         }
       }
       if (guestShares.length) finalExtraParticipants = guestShares;

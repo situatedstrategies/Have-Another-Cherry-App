@@ -6,12 +6,7 @@ import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
-
-function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
+import CherryLogo from './CherryLogo';
 
 const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 

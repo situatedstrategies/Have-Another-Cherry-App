@@ -9,6 +9,7 @@ import {
   isPasswordValid,
 } from '../lib/password';
 import { SUPPORT_EMAIL, describeCodeError, sanitizeContinueUrl } from '../lib/authAction';
+import CherryLogo from './CherryLogo';
 
 // Handles the Firebase Auth email action links that used to land on
 // <project>.firebaseapp.com/__/auth/action. App Hosting is Cloud Run based and
@@ -27,12 +28,6 @@ type Phase =
   | { kind: 'success'; heading: string; message: string }
   | { kind: 'error'; message: string; offerNewLink: boolean }
   | { kind: 'unsupported' };
-
-function CherryLogo({ className = 'h-10 w-10' }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
 
 export default function AuthActionHandler() {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });

@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Expense, User } from '../types';
 import { parseLocalDate } from '../lib/recurring';
+import { roundCurrency } from '../lib/money';
+import { nameOf } from '../lib/members';
 
 interface MonthlyComparisonChartProps {
   expenses: Expense[];
@@ -16,8 +18,6 @@ const RANGES: { key: string; label: string; months: number }[] = [
   { key: '6M', label: '6M', months: 6 },
   { key: '1Y', label: '1Y', months: 12 },
 ];
-
-const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
 // Tooltip for the lending chart: shows who lent and who borrowed that month.
 function LendingTooltip({ active, payload, label, compare }: any) {
@@ -64,8 +64,6 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
     const currentMonth = now.getMonth();
     const withYear = months >= 12;
 
-    const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Someone';
-
     // Build `months` monthly buckets ending this month, shifted back by periodOffset periods.
     const buildBuckets = (periodOffset: number) =>
       Array.from({ length: months }).map((_, i) => {
@@ -98,27 +96,27 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       // but nobody lent anything: there is no payer to owe.
       const claimed = !!exp.paidBy;
       const payerShare = exp.shares?.[exp.paidBy] || 0;
-      const lent = claimed ? Math.max(0, round2(amount - payerShare)) : 0; // what everyone else owes the payer
+      const lent = claimed ? Math.max(0, roundCurrency(amount - payerShare)) : 0; // what everyone else owes the payer
 
       if (curMap.has(key)) {
         const b = cur[curMap.get(key)!];
         b.spending += amount;
         b.lending += lent;
         if (claimed) {
-          const payerName = nameOf(exp.paidBy);
-          if (lent > 0) b.lentBy[payerName] = round2((b.lentBy[payerName] || 0) + lent);
+          const payerName = nameOf(exp.paidBy, members);
+          if (lent > 0) b.lentBy[payerName] = roundCurrency((b.lentBy[payerName] || 0) + lent);
           Object.entries(exp.shares || {}).forEach(([uid, s]) => {
             if (uid !== exp.paidBy && (s || 0) > 0) {
-              const n = nameOf(uid);
-              b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + (s || 0));
+              const n = nameOf(uid, members);
+              b.borrowedBy[n] = roundCurrency((b.borrowedBy[n] || 0) + (s || 0));
             }
           });
           if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
             const n = exp.thirdPersonName || 'Third person';
-            b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
+            b.borrowedBy[n] = roundCurrency((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
           }
           (exp.extraParticipants || []).forEach(g => {
-            b.borrowedBy[g.name] = round2((b.borrowedBy[g.name] || 0) + g.share);
+            b.borrowedBy[g.name] = roundCurrency((b.borrowedBy[g.name] || 0) + g.share);
           });
         }
       } else if (prevMap.has(key)) {
@@ -130,10 +128,10 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
 
     return cur.map((b, i) => ({
       name: b.label,
-      spending: round2(b.spending),
-      lending: round2(b.lending),
-      prevSpending: round2(prev[i]?.spending || 0),
-      prevLending: round2(prev[i]?.lending || 0),
+      spending: roundCurrency(b.spending),
+      lending: roundCurrency(b.lending),
+      prevSpending: roundCurrency(prev[i]?.spending || 0),
+      prevLending: roundCurrency(prev[i]?.lending || 0),
       lentBy: b.lentBy,
       borrowedBy: b.borrowedBy,
     }));

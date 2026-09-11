@@ -36,6 +36,14 @@ export const getFullMembers = (group: any) => {
   return members;
 };
 
+/** Display name for a uid on a roster. 'You' when it is the viewer's own uid,
+ *  'Someone' when the uid is not on the roster. */
+export const nameOf = (
+  uid: string,
+  members: { uid: string; name?: string }[],
+  selfUid?: string
+): string => (uid === selfUid ? 'You' : members.find(m => m.uid === uid)?.name || 'Someone');
+
 export const getFullDefaultSplit = (group: any) => {
   if (!group) return {};
   const ds = { ...(group.defaultSplit || {}) };

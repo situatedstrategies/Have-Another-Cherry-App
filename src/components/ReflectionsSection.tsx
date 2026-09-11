@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { NotebookPen, Lock, Users, Trash2, Share2 } from 'lucide-react';
 import { Group } from '../types';
-import { getFullMembers } from '../lib/members';
+import { getFullMembers, nameOf } from '../lib/members';
+import { formatDateTime } from '../lib/format';
 import {
   REFLECTION_MOODS,
   Reflection,
@@ -35,8 +36,6 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
   const [error, setError] = useState('');
 
   const members = getFullMembers(group);
-  const nameOf = (uid: string) =>
-    uid === activeUser ? 'You' : members.find(m => m.uid === uid)?.name || 'Someone';
 
   useEffect(() => {
     let cancelled = false;
@@ -97,9 +96,6 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
       setError('Could not delete that reflection. Try again in a moment.');
     }
   };
-
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="space-y-4 pt-4 border-t border-natural-border" id="reflections-section">
@@ -177,7 +173,7 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-natural-text">
                     {r.shared
-                      ? <span className="flex items-center gap-1 text-natural-muted"><Users className="h-3 w-3" /> {nameOf(r.authorUid)}</span>
+                      ? <span className="flex items-center gap-1 text-natural-muted"><Users className="h-3 w-3" /> {nameOf(r.authorUid, members, activeUser)}</span>
                       : <span className="flex items-center gap-1 text-natural-primary"><Lock className="h-3 w-3" /> Only you</span>}
                     {moodMeta && (
                       <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-natural-sidebar border border-natural-border text-natural-muted">
@@ -185,7 +181,7 @@ export default function ReflectionsSection({ expenseId, group, activeUser }: Ref
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-natural-muted font-mono">{fmt(r.createdAt)}</span>
+                  <span className="text-[10px] text-natural-muted font-mono">{formatDateTime(r.createdAt)}</span>
                 </div>
                 <p className="text-xs text-natural-text leading-relaxed whitespace-pre-wrap">{r.text}</p>
                 {mine && (

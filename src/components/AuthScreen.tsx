@@ -11,6 +11,7 @@ import {
   checkPassword,
   isPasswordValid,
 } from '../lib/password';
+import CherryLogo from './CherryLogo';
 
 // Bumped 2026-09-02: eligibility lowered from 18+ to 13+ (parent or guardian
 // permission required under 18), and signup now records an age attestation.
@@ -115,13 +116,6 @@ async function recordTermsAcceptance(uid: string) {
   }
 }
 
-// Brand logo (public/logo.svg, mirrored from the marketing site), used across
-// the app; the email templates keep the PNG mark for email-client support.
-function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
 
 // Which view to open on. The marketing site sends people here from two very
 // different buttons: "Create an account" and "Log in". Landing a would-be

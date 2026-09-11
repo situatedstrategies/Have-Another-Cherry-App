@@ -6,6 +6,7 @@ import { X, Calendar, Tag, ShieldCheck, CreditCard, Clock, User, Trash2, Edit2, 
 import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
 import ReflectionsSection from './ReflectionsSection';
 import { intervalLabel } from '../lib/recurring';
+import { formatDate, formatDateTime } from '../lib/format';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -44,13 +45,6 @@ export default function ExpenseDetail({
   // Settlement id awaiting inline "remove entry" confirmation.
   const [voidingSettlement, setVoidingSettlement] = useState<string | null>(null);
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    // Date-only strings (YYYY-MM-DD) should render without timezone shifting.
-    const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-  
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -58,16 +52,6 @@ export default function ExpenseDetail({
     setCommentText('');
   };
   
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const members = useMemo(() => getFullMembers(group), [group]);
   const payerMember = members.find(m => m.uid === expense.paidBy);
   const payerName = payerMember?.name || 'Someone';

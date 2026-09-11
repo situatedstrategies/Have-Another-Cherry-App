@@ -4,13 +4,7 @@ import { Expense, Group } from '../types';
 import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
 import { Search, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
 import { intervalLabel } from '../lib/recurring';
-
-// Render a date-only (YYYY-MM-DD) string without a timezone shift (new Date on a
-// bare date parses as UTC midnight, showing the prior day in negative-UTC zones).
-const fmtDate = (dateStr: string) => {
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(dateStr + 'T00:00:00') : new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
+import { formatCurrency, formatDate } from '../lib/format';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -71,11 +65,6 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       setSortField(field);
       setSortOrder('desc');
     }
-  };
-
-  // Helper to format currency
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   };
 
   const getCategoryColor = (_category: string) => {
@@ -286,7 +275,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-natural-muted">
-                      <span className="font-mono">{fmtDate(exp.date)}</span>
+                      <span className="font-mono">{formatDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
                       <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
                       <span className="text-natural-border">•</span>
