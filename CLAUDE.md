@@ -25,11 +25,11 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).
 
 ## Commands
-- Install: `bun install` (repo uses Bun; `npm install` also works).
+- Install: `npm install` (App Hosting uses npm).
 - Dev: `npm run dev` (starts `tsx server.ts`; open http://localhost:3000).
 - Build: `npm run build` (`vite build` + esbuild bundles the server to `dist/server.cjs`).
 - Start built app: `npm run start`.
-- Typecheck: `npm run lint` (`tsc --noEmit`).
+- Lint and typecheck: `npm run lint` (ESLint, then `tsc --noEmit`). Tests: `npm test`. Formatting: `npm run format` / `npm run format:check`.
 
 ## Check live backend state before assuming it (hard rule)
 
