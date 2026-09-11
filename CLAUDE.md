@@ -9,7 +9,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 ## Stack
 
 - Frontend: React 19 + Vite 6 + TypeScript, Tailwind CSS v4 (`@tailwindcss/vite`).
-- Backend: Express server in `server.ts` (run with `tsx`). In dev it uses Vite middleware; in prod it serves the built SPA from `dist/`.
+- Backend: Express server in `server/index.ts` with route modules under `server/routes/` (run with `tsx`). In dev it uses Vite middleware; in prod it serves the built SPA from `dist/`.
 - Data/auth: Firebase (Auth + Firestore, client SDK). `firebase-admin` is a dependency but the server currently uses ADC, not the Admin SDK.
 - AI: Google Gemini via **Vertex AI** (`@google/genai`), authenticated with Application Default Credentials (ADC) - no API key.
 - Email: Resend (`resend`), sending from a verified domain.
@@ -23,14 +23,14 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `server/*.ts` - server-only modules (resend, notion, reminders, actionLink, profiles) and `server/templates/` for the email templates. Nothing under `src/` may import from `server/` (ESLint enforces this).
 - `src/types.ts` - data model (Group, User, Expense, Settlement, etc.).
 - `src/firebase.ts` - Firebase init from `firebase-applet-config.json`.
-- `server.ts` - Express API + static serving.
+- `server/index.ts` - app setup, middleware, static serving; `server/routes/*.ts` - API routes by concern (auth, invites, ai, billing, notifications, support); `server/middleware.ts` - requireAuth, rateLimit, requireSecret, requireGroupMember.
 - `public/` - static assets served at site root (e.g. `/cherry2transparent.png`).
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).
 
 ## Commands
 
 - Install: `npm install` (App Hosting uses npm).
-- Dev: `npm run dev` (starts `tsx server.ts`; open http://localhost:3000).
+- Dev: `npm run dev` (starts `tsx server/index.ts`; open http://localhost:3000).
 - Build: `npm run build` (`vite build` + esbuild bundles the server to `dist/server.cjs`).
 - Start built app: `npm run start`.
 - Lint and typecheck: `npm run lint` (ESLint, then `tsc --noEmit`). Tests: `npm test`. Formatting: `npm run format` / `npm run format:check`.
@@ -74,13 +74,13 @@ returns the actual build failure, including a Cloud Build log link.
 - App Hosting backend: `have-another-cherry`, region `us-east4`.
 - Live URL: https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app/
 - Custom domain: app.haveanothercherry.com. Marketing site: haveanothercherry.com (Squarespace).
-- The site password wall in `server.ts` is OFF by default (the app is public). `SITE_GATE_ENABLED=1` in `apphosting.yaml` turns it back on.
+- The site password wall in `server/index.ts` is OFF by default (the app is public). `SITE_GATE_ENABLED=1` in `apphosting.yaml` turns it back on.
 
 ## Retired beta environment
 
 There is no beta any more. It was a second App Hosting backend on its own Firebase
 project (`have-another-cherry-beta`) at beta.haveanothercherry.com, and it split the
-user base in two. `server.ts` now 301-redirects any `beta.*` host to
+user base in two. `server/index.ts` now 301-redirects any `beta.*` host to
 app.haveanothercherry.com. Do not reintroduce `firebase-applet-config.beta.json`,
 `apphosting.beta.yaml`, or a `VITE_APP_ENV` switch; one project, one backend.
 
@@ -146,7 +146,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   output: not in UI copy, error messages, emails, comments, commit messages, AI
   prompts, or AI-generated text. Use periods, hyphens (-), and colons only.
 - AI endpoints must (a) instruct the model not to use em dashes and (b) scrub
-  responses with `stripEmDashes` in `server.ts` before returning them. Keep both
+  responses with `stripEmDashes` in `server/shared.ts` before returning them. Keep both
   in place when adding new AI endpoints.
 
 ## Conventions / gotchas
@@ -154,4 +154,4 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Source of truth is GitHub `main` - that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.
-- Keep `PORT` as `Number(process.env.PORT) || 3000` in `server.ts`.
+- Keep `PORT` as `Number(process.env.PORT) || 3000` in `server/index.ts`.

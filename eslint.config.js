@@ -43,7 +43,7 @@ export default tseslint.config(
   },
   {
     // Node-side code and one-off scripts print their results on purpose.
-    files: ['server.ts', 'scripts/**', 'test/**'],
+    files: ['server/**', 'scripts/**', 'test/**'],
     rules: { 'no-console': 'off' },
   }
 );

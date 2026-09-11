@@ -21,5 +21,5 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true
   },
-  "include": ["src", "server", "server.ts", "scripts", "test", "vite.config.ts"]
+  "include": ["src", "server", "scripts", "test", "vite.config.ts"]
 }
