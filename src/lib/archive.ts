@@ -70,7 +70,7 @@ export function parseArchiveMonthKey(key: string): Date | null {
  * main snapshot and there would be no month key under which anyone could ask
  * for it back. Undated rows stay hot forever, which is the safe way to fail.
  */
-export function expenseDate(expense: Expense): Date | null {
+function expenseDate(expense: Expense): Date | null {
   const raw = (expense.date || '').trim();
   if (!raw) return null;
   const parsed = new Date(raw);

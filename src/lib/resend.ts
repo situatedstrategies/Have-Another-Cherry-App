@@ -29,8 +29,6 @@ const withComplianceFooter = (html: string): string =>
     ? html.replace("</body>", `${EMAIL_COMPLIANCE_FOOTER}</body>`)
     : html + EMAIL_COMPLIANCE_FOOTER;
 
-const EMAIL_INVITES_ACTIVE = true;
-
 function escapeHtml(input: string): string {
   return String(input == null ? "" : input)
     .replace(/&/g, "&amp;")
@@ -50,11 +48,6 @@ export async function sendInviteEmail(
   fromName?: string,
   split?: SplitEntry[]
 ) {
-  if (!EMAIL_INVITES_ACTIVE) {
-    console.log("[PRIVACY MODE] Suppressed email invite to " + email + " for group " + groupName);
-    return { id: "mocked_privacy_id_12345" };
-  }
-
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error("RESEND_API_KEY is not configured");

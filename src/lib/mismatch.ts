@@ -1,13 +1,13 @@
 import { PaymentInstrument, MismatchType, Expense } from '../types';
 
-export const getInstrumentClass = (instrument?: PaymentInstrument): 'IMMEDIATE' | 'DEFERRED' | null => {
+const getInstrumentClass = (instrument?: PaymentInstrument): 'IMMEDIATE' | 'DEFERRED' | null => {
   if (!instrument) return null;
   if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(instrument)) return 'IMMEDIATE';
   if (instrument === 'CREDIT') return 'DEFERRED';
   return null; // OTHER
 };
 
-export const classifyMismatch = (contribution?: PaymentInstrument, settlement?: PaymentInstrument): MismatchType => {
+const classifyMismatch = (contribution?: PaymentInstrument, settlement?: PaymentInstrument): MismatchType => {
   const c = getInstrumentClass(contribution);
   const s = getInstrumentClass(settlement);
   

@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-export const RECAPTCHA_SITE_KEY = firebaseConfig.recaptchaSiteKey;
+const RECAPTCHA_SITE_KEY = firebaseConfig.recaptchaSiteKey;
 
 let scriptPromise: Promise<void> | null = null;
 

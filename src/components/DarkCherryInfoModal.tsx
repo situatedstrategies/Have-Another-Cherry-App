@@ -1,4 +1,3 @@
-import React from 'react';
 import { EyeOff, HandCoins, ShieldCheck, Cherry } from 'lucide-react';
 import Modal from './Modal';
 

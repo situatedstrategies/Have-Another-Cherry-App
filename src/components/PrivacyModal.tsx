@@ -1,4 +1,3 @@
-import React from 'react';
 import { Shield, Lock, FileText, Download, Trash2 } from 'lucide-react';
 import Modal from './Modal';
 import { LegalDoc } from './LegalModal';

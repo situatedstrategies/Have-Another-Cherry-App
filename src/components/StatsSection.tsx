@@ -1,7 +1,7 @@
 import { Expense, Group } from '../types';
 import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
 import { joinedUids } from '../lib/members';
-import { CreditCard, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
+import { CreditCard, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface StatsSectionProps {
   expenses: Expense[];

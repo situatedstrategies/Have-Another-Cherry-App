@@ -378,7 +378,6 @@ async function startServer() {
         const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
         const mimeType = cleanImageMime(req.body?.mimeType);
 
-        console.log("Analyzing uploaded receipt image with Gemini API (Vertex)...");
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
           contents: [
@@ -1754,11 +1753,9 @@ async function startServer() {
       if (hasOtherSignIn) {
         await adminAuth.updateUser(user.uid, { providersToUnlink: ["apple.com"] });
         await adminAuth.revokeRefreshTokens(user.uid);
-        console.log(`Apple ${type}: unlinked apple.com from ${user.uid}, sessions revoked`);
       } else {
         await getFirestore().collection("users").doc(user.uid).delete();
         await adminAuth.deleteUser(user.uid);
-        console.log(`Apple ${type}: wiped account ${user.uid}`);
       }
       return res.status(200).json({ received: true });
     } catch (err: any) {

@@ -21,7 +21,7 @@ const SETTLEMENT_STATUS_RANK: Record<string, number> = {
 const settlementRank = (s: Settlement): number =>
   SETTLEMENT_STATUS_RANK[s.status] ?? 0;
 
-export function mergeSettlements(
+function mergeSettlements(
   local: Settlement[] = [],
   incoming: Settlement[] = []
 ): Settlement[] {
@@ -42,7 +42,7 @@ export function mergeSettlements(
   return Array.from(byId.values());
 }
 
-export function mergeComments(
+function mergeComments(
   local: Comment[] = [],
   incoming: Comment[] = []
 ): Comment[] {

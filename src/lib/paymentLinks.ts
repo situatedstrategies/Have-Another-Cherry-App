@@ -50,16 +50,3 @@ export function zelleTarget(enrolledHandle: string): PaymentTarget {
     copyText: handle,
   };
 }
-
-// Every way the payer can send money to this recipient, given the recipient's
-// stored handles. Order = preference (deep link first).
-export function paymentTargetsFor(
-  handles: { venmo?: string; zelle?: string } | undefined,
-  amount: number,
-  note: string
-): PaymentTarget[] {
-  const targets: PaymentTarget[] = [];
-  if (handles?.venmo?.trim()) targets.push(venmoTarget(handles.venmo, amount, note));
-  if (handles?.zelle?.trim()) targets.push(zelleTarget(handles.zelle));
-  return targets;
-}

@@ -101,9 +101,6 @@ export const seatAddBlocker = (group: Partial<Group> | null | undefined): string
   return null;
 };
 
-export const canAddSeat = (group: Partial<Group> | null | undefined): boolean =>
-  seatAddBlocker(group) === null;
-
 /** The percentage a new seat is offered by default: an equal share of the
  *  roster it is joining. */
 export const suggestedSeatPercent = (group: Partial<Group> | null | undefined): number =>

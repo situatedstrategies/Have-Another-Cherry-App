@@ -49,7 +49,7 @@ export const parseLocalDate = (s: string): Date =>
   new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T00:00:00' : s);
 
 /** YYYY-MM-DD in the local zone, which is how every date is stored. */
-export const toLocalIso = (d: Date): string =>
+const toLocalIso = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Today as a local YYYY-MM-DD. `toISOString()` gives the UTC date, which

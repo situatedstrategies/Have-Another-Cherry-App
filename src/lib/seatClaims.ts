@@ -24,7 +24,7 @@ import { Expense } from '../types';
 const GHOST = /^ghost_(\d+)$/;
 
 /** Placeholder ids referenced anywhere on an expense, lowest index first. */
-export function ghostIdsOn(expense: Expense): string[] {
+function ghostIdsOn(expense: Expense): string[] {
   const ids = new Set<string>();
   const add = (v: unknown) => { if (typeof v === 'string' && GHOST.test(v)) ids.add(v); };
   Object.keys(expense.shares || {}).forEach(add);

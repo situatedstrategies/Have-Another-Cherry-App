@@ -19,7 +19,7 @@
 // someone's inbox has to outlive whichever host minted it, so it is pinned.
 // Local dev keeps its own origin so the handler can be exercised offline, and
 // AUTH_ACTION_URL still overrides everything if a backend ever needs to.
-export const PUBLIC_APP_ORIGIN = 'https://app.haveanothercherry.com';
+const PUBLIC_APP_ORIGIN = 'https://app.haveanothercherry.com';
 
 export function actionHandlerBase(
   headers: Record<string, string | string[] | undefined>,

@@ -22,7 +22,6 @@ export const PASSWORD_MAX_LENGTH = 15;
 
 // Exactly the set Firebase reports as allowedNonAlphanumericCharacters. Note
 // that + and = are NOT in it, so "Pass1+" style passwords are refused.
-export const PASSWORD_SPECIAL_CHARS = '^$*.[]{}()?"!@#%&/\\,><\':;|_~`-';
 const SPECIAL_RE = /[\^$*.[\]{}()?"!@#%&/\\,><':;|_~`-]/;
 
 export interface PasswordChecks {
