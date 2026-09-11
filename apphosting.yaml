@@ -31,7 +31,7 @@ env:
   #
   # The database ID is a plain value: it is a pointer, not a credential, and it
   # is useless to anyone without the token. With NOTION_TOKEN unset the mirror
-  # is a no-op by design (src/lib/notion.ts), so signups still land by email.
+  # is a no-op by design (server/notion.ts), so signups still land by email.
   - variable: NOTION_TOKEN
     secret: NOTION_TOKEN
     availability:

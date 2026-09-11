@@ -58,7 +58,7 @@ export async function sendInviteEmail(
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), 'src/templates/inviteEmail.html');
+  const templatePath = path.join(process.cwd(), 'server/templates/inviteEmail.html');
   let htmlTemplate = '';
   try {
     htmlTemplate = await fs.readFile(templatePath, 'utf-8');
@@ -142,7 +142,7 @@ export async function sendVerificationEmail(
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), 'src/templates/verifyEmail.html');
+  const templatePath = path.join(process.cwd(), 'server/templates/verifyEmail.html');
   let htmlTemplate = '';
   try {
     htmlTemplate = await fs.readFile(templatePath, 'utf-8');
@@ -185,7 +185,7 @@ export async function sendResetEmail(email: string, resetLink: string, recipient
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), 'src/templates/resetEmail.html');
+  const templatePath = path.join(process.cwd(), 'server/templates/resetEmail.html');
   let htmlTemplate = '';
   try {
     htmlTemplate = await fs.readFile(templatePath, 'utf-8');

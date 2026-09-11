@@ -5,7 +5,7 @@
 //
 // Run with: npm run test:parity
 
-import { reminderTargetDate, reminderPayload } from '../src/lib/reminders';
+import { reminderTargetDate, reminderPayload } from '../server/reminders';
 
 let failures = 0;
 const check = (name: string, actual: unknown, expected: unknown) => {

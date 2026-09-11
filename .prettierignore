@@ -3,6 +3,7 @@ node_modules
 docs/brand-guide.html
 package-lock.json
 src/templates
+server/templates
 apphosting.yaml
 firebase.json
 .firebaserc

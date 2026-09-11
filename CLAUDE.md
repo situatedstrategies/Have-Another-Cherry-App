@@ -19,9 +19,9 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 
 - `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry).
 - `src/components/*.tsx` - screens (GroupSetup, ExpenseForm, ExpenseList, ExpenseDetail, SettleUpModal, ProfileSetup, StatsSection, AuthScreen, etc.).
-- `src/lib/*.ts` - helpers (resend, crypto, members, profiles, accounting, mismatch).
+- `src/lib/*.ts` - client helpers (crypto, members, money, mismatch, format).
+- `server/*.ts` - server-only modules (resend, notion, reminders, actionLink, profiles) and `server/templates/` for the email templates. Nothing under `src/` may import from `server/` (ESLint enforces this).
 - `src/types.ts` - data model (Group, User, Expense, Settlement, etc.).
-- `src/templates/inviteEmail.html` - Resend invite email template.
 - `src/firebase.ts` - Firebase init from `firebase-applet-config.json`.
 - `server.ts` - Express API + static serving.
 - `public/` - static assets served at site root (e.g. `/cherry2transparent.png`).
@@ -98,7 +98,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - `RESEND_API_KEY` lives in **Cloud Secret Manager**, referenced in `apphosting.yaml` (env var backed by `secret:`), not as a plaintext env var.
 - The App Hosting compute SA has both `Secret Manager Secret Accessor` and `Secret Manager Viewer` on that secret (Viewer is needed so the build can resolve the `latest` version).
 - Senders (hard rule, all verified on Resend): `poolside@haveanothercherry.com` for human-flavored email (invites, waitlist replies). `tartcherry@haveanothercherry.com` for payment reminders. `notifications@haveanothercherry.com` for system notifications (e.g. waitlist signups forwarded to the poolside inbox). `reset@haveanothercherry.com` for password resets and `verify@haveanothercherry.com` for email verification. `help@haveanothercherry.com` reaches a real person: it is the support/unsubscribe contact, never a sender.
-- Template `src/templates/inviteEmail.html` uses placeholders `{{recipientName}}`, `{{fromName}}`, `{{groupName}}`, `{{inviteCode}}`, `{{splitRows}}`. `src/lib/resend.ts` builds the split rows and fills the placeholders, then sends.
+- Template `server/templates/inviteEmail.html` uses placeholders `{{recipientName}}`, `{{fromName}}`, `{{groupName}}`, `{{inviteCode}}`, `{{splitRows}}`. `server/resend.ts` builds the split rows and fills the placeholders, then sends.
 - Invite flow: `GroupSetup.tsx` (collects recipient name + email, computes fromName and split) -> `POST /api/send-invite` -> `sendInviteEmail(...)`.
 
 ## Data model note (the "split")

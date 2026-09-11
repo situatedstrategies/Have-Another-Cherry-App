@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto';
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
-import { reminderTargetDate, reminderPayload } from './src/lib/reminders';
+import { reminderTargetDate, reminderPayload } from './server/reminders';
 import {
   sendInviteEmail,
   sendResetEmail,
@@ -12,9 +12,10 @@ import {
   sendBetaSignupNotification,
   sendReminderEmail,
   sendSupportRequest,
-} from './src/lib/resend';
-import { actionHandlerBase, retargetActionLink } from './src/lib/actionLink';
-import { addWaitlistLeadToNotion, deviceFromUserAgent } from './src/lib/notion';
+} from './server/resend';
+import { actionHandlerBase, retargetActionLink } from './server/actionLink';
+import { addWaitlistLeadToNotion, deviceFromUserAgent } from './server/notion';
+import { FINANCIAL_PROFILES } from './server/profiles';
 import firebaseConfig from './firebase-applet-config.json';
 import type { GoogleGenAI, Type } from '@google/genai';
 
@@ -378,7 +379,6 @@ async function startServer() {
   };
 
   const getCuratedProfile = async () => {
-    const { FINANCIAL_PROFILES } = await import('./src/lib/profiles.js');
     const f = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
     return { ...f, greetingTone: 'harmonious' };
   };
