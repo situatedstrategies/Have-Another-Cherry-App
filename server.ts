@@ -9,6 +9,9 @@ import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNot
 import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
 import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
 import firebaseConfig from "./firebase-applet-config.json";
+import type { GoogleGenAI, Type } from "@google/genai";
+
+const PROJECT_ID = "gen-lang-client-0987674990";
 
 async function startServer() {
   const app = express();
@@ -52,7 +55,7 @@ async function startServer() {
   // same-origin, so this doesn't affect it - it just blocks other sites).
   const allowedOrigins = (
     process.env.ALLOWED_ORIGINS ||
-    "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000," +
+    `https://app.haveanothercherry.com,https://have-another-cherry--${PROJECT_ID}.us-east4.hosted.app,http://localhost:3000,` +
     // Marketing site origins: the beta signup form on these pages posts to
     // /api/beta-signup cross-origin.
     "https://haveanothercherry.com,https://www.haveanothercherry.com,https://have-another-cherry-marketing.pages.dev"
@@ -97,7 +100,7 @@ async function startServer() {
     "7d93884ca2bb3700085c9ba2892bd9fce9c119ac7a9d7555f4e44230137d6c38";
   const GATE_HOSTS = new Set([
     "app.haveanothercherry.com",
-    "have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app",
+    `have-another-cherry--${PROJECT_ID}.us-east4.hosted.app`,
   ]);
   const GATE_EXEMPT_PATHS = new Set([
     "/api/revenuecat-webhook",
@@ -211,7 +214,7 @@ async function startServer() {
   // own domain.
   app.use("/__/auth", async (req, res) => {
     try {
-      const upstreamOrigin = "https://gen-lang-client-0987674990.firebaseapp.com";
+      const upstreamOrigin = `https://${PROJECT_ID}.firebaseapp.com`;
       const upstream = await fetch(upstreamOrigin + req.originalUrl, {
         method: req.method,
         headers: { accept: String(req.headers.accept || "*/*") },
@@ -273,6 +276,27 @@ async function startServer() {
   const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
   const cleanImageMime = (v: unknown): string =>
     typeof v === "string" && ALLOWED_IMAGE_MIME.has(v.toLowerCase()) ? v.toLowerCase() : "image/jpeg";
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isValidEmail = (value: unknown): value is string =>
+    typeof value === "string" && EMAIL_RE.test(value);
+
+  // One Vertex AI client per process, built on first use.
+  let vertexClient: { ai: GoogleGenAI; Type: typeof Type } | null = null;
+  const getVertexClient = async () => {
+    if (!vertexClient) {
+      const { GoogleGenAI, Type } = await import("@google/genai");
+      vertexClient = {
+        ai: new GoogleGenAI({
+          vertexai: true,
+          project: process.env.GOOGLE_CLOUD_PROJECT || PROJECT_ID,
+          location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+        }),
+        Type,
+      };
+    }
+    return vertexClient;
+  };
 
   // Lazily initialize the Firebase Admin SDK (ADC) once, shared across endpoints.
   const ensureAdminApp = async () => {
@@ -363,12 +387,7 @@ async function startServer() {
   // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
   app.post("/api/scan-receipt", requireAuth, rateLimit("scan", 60), async (req, res) => {
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const base64Image = req.body?.image;
       if (!base64Image || typeof base64Image !== "string") {
@@ -451,12 +470,7 @@ async function startServer() {
   // readable is persisted anywhere by this request.
   app.post("/api/vault-extract", requireAuth, rateLimit("vault", 30), async (req, res) => {
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
       const image = typeof req.body?.image === "string" ? req.body.image : "";
@@ -675,7 +689,7 @@ async function startServer() {
   app.post("/api/send-invite", requireAuth, rateLimit("invite"), async (req, res) => {
     try {
       const { email, groupName, inviteCode, recipientName, fromName, split } = req.body || {};
-      if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!isValidEmail(email)) {
         return res.status(400).json({ error: "A valid recipient email is required." });
       }
       // The template escapes HTML, so these caps are about size, not markup:
@@ -743,7 +757,7 @@ async function startServer() {
     }
     // Same shape check as send-invite, before the Admin SDK sees it: a
     // malformed address should be a 400 here, not an opaque SDK error.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return res.status(400).json({ error: "Please enter a valid email address." });
     }
 
@@ -835,12 +849,7 @@ async function startServer() {
     }
 
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const prompt =
         "You are a behavioral-economics-informed relationship finance analyst for \"Have Another Cherry\", " +
@@ -920,12 +929,7 @@ async function startServer() {
     const sizeKey = count <= 1 ? "solo" : count === 2 ? "pair" : "group";
 
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const audience =
         count <= 1 ? "one person managing their own bowl"
@@ -996,12 +1000,7 @@ async function startServer() {
         : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
 
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const severityBand =
         severityPct >= 50 ? "large (over 50% apart) - be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation"
@@ -1074,7 +1073,7 @@ async function startServer() {
     const fromEmail =
       (req as any).firebaseUser?.email ||
       (typeof email === "string" ? email.trim() : "");
-    if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
+    if (!isValidEmail(fromEmail)) {
       return res.status(400).json({ error: "A valid email address is required." });
     }
 
@@ -1161,7 +1160,7 @@ async function startServer() {
 
   app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
     const { email } = req.body || {};
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return res.status(400).json({ error: "A valid email address is required." });
     }
 
@@ -1236,7 +1235,7 @@ async function startServer() {
       typeof v === "string" ? v.trim().slice(0, max) : "";
 
     const email = clean(body.email, 254);
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return res.status(400).json({ error: "A valid email address is required." });
     }
     if (body.consent !== "yes") {
