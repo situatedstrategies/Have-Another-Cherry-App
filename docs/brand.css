@@ -13,28 +13,28 @@
    -------------------------------------------------------------------------- */
 :root {
   /* Color, cherry red is the ONLY hue. Everything else is a zinc neutral. */
-  --hac-cherry:       #C41200;  /* primary accent: CTAs, tick bar, highlights */
-  --hac-cherry-ink:   #A00E00;  /* deep cherry: hover state of solid red buttons */
-  --hac-cherry-wash:  #FBEAE7;  /* pale cherry tint: soft washes and highlights  */
-  --hac-ink:          #18181B;  /* headlines, body text                       */
-  --hac-paper:        #F4F4F5;  /* page background                            */
-  --hac-surface:      #FFFFFF;  /* cards, panels                              */
-  --hac-sidebar:      #E4E4E7;  /* secondary background, soft panels          */
-  --hac-border:       #D4D4D8;  /* 1px hairline borders                       */
-  --hac-muted:        #52525B;  /* secondary text                             */
-  --hac-faint:        #71717A;  /* tertiary text, fine print                  */
+  --hac-cherry: #c41200; /* primary accent: CTAs, tick bar, highlights */
+  --hac-cherry-ink: #a00e00; /* deep cherry: hover state of solid red buttons */
+  --hac-cherry-wash: #fbeae7; /* pale cherry tint: soft washes and highlights  */
+  --hac-ink: #18181b; /* headlines, body text                       */
+  --hac-paper: #f4f4f5; /* page background                            */
+  --hac-surface: #ffffff; /* cards, panels                              */
+  --hac-sidebar: #e4e4e7; /* secondary background, soft panels          */
+  --hac-border: #d4d4d8; /* 1px hairline borders                       */
+  --hac-muted: #52525b; /* secondary text                             */
+  --hac-faint: #71717a; /* tertiary text, fine print                  */
 
   /* Type, three faces, three jobs. Never substitute. */
-  --hac-font-display: "Lora", Georgia, serif;                    /* headlines, wordmark */
-  --hac-font-body:    "Inter", Helvetica, Arial, sans-serif;     /* everything else     */
-  --hac-font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, monospace; /* money, codes, % */
+  --hac-font-display: 'Lora', Georgia, serif; /* headlines, wordmark */
+  --hac-font-body: 'Inter', Helvetica, Arial, sans-serif; /* everything else     */
+  --hac-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; /* money, codes, % */
 
   /* Shape, soft but precise */
-  --hac-radius-sm:   8px;    /* inputs, small chips        */
-  --hac-radius-md:   10px;   /* buttons                    */
-  --hac-radius-lg:   12px;   /* inner panels, code boxes   */
-  --hac-radius-xl:   16px;   /* cards, containers          */
-  --hac-radius-pill: 999px;  /* pill CTAs, the tick bar    */
+  --hac-radius-sm: 8px; /* inputs, small chips        */
+  --hac-radius-md: 10px; /* buttons                    */
+  --hac-radius-lg: 12px; /* inner panels, code boxes   */
+  --hac-radius-xl: 16px; /* cards, containers          */
+  --hac-radius-pill: 999px; /* pill CTAs, the tick bar    */
 
   /* Elevation, barely there */
   --hac-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
@@ -53,7 +53,9 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.hac h1, .hac h2, .hac h3 {
+.hac h1,
+.hac h2,
+.hac h3 {
   font-family: var(--hac-font-display);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -61,14 +63,32 @@
   color: var(--hac-ink);
   margin: 0;
 }
-.hac h1 { font-size: clamp(2rem, 5vw, 3rem); }
-.hac h2 { font-size: 1.625rem; }
-.hac h3 { font-size: 1.25rem; }
+.hac h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+.hac h2 {
+  font-size: 1.625rem;
+}
+.hac h3 {
+  font-size: 1.25rem;
+}
 
-.hac p     { margin: 0 0 1em; }
-.hac small { font-size: 0.75rem; color: var(--hac-faint); }
-.hac a     { color: var(--hac-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.hac a:hover { color: var(--hac-cherry); }
+.hac p {
+  margin: 0 0 1em;
+}
+.hac small {
+  font-size: 0.75rem;
+  color: var(--hac-faint);
+}
+.hac a {
+  color: var(--hac-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hac a:hover {
+  color: var(--hac-cherry);
+}
 
 /* Money, percentages, invite codes, always mono, always tabular */
 .hac-num {
@@ -97,7 +117,10 @@
   border: 0;
   margin: 14px 0 0;
 }
-.hac-tick--center { margin-left: auto; margin-right: auto; }
+.hac-tick--center {
+  margin-left: auto;
+  margin-right: auto;
+}
 
 /* --------------------------------------------------------------------------
    3. Buttons
@@ -113,16 +136,21 @@
   cursor: pointer;
   text-decoration: none;
   text-align: center;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 /* Primary: cherry red, white text. One per composition. */
 .hac-btn--primary {
   background: var(--hac-cherry);
-  color: #FFFFFF;
+  color: #ffffff;
   box-shadow: var(--hac-shadow-sm);
 }
-.hac-btn--primary:hover { background: var(--hac-cherry-ink); box-shadow: var(--hac-shadow-md); }
+.hac-btn--primary:hover {
+  background: var(--hac-cherry-ink);
+  box-shadow: var(--hac-shadow-md);
+}
 
 /* Secondary: white with hairline border */
 .hac-btn--secondary {
@@ -131,7 +159,9 @@
   border: 1px solid var(--hac-border);
   box-shadow: var(--hac-shadow-sm);
 }
-.hac-btn--secondary:hover { background: var(--hac-sidebar); }
+.hac-btn--secondary:hover {
+  background: var(--hac-sidebar);
+}
 
 /* Pill variant: compact rounded-full CTA (app header style) */
 .hac-btn--pill {
@@ -204,9 +234,13 @@
   border-radius: var(--hac-radius-sm);
   padding: 10px 12px;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
-.hac-input::placeholder { color: var(--hac-faint); }
+.hac-input::placeholder {
+  color: var(--hac-faint);
+}
 .hac-input:focus {
   border-color: var(--hac-muted);
   box-shadow: 0 0 0 1px var(--hac-muted);
@@ -225,9 +259,18 @@
 /* Red-flood variant (high-impact ads): everything on cherry */
 .hac-flood {
   background: var(--hac-cherry);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 .hac-flood .hac-wordmark,
-.hac-flood h1, .hac-flood h2, .hac-flood h3 { color: #FFFFFF; }
-.hac-flood .hac-tick { background: #FFFFFF; }
-.hac-flood .hac-btn--primary { background: #FFFFFF; color: var(--hac-cherry); }
+.hac-flood h1,
+.hac-flood h2,
+.hac-flood h3 {
+  color: #ffffff;
+}
+.hac-flood .hac-tick {
+  background: #ffffff;
+}
+.hac-flood .hac-btn--primary {
+  background: #ffffff;
+  color: var(--hac-cherry);
+}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertTriangle, LifeBuoy } from 'lucide-react';
 import Modal from './Modal';
 import { CherryError, supportMailto, SUPPORT_EMAIL } from '../lib/errors';

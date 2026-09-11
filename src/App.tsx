@@ -1,18 +1,55 @@
-import { getFullMembers, joinedUids, pendingSeats, withAddedSeat, withRemovedSeat } from './lib/members';
+import {
+  getFullMembers,
+  joinedUids,
+  pendingSeats,
+  withAddedSeat,
+  withRemovedSeat,
+} from './lib/members';
 import { claimSeats } from './lib/seatClaims';
 import { computeMismatchForSettlement } from './lib/mismatch';
-import { getRemainingSettlementAmount, getSettlementTotal, getExpenseStatusLabel, getNormalizedExpenseStatus, roundCurrency, isDarkCherry, getDarkCherryRemaining } from './lib/money';
+import {
+  getRemainingSettlementAmount,
+  getSettlementTotal,
+  getExpenseStatusLabel,
+  getNormalizedExpenseStatus,
+  roundCurrency,
+  isDarkCherry,
+  getDarkCherryRemaining,
+} from './lib/money';
 import { mergeExpense } from './lib/merge';
 import { advanceIntervalStr, parseLocalDate, todayLocal } from './lib/recurring';
 import { encryptData, decryptData } from './lib/crypto';
 import { useGroupLedgerSnapshot } from './hooks/useGroupLedgerSnapshot';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, query, onSnapshot, updateDoc, deleteDoc, doc, setDoc, getDoc, getDocs, where, deleteField, arrayRemove } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, GoogleAuthProvider, OAuthProvider, EmailAuthProvider, updateProfile } from 'firebase/auth';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  collection,
+  query,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  where,
+  deleteField,
+  arrayRemove,
+} from 'firebase/firestore';
+import {
+  onAuthStateChanged,
+  deleteUser,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  GoogleAuthProvider,
+  OAuthProvider,
+  EmailAuthProvider,
+  updateProfile,
+} from 'firebase/auth';
 import { auth, db, authHeader, forgetKeepSignedIn } from './firebase';
 import { pushPermission, enableWebPush, disableWebPush, listenForegroundPush } from './lib/push';
 import { configureBilling } from './lib/billing';
 import ErrorSupportModal from './components/ErrorSupportModal';
+import CherryLogo from './components/CherryLogo';
 import ModuleBoundary from './components/ModuleBoundary';
 import { CHERRY_ERRORS, CherryError } from './lib/errors';
 import { normalizeAmount } from './lib/limits';
@@ -28,7 +65,6 @@ import BackupModal from './components/BackupModal';
 import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
-import Modal from './components/Modal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import FinancialAlignmentModal from './components/FinancialAlignmentModal';
@@ -39,28 +75,39 @@ import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { hasPlus } from './lib/entitlements';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Plus, Cloud, Sparkles, RefreshCcw, Settings, X, AlertCircle, Check, ChevronDown, TrendingUp, Vault as VaultIcon, Wallet } from 'lucide-react';
+import {
+  Plus,
+  Sparkles,
+  RefreshCcw,
+  Settings,
+  X,
+  AlertCircle,
+  Check,
+  ChevronDown,
+  TrendingUp,
+  Vault as VaultIcon,
+  Wallet,
+} from 'lucide-react';
 
-function CherryLogo({ className = "h-10 w-10" }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
-
-// A key that changes weekly (ISO week) and when the group size changes, so the
-// cached greeting refreshes at most once per week (or when membership changes).
+// ISO week plus member count, so the cached greeting refreshes weekly or when membership changes.
 function getGreetingKey(memberCount: number): string {
   const d = new Date();
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const dayNum = (date.getUTCDay() + 6) % 7;
   date.setUTCDate(date.getUTCDate() - dayNum + 3);
   const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  const week =
+    1 +
+    Math.round(
+      ((date.getTime() - firstThursday.getTime()) / 86400000 -
+        3 +
+        ((firstThursday.getUTCDay() + 6) % 7)) /
+        7
+    );
   return `${date.getUTCFullYear()}-W${week}-m${memberCount}`;
 }
 
-// Consistent, branded loading screen - same background as every other screen so
-// switching between them never flashes white or a stale page.
+// Same background as every other screen, so switching never flashes white.
 function LoadingScreen({ label = 'Loading...' }: { label?: string }) {
   return (
     <div className="min-h-screen bg-natural-bg flex flex-col items-center justify-center animate-in fade-in duration-300">
@@ -77,27 +124,25 @@ export default function App() {
   const [group, setGroup] = useState<Group | null>(null);
   const [groupUsers, setGroupUsers] = useState<Record<string, any>>({});
 
-  // A user can belong to several groups. `activeGroupId` is the one being viewed;
-  // `groupIds` is the full set. Both fall back to the legacy single `groupId`
-  // field for accounts created before multi-group support.
+  // `activeGroupId` is the group being viewed; `groupIds` is the full set. Both
+  // fall back to the legacy single `groupId` field.
   const activeGroupId: string | null = userProfile?.activeGroupId || userProfile?.groupId || null;
-  const groupIds: string[] = Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
-    ? userProfile.groupIds
-    : (userProfile?.groupId ? [userProfile.groupId] : []);
-  // Latest membership for listeners that must not re-subscribe on every
-  // profile change (the group snapshot below).
+  const groupIds: string[] =
+    Array.isArray(userProfile?.groupIds) && userProfile.groupIds.length
+      ? userProfile.groupIds
+      : userProfile?.groupId
+        ? [userProfile.groupId]
+        : [];
+  // For listeners that must not re-subscribe on every profile change.
   const groupIdsRef = useRef<string[]>([]);
   groupIdsRef.current = groupIds;
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Modal / Form States
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
-  // Multi-group UI state: the header switcher menu, the "add another group"
-  // overlay, and cached names for the groups this user belongs to.
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [groupSummaries, setGroupSummaries] = useState<Record<string, { name?: string }>>({});
@@ -112,11 +157,13 @@ export default function App() {
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
-  // The one error dialog: what failed, what stands, and a pre-filled path
-  // to help@haveanothercherry.com. Set from any failure point.
-  const [supportError, setSupportError] = useState<{ error: CherryError; screen?: string; detail?: string } | null>(null);
+  // The one error dialog, set from any failure point.
+  const [supportError, setSupportError] = useState<{
+    error: CherryError;
+    screen?: string;
+    detail?: string;
+  } | null>(null);
   const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
-  // Settings inputs for the spending threshold and direct-payment handles.
   const [thresholdInput, setThresholdInput] = useState('');
   const [venmoInput, setVenmoInput] = useState('');
   const [zelleInput, setZelleInput] = useState('');
@@ -129,24 +176,31 @@ export default function App() {
   const [showSettleModal, setShowSettleModal] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  // Stable identities so Toast's auto-dismiss timer isn't reset on every re-render.
-  const addToast = useCallback((title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setToasts(prev => [...prev, { id: Date.now().toString() + Math.random().toString(), title, message, type }]);
-  }, []);
+  // Stable identities so Toast's auto-dismiss timer is not reset on every render.
+  const addToast = useCallback(
+    (title: string, message: string, type: 'info' | 'success' | 'error' = 'info') => {
+      setToasts((prev) => [
+        ...prev,
+        { id: Date.now().toString() + Math.random().toString(), title, message, type },
+      ]);
+    },
+    []
+  );
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Called after the user creates or joins a group (initial setup or "add another
-  // group"). The group doc + user membership were already written by GroupSetup;
-  // here we make the new group active locally and clear the previous group's
-  // transient view state so nothing from the old group bleeds through.
+  // After creating or joining a group (GroupSetup already wrote the docs):
+  // make it active locally and clear the previous group's view state.
   const applyJoinedGroup = useCallback((gid: string) => {
     setUserProfile((prev: any) => {
-      const prevIds: string[] = Array.isArray(prev?.groupIds) && prev.groupIds.length
-        ? prev.groupIds
-        : (prev?.groupId ? [prev.groupId] : []);
+      const prevIds: string[] =
+        Array.isArray(prev?.groupIds) && prev.groupIds.length
+          ? prev.groupIds
+          : prev?.groupId
+            ? [prev.groupId]
+            : [];
       const gids = Array.from(new Set([...prevIds, gid]));
       return { ...(prev || {}), groupId: gid, activeGroupId: gid, groupIds: gids };
     });
@@ -161,21 +215,16 @@ export default function App() {
     setDismissedWaiting(false);
   }, []);
 
-  // 1. Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (!user) {
         setIsLoading(false);
       } else {
-        // Web billing is dormant unless VITE_RC_WEB_KEY is set; when it is,
-        // key it to the Firebase uid (same rule as the mobile apps) so a
-        // purchase maps to users/{uid} via the webhook.
+        // Web billing is keyed to the Firebase uid so a purchase maps to users/{uid}.
         configureBilling(user.uid).catch(console.error);
-        // Promo allowlist (owner, review accounts): the server decides from
-        // the verified token and writes the entitlement; the profile
-        // listener picks it up. Silent on failure: nothing is lost, the
-        // paywall simply stays where it is until the next sign-in.
+        // Promo allowlist: the server writes the entitlement and the profile
+        // listener picks it up. Silent on failure.
         authHeader()
           .then((h) => fetch('/api/plus-promo-sync', { method: 'POST', headers: h }))
           .catch(() => {});
@@ -184,11 +233,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 1b. Web push. If this browser already granted notifications, silently
-  // refresh the token registration; either way, surface pushes that arrive
-  // while the app is open as toasts (the browser only shows them when the
-  // tab is in the background). The first permission ask lives in Settings,
-  // behind a click - never an unprompted browser dialog on load.
+  // Web push: refresh the token if permission was already granted, and show
+  // pushes that arrive while the tab is open as toasts. The first permission
+  // ask lives in Settings, behind a click.
   useEffect(() => {
     if (!currentUser) return;
     let unsub: (() => void) | undefined;
@@ -201,10 +248,12 @@ export default function App() {
       if (cancelled) u();
       else unsub = u;
     })();
-    return () => { cancelled = true; unsub?.(); };
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [currentUser]);
 
-  // 2. Fetch User Profile
   useEffect(() => {
     if (!currentUser) return;
     setIsLoading(true);
@@ -214,16 +263,27 @@ export default function App() {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
           const profile = userDoc.data() as any;
-          // Backfill a missing/legacy name from the account's sign-in display name
-          // (covers both Google and email/password accounts).
-          if ((!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') && currentUser.displayName) {
+          // Backfill a missing name from the sign-in display name.
+          if (
+            (!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') &&
+            currentUser.displayName
+          ) {
             profile.name = currentUser.displayName;
-            updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(() => {});
+            updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(
+              () => {}
+            );
           }
-          // Migrate legacy single-group accounts to the multi-group shape so the
-          // group switcher and security rules have the fields they expect.
-          if (profile.groupId && (!Array.isArray(profile.groupIds) || profile.groupIds.length === 0 || !profile.activeGroupId)) {
-            profile.groupIds = Array.isArray(profile.groupIds) && profile.groupIds.length ? profile.groupIds : [profile.groupId];
+          // Migrate legacy single-group accounts to the multi-group shape.
+          if (
+            profile.groupId &&
+            (!Array.isArray(profile.groupIds) ||
+              profile.groupIds.length === 0 ||
+              !profile.activeGroupId)
+          ) {
+            profile.groupIds =
+              Array.isArray(profile.groupIds) && profile.groupIds.length
+                ? profile.groupIds
+                : [profile.groupId];
             profile.activeGroupId = profile.activeGroupId || profile.groupId;
             updateDoc(doc(db, 'users', currentUser.uid), {
               groupIds: profile.groupIds,
@@ -235,7 +295,7 @@ export default function App() {
           setUserProfile({}); // Setup required
         }
       } catch (error) {
-        console.error("Error fetching profile", error);
+        console.error('Error fetching profile', error);
       } finally {
         setIsLoading(false);
       }
@@ -244,101 +304,103 @@ export default function App() {
     fetchProfile();
   }, [currentUser]);
 
-  // 2b. Listen to the active Group
   useEffect(() => {
     if (!currentUser || !activeGroupId) return;
     const gid = activeGroupId;
-    const groupUnsubscribe = onSnapshot(doc(db, 'groups', gid), (groupSnapshot) => {
-      // Read before exists(): that guard narrows the snapshot type to never.
-      const fromCache = groupSnapshot.metadata.fromCache;
-      if (groupSnapshot.exists()) {
-        setGroup(groupSnapshot.data() as Group);
-        return;
+    const groupUnsubscribe = onSnapshot(
+      doc(db, 'groups', gid),
+      (groupSnapshot) => {
+        // Read before exists(): that guard narrows the snapshot type to never.
+        const fromCache = groupSnapshot.metadata.fromCache;
+        if (groupSnapshot.exists()) {
+          setGroup(groupSnapshot.data() as Group);
+          return;
+        }
+        // A miss served from cache is not a deletion: the server has not spoken
+        // yet (cold start, or offline), so wait for a synced snapshot.
+        if (fromCache) return;
+        // The group is gone. Left alone, the profile still points at it and the
+        // app sits on "Loading your group" forever, so drop it locally and
+        // scrub it from the user doc best effort.
+        const remaining = groupIdsRef.current.filter((id) => id !== gid);
+        const nextActive = remaining[0] || null;
+        setGroup(null);
+        setUserProfile((prev: any) =>
+          prev
+            ? { ...prev, groupIds: remaining, activeGroupId: nextActive, groupId: nextActive }
+            : prev
+        );
+        updateDoc(doc(db, 'users', currentUser.uid), {
+          groupIds: arrayRemove(gid),
+          activeGroupId: nextActive ?? deleteField(),
+          groupId: nextActive ?? deleteField(),
+        }).catch(() => {});
+      },
+      (error) => {
+        // Sign-out cancels listeners with permission-denied; teardown noise.
+        if (error.code === 'permission-denied' && !auth.currentUser) return;
+        console.error('groupUnsubscribe error:', error);
       }
-      // A miss served from cache only means the document is not cached (the
-      // memory cache is empty on a cold start, and Firestore raises the first
-      // event from cache while offline). The server has not said the group is
-      // gone, so wait for a synced snapshot. Treating it as deleted here
-      // scrubbed a real group from the profile on every offline launch.
-      if (fromCache) return;
-      // The group is gone (its last member left and it was deleted, or the
-      // id on the profile is stale). The leave path also deletes the doc and
-      // this fires once more with the same writes, which is harmless. Left alone, the profile still points at
-      // it and the app sits on "Loading your group" forever. Drop it locally
-      // so GroupSetup renders, and scrub it from the user doc best effort.
-      const remaining = groupIdsRef.current.filter(id => id !== gid);
-      const nextActive = remaining[0] || null;
-      setGroup(null);
-      setUserProfile((prev: any) => (prev ? { ...prev, groupIds: remaining, activeGroupId: nextActive, groupId: nextActive } : prev));
-      updateDoc(doc(db, 'users', currentUser.uid), {
-        groupIds: arrayRemove(gid),
-        activeGroupId: nextActive ?? deleteField(),
-        groupId: nextActive ?? deleteField(),
-      }).catch(() => {});
-    }, (error) => {
-      // Sign-out cancels live listeners with permission-denied before the
-      // effect cleanup runs. That is teardown noise, not a rules problem.
-      if (error.code === 'permission-denied' && !auth.currentUser) return;
-      console.error('groupUnsubscribe error:', error);
-    });
+    );
     return () => groupUnsubscribe();
   }, [currentUser, activeGroupId]);
 
-  // Cache the names of every group this user belongs to, for the header switcher.
-  // The rules allow any signed-in user to `get` a group by id, so a light read
-  // per group is enough - no schema bloat on the user doc.
+  // Group names for the header switcher. Any signed-in user may `get` a group by id.
   useEffect(() => {
-    if (!groupIds.length) { setGroupSummaries({}); return; }
+    if (!groupIds.length) {
+      setGroupSummaries({});
+      return;
+    }
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(groupIds.map(async (gid) => {
-        try {
-          const snap = await getDoc(doc(db, 'groups', gid));
-          return [gid, { name: snap.exists() ? (snap.data() as any).name : undefined }] as const;
-        } catch {
-          return [gid, {}] as const;
-        }
-      }));
+      const entries = await Promise.all(
+        groupIds.map(async (gid) => {
+          try {
+            const snap = await getDoc(doc(db, 'groups', gid));
+            return [gid, { name: snap.exists() ? (snap.data() as any).name : undefined }] as const;
+          } catch {
+            return [gid, {}] as const;
+          }
+        })
+      );
       if (!cancelled) setGroupSummaries(Object.fromEntries(entries));
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupIds.join(',')]);
 
-  // Live roster of the group's members. Firestore rules are not filters: a
-  // collection query cannot prove the per-document users `read` rule (it
-  // depends on each doc's groupIds), so a where(__name__, in, ...) query is
-  // denied outright with "Missing or insufficient permissions". Listen to
-  // each member doc individually instead - a single-doc read evaluates the
-  // rule against the actual document, which groupmates pass.
+  // One listener per member doc. Rules are not filters: a collection query
+  // cannot prove the per-document users `read` rule and is denied outright,
+  // while a single-doc read evaluates it against the actual document.
   const memberIdsKey = (group?.memberIds || []).join(',');
   useEffect(() => {
     if (!currentUser || !memberIdsKey) return;
     const memberIds = memberIdsKey.split(',');
     const users: Record<string, any> = {};
     const unsubs = memberIds.map((uid) =>
-      onSnapshot(doc(db, 'users', uid), (snap) => {
-        if (snap.exists()) {
-          users[uid] = snap.data();
-        } else {
-          delete users[uid];
+      onSnapshot(
+        doc(db, 'users', uid),
+        (snap) => {
+          if (snap.exists()) {
+            users[uid] = snap.data();
+          } else {
+            delete users[uid];
+          }
+          setGroupUsers({ ...users });
+        },
+        (error) => {
+          if (error.code === 'permission-denied' && !auth.currentUser) return;
+          // Surface it: a silent empty roster disables every feature built on it.
+          console.error('group member listener error for ' + uid + ':', error);
         }
-        setGroupUsers({ ...users });
-      }, (error) => {
-        if (error.code === 'permission-denied' && !auth.currentUser) return;
-        // Surface (don't swallow) a permission failure - otherwise the member
-        // roster silently stays empty and every feature built on it (names,
-        // income recalc, discrepancy banner) quietly does nothing.
-        console.error('group member listener error for ' + uid + ':', error);
-      })
+      )
     );
     return () => unsubs.forEach((u) => u());
   }, [currentUser, memberIdsKey]);
 
-  
-  
-  
-  // Load the cached ledger when the active user or group *id* changes - not on
-  // every unrelated group field update (which reloaded and could flicker state).
+  // Keyed on the group id, not the group object, so unrelated field updates
+  // do not reload the ledger.
   useEffect(() => {
     if (!activeUser || !group) return;
     const stored = localStorage.getItem('expenses_' + group.id);
@@ -353,8 +415,7 @@ export default function App() {
     }
   }, [activeUser, group?.id]);
 
-  // Shared encrypted group snapshot provides historical ledger backfill
-  // when a new member/device joins an existing active group.
+  // Historical backfill from the shared encrypted snapshot.
   useGroupLedgerSnapshot({
     activeUser,
     groupId: group?.id,
@@ -362,29 +423,25 @@ export default function App() {
     setExpenses,
   });
 
-  // Claim placeholder seats in history (lib/seatClaims). An expense logged
-  // before a member joined names their pending seat (ghost_N) rather than
-  // them, so they showed as 0% and the seat as "Unknown" on everything logged
-  // before they redeemed the code. Re-run whenever the ledger or the roster
-  // changes, so the partner's open tab heals the moment the join lands; the
-  // snapshot persist effect above then writes the claimed ledger back.
+  // Claim placeholder seats (lib/seatClaims) whenever the ledger or roster
+  // changes, so an open tab heals the moment a join lands; the persist
+  // effect then writes the claimed ledger back.
   useEffect(() => {
     if (!group?.id || !memberIdsKey || expenses.length === 0) return;
     const claimed = claimSeats(expenses, memberIdsKey.split(','));
     if (!claimed.changed) return;
     setExpenses(claimed.expenses);
-    try { localStorage.setItem('expenses_' + group.id, JSON.stringify(claimed.expenses)); } catch {}
+    try {
+      localStorage.setItem('expenses_' + group.id, JSON.stringify(claimed.expenses));
+    } catch {}
   }, [expenses, memberIdsKey, group?.id]);
 
-  // Sync Queue Listener
+  // Transfer queue: encrypted expense upserts and deletes from other members.
   useEffect(() => {
     if (!activeUser || !group) return;
 
     const groupId = group.id;
-    const q = query(
-      collection(db, 'transfer_queue'),
-      where('to', '==', activeUser)
-    );
+    const q = query(collection(db, 'transfer_queue'), where('to', '==', activeUser));
 
     const unsubscribe = onSnapshot(
       q,
@@ -397,14 +454,13 @@ export default function App() {
 
           const data = change.doc.data();
 
-          // Messages from another group may be leftovers from a group the
-          // user previously belonged to. Leave them untouched.
+          // Leftovers from a group the user previously belonged to.
           if (data.groupId && data.groupId !== groupId) continue;
 
           try {
             const decrypted = await decryptData(data.payload, groupId);
 
-            // Never destroy a queue item we could not decrypt.
+            // Never delete a queue item we could not decrypt.
             if (!decrypted) continue;
 
             if (data.action === 'DELETE') {
@@ -413,10 +469,7 @@ export default function App() {
               newExps.push(decrypted as Expense);
             }
 
-            // Delete only after successful decryption/processing.
-            deleteDoc(
-              doc(db, 'transfer_queue', change.doc.id)
-            ).catch(console.error);
+            deleteDoc(doc(db, 'transfer_queue', change.doc.id)).catch(console.error);
           } catch (e) {
             console.error('Transfer queue decrypt failed', e);
           }
@@ -424,15 +477,11 @@ export default function App() {
 
         if (newExps.length === 0 && deletedIds.length === 0) return;
 
-        setExpenses(prev => {
-          let updated = prev.filter(
-            expense => !deletedIds.includes(expense.id)
-          );
+        setExpenses((prev) => {
+          const updated = prev.filter((expense) => !deletedIds.includes(expense.id));
 
           for (const incoming of newExps) {
-            const idx = updated.findIndex(
-              expense => expense.id === incoming.id
-            );
+            const idx = updated.findIndex((expense) => expense.id === incoming.id);
 
             if (idx >= 0) {
               updated[idx] = mergeExpense(updated[idx], incoming);
@@ -441,17 +490,10 @@ export default function App() {
             }
           }
 
-          updated.sort(
-            (a, b) =>
-              new Date(b.date).getTime() -
-              new Date(a.date).getTime()
-          );
+          updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
           try {
-            localStorage.setItem(
-              `expenses_${groupId}`,
-              JSON.stringify(updated)
-            );
+            localStorage.setItem(`expenses_${groupId}`, JSON.stringify(updated));
           } catch (e) {
             console.error('Failed to persist synced ledger', e);
           }
@@ -459,7 +501,7 @@ export default function App() {
           return updated;
         });
       },
-      error => {
+      (error) => {
         console.error('transfer_queue listener error:', error);
       }
     );
@@ -467,11 +509,9 @@ export default function App() {
     return () => unsubscribe();
   }, [activeUser, group?.id]);
 
-  // Recurring autopilot: when a recurring expense's next date arrives, log the
-  // new instance automatically and advance the schedule. Only the payer's own
-  // account spawns instances (so two members can't double-log), and spawned
-  // copies carry recurringSourceId + date as a duplicate guard. Runs at most
-  // once per group per day per session.
+  // Recurring autopilot. Only the payer's own account spawns instances, so two
+  // members cannot double-log, and copies carry recurringSourceId + date as a
+  // duplicate guard. Runs at most once per group per day per session.
   const recurringAutopilotRef = useRef('');
   useEffect(() => {
     if (!activeUser || !group || expenses.length === 0) return;
@@ -481,9 +521,7 @@ export default function App() {
     if (recurringAutopilotRef.current === runKey) return;
 
     const today = todayLocal();
-    // Materialise a cycle two weeks before it is due, so it reaches the
-    // calendar in time to be planned for. It keeps its real future date, so
-    // the ledger files it under upcoming rather than into this month.
+    // Materialise a cycle two weeks early, keeping its real future date.
     const horizon = (() => {
       const d = new Date(today + 'T00:00:00');
       d.setDate(d.getDate() + 14);
@@ -500,17 +538,15 @@ export default function App() {
         guard++;
         const dueDate = next;
         const dupe =
-          expenses.some(x => x.recurringSourceId === exp.id && x.date === dueDate) ||
-          spawned.some(x => x.recurringSourceId === exp.id && x.date === dueDate);
+          expenses.some((x) => x.recurringSourceId === exp.id && x.date === dueDate) ||
+          spawned.some((x) => x.recurringSourceId === exp.id && x.date === dueDate);
         if (!dupe) {
           spawned.push({
             ...exp,
             id: crypto.randomUUID(),
             date: dueDate,
-            // Unclaimed. Inheriting the definition's payer asserts that
-            // whoever set the bill up also paid it this month, which is a
-            // claim about this month made by a record from last year.
-            // Someone claims it when it is actually paid.
+            // Unclaimed: the definition's payer is a claim about last year,
+            // not this month. Someone claims it when it is actually paid.
             paidBy: '',
             createdAt: new Date().toISOString(),
             editedAt: new Date().toISOString(),
@@ -523,10 +559,12 @@ export default function App() {
             recurringSourceId: exp.id,
           });
         }
-        // Anchored on the definition's own day, so a bill set for the 31st
-        // keeps coming back to the 31st instead of sticking at 28 after one
-        // February. The calendar walks with the same anchor.
-        next = advanceIntervalStr(dueDate, exp.recurringInterval, parseLocalDate(exp.date).getDate());
+        // Anchored on the definition's own day, so the 31st stays the 31st.
+        next = advanceIntervalStr(
+          dueDate,
+          exp.recurringInterval,
+          parseLocalDate(exp.date).getDate()
+        );
       }
       if (next !== exp.nextRecurringDate) sourceUpdates.set(exp.id, next);
     }
@@ -534,9 +572,15 @@ export default function App() {
     recurringAutopilotRef.current = runKey;
     if (spawned.length === 0 && sourceUpdates.size === 0) return;
 
-    setExpenses(prev => {
-      const updated = prev.map(e =>
-        sourceUpdates.has(e.id) ? { ...e, nextRecurringDate: sourceUpdates.get(e.id)!, editedAt: new Date().toISOString() } : e
+    setExpenses((prev) => {
+      const updated = prev.map((e) =>
+        sourceUpdates.has(e.id)
+          ? {
+              ...e,
+              nextRecurringDate: sourceUpdates.get(e.id)!,
+              editedAt: new Date().toISOString(),
+            }
+          : e
       );
       const merged = [...spawned, ...updated].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -549,20 +593,23 @@ export default function App() {
       return merged;
     });
 
-    // Sync through the same encrypted queue the rest of the ledger uses.
     (async () => {
       try {
-        const others = memberIds.filter(id => id !== activeUser);
+        const others = memberIds.filter((id) => id !== activeUser);
         const toSend: Expense[] = [
           ...spawned,
           ...expenses
-            .filter(e => sourceUpdates.has(e.id))
-            .map(e => ({ ...e, nextRecurringDate: sourceUpdates.get(e.id)!, editedAt: new Date().toISOString() })),
+            .filter((e) => sourceUpdates.has(e.id))
+            .map((e) => ({
+              ...e,
+              nextRecurringDate: sourceUpdates.get(e.id)!,
+              editedAt: new Date().toISOString(),
+            })),
         ];
         for (const expensePayload of toSend) {
           const encrypted = await encryptData(expensePayload, groupId);
           await Promise.allSettled(
-            others.map(memberId =>
+            others.map((memberId) =>
               setDoc(doc(collection(db, 'transfer_queue')), {
                 to: memberId,
                 from: activeUser,
@@ -590,9 +637,8 @@ export default function App() {
     }
   }, [activeUser, group?.id, expenses]);
 
-  // Keep settings inputs synced with the saved profile values. Handles are
-  // stored encrypted (paymentHandlesEnc, keyed by the owner's uid), so decrypt
-  // for display; legacy plaintext paymentHandles is the fallback.
+  // Settings inputs mirror the profile. Handles are stored encrypted with the
+  // owner's uid; legacy plaintext paymentHandles is the fallback.
   useEffect(() => {
     setThresholdInput(
       userProfile?.recurringThreshold > 0 ? String(userProfile.recurringThreshold) : ''
@@ -612,14 +658,21 @@ export default function App() {
         setZelleInput(handles?.zelle || '');
       }
     })();
-    return () => { cancelled = true; };
-  }, [userProfile?.recurringThreshold, userProfile?.paymentHandlesEnc, userProfile?.paymentHandles, activeUser]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    userProfile?.recurringThreshold,
+    userProfile?.paymentHandlesEnc,
+    userProfile?.paymentHandles,
+    activeUser,
+  ]);
 
-  // Decrypted payment handles for every group member, for the settle screen's
-  // Venmo/Zelle handoff. Each member's handles are encrypted with their own
-  // uid, which every group member knows, so the ciphertext is opaque in
-  // Firestore but readable in-app.
-  const [paymentHandlesByUid, setPaymentHandlesByUid] = useState<Record<string, { venmo?: string; zelle?: string }>>({});
+  // Every member's handles, decrypted with their uid (which groupmates know),
+  // for the settle screen's Venmo/Zelle handoff.
+  const [paymentHandlesByUid, setPaymentHandlesByUid] = useState<
+    Record<string, { venmo?: string; zelle?: string }>
+  >({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -638,11 +691,12 @@ export default function App() {
       }
       if (!cancelled) setPaymentHandlesByUid(next);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupUsers]);
 
-  // Weekly cherry greeting: generate once per week (per group size) and cache it
-  // on the user doc so we don't call the AI on every load.
+  // Weekly greeting, cached on the user doc.
   useEffect(() => {
     if (!activeUser || !userProfile?.financialProfile || !group) return;
     const memberCount = group.memberIds?.length || 1;
@@ -671,13 +725,20 @@ export default function App() {
         console.error('Weekly greeting fetch failed', e);
       }
     })();
-    return () => { cancelled = true; };
-  }, [activeUser, group?.memberIds?.length, userProfile?.financialProfile?.type, userProfile?.weeklyGreeting?.key]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeUser,
+    group?.memberIds?.length,
+    userProfile?.financialProfile?.type,
+    userProfile?.weeklyGreeting?.key,
+  ]);
 
-  // Update selectedExpense ref if background data updates
+  // Keep the selected expense current as background data changes.
   useEffect(() => {
     if (selectedExpense) {
-      const updated = expenses.find(e => e.id === selectedExpense.id);
+      const updated = expenses.find((e) => e.id === selectedExpense.id);
       if (updated) {
         setSelectedExpense(updated);
       }
@@ -693,56 +754,65 @@ export default function App() {
   }
 
   if (userProfile && !userProfile.financialProfile) {
-    return <div className="animate-in fade-in duration-300"><ProfileSetup userId={activeUser} onComplete={() => {
-      getDoc(doc(db, 'users', activeUser)).then(userDoc => {
-        if (userDoc.exists()) setUserProfile(userDoc.data() as any);
-      }).catch(e => console.error('Failed to reload profile', e));
-    }} /></div>;
-  }
-
-  // The user belongs to a group but its data hasn't arrived yet - show a loading
-  // screen, NOT the create/join screen, so we never flash the wrong page.
-  if (activeGroupId && !group) {
-    return <LoadingScreen label="Loading your group..." />;
+    return (
+      <div className="animate-in fade-in duration-300">
+        <ProfileSetup
+          userId={activeUser}
+          onComplete={() => {
+            getDoc(doc(db, 'users', activeUser))
+              .then((userDoc) => {
+                if (userDoc.exists()) setUserProfile(userDoc.data() as any);
+              })
+              .catch((e) => console.error('Failed to reload profile', e));
+          }}
+        />
+      </div>
+    );
   }
 
   if (!activeGroupId) {
-    return <div className="animate-in fade-in duration-300"><GroupSetup onComplete={applyJoinedGroup} /></div>;
+    return (
+      <div className="animate-in fade-in duration-300">
+        <GroupSetup onComplete={applyJoinedGroup} />
+      </div>
+    );
   }
 
-  // Non-blocking: members who are in the group but haven't finished their quiz yet.
-  // We no longer lock the whole app on this - the ledger is usable right away and we
-  // surface a gentle, dismissible banner instead (see below).
+  // Group data not here yet: a loading screen, never the create/join screen.
+  if (!group) {
+    return <LoadingScreen label="Loading your group..." />;
+  }
+
+  // Members who have not finished their quiz. Non-blocking: a dismissible banner.
   const missingProfiles = (group.memberIds || []).filter(
-    id => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
+    (id) => id !== activeUser && groupUsers[id] && !groupUsers[id]?.financialProfile
   );
 
-  // Dark Cherry amounts stay hidden from everyone but their creator, so keep
-  // them out of the aggregate stats and charts too - a group total that
-  // includes a hidden pot would let members back the number out.
-  const statsVisibleExpenses = expenses.filter(
-    e => !isDarkCherry(e) || e.paidBy === activeUser
-  );
+  // Dark Cherry amounts are hidden from everyone but their creator, so a
+  // group total that included one would let members back the number out.
+  const statsVisibleExpenses = expenses.filter((e) => !isDarkCherry(e) || e.paidBy === activeUser);
 
-  // Cherry + entitlement (set by the mobile-subscription webhook; false for
-  // everyone until the iOS/Android apps exist). Gates vault, thresholds,
-  // rhythm, and Dark Cherry creation.
+  // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
   const isPlus = hasPlus(userProfile);
 
-  // Spending thresholds: each member's limit (from their synced profile), and
-  // any of the current user's shares that exceed their own.
+  // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
   Object.entries(groupUsers).forEach(([uid, u]: any) => {
     memberThresholds[uid] = Number(u?.recurringThreshold) || 0;
   });
   const myThreshold = Number(userProfile?.recurringThreshold) || 0;
-  const overThresholdExpenses = myThreshold > 0
-    ? expenses.filter(e => e.paidBy !== activeUser && (e.shares?.[activeUser] || 0) > myThreshold && !isDarkCherry(e))
-    : [];
+  const overThresholdExpenses =
+    myThreshold > 0
+      ? expenses.filter(
+          (e) =>
+            e.paidBy !== activeUser &&
+            (e.shares?.[activeUser] || 0) > myThreshold &&
+            !isDarkCherry(e)
+        )
+      : [];
 
-  // Compare what each member reported as their own income against what the
-  // others estimated for them. Track the worst relative gap so the alignment
-  // modal can tune its conversation starter to how far apart the numbers are.
+  // Each member's reported income against what the others estimated. The
+  // worst relative gap tunes the alignment modal's conversation starter.
   let hasIncomeDiscrepancy = false;
   let incomeDiscrepancyPct = 0;
   if (groupUsers && Object.keys(groupUsers).length >= 2) {
@@ -759,49 +829,54 @@ export default function App() {
 
         if (u1Income && u2PartnerEst && Math.abs(u1Income - u2PartnerEst) > u1Income * 0.1) {
           hasIncomeDiscrepancy = true;
-          incomeDiscrepancyPct = Math.max(incomeDiscrepancyPct, (Math.abs(u1Income - u2PartnerEst) / u1Income) * 100);
+          incomeDiscrepancyPct = Math.max(
+            incomeDiscrepancyPct,
+            (Math.abs(u1Income - u2PartnerEst) / u1Income) * 100
+          );
         }
         if (u2Income && u1PartnerEst && Math.abs(u2Income - u1PartnerEst) > u2Income * 0.1) {
           hasIncomeDiscrepancy = true;
-          incomeDiscrepancyPct = Math.max(incomeDiscrepancyPct, (Math.abs(u2Income - u1PartnerEst) / u2Income) * 100);
+          incomeDiscrepancyPct = Math.max(
+            incomeDiscrepancyPct,
+            (Math.abs(u2Income - u1PartnerEst) / u2Income) * 100
+          );
         }
       }
     }
   }
-  
 
   const handleSignOut = async () => {
-    // Stop push delivery to this browser for the account being left. Best
-    // effort: cleanup must never block signing out.
+    // Best effort: cleanup must never block signing out.
     const uid = auth.currentUser?.uid;
     if (uid) await disableWebPush(uid).catch(() => {});
-    // Signing out also resets the "keep me signed in" choice, so the next
-    // visit always asks for login again instead of silently restoring a
-    // session.
+    // The next visit asks for login again instead of restoring a session.
     forgetKeepSignedIn();
-    // Just sign out and let the auth listener reset state. Clearing userProfile
-    // synchronously here briefly renders ProfileSetup (no financialProfile) for a
-    // frame before currentUser clears - so we don't.
+    // Let the auth listener reset state: clearing userProfile here would
+    // flash ProfileSetup for a frame before currentUser clears.
     auth.signOut();
   };
 
   const handleAddComment = async (expenseId: string, text: string) => {
     if (!group) return;
-    const expense = expenses.find(e => e.id === expenseId);
+    const expense = expenses.find((e) => e.id === expenseId);
     if (!expense) return;
 
     const newComment = {
       id: crypto.randomUUID(),
       userId: activeUser,
       text,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     const updatedExp = { ...expense, comments: [...(expense.comments || []), newComment] };
     try {
       await syncExpenseUpdate(updatedExp);
     } catch (e: any) {
       console.error('Comment sync failed', e);
-      setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Expense comment', detail: String(e?.message || e) });
+      setSupportError({
+        error: CHERRY_ERRORS.expenseSave,
+        screen: 'Expense comment',
+        detail: String(e?.message || e),
+      });
     }
   };
 
@@ -815,27 +890,26 @@ export default function App() {
       return `"${text.replace(/"/g, '""')}"`;
     };
 
-    // The CSV only gains the "Participant Type" column (and guest rows) once at
-    // least one expense includes an added cherry (extra participant). With no
-    // extras anywhere, the export format is unchanged.
-    const hasExtras = expenses.some(e => (e.extraParticipants || []).length > 0);
+    // The "Participant Type" column and guest rows appear only once some
+    // expense has an extra participant, so the plain format is unchanged.
+    const hasExtras = expenses.some((e) => (e.extraParticipants || []).length > 0);
 
-    let csv = [
-      'Title',
-      'Amount',
-      'Date',
-      'Category',
-      'Paid By',
-      'Status',
-      'Split Type',
-      'Participant',
-      ...(hasExtras ? ['Participant Type'] : []),
-      'Original Share',
-      'Confirmed Paid',
-      'Remaining Balance'
-    ].join(',') + '\n';
+    let csv =
+      [
+        'Title',
+        'Amount',
+        'Date',
+        'Category',
+        'Paid By',
+        'Status',
+        'Split Type',
+        'Participant',
+        ...(hasExtras ? ['Participant Type'] : []),
+        'Original Share',
+        'Confirmed Paid',
+        'Remaining Balance',
+      ].join(',') + '\n';
 
-    // Build a row, inserting the type column only when the extras format is active.
     const rowFor = (
       expense: Expense,
       paidByName: string,
@@ -844,50 +918,64 @@ export default function App() {
       originalShare: number,
       confirmedPaid: number,
       remaining: number
-    ) => [
-      escapeCsv(expense.title),
-      roundCurrency(expense.amount).toFixed(2),
-      escapeCsv(expense.date),
-      escapeCsv(expense.category),
-      escapeCsv(paidByName),
-      escapeCsv(getExpenseStatusLabel(expense)),
-      escapeCsv(expense.splitType),
-      escapeCsv(participant),
-      ...(hasExtras ? [escapeCsv(type)] : []),
-      roundCurrency(originalShare).toFixed(2),
-      roundCurrency(confirmedPaid).toFixed(2),
-      roundCurrency(remaining).toFixed(2)
-    ].join(',') + '\n';
+    ) =>
+      [
+        escapeCsv(expense.title),
+        roundCurrency(expense.amount).toFixed(2),
+        escapeCsv(expense.date),
+        escapeCsv(expense.category),
+        escapeCsv(paidByName),
+        escapeCsv(getExpenseStatusLabel(expense)),
+        escapeCsv(expense.splitType),
+        escapeCsv(participant),
+        ...(hasExtras ? [escapeCsv(type)] : []),
+        roundCurrency(originalShare).toFixed(2),
+        roundCurrency(confirmedPaid).toFixed(2),
+        roundCurrency(remaining).toFixed(2),
+      ].join(',') + '\n';
 
-    expenses.forEach(expense => {
+    expenses.forEach((expense) => {
       const paidByName =
-        allMembers.find(member => member.uid === expense.paidBy)?.name ||
-        expense.paidBy;
+        allMembers.find((member) => member.uid === expense.paidBy)?.name || expense.paidBy;
 
       Object.entries(expense.shares || {}).forEach(([userId, originalShare]) => {
         if (userId === expense.paidBy) return;
 
-        const participantName =
-          allMembers.find(member => member.uid === userId)?.name || userId;
+        const participantName = allMembers.find((member) => member.uid === userId)?.name || userId;
 
         const confirmedPaid = getSettlementTotal(expense, userId, false);
         const remainingBalance = getRemainingSettlementAmount(expense, userId, false);
 
-        csv += rowFor(expense, paidByName, participantName, 'Member', originalShare || 0, confirmedPaid, remainingBalance);
+        csv += rowFor(
+          expense,
+          paidByName,
+          participantName,
+          'Member',
+          originalShare || 0,
+          confirmedPaid,
+          remainingBalance
+        );
       });
 
       if (expense.splitType === 'third_party' && expense.thirdPersonShare) {
-        csv += rowFor(expense, paidByName, expense.thirdPersonName || 'Third Person', 'Guest', expense.thirdPersonShare, 0, expense.thirdPersonShare);
+        csv += rowFor(
+          expense,
+          paidByName,
+          expense.thirdPersonName || 'Third Person',
+          'Guest',
+          expense.thirdPersonShare,
+          0,
+          expense.thirdPersonShare
+        );
       }
 
-      // Per-transaction cherries (guests) - only present when hasExtras is true.
-      (expense.extraParticipants || []).forEach(g => {
+      (expense.extraParticipants || []).forEach((g) => {
         csv += rowFor(expense, paidByName, g.name, 'Guest', g.share, 0, g.share);
       });
     });
 
     const blob = new Blob([csv], {
-      type: 'text/csv;charset=utf-8;'
+      type: 'text/csv;charset=utf-8;',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -902,42 +990,39 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Scrub the current user out of a specific group document. Shared by "Leave
-  // Group" and "Delete Account". Redistributes the leaver's split percentage
-  // across the remaining members so household-default expenses still bill 100%,
-  // and deletes the group entirely if the last member leaves (no orphaned dead
-  // group). Reads the group fresh so it works for any of the user's groups, not
-  // just the one currently loaded into view.
+  // Shared by Leave Group and Delete Account. Redistributes the leaver's split
+  // so household-default expenses still bill 100%, and deletes the group when
+  // the last member leaves. Reads the group fresh so it works for any group.
   const removeSelfFromGroupById = async (gid: string) => {
     const groupRef = doc(db, 'groups', gid);
     const snap = await getDoc(groupRef);
     if (!snap.exists()) return;
     const g = snap.data() as Group;
-    const newMembers = (g.members || []).filter(m => m.uid !== activeUser);
-    const newMemberIds = (g.memberIds || []).filter(id => id !== activeUser);
+    const newMembers = (g.members || []).filter((m) => m.uid !== activeUser);
+    const newMemberIds = (g.memberIds || []).filter((id) => id !== activeUser);
 
-    // Last member out - delete the whole group rather than leaving a dead,
-    // empty group that still occupies its invite code.
+    // Last member out deletes the group rather than leaving a dead one on the invite code.
     if (newMemberIds.length === 0) {
       await deleteDoc(groupRef);
       return;
     }
 
-    // Redistribute the leaver's percentage across the remaining joined members
-    // (proportional to their current shares) so the default split still sums to
-    // 100. Pending ghost slots in availableSplits are left untouched.
+    // Proportional to current shares; pending ghost slots are left untouched.
     const split = g.defaultSplit || {};
     const leaverPct = Number(split[activeUser]) || 0;
     const newDefault: Record<string, number> = {};
-    newMemberIds.forEach(uid => { newDefault[uid] = Number(split[uid]) || 0; });
+    newMemberIds.forEach((uid) => {
+      newDefault[uid] = Number(split[uid]) || 0;
+    });
     const joinedSum = newMemberIds.reduce((sum, uid) => sum + (Number(split[uid]) || 0), 0);
     if (leaverPct > 0) {
       let acc = 0;
       newMemberIds.forEach((uid, i) => {
         const base = Number(split[uid]) || 0;
-        const add = i === newMemberIds.length - 1
-          ? leaverPct - acc
-          : Math.round(leaverPct * (joinedSum > 0 ? base / joinedSum : 1 / newMemberIds.length));
+        const add =
+          i === newMemberIds.length - 1
+            ? leaverPct - acc
+            : Math.round(leaverPct * (joinedSum > 0 ? base / joinedSum : 1 / newMemberIds.length));
         acc += add;
         newDefault[uid] = base + add;
       });
@@ -950,29 +1035,28 @@ export default function App() {
     });
   };
 
-  // Delete the queue messages addressed to this user (allowed by the rules for
-  // to == self). Best-effort cleanup during account deletion.
+  // Best-effort cleanup during account deletion (the rules allow to == self).
   const deleteMyInboundQueue = async () => {
     if (!activeUser) return;
     try {
-      const snap = await getDocs(query(collection(db, 'transfer_queue'), where('to', '==', activeUser)));
-      await Promise.allSettled(snap.docs.map(d => deleteDoc(d.ref)));
+      const snap = await getDocs(
+        query(collection(db, 'transfer_queue'), where('to', '==', activeUser))
+      );
+      await Promise.allSettled(snap.docs.map((d) => deleteDoc(d.ref)));
     } catch (e) {
       console.error('Failed to clean up inbound queue', e);
     }
   };
 
-  // Clear any locally cached ledger data for this user across every group they
-  // belong to, plus their backup secret. Used during account deletion.
+  // Local ledger caches for every group, plus the backup secret.
   const clearLocalData = () => {
-    groupIds.forEach(gid => localStorage.removeItem('expenses_' + gid));
+    groupIds.forEach((gid) => localStorage.removeItem('expenses_' + gid));
     if (group) localStorage.removeItem('expenses_' + group.id);
     if (activeUser) localStorage.removeItem(`group_secret_${activeUser}`);
   };
 
-  // Switch the active group. The ledger, roster and sync inbox all re-key off
-  // `activeGroupId`, so we just persist the choice and clear the previous group's
-  // transient view state.
+  // Everything re-keys off activeGroupId, so persist the choice and clear the
+  // previous group's view state.
   const handleSwitchGroup = async (gid: string) => {
     setShowGroupMenu(false);
     if (!gid || gid === activeGroupId) return;
@@ -993,10 +1077,9 @@ export default function App() {
 
   const handleLeaveGroup = async () => {
     if (!activeGroupId) return;
-    const remaining = groupIds.filter(id => id !== activeGroupId);
+    const remaining = groupIds.filter((id) => id !== activeGroupId);
     const nextActive = remaining[0] || null;
-    // The last joined member out deletes the group (removeSelfFromGroupById),
-    // and with it the shared ledger, so the confirmation has to say so.
+    // The last member out deletes the group and its ledger; say so.
     const lastOne = !!group && joinedUids(group).length <= 1;
     const afterwards = nextActive
       ? "You'll be switched to another of your groups. Your account and your other groups stay intact."
@@ -1016,24 +1099,27 @@ export default function App() {
       setShowSettings(false);
       setShowPrivacyModal(false);
       setShowGroupMenu(false);
-      setUserProfile((prev: any) => ({ ...(prev || {}), groupIds: remaining, activeGroupId: nextActive, groupId: nextActive }));
+      setUserProfile((prev: any) => ({
+        ...(prev || {}),
+        groupIds: remaining,
+        activeGroupId: nextActive,
+        groupId: nextActive,
+      }));
       setGroup(null);
       setGroupUsers({});
       setExpenses([]);
       setSelectedExpense(null);
     } catch (err) {
-      console.error("Error leaving group", err);
-      alert("Failed to leave the group. Please try again.");
+      console.error('Error leaving group', err);
+      alert('Failed to leave the group. Please try again.');
     }
   };
 
-  // Re-authenticate the current user when Firebase requires a recent login before
-  // a sensitive operation (account deletion). Handles Google, Apple and
-  // email/password; an Apple account used to be told to sign out and back in,
-  // which never satisfied the recent-login check, so it could not be deleted.
+  // Firebase requires a recent login before account deletion. Apple needs the
+  // popup flow: signing out and back in never satisfies the check.
   const reauthenticate = async () => {
     const user = auth.currentUser;
-    if (!user) throw new Error("No signed-in user");
+    if (!user) throw new Error('No signed-in user');
     const providerId = user.providerData[0]?.providerId;
     if (providerId === 'google.com') {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
@@ -1043,44 +1129,45 @@ export default function App() {
       apple.addScope('name');
       await reauthenticateWithPopup(user, apple);
     } else if (providerId === 'password') {
-      const pw = window.prompt("For your security, please re-enter your password to permanently delete your account:");
-      if (!pw) throw new Error("cancelled");
+      const pw = window.prompt(
+        'For your security, please re-enter your password to permanently delete your account:'
+      );
+      if (!pw) throw new Error('cancelled');
       const credential = EmailAuthProvider.credential(user.email || '', pw);
       await reauthenticateWithCredential(user, credential);
     } else {
-      throw new Error("Please sign out and sign back in, then try deleting your account again.");
+      throw new Error('Please sign out and sign back in, then try deleting your account again.');
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm("Permanently delete your account? This removes you from your current group, deletes your app profile, clears local ledger data, and deletes your sign-in account. This action cannot be undone.")) return;
+    if (
+      !window.confirm(
+        'Permanently delete your account? This removes you from your current group, deletes your app profile, clears local ledger data, and deletes your sign-in account. This action cannot be undone.'
+      )
+    )
+      return;
     try {
-      // Authenticate before performing destructive operations so a cancelled
-      // or failed reauthentication cannot leave the account half-deleted.
+      // First, so a cancelled reauthentication cannot leave the account half-deleted.
       await reauthenticate();
 
-      // Firestore cleanup must happen while still authenticated (these writes
-      // need auth), so they precede the auth-account deletion.
-      // 1. Remove from every group the user belongs to (re-normalizes each split
-      //    / deletes any group they were the last member of).
+      // Firestore cleanup needs auth, so it precedes the auth-account deletion.
       for (const gid of groupIds) {
-        try { await removeSelfFromGroupById(gid); }
-        catch (e) { console.error('Failed to leave group during account deletion', gid, e); }
+        try {
+          await removeSelfFromGroupById(gid);
+        } catch (e) {
+          console.error('Failed to leave group during account deletion', gid, e);
+        }
       }
 
-      // 2. Clean up the queue messages addressed to this user.
       await deleteMyInboundQueue();
 
-      // 3. Delete the Firestore profile.
       await deleteDoc(doc(db, 'users', activeUser));
 
-      // 4. Clear local cached ledger data.
       clearLocalData();
 
-      // 5. Delete the Firebase Authentication account (last - it revokes the
-      //    auth needed for the steps above).
+      // Last: this revokes the auth the steps above needed.
       await deleteUser(auth.currentUser!);
-      // Auth listener will drop currentUser -> AuthScreen. Reset local state too.
       setShowSettings(false);
       setShowPrivacyModal(false);
       setUserProfile(null);
@@ -1089,25 +1176,23 @@ export default function App() {
       setExpenses([]);
     } catch (err: any) {
       if (err?.message === 'cancelled') return;
-      console.error("Error deleting account", err);
-      alert(err?.message || "Failed to delete your account. Please sign out, sign back in, and try again.");
+      console.error('Error deleting account', err);
+      alert(
+        err?.message ||
+          'Failed to delete your account. Please sign out, sign back in, and try again.'
+      );
     }
   };
 
-  const broadcastToMembers = async (
-    action: 'UPSERT' | 'DELETE',
-    payloadObject: unknown
-  ) => {
+  const broadcastToMembers = async (action: 'UPSERT' | 'DELETE', payloadObject: unknown) => {
     if (!group) return;
 
     const encrypted = await encryptData(payloadObject, group.id);
 
-    const otherMembers = (group.memberIds || []).filter(
-      id => id !== activeUser
-    );
+    const otherMembers = (group.memberIds || []).filter((id) => id !== activeUser);
 
     const results = await Promise.allSettled(
-      otherMembers.map(memberId =>
+      otherMembers.map((memberId) =>
         setDoc(doc(collection(db, 'transfer_queue')), {
           to: memberId,
           from: activeUser,
@@ -1119,21 +1204,15 @@ export default function App() {
       )
     );
 
-    const failed = results.filter(
-      result => result.status === 'rejected'
-    ).length;
+    const failed = results.filter((result) => result.status === 'rejected').length;
 
     if (failed > 0) {
-      console.error(
-        `broadcastToMembers: ${failed}/${otherMembers.length} writes failed`
-      );
+      console.error(`broadcastToMembers: ${failed}/${otherMembers.length} writes failed`);
     }
   };
 
-  // Fire-and-forget push to the rest of the group after a ledger write. Best
-  // effort by design: a notification failing must never block or fail the
-  // write it follows, so errors are swallowed. The server enforces membership
-  // and the pushes carry no amounts or titles (see server.ts).
+  // Best effort: a failed notification must never fail the write it follows.
+  // The server enforces membership and the push carries no amounts or titles.
   const notifyLedgerEvent = (kind: 'expense_logged' | 'payment_logged') => {
     const gid = group?.id;
     if (!gid) return;
@@ -1144,16 +1223,17 @@ export default function App() {
           headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
           body: JSON.stringify({ groupId: gid, kind }),
         });
-      } catch { /* best effort */ }
+      } catch {
+        /* best effort */
+      }
     })();
   };
 
-  // Gently remind: manual push to this expense's outstanding debtors. Returns
-  // whether anything was sent so the caller can toast accordingly.
+  // Manual push to this expense's outstanding debtors.
   const handleGentleRemind = async (expense: Expense) => {
     if (!group) return;
-    const debtors = group.memberIds.filter(uid =>
-      uid !== expense.paidBy && getRemainingSettlementAmount(expense, uid, false) > 0.01
+    const debtors = group.memberIds!.filter(
+      (uid) => uid !== expense.paidBy && getRemainingSettlementAmount(expense, uid, false) > 0.01
     );
     try {
       const res = await fetch('/api/send-nudge', {
@@ -1175,18 +1255,16 @@ export default function App() {
     }
   };
 
-  const handleAddOrEditExpense = async (formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>) => {
-    // Money limits (lib/limits.ts): exact to $999,999, rounded to the
-    // nearest $100k from $1M, refused past the hard cap as a typo.
+  const handleAddOrEditExpense = async (
+    formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>
+  ) => {
     const normalizedAmount = normalizeAmount(Number(formData.amount));
     if (!normalizedAmount) {
       setSupportError({ error: CHERRY_ERRORS.amountTooLarge, screen: 'Log expense' });
       return;
     }
     if (normalizedAmount.wasRounded) {
-      // The shares were computed from the unrounded amount; scale them by the
-      // same factor so they still cover the saved total exactly (a purchase
-      // this size is an estimate anyway - the ratios are what matter).
+      // Scale the shares by the same factor so they still cover the saved total.
       const scale = normalizedAmount.value / Number(formData.amount);
       const scaled = (v: number) => Math.round(v * scale * 100) / 100;
       formData = {
@@ -1200,14 +1278,18 @@ export default function App() {
           : {}),
         ...(formData.extraParticipants
           ? {
-              extraParticipants: formData.extraParticipants.map(g => ({
+              extraParticipants: formData.extraParticipants.map((g) => ({
                 ...g,
                 share: scaled(g.share),
               })),
             }
           : {}),
       };
-      addToast('Rounded', `Saved as $${normalizedAmount.value.toLocaleString()} - amounts this large round to the nearest $100,000.`, 'info');
+      addToast(
+        'Rounded',
+        `Saved as $${normalizedAmount.value.toLocaleString()} - amounts this large round to the nearest $100,000.`,
+        'info'
+      );
     }
     try {
       if (!group.categories?.includes(formData.category)) {
@@ -1216,25 +1298,22 @@ export default function App() {
         await updateDoc(groupRef, { categories: newCategories });
       }
 
-      // "Quick settle": when logging an expense that's already been paid back,
-      // mark every debtor's share as a confirmed settlement so it lands closed.
+      // Quick settle: an expense already paid back lands closed.
       const quickSettle = (formData as any).quickSettle === true;
       const { quickSettle: _omitQuickSettle, ...cleanForm } = formData as any;
 
       let finalExpense: Expense;
       if (editingExpense) {
-        // Build on the freshest copy of the expense, not the snapshot taken when
-        // the form opened, a settlement logged or confirmed while the form was
-        // open must survive the save. `editedAt` marks this content revision so
-        // merges elsewhere know these fields are the newest.
-        const latest = expenses.find(ex => ex.id === editingExpense.id) || editingExpense;
+        // Build on the freshest copy, so a settlement logged while the form was
+        // open survives the save. `editedAt` marks this content revision.
+        const latest = expenses.find((ex) => ex.id === editingExpense.id) || editingExpense;
         finalExpense = { ...latest, ...cleanForm, editedAt: new Date().toISOString() };
-        // Shares/amount may have changed - re-derive status from the new shares
-        // vs. the existing settlements so a previously-"settled" expense doesn't
-        // keep hiding newly-created debt (or stay open after a reduction).
+        // Re-derive status from the new shares against existing settlements.
         finalExpense.status = getNormalizedExpenseStatus(finalExpense);
-        setExpenses(prev => {
-          const updated = prev.map(ex => ex.id === finalExpense.id ? mergeExpense(ex, finalExpense) : ex);
+        setExpenses((prev) => {
+          const updated = prev.map((ex) =>
+            ex.id === finalExpense.id ? mergeExpense(ex, finalExpense) : ex
+          );
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
           return updated;
         });
@@ -1275,9 +1354,9 @@ export default function App() {
           groupId: group.id,
           status,
           createdAt,
-          editedAt: createdAt
+          editedAt: createdAt,
         };
-        setExpenses(prev => {
+        setExpenses((prev) => {
           const updated = [finalExpense, ...prev];
           localStorage.setItem('expenses_' + group.id, JSON.stringify(updated));
           return updated;
@@ -1285,31 +1364,34 @@ export default function App() {
         setShowForm(false);
       }
 
-      // Sync to every other group member.
       await broadcastToMembers('UPSERT', finalExpense);
 
-      // Tell the group. New expenses only: edits would be noisy.
+      // New expenses only: edits would be noisy.
       if (!editingExpense) notifyLedgerEvent('expense_logged');
     } catch (e: any) {
       console.error(e);
-      setSupportError({ error: CHERRY_ERRORS.expenseSave, screen: 'Log expense', detail: String(e?.message || e) });
+      setSupportError({
+        error: CHERRY_ERRORS.expenseSave,
+        screen: 'Log expense',
+        detail: String(e?.message || e),
+      });
     }
   };
 
-
-  // Claiming an unclaimed expense. Recurring bills arrive with nobody
-  // attached, so this is the step that turns one into a real ledger entry:
-  // until it happens the expense owes nobody and settles nothing.
+  // Recurring bills arrive unclaimed; until claimed an expense owes nobody.
   const handleClaimExpense = async (expenseId: string, payerUid: string) => {
     if (!group) return;
     const groupId = group.id;
-    const target = expenses.find(e => e.id === expenseId);
+    const target = expenses.find((e) => e.id === expenseId);
     if (!target) return;
     const claimed: Expense = { ...target, paidBy: payerUid, editedAt: new Date().toISOString() };
-    setExpenses(prev => {
-      const updated = prev.map(e => (e.id === expenseId ? claimed : e));
-      try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
-      catch (err) { console.error('Failed to persist expenses', err); }
+    setExpenses((prev) => {
+      const updated = prev.map((e) => (e.id === expenseId ? claimed : e));
+      try {
+        localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to persist expenses', err);
+      }
       return updated;
     });
     setSelectedExpense(claimed);
@@ -1321,16 +1403,18 @@ export default function App() {
   };
 
   const handleDeleteExpense = async (id: string) => {
-    // ExpenseDetail already gates this behind an inline "Confirm Delete?" step,
-    // so no second native confirm here.
+    // ExpenseDetail already confirms inline.
     if (!group) return;
     const groupId = group.id;
     try {
-      const expenseToDelete = expenses.find(e => e.id === id);
-      setExpenses(prev => {
-        const updated = prev.filter(e => e.id !== id);
-        try { localStorage.setItem('expenses_' + groupId, JSON.stringify(updated)); }
-        catch (e) { console.error('Failed to persist expenses', e); }
+      const expenseToDelete = expenses.find((e) => e.id === id);
+      setExpenses((prev) => {
+        const updated = prev.filter((e) => e.id !== id);
+        try {
+          localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to persist expenses', e);
+        }
         return updated;
       });
       setSelectedExpense(null);
@@ -1339,7 +1423,7 @@ export default function App() {
         await broadcastToMembers('DELETE', { id });
       }
     } catch (e: any) {
-      console.error("Delete error:", e);
+      console.error('Delete error:', e);
       setSupportError({
         error: {
           code: 'EXPENSE_DELETE_FAILED',
@@ -1353,16 +1437,15 @@ export default function App() {
     }
   };
 
-    const syncExpenseUpdate = async (updatedExpense: Expense) => {
+  const syncExpenseUpdate = async (updatedExpense: Expense) => {
     if (!group) return;
     const groupId = group.id;
-    // Merge onto the current copy instead of replacing it, so an update built
-    // from a slightly stale snapshot can't drop a settlement or comment that
-    // arrived from another member in the meantime.
-    const current = expenses.find(e => e.id === updatedExpense.id);
+    // Merge, do not replace: a stale snapshot must not drop a settlement or
+    // comment that arrived from another member.
+    const current = expenses.find((e) => e.id === updatedExpense.id);
     const merged = current ? mergeExpense(current, updatedExpense) : updatedExpense;
-    setExpenses(prev => {
-      const updated = prev.map(e => e.id === merged.id ? mergeExpense(e, merged) : e);
+    setExpenses((prev) => {
+      const updated = prev.map((e) => (e.id === merged.id ? mergeExpense(e, merged) : e));
       try {
         localStorage.setItem('expenses_' + groupId, JSON.stringify(updated));
       } catch (e) {
@@ -1374,40 +1457,49 @@ export default function App() {
     await broadcastToMembers('UPSERT', merged);
   };
 
-  const handleSettleUpProposal = async (instrumentType: import('./types').PaymentInstrument, amount: number, label: string, debtorId: string, paymentDate?: string) => {
+  const handleSettleUpProposal = async (
+    instrumentType: import('./types').PaymentInstrument,
+    amount: number,
+    label: string,
+    debtorId: string,
+    paymentDate?: string
+  ) => {
     if (!selectedExpense || !group) return;
 
-    // Work from the freshest copy of the expense, not the snapshot captured
-    // when the detail modal opened, an edit or confirmation may have synced in
-    // since, and validating against stale shares is how duplicates get logged.
-    const expense = expenses.find(e => e.id === selectedExpense.id) || selectedExpense;
+    // Validate against the freshest copy, not the one the modal opened with.
+    const expense = expenses.find((e) => e.id === selectedExpense.id) || selectedExpense;
 
     const normalizedAmount = roundCurrency(amount);
-    // A pending seat (ghost_N) is a valid debtor: the person who has not
-    // joined yet can still hand over cash, and the claim pass rewrites the
-    // settlement to their real uid the moment they do. Requiring memberIds
-    // here meant a solo creator could never clear a share they had split off.
+    // A pending seat (ghost_N) is a valid debtor; the claim pass rewrites the
+    // settlement to their real uid when they join.
     const baseValid =
-      getFullMembers(group).some(m => m.uid === debtorId) &&
+      getFullMembers(group).some((m) => m.uid === debtorId) &&
       Number.isFinite(normalizedAmount) &&
       normalizedAmount > 0;
 
     if (isDarkCherry(expense)) {
-      // Dark Cherry: contributors are bound only by the creator's per-payment
-      // range (the pot is hidden from them); the creator logging a received
-      // payment is bound by what's actually left in the pot.
+      // Contributors are bound by the creator's per-payment range; the creator
+      // is bound by what is left in the pot.
       const isCreatorLogging = expense.paidBy === activeUser;
       if (isCreatorLogging) {
         const potRemaining = getDarkCherryRemaining(expense, true);
         if (!baseValid || normalizedAmount > potRemaining) {
-          addToast('Invalid Payment', `Payment must be between $0.01 and $${potRemaining.toFixed(2)}.`, 'info');
+          addToast(
+            'Invalid Payment',
+            `Payment must be between $0.01 and $${potRemaining.toFixed(2)}.`,
+            'info'
+          );
           return;
         }
       } else {
         const min = expense.blindMin || 0.01;
         const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
         if (!baseValid || normalizedAmount < min || normalizedAmount > max) {
-          addToast('Invalid Payment', `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`, 'info');
+          addToast(
+            'Invalid Payment',
+            `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`,
+            'info'
+          );
           return;
         }
       }
@@ -1425,13 +1517,11 @@ export default function App() {
 
     const isCreditor = expense.paidBy === activeUser;
 
-    // The payer "logging a received payment" that exactly matches a payment the
-    // debtor already logged is a confirmation of that payment, not a second one.
-    // Without this, both entries end up confirmed and the debtor shows as
-    // having paid twice.
+    // A received payment that exactly matches a pending one is a confirmation
+    // of it, not a second payment.
     if (isCreditor) {
       const matchingPending = (expense.settlements || []).find(
-        s =>
+        (s) =>
           s.status === 'pending' &&
           s.paidBy === debtorId &&
           Math.abs(s.amount - normalizedAmount) < 0.005
@@ -1454,25 +1544,25 @@ export default function App() {
       timestamp: new Date().toISOString(),
       paymentDate: paymentDate || todayLocal(),
       status: isCreditor ? 'confirmed' : 'pending',
-      mismatchType: computeMismatchForSettlement(expense, instrumentType)
+      mismatchType: computeMismatchForSettlement(expense, instrumentType),
     };
 
     const settlements = [...(expense.settlements || []), newSettlement];
 
-    // Status is derived per-debtor from the actual shares vs. settlements
-    // (getNormalizedExpenseStatus), not an aggregate sum - so one overpaid
-    // debtor can't mask another's shortfall and mark the whole expense closed.
+    // Per-debtor status, so one overpaid debtor cannot mask another's shortfall.
     const updatedExp: Expense = { ...expense, settlements };
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       setShowSettleModal(false);
       await syncExpenseUpdate(updatedExp);
-      // Toast only once the write has gone through: a "logged" message over
-      // a failed save is how a payment gets sent twice.
-      addToast(isCreditor ? 'Payment Logged' : 'Settlement Logged', isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.', 'success');
+      // Toast only after the write: "logged" over a failed save gets a payment sent twice.
+      addToast(
+        isCreditor ? 'Payment Logged' : 'Settlement Logged',
+        isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.',
+        'success'
+      );
       notifyLedgerEvent('payment_logged');
 
-      // Write mismatch to protected collection
       const computedMismatch = computeMismatchForSettlement(expense, instrumentType);
       if (computedMismatch !== 'NOT_CLASSIFIABLE' && computedMismatch !== 'NO_MISMATCH') {
         const mismatchRef = doc(db, 'group_mismatches', group.id, 'events', newSettlement.id);
@@ -1483,21 +1573,25 @@ export default function App() {
           paidBy: debtorId,
           receivedBy: expense.paidBy,
           amount: normalizedAmount,
-          timestamp: newSettlement.timestamp
-        }).catch(e => console.error("Data write failed", e));
+          timestamp: newSettlement.timestamp,
+        }).catch((e) => console.error('Data write failed', e));
       }
     } catch (e: any) {
       console.error(e);
-      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Settle up', detail: String(e?.message || e) });
+      setSupportError({
+        error: CHERRY_ERRORS.settlementSave,
+        screen: 'Settle up',
+        detail: String(e?.message || e),
+      });
     }
   };
 
   const handleConfirmSettleReceipt = async (settlementId: string) => {
     if (!group || !selectedExpense) return;
-    const expense = expenses.find(e => e.id === selectedExpense.id);
+    const expense = expenses.find((e) => e.id === selectedExpense.id);
     if (!expense) return;
 
-    const settlements = (expense.settlements || []).map(s =>
+    const settlements = (expense.settlements || []).map((s) =>
       s.id === settlementId ? { ...s, status: 'confirmed' as const } : s
     );
 
@@ -1508,25 +1602,32 @@ export default function App() {
       addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
     } catch (e: any) {
       console.error('Confirm receipt failed', e);
-      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Confirm receipt', detail: String(e?.message || e) });
+      setSupportError({
+        error: CHERRY_ERRORS.settlementSave,
+        screen: 'Confirm receipt',
+        detail: String(e?.message || e),
+      });
     }
   };
 
-  // Remove a payment entry that was logged in error (e.g. the same real-world
-  // payment recorded twice). Voids rather than deletes: the entry stays in the
-  // audit trail as a tombstone so a merge with another device's copy can't
-  // resurrect it, but it no longer counts toward the balance.
+  // Voids rather than deletes: the tombstone stops a merge from another
+  // device resurrecting the entry.
   const handleVoidSettlement = async (settlementId: string) => {
     if (!group || !selectedExpense) return;
-    const expense = expenses.find(e => e.id === selectedExpense.id);
+    const expense = expenses.find((e) => e.id === selectedExpense.id);
     if (!expense) return;
 
-    const target = (expense.settlements || []).find(s => s.id === settlementId);
+    const target = (expense.settlements || []).find((s) => s.id === settlementId);
     if (!target || target.status === 'voided') return;
 
-    const settlements = (expense.settlements || []).map(s =>
+    const settlements = (expense.settlements || []).map((s) =>
       s.id === settlementId
-        ? { ...s, status: 'voided' as const, voidedAt: new Date().toISOString(), voidedBy: activeUser }
+        ? {
+            ...s,
+            status: 'voided' as const,
+            voidedAt: new Date().toISOString(),
+            voidedBy: activeUser,
+          }
         : s
     );
 
@@ -1534,14 +1635,21 @@ export default function App() {
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       await syncExpenseUpdate(updatedExp);
-      addToast('Payment Removed', 'The payment entry was removed and the balance updated.', 'success');
+      addToast(
+        'Payment Removed',
+        'The payment entry was removed and the balance updated.',
+        'success'
+      );
     } catch (e: any) {
       console.error('Void settlement failed', e);
-      setSupportError({ error: CHERRY_ERRORS.settlementSave, screen: 'Remove payment entry', detail: String(e?.message || e) });
+      setSupportError({
+        error: CHERRY_ERRORS.settlementSave,
+        screen: 'Remove payment entry',
+        detail: String(e?.message || e),
+      });
     }
   };
 
-  // Let the user set/change their display name regardless of how they signed in.
   const handleSaveName = async (newName: string) => {
     if (!newName) {
       addToast('Name Required', 'Please enter a name.', 'info');
@@ -1550,11 +1658,17 @@ export default function App() {
     try {
       await updateDoc(doc(db, 'users', activeUser), { name: newName });
       if (auth.currentUser) {
-        try { await updateProfile(auth.currentUser, { displayName: newName }); } catch (e) { console.error(e); }
+        try {
+          await updateProfile(auth.currentUser, { displayName: newName });
+        } catch (e) {
+          console.error(e);
+        }
       }
-      // Keep the group's stored member list in sync so the name shows everywhere.
-      if (group && group.members?.some(m => m.uid === activeUser)) {
-        const newMembers = group.members.map(m => m.uid === activeUser ? { ...m, name: newName } : m);
+      // The group's member list carries the name too.
+      if (group && group.members?.some((m) => m.uid === activeUser)) {
+        const newMembers = group.members.map((m) =>
+          m.uid === activeUser ? { ...m, name: newName } : m
+        );
         await updateDoc(doc(db, 'groups', group.id), { members: newMembers });
       }
       setUserProfile((prev: any) => ({ ...(prev || {}), name: newName }));
@@ -1565,8 +1679,7 @@ export default function App() {
     }
   };
 
-  // Marketing email is opt-in and this is the only client writer. An update
-  // rather than a merge set, so it cannot recreate a profile that an account
+  // An update, not a merge set, so it cannot recreate a profile an account
   // deletion just removed. Same-value calls are dropped so a double click
   // cannot move the consent timestamp.
   const handleSaveMarketingOptIn = async (optIn: boolean) => {
@@ -1584,8 +1697,7 @@ export default function App() {
     }
   };
 
-  // Spending threshold: the most this user wants to owe on a single shared
-  // expense. Synced to their profile so other members' forms can warn early.
+  // Synced to the profile so other members' forms can warn early.
   const handleSaveThreshold = async () => {
     if (savingThreshold) return;
     const val = Math.max(0, Number(thresholdInput) || 0);
@@ -1593,19 +1705,24 @@ export default function App() {
     try {
       await updateDoc(doc(db, 'users', activeUser), { recurringThreshold: val });
       setUserProfile((prev: any) => ({ ...(prev || {}), recurringThreshold: val }));
-      addToast('Threshold Saved', val > 0 ? `We'll flag shared expenses over $${val}.` : 'Threshold cleared.', 'success');
+      addToast(
+        'Threshold Saved',
+        val > 0 ? `We'll flag shared expenses over $${val}.` : 'Threshold cleared.',
+        'success'
+      );
     } catch (e) {
       console.error('Failed to save threshold', e);
-      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - spending threshold' });
+      setSupportError({
+        error: CHERRY_ERRORS.settingsSave,
+        screen: 'Settings - spending threshold',
+      });
     } finally {
       setSavingThreshold(false);
     }
   };
 
-  // Direct-payment handles (Venmo/Zelle) other members use to pay this user.
-  // Written to Firestore ONLY encrypted (keyed by the owner's uid); any legacy
-  // plaintext copy is deleted on save. Handles never enter cloud backups
-  // either: backups contain only the expense ledger.
+  // Written only encrypted (keyed by the owner's uid); any legacy plaintext
+  // copy is deleted on save. Handles never enter cloud backups.
   const handleSavePaymentHandles = async () => {
     if (savingHandles) return;
     const handles = {
@@ -1619,9 +1736,17 @@ export default function App() {
         paymentHandlesEnc: enc,
         paymentHandles: deleteField(),
       });
-      setUserProfile((prev: any) => ({ ...(prev || {}), paymentHandlesEnc: enc, paymentHandles: undefined }));
-      setPaymentHandlesByUid(prev => ({ ...prev, [activeUser]: handles }));
-      addToast('Payment Info Saved', 'Encrypted and saved. Group members can now pay you directly through Venmo or Zelle.', 'success');
+      setUserProfile((prev: any) => ({
+        ...(prev || {}),
+        paymentHandlesEnc: enc,
+        paymentHandles: undefined,
+      }));
+      setPaymentHandlesByUid((prev) => ({ ...prev, [activeUser]: handles }));
+      addToast(
+        'Payment Info Saved',
+        'Encrypted and saved. Group members can now pay you directly through Venmo or Zelle.',
+        'success'
+      );
     } catch (e) {
       console.error('Failed to save payment handles', e);
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - payment handles' });
@@ -1634,11 +1759,11 @@ export default function App() {
     try {
       await updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
       setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));
-    } catch (e) { console.error('Failed to reset profile', e); }
+    } catch (e) {
+      console.error('Failed to reset profile', e);
+    }
   };
 
-  // Email the invite code to someone holding a pending seat. The address
-  // comes from an inline field in Settings (the seat form or the roster row).
   const handleResendInvite = async (memberName: string, email: string) => {
     const to = email.trim();
     if (!to || !group) return;
@@ -1651,7 +1776,10 @@ export default function App() {
           groupName: group.name,
           inviteCode: group.inviteCode,
           recipientName: memberName,
-          fromName: (userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name) ? userProfile.name : currentUser?.displayName) || undefined,
+          fromName:
+            (userProfile?.name && !['Anonymous', 'Unknown'].includes(userProfile.name)
+              ? userProfile.name
+              : currentUser?.displayName) || undefined,
         }),
       });
       if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${to}.`, 'success');
@@ -1661,10 +1789,7 @@ export default function App() {
     }
   };
 
-  // Grow the group by one pending seat. Written as a whole-field update rather
-  // than dotted paths because every share changes at once, and read back
-  // through the group snapshot listener. With an email, the invite goes out
-  // right after the seat is written.
+  // A whole-field update, because every share changes at once.
   const handleAddSeat = async (name: string, percent: number, email?: string) => {
     if (!group) return;
     const next = withAddedSeat(group, name, percent);
@@ -1674,7 +1799,11 @@ export default function App() {
       targetNumPeople: next.targetNumPeople,
       addedSeats: next.addedSeats,
     });
-    addToast('Seat Added', `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`, 'success');
+    addToast(
+      'Seat Added',
+      `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`,
+      'success'
+    );
     if (email?.trim()) await handleResendInvite(name.trim(), email);
   };
 
@@ -1682,7 +1811,12 @@ export default function App() {
     if (!group) return;
     const seat = pendingSeats(group)[index];
     if (!seat) return;
-    if (!window.confirm(`Remove the pending seat for ${seat.name}? Their ${seat.split}% goes back to everyone else.`)) return;
+    if (
+      !window.confirm(
+        `Remove the pending seat for ${seat.name}? Their ${seat.split}% goes back to everyone else.`
+      )
+    )
+      return;
     try {
       const next = withRemovedSeat(group, index);
       await updateDoc(doc(db, 'groups', group.id), {
@@ -1704,7 +1838,11 @@ export default function App() {
     const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
     const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
     if (inc1 <= 0 || inc2 <= 0) {
-      addToast('Cannot Recalculate', 'Everyone needs an income on their profile before the split can be recalculated.', 'error');
+      addToast(
+        'Cannot Recalculate',
+        'Everyone needs an income on their profile before the split can be recalculated.',
+        'error'
+      );
       return;
     }
     const total = inc1 + inc2;
@@ -1715,19 +1853,26 @@ export default function App() {
         [`defaultSplit.${uids[0]}`]: pct1,
         [`defaultSplit.${uids[1]}`]: pct2,
       });
-      addToast('Split Updated', `New split is ${pct1}% / ${pct2}% based on verified incomes.`, 'success');
+      addToast(
+        'Split Updated',
+        `New split is ${pct1}% / ${pct2}% based on verified incomes.`,
+        'success'
+      );
     } catch (e) {
       console.error('Failed to recalculate split', e);
       addToast('Error', 'Could not update the split. Please try again.', 'error');
     }
   };
 
-  // Payments logged by others that are waiting for THIS user to confirm receipt.
-  const pendingToConfirm = expenses.filter(e =>
-    (e.settlements || []).some(s => s.status === 'pending' && s.receivedBy === activeUser)
+  // Payments waiting for this user to confirm receipt.
+  const pendingToConfirm = expenses.filter((e) =>
+    (e.settlements || []).some((s) => s.status === 'pending' && s.receivedBy === activeUser)
   );
   const pendingConfirmCount = pendingToConfirm.reduce(
-    (n, e) => n + (e.settlements || []).filter(s => s.status === 'pending' && s.receivedBy === activeUser).length,
+    (n, e) =>
+      n +
+      (e.settlements || []).filter((s) => s.status === 'pending' && s.receivedBy === activeUser)
+        .length,
     0
   );
 
@@ -1742,20 +1887,21 @@ export default function App() {
       id="app-root"
     >
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      {/* Cherry Checkered Border Top Strip */}
       <div className="h-px bg-natural-sidebar w-full" />
 
       <main className="max-w-6xl lg:max-w-7xl 2xl:max-w-[100rem] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
-        
         {hasIncomeDiscrepancy && (
           <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
             <div className="flex gap-3 items-start">
               <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-bold text-natural-text">Conversation Starter: Financial Alignment</h3>
+                <h3 className="text-sm font-bold text-natural-text">
+                  Conversation Starter: Financial Alignment
+                </h3>
                 <p className="text-sm text-natural-muted mt-1">
-                  It looks like there's a discrepancy between what you reported as your income and what someone else in the group estimated (or vice versa).
-                  Money conversations can be tough, but clarity is the first step to fairness.
+                  It looks like there's a discrepancy between what you reported as your income and
+                  what someone else in the group estimated (or vice versa). Money conversations can
+                  be tough, but clarity is the first step to fairness.
                 </p>
                 <button
                   onClick={() => setShowAlignmentModal(true)}
@@ -1768,11 +1914,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Top bar */}
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8" id="app-header">
-          {/* The masthead was a 56px mark beside a 30px display face, which on a
-              phone pushed the balances and the ledger below the fold before any
-              of them had said anything. It scales back up from sm. */}
+        <header
+          className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8"
+          id="app-header"
+        >
           <div className="flex items-center gap-3 sm:gap-4 relative">
             <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
               <CherryLogo className="h-9 w-9 sm:h-14 sm:w-14" />
@@ -1782,9 +1927,7 @@ export default function App() {
             </h1>
           </div>
 
-          {/* Phones get three equal columns that span the width; from sm up the
-              buttons sit their natural size in a row. flex-wrap alone left them
-              ragged on narrow screens because the padding is fixed. */}
+          {/* Three equal columns on phones; natural size in a row from sm up. */}
           <div
             className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
             id="header-controls"
@@ -1795,7 +1938,11 @@ export default function App() {
               title="Household Vault"
             >
               <VaultIcon className="h-4 w-4 shrink-0" /> Vault
-              {!isPlus && <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+              {!isPlus && (
+                <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
+                  Cherry +
+                </span>
+              )}
             </button>
             <button
               onClick={() => setShowPlanPurchase(true)}
@@ -1821,14 +1968,21 @@ export default function App() {
         </header>
 
         <div className="space-y-6" id="dashboard-content">
-          <div className="bg-white border border-natural-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" id="welcome-banner">
+          <div
+            className="bg-white border border-natural-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            id="welcome-banner"
+          >
             <div className="flex items-center gap-3">
               <div className="p-2 bg-natural-sage text-natural-primary rounded-xl">
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-natural-text">
-                  Welcome back, <span className="capitalize">{userProfile?.name || currentUser?.displayName || 'Friend'}</span>!
+                  Welcome back,{' '}
+                  <span className="capitalize">
+                    {userProfile?.name || currentUser?.displayName || 'Friend'}
+                  </span>
+                  !
                 </h3>
                 {userProfile?.weeklyGreeting?.text && (
                   <p className="text-xs text-natural-primary font-medium mt-1 italic leading-snug max-w-md">
@@ -1837,23 +1991,30 @@ export default function App() {
                 )}
                 <div className="relative mt-0.5">
                   <button
-                    onClick={() => setShowGroupMenu(v => !v)}
+                    onClick={() => setShowGroupMenu((v) => !v)}
                     className="text-xs text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
                     title="Switch group"
                   >
-                    Group: <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
-                    <ChevronDown size={12} className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`} />
+                    Group:{' '}
+                    <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`}
+                    />
                   </button>
                   {showGroupMenu && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
                       <div className="absolute left-0 mt-1 z-20 w-64 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
-                        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">Your Groups</p>
-                        {groupIds.map(gid => {
+                        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">
+                          Your Groups
+                        </p>
+                        {groupIds.map((gid) => {
                           const isActive = gid === activeGroupId;
-                          const name = gid === group.id
-                            ? (group.name || 'Unnamed Group')
-                            : (groupSummaries[gid]?.name || 'Unnamed Group');
+                          const name =
+                            gid === group.id
+                              ? group.name || 'Unnamed Group'
+                              : groupSummaries[gid]?.name || 'Unnamed Group';
                           return (
                             <button
                               key={gid}
@@ -1862,13 +2023,18 @@ export default function App() {
                               className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${isActive ? 'font-bold text-natural-primary bg-natural-sage/20 cursor-default' : 'text-natural-text hover:bg-natural-bg'}`}
                             >
                               <span className="truncate">{name}</span>
-                              {isActive && <Check size={14} className="text-natural-primary shrink-0" />}
+                              {isActive && (
+                                <Check size={14} className="text-natural-primary shrink-0" />
+                              )}
                             </button>
                           );
                         })}
                         <div className="border-t border-natural-border my-1" />
                         <button
-                          onClick={() => { setShowGroupMenu(false); setShowAddGroup(true); }}
+                          onClick={() => {
+                            setShowGroupMenu(false);
+                            setShowAddGroup(true);
+                          }}
                           className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
                         >
                           <Plus size={14} /> Join or create another group
@@ -1880,7 +2046,7 @@ export default function App() {
               </div>
             </div>
             <div className="flex justify-end">
-              <button 
+              <button
                 onClick={() => setShowSettings(true)}
                 className="text-natural-muted hover:text-natural-primary flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 border border-natural-border rounded-md shadow-sm"
                 title="Account Settings"
@@ -1901,10 +2067,13 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">
-                  {pendingConfirmCount === 1 ? 'A payment needs your confirmation' : `${pendingConfirmCount} payments need your confirmation`}
+                  {pendingConfirmCount === 1
+                    ? 'A payment needs your confirmation'
+                    : `${pendingConfirmCount} payments need your confirmation`}
                 </h3>
                 <p className="text-xs text-natural-muted mt-1">
-                  Someone logged a payment to you. Confirm receipt so it clears and updates their balance.
+                  Someone logged a payment to you. Confirm receipt so it clears and updates their
+                  balance.
                 </p>
               </div>
               <button
@@ -1921,10 +2090,15 @@ export default function App() {
               <AlertCircle className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">
-                  {overThresholdExpenses.length === 1 ? 'A shared expense is over your threshold' : `${overThresholdExpenses.length} shared expenses are over your threshold`}
+                  {overThresholdExpenses.length === 1
+                    ? 'A shared expense is over your threshold'
+                    : `${overThresholdExpenses.length} shared expenses are over your threshold`}
                 </h3>
                 <p className="text-xs text-natural-muted mt-1">
-                  Your share {overThresholdExpenses.length === 1 ? 'here exceeds' : 'on these exceeds'} your spending threshold of ${myThreshold.toFixed(0)}. Worth a look, and a conversation if the timing's tight.
+                  Your share{' '}
+                  {overThresholdExpenses.length === 1 ? 'here exceeds' : 'on these exceeds'} your
+                  spending threshold of ${myThreshold.toFixed(0)}. Worth a look, and a conversation
+                  if the timing's tight.
                 </p>
               </div>
               <button
@@ -1940,13 +2114,16 @@ export default function App() {
             <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-natural-text">Some members are still setting up</h3>
+                <h3 className="text-sm font-bold text-natural-text">
+                  Some members are still setting up
+                </h3>
                 <p className="text-xs text-natural-muted mt-1">
-                  You can start logging and settling expenses right away. Income-based splits and financial
-                  insights will get more accurate once everyone finishes their profile quiz.
+                  You can start logging and settling expenses right away. Income-based splits and
+                  financial insights will get more accurate once everyone finishes their profile
+                  quiz.
                 </p>
                 <div className="mt-2 space-y-0.5">
-                  {missingProfiles.map(id => (
+                  {missingProfiles.map((id) => (
                     <div key={id} className="text-xs font-medium text-natural-primary">
                       {groupUsers[id]?.name || 'Someone'} hasn't completed setup yet.
                     </div>
@@ -1964,14 +2141,14 @@ export default function App() {
             </div>
           )}
 
-          {/* Two-column on large screens: balances become a sticky right rail
-              beside the ledger; on phones/iPad-portrait they stay a full-width
-              band above the ledger so nothing gets cut off. */}
+          {/* Balances are a sticky right rail on large screens and a band above the ledger on phones. */}
           <div className="flex flex-col lg:flex-row lg:items-start gap-6">
             <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">Shared Ledger</h3>
+                  <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
+                    Shared Ledger
+                  </h3>
                 </div>
                 <ModuleBoundary label="Shared Ledger">
                   <ExpenseList
@@ -1982,34 +2159,28 @@ export default function App() {
                   />
                 </ModuleBoundary>
               </div>
-              {/* Month-over-month is "Insights and monthly trends" on the
-                  paywall, so it is gated with the rest of it rather than
-                  being the one Cherry + feature the web gives away. */}
+              {/* Gated: month-over-month is on the paywall as "Insights and monthly trends". */}
               {isPlus && (
                 <ModuleBoundary label="Monthly trends">
-                  <MonthlyComparisonChart expenses={statsVisibleExpenses} members={getFullMembers(group)} />
+                  <MonthlyComparisonChart
+                    expenses={statsVisibleExpenses}
+                    members={getFullMembers(group)}
+                  />
                 </ModuleBoundary>
               )}
             </div>
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
-              {/* Insights is a Cherry + feature, and Cherry + is sold inside
-                  the mobile apps. On web it opens the waitlist instead of the
-                  feature, which is the same treatment every other Cherry +
-                  surface here already gets. */}
-              {/* Balances are not a Cherry + feature and never were. The
-                  paywall sells Dark Cherry, the Vault, thresholds, insights
-                  and rhythm; "You owe / owed to you / settled" is the
-                  splitter itself, and the site promises the free plan is the
-                  whole splitter rather than a trial of it. Gating these four
-                  cards made that promise false and left a free household
-                  unable to see who owed whom, which is the one question the
-                  product exists to answer. */}
+              {/* Balances are the free splitter itself, never gated. */}
               <ModuleBoundary label="Balances">
-                <StatsSection expenses={statsVisibleExpenses} group={group} activeUser={activeUser} orientation="rail" onCardClick={(card) => setOwedModal(card)} />
+                <StatsSection
+                  expenses={statsVisibleExpenses}
+                  group={group}
+                  activeUser={activeUser}
+                  orientation="rail"
+                  onCardClick={(card) => setOwedModal(card)}
+                />
               </ModuleBoundary>
-              {/* The insights upsell stays for free households, since the
-                  month-over-month chart above really is behind the paywall. */}
               {!isPlus && (
                 <button
                   type="button"
@@ -2017,16 +2188,19 @@ export default function App() {
                   className="w-full text-left bg-white border border-natural-border rounded-2xl p-5 shadow-sm hover:border-natural-primary/40 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">Insights</span>
-                    <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
+                      Insights
+                    </span>
+                    <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
+                      Cherry +
+                    </span>
                   </div>
                   <p className="mt-2 font-display text-lg font-semibold text-natural-text">
                     See where the money actually goes
                   </p>
                   <p className="mt-1 text-sm text-natural-muted">
-                    How it was paid, who is carrying the card, and how long
-                    things take to come back. Arriving with the iOS and Android
-                    apps.
+                    How it was paid, who is carrying the card, and how long things take to come
+                    back. Arriving with the iOS and Android apps.
                   </p>
                   <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
                     Join the waitlist
@@ -2034,19 +2208,25 @@ export default function App() {
                 </button>
               )}
               <ModuleBoundary label="Rhythm">
-                <RhythmCard expenses={expenses} locked={!isPlus} onUnlock={() => setShowCherryPlus(true)} />
+                <RhythmCard
+                  expenses={expenses}
+                  locked={!isPlus}
+                  onUnlock={() => setShowCherryPlus(true)}
+                />
               </ModuleBoundary>
             </div>
           </div>
         </div>
 
-        <footer className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1" id="app-footer">
+        <footer
+          className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1"
+          id="app-footer"
+        >
           <p>Have Another Cherry • Shared Home Ledger</p>
           <p className="font-mono">Real-time Cloud Sync Active</p>
         </footer>
       </main>
 
-      {/* MODALS */}
       {showAddGroup && (
         <div className="fixed inset-0 z-50 overflow-auto animate-in fade-in duration-200">
           <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
@@ -2080,17 +2260,25 @@ export default function App() {
           onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}
           onOpenBackup={() => {
-            // Backups & export are Cherry + (site feature list): free users
-            // get the upgrade page, never a dead end.
+            // Backups and export are Cherry +; free users get the upgrade page.
             setShowSettings(false);
-            if (isPlus) { setShowBackup(true); } else { setShowCherryPlus(true); }
+            if (isPlus) {
+              setShowBackup(true);
+            } else {
+              setShowCherryPlus(true);
+            }
           }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
-          onSignOut={() => { setShowSettings(false); handleSignOut(); }}
+          onSignOut={() => {
+            setShowSettings(false);
+            handleSignOut();
+          }}
           extraSection={
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider">Budget & Payments</h3>
+                <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+                  Budget & Payments
+                </h3>
                 <button
                   onClick={() => setShowCherryPlus(true)}
                   className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
@@ -2103,14 +2291,23 @@ export default function App() {
                 <div>
                   <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-2">
                     Spending threshold
-                    {!isPlus && <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">Cherry +</span>}
+                    {!isPlus && (
+                      <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
+                        Cherry +
+                      </span>
+                    )}
                   </label>
-                  <p className="text-xs text-natural-muted mb-2">The most you want to owe on a single shared expense. Everyone on the expense gets a heads-up when a split goes over it.</p>
+                  <p className="text-xs text-natural-muted mb-2">
+                    The most you want to owe on a single shared expense. Everyone on the expense
+                    gets a heads-up when a split goes over it.
+                  </p>
                   {isPlus ? (
                     <div>
                       <div className="flex items-center gap-2">
                         <div className="relative flex-1">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                            $
+                          </span>
                           <input
                             type="number"
                             min="0"
@@ -2132,7 +2329,10 @@ export default function App() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => { setShowSettings(false); setShowCherryPlus(true); }}
+                      onClick={() => {
+                        setShowSettings(false);
+                        setShowCherryPlus(true);
+                      }}
                       className="w-full py-2 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 rounded-lg transition-colors"
                     >
                       Unlock with Cherry +
@@ -2141,11 +2341,18 @@ export default function App() {
                 </div>
 
                 <div className="border-t border-natural-primary/10 pt-3">
-                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-1.5"><Wallet size={12} /> How people pay you</label>
-                  <p className="text-xs text-natural-muted mb-2">Add your handles and group members get a one-tap way into Venmo or Zelle when they settle up with you.</p>
+                  <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Wallet size={12} /> How people pay you
+                  </label>
+                  <p className="text-xs text-natural-muted mb-2">
+                    Add your handles and group members get a one-tap way into Venmo or Zelle when
+                    they settle up with you.
+                  </p>
                   <div className="space-y-2">
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">@</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                        @
+                      </span>
                       <input
                         type="text"
                         value={venmoInput}
@@ -2204,8 +2411,7 @@ export default function App() {
           onClose={() => setShowCherryPlus(false)}
           customerEmail={currentUser?.email || userProfile?.email}
           onPurchased={() =>
-            // Unlock immediately; the RevenueCat webhook writes the durable
-            // copy to users/{uid} and wins on the next profile load.
+            // Unlock now; the webhook writes the durable copy to users/{uid}.
             setUserProfile((prev: any) => ({
               ...(prev || {}),
               isPlus: true,
@@ -2242,7 +2448,7 @@ export default function App() {
           groupId={group.id}
           activeUser={activeUser}
           expenses={expenses}
-          memberNames={Object.fromEntries(getFullMembers(group).map(m => [m.uid, m.name]))}
+          memberNames={Object.fromEntries(getFullMembers(group).map((m) => [m.uid, m.name]))}
           categories={group.categories}
           onClose={() => setShowVault(false)}
         />
@@ -2278,17 +2484,15 @@ export default function App() {
         />
       )}
 
-      {/* Render the live copy of the selected expense, not the snapshot taken
-          when it was opened: confirmations and edits synced from other members
-          must show up (and be validated against) immediately. */}
+      {/* The live copy, so synced confirmations and edits show up immediately. */}
       {selectedExpense && (
         <ExpenseDetail
-          expense={expenses.find(e => e.id === selectedExpense.id) || selectedExpense}
+          expense={expenses.find((e) => e.id === selectedExpense.id) || selectedExpense}
           group={group}
           activeUser={activeUser}
           onClose={() => setSelectedExpense(null)}
           onEdit={() => {
-            setEditingExpense(expenses.find(e => e.id === selectedExpense.id) || selectedExpense);
+            setEditingExpense(expenses.find((e) => e.id === selectedExpense.id) || selectedExpense);
             setSelectedExpense(null);
             setShowForm(true);
           }}
@@ -2297,14 +2501,16 @@ export default function App() {
           onConfirmReceipt={(settlementId) => handleConfirmSettleReceipt(settlementId)}
           onVoidSettlement={(settlementId) => handleVoidSettlement(settlementId)}
           onAddComment={(text) => handleAddComment(selectedExpense.id, text)}
-          onGentleRemind={() => handleGentleRemind(expenses.find(e => e.id === selectedExpense.id) || selectedExpense)}
+          onGentleRemind={() =>
+            handleGentleRemind(expenses.find((e) => e.id === selectedExpense.id) || selectedExpense)
+          }
           onClaim={(uid) => handleClaimExpense(selectedExpense.id, uid)}
         />
       )}
 
       {showSettleModal && selectedExpense && (
         <SettleUpModal
-          expense={expenses.find(e => e.id === selectedExpense.id) || selectedExpense}
+          expense={expenses.find((e) => e.id === selectedExpense.id) || selectedExpense}
           group={group}
           activeUser={activeUser}
           paymentHandlesByUid={paymentHandlesByUid}
@@ -2317,4 +2523,3 @@ export default function App() {
     </div>
   );
 }
-

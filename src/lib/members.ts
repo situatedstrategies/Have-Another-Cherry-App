@@ -26,21 +26,29 @@ export const getFullMembers = (group: any) => {
   if (!group) return [];
   const members = [...(group.members || [])];
   const splits = group.availableSplits || [];
-  splits.forEach((s, idx) => {
+  splits.forEach((s: any, idx: number) => {
     members.push({
       uid: `ghost_${idx}`,
       name: typeof s === 'string' ? s : s.name,
-      email: ''
+      email: '',
     });
   });
   return members;
 };
 
+/** Display name for a uid on a roster. 'You' when it is the viewer's own uid,
+ *  'Someone' when the uid is not on the roster. */
+export const nameOf = (
+  uid: string,
+  members: { uid: string; name?: string }[],
+  selfUid?: string
+): string => (uid === selfUid ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone');
+
 export const getFullDefaultSplit = (group: any) => {
   if (!group) return {};
   const ds = { ...(group.defaultSplit || {}) };
   const splits = group.availableSplits || [];
-  splits.forEach((s, idx) => {
+  splits.forEach((s: any, idx: number) => {
     ds[`ghost_${idx}`] = typeof s === 'object' ? s.split : 0;
   });
   return ds;
@@ -63,8 +71,12 @@ export const pendingSeats = (group: Partial<Group> | null | undefined): PendingS
  *  so a half-joined member (in one list but not the other) still counts once. */
 export const joinedUids = (group: Partial<Group> | null | undefined): string[] => {
   const ids = new Set<string>();
-  (group?.memberIds || []).forEach(id => { if (id) ids.add(id); });
-  (group?.members || []).forEach(m => { if (m?.uid) ids.add(m.uid); });
+  (group?.memberIds || []).forEach((id) => {
+    if (id) ids.add(id);
+  });
+  (group?.members || []).forEach((m) => {
+    if (m?.uid) ids.add(m.uid);
+  });
   return Array.from(ids);
 };
 
@@ -101,9 +113,6 @@ export const seatAddBlocker = (group: Partial<Group> | null | undefined): string
   return null;
 };
 
-export const canAddSeat = (group: Partial<Group> | null | undefined): boolean =>
-  seatAddBlocker(group) === null;
-
 /** The percentage a new seat is offered by default: an equal share of the
  *  roster it is joining. */
 export const suggestedSeatPercent = (group: Partial<Group> | null | undefined): number =>
@@ -118,13 +127,16 @@ export const scalePercents = (values: number[], target: number): number[] => {
   if (values.length === 0) return [];
   const safeTarget = Math.max(0, round1(target));
   const sum = values.reduce((a, b) => a + (Number(b) || 0), 0);
-  const scaled = sum > 0
-    ? values.map(v => round1(((Number(v) || 0) / sum) * safeTarget))
-    : values.map(() => round1(safeTarget / values.length));
+  const scaled =
+    sum > 0
+      ? values.map((v) => round1(((Number(v) || 0) / sum) * safeTarget))
+      : values.map(() => round1(safeTarget / values.length));
   const drift = round1(safeTarget - scaled.reduce((a, b) => a + b, 0));
   if (drift !== 0) {
     let big = 0;
-    scaled.forEach((v, i) => { if (v > scaled[big]) big = i; });
+    scaled.forEach((v, i) => {
+      if (v > scaled[big]) big = i;
+    });
     scaled[big] = round1(scaled[big] + drift);
   }
   return scaled;
@@ -146,13 +158,12 @@ const rebalance = (
 ): { defaultSplit: Record<string, number>; availableSplits: PendingSeat[] } => {
   const uids = joinedUids(group);
   const current = group.defaultSplit || {};
-  const values = [
-    ...uids.map(uid => Number(current[uid]) || 0),
-    ...pending.map(p => p.split),
-  ];
+  const values = [...uids.map((uid) => Number(current[uid]) || 0), ...pending.map((p) => p.split)];
   const scaled = scalePercents(values, 100 - reserve);
   const defaultSplit: Record<string, number> = {};
-  uids.forEach((uid, i) => { defaultSplit[uid] = scaled[i]; });
+  uids.forEach((uid, i) => {
+    defaultSplit[uid] = scaled[i];
+  });
   const availableSplits = pending.map((p, i) => ({ name: p.name, split: scaled[uids.length + i] }));
   return { defaultSplit, availableSplits };
 };
@@ -198,9 +209,7 @@ export const withRemovedSeat = (group: Partial<Group>, index: number): SeatUpdat
   return {
     defaultSplit,
     availableSplits,
-    // Floors at two rather than at the seats that exist: removing the last
-    // pending seat used to write a capacity of one, after which every invite
-    // was refused as "already full" while Settings still showed the code.
+    // Floors at two: a capacity of one refuses every invite while Settings still shows the code.
     targetNumPeople: Math.max(MIN_GROUP_CAPACITY, seats),
     addedSeats: Math.max(0, addedSeats(group) - 1),
   };

@@ -1,6 +1,6 @@
-import { Resend } from "resend";
-import fs from "fs/promises";
-import path from "path";
+import { Resend } from 'resend';
+import fs from 'fs/promises';
+import path from 'path';
 
 // Compliance footer appended to every user-facing email: why you got this,
 // what we keep (your email address, nothing more), how to unsubscribe, and a
@@ -25,22 +25,23 @@ const EMAIL_COMPLIANCE_FOOTER = `
 </table>`;
 
 const withComplianceFooter = (html: string): string =>
-  html.includes("</body>")
-    ? html.replace("</body>", `${EMAIL_COMPLIANCE_FOOTER}</body>`)
+  html.includes('</body>')
+    ? html.replace('</body>', `${EMAIL_COMPLIANCE_FOOTER}</body>`)
     : html + EMAIL_COMPLIANCE_FOOTER;
 
-const EMAIL_INVITES_ACTIVE = true;
-
 function escapeHtml(input: string): string {
-  return String(input == null ? "" : input)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(input == null ? '' : input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-interface SplitEntry { name: string; split: number; }
+interface SplitEntry {
+  name: string;
+  split: number;
+}
 
 export async function sendInviteEmail(
   email: string,
@@ -50,55 +51,70 @@ export async function sendInviteEmail(
   fromName?: string,
   split?: SplitEntry[]
 ) {
-  if (!EMAIL_INVITES_ACTIVE) {
-    console.log("[PRIVACY MODE] Suppressed email invite to " + email + " for group " + groupName);
-    return { id: "mocked_privacy_id_12345" };
-  }
-
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error('RESEND_API_KEY is not configured');
   }
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), "src/templates/inviteEmail.html");
-  let htmlTemplate = "";
+  const templatePath = path.join(process.cwd(), 'src/templates/inviteEmail.html');
+  let htmlTemplate = '';
   try {
-    htmlTemplate = await fs.readFile(templatePath, "utf-8");
+    htmlTemplate = await fs.readFile(templatePath, 'utf-8');
   } catch (error) {
-    console.error("Failed to load email template:", error);
-    throw new Error("Could not load email template.");
+    console.error('Failed to load email template:', error);
+    throw new Error('Could not load email template.');
   }
 
-  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
-  const safeFrom = fromName && fromName.trim() ? fromName.trim() : "A friend";
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : 'there';
+  const safeFrom = fromName && fromName.trim() ? fromName.trim() : 'A friend';
 
-  const rowStyleName = "padding:11px 0;border-bottom:1px solid #E4E4E7;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;color:#18181B;font-weight:500;";
-  const rowStylePct = "padding:11px 0;border-bottom:1px solid #E4E4E7;text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;color:#C41200;font-weight:700;";
+  const rowStyleName =
+    "padding:11px 0;border-bottom:1px solid #E4E4E7;font-family:'Inter',Helvetica,Arial,sans-serif;font-size:15px;color:#18181B;font-weight:500;";
+  const rowStylePct =
+    "padding:11px 0;border-bottom:1px solid #E4E4E7;text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;color:#C41200;font-weight:700;";
 
   const entries = Array.isArray(split) ? split.filter((s) => s && s.name) : [];
   let splitRows: string;
   if (entries.length) {
-    splitRows = entries.map((s) => {
-      const pct = Math.round((Number(s.split) || 0) * 10) / 10;
-      return '<tr><td style="' + rowStyleName + '">' + escapeHtml(s.name) + '</td><td style="' + rowStylePct + '">' + pct + '%</td></tr>';
-    }).join("");
+    splitRows = entries
+      .map((s) => {
+        const pct = Math.round((Number(s.split) || 0) * 10) / 10;
+        return (
+          '<tr><td style="' +
+          rowStyleName +
+          '">' +
+          escapeHtml(s.name) +
+          '</td><td style="' +
+          rowStylePct +
+          '">' +
+          pct +
+          '%</td></tr>'
+        );
+      })
+      .join('');
   } else {
-    splitRows = '<tr><td style="padding:11px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;color:#52525B;">The split gets set up in the app.</td></tr>';
+    splitRows =
+      '<tr><td style="padding:11px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;color:#52525B;">The split gets set up in the app.</td></tr>';
   }
 
   const htmlContent = htmlTemplate
-    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
-    .split("{{fromName}}").join(escapeHtml(safeFrom))
-    .split("{{groupName}}").join(escapeHtml(groupName || "your group"))
-    .split("{{inviteCode}}").join(escapeHtml(inviteCode || ""))
-    .split("{{splitRows}}").join(splitRows);
+    .split('{{recipientName}}')
+    .join(escapeHtml(safeRecipient))
+    .split('{{fromName}}')
+    .join(escapeHtml(safeFrom))
+    .split('{{groupName}}')
+    .join(escapeHtml(groupName || 'your group'))
+    .split('{{inviteCode}}')
+    .join(escapeHtml(inviteCode || ''))
+    .split('{{splitRows}}')
+    .join(splitRows);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <poolside@haveanothercherry.com>",
+    from: 'Have Another Cherry <poolside@haveanothercherry.com>',
     to: [email],
-    subject: safeFrom + " invited you to " + groupName + " on Have Another Cherry",
+    subject: safeFrom + ' invited you to ' + groupName + ' on Have Another Cherry',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -121,30 +137,32 @@ export async function sendVerificationEmail(
   // the shared key so the flow works before a dedicated key exists.
   const apiKey = process.env.VERIFY_RESEND_API || process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("No Resend API key configured for verification emails");
+    throw new Error('No Resend API key configured for verification emails');
   }
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), "src/templates/verifyEmail.html");
-  let htmlTemplate = "";
+  const templatePath = path.join(process.cwd(), 'src/templates/verifyEmail.html');
+  let htmlTemplate = '';
   try {
-    htmlTemplate = await fs.readFile(templatePath, "utf-8");
+    htmlTemplate = await fs.readFile(templatePath, 'utf-8');
   } catch (error) {
-    console.error("Failed to load verification email template:", error);
-    throw new Error("Could not load verification email template.");
+    console.error('Failed to load verification email template:', error);
+    throw new Error('Could not load verification email template.');
   }
 
-  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : 'there';
 
   const htmlContent = htmlTemplate
-    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
-    .split("{{verifyLink}}").join(escapeHtml(verifyLink));
+    .split('{{recipientName}}')
+    .join(escapeHtml(safeRecipient))
+    .split('{{verifyLink}}')
+    .join(escapeHtml(verifyLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <verify@haveanothercherry.com>",
+    from: 'Have Another Cherry <verify@haveanothercherry.com>',
     to: [email],
-    subject: "Confirm your email for Have Another Cherry",
+    subject: 'Confirm your email for Have Another Cherry',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -157,39 +175,37 @@ export async function sendVerificationEmail(
 
 // Send a password reset email via Resend from reset@haveanothercherry.com.
 // The resetLink is generated server-side by the Firebase Admin SDK.
-export async function sendResetEmail(
-  email: string,
-  resetLink: string,
-  recipientName?: string
-) {
+export async function sendResetEmail(email: string, resetLink: string, recipientName?: string) {
   // Reset emails use their own Resend key (RESET_RESEND_API); fall back to the
   // shared RESEND_API_KEY if the dedicated one isn't configured.
   const apiKey = process.env.RESET_RESEND_API || process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESET_RESEND_API is not configured");
+    throw new Error('RESET_RESEND_API is not configured');
   }
 
   const resend = new Resend(apiKey);
 
-  const templatePath = path.join(process.cwd(), "src/templates/resetEmail.html");
-  let htmlTemplate = "";
+  const templatePath = path.join(process.cwd(), 'src/templates/resetEmail.html');
+  let htmlTemplate = '';
   try {
-    htmlTemplate = await fs.readFile(templatePath, "utf-8");
+    htmlTemplate = await fs.readFile(templatePath, 'utf-8');
   } catch (error) {
-    console.error("Failed to load reset email template:", error);
-    throw new Error("Could not load reset email template.");
+    console.error('Failed to load reset email template:', error);
+    throw new Error('Could not load reset email template.');
   }
 
-  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : "there";
+  const safeRecipient = recipientName && recipientName.trim() ? recipientName.trim() : 'there';
 
   const htmlContent = htmlTemplate
-    .split("{{recipientName}}").join(escapeHtml(safeRecipient))
-    .split("{{resetLink}}").join(escapeHtml(resetLink));
+    .split('{{recipientName}}')
+    .join(escapeHtml(safeRecipient))
+    .split('{{resetLink}}')
+    .join(escapeHtml(resetLink));
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <reset@haveanothercherry.com>",
+    from: 'Have Another Cherry <reset@haveanothercherry.com>',
     to: [email],
-    subject: "Reset your Have Another Cherry password",
+    subject: 'Reset your Have Another Cherry password',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -208,15 +224,15 @@ export async function sendResetEmail(
 export async function sendWaitlistNotification(subscriberEmail: string) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error('RESEND_API_KEY is not configured');
   }
 
   const resend = new Resend(apiKey);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <notifications@haveanothercherry.com>",
-    to: "poolside@haveanothercherry.com",
-    subject: "Cherry + waitlist signup",
+    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    to: 'poolside@haveanothercherry.com',
+    subject: 'Cherry + waitlist signup',
     text:
       `New Cherry + waitlist signup:\n\n${subscriberEmail}\n\n` +
       `Signed up ${new Date().toISOString()} from the in-app coming-soon page.`,
@@ -242,24 +258,24 @@ export async function sendBetaSignupNotification(signup: {
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error('RESEND_API_KEY is not configured');
   }
 
   const resend = new Resend(apiKey);
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <notifications@haveanothercherry.com>",
-    to: "poolside@haveanothercherry.com",
+    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    to: 'poolside@haveanothercherry.com',
     replyTo: signup.email,
     subject: `Beta signup: ${signup.name || signup.email}`,
     text:
       `New beta signup from the marketing site:\n\n` +
-      `Name: ${signup.name || "not given"}\n` +
+      `Name: ${signup.name || 'not given'}\n` +
       `Email: ${signup.email}\n` +
-      `Shares money with: ${signup.household || "not given"}\n` +
-      `Wants to test: ${signup.interests || "not given"}\n` +
-      `Notes: ${signup.notes || "none"}\n` +
-      `Page: ${signup.source || "unknown"}\n\n` +
+      `Shares money with: ${signup.household || 'not given'}\n` +
+      `Wants to test: ${signup.interests || 'not given'}\n` +
+      `Notes: ${signup.notes || 'none'}\n` +
+      `Page: ${signup.source || 'unknown'}\n\n` +
       `Signed up ${new Date().toISOString()} with consent to be emailed.`,
   });
 
@@ -286,7 +302,7 @@ export async function sendReminderEmail(
 ) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error('RESEND_API_KEY is not configured');
   }
 
   const resend = new Resend(apiKey);
@@ -296,7 +312,7 @@ export async function sendReminderEmail(
     <div style="max-width:520px; margin:0 auto; background:#FFFFFF; border:1px solid #D4D4D8; border-radius:16px; padding:32px;">
       <h1 style="font-family: Georgia, serif; font-size:22px; color:#18181B; margin:0 0 16px;">A gentle nudge from ${groupName}</h1>
       <p style="color:#52525B; font-size:14.5px; line-height:1.6; margin:0 0 16px;">
-        Hi ${toName || "there"}, ${fromName} sent a friendly reminder from Have Another Cherry.
+        Hi ${toName || 'there'}, ${fromName} sent a friendly reminder from Have Another Cherry.
         There's an open balance waiting for you in ${groupName}. No rush and no pressure:
         this is just the app doing the asking so nobody has to.
       </p>
@@ -313,7 +329,7 @@ export async function sendReminderEmail(
   </div>`;
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <tartcherry@haveanothercherry.com>",
+    from: 'Have Another Cherry <tartcherry@haveanothercherry.com>',
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
     html: withComplianceFooter(html),
@@ -342,7 +358,7 @@ export async function sendSupportRequest(request: {
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured");
+    throw new Error('RESEND_API_KEY is not configured');
   }
 
   const resend = new Resend(apiKey);
@@ -351,15 +367,15 @@ export async function sendSupportRequest(request: {
     : request.fromEmail;
 
   const { data, error } = await resend.emails.send({
-    from: "Have Another Cherry <notifications@haveanothercherry.com>",
-    to: "help@haveanothercherry.com",
+    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    to: 'help@haveanothercherry.com',
     replyTo: request.fromEmail,
     subject: `[Support] ${request.fromEmail}`,
     text:
       `Support request from ${who}\n\n` +
       `${request.message.trim()}\n\n` +
       `--- app context ---\n` +
-      `${request.context?.trim() || "(none supplied)"}\n` +
+      `${request.context?.trim() || '(none supplied)'}\n` +
       `Received ${new Date().toISOString()}`,
   });
 

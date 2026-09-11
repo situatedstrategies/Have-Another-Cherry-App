@@ -1,4 +1,3 @@
-import React from 'react';
 import { EyeOff, HandCoins, ShieldCheck, Cherry } from 'lucide-react';
 import Modal from './Modal';
 
@@ -39,9 +38,9 @@ export default function DarkCherryInfoModal({ onClose }: { onClose: () => void }
     >
       <div className="space-y-5">
         <p className="text-sm text-natural-text leading-relaxed">
-          A <strong>Dark Cherry</strong> is a blind split - for the expenses where talking
-          about exact numbers feels weird. Think of it as money going into a shared pot,
-          without anyone staring at a balance.
+          A <strong>Dark Cherry</strong> is a blind split - for the expenses where talking about
+          exact numbers feels weird. Think of it as money going into a shared pot, without anyone
+          staring at a balance.
         </p>
 
         <div className="space-y-3">
@@ -56,23 +55,24 @@ export default function DarkCherryInfoModal({ onClose }: { onClose: () => void }
           <div className="flex gap-3 items-start bg-natural-bg/50 border border-natural-border rounded-xl p-3.5">
             <HandCoins className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             <p className="text-xs text-natural-text leading-relaxed">
-              <strong>Give what you can, when you can.</strong> The creator sets a comfortable
-              range for each payment. You just log something in that range toward the pot - once, or as many times as you like.
+              <strong>Give what you can, when you can.</strong> The creator sets a comfortable range
+              for each payment. You just log something in that range toward the pot - once, or as
+              many times as you like.
             </p>
           </div>
           <div className="flex gap-3 items-start bg-natural-bg/50 border border-natural-border rounded-xl p-3.5">
             <ShieldCheck className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             <p className="text-xs text-natural-text leading-relaxed">
-              <strong>It closes itself.</strong> When the pot quietly reaches the target, the
-              cherry is settled and everyone sees it's done. Nobody ever had to ask anyone for
-              a specific amount.
+              <strong>It closes itself.</strong> When the pot quietly reaches the target, the cherry
+              is settled and everyone sees it's done. Nobody ever had to ask anyone for a specific
+              amount.
             </p>
           </div>
         </div>
 
         <p className="text-xs text-natural-muted leading-relaxed italic border-t border-natural-border/60 pt-3">
-          It's for the households where "you owe me $43.50" lands wrong - a little less
-          precise, a lot more kind.
+          It's for the households where "you owe me $43.50" lands wrong - a little less precise, a
+          lot more kind.
         </p>
       </div>
     </Modal>

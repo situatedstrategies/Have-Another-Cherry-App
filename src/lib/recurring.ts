@@ -1,23 +1,10 @@
 // Recurring interval arithmetic, ported from the Flutter client's
-// `lib/domain/ledger/recurring.dart`.
-//
-// This exists because the same arithmetic was written three times on the web
-// (App.tsx's autopilot, ExpenseForm's next-date, HouseholdVault's calendar
-// projection) and all three had the same two bugs:
-//
-//   1. `d.setMonth(d.getMonth() + 1)` on 31 January gives 3 March, so a bill
-//      due on the 31st skipped February entirely and drifted later every year.
-//   2. Even clamped, a bill that lands on 28 February has forgotten it was
-//      ever the 31st, so it sticks at 28 for good.
-//
-// Both clients write the same ledger, so they have to agree about which day a
-// cycle falls on. `scripts/recurring-parity.ts` runs the Dart suite's own
-// cases against this file.
+// recurring.dart. Both clients write the same ledger, so they have to agree
+// about which day a cycle falls on; scripts/recurring-parity.ts runs the Dart
+// suite's cases against this file. Month steps are anchored on the original
+// day so a bill set for the 31st does not stick at 28 after one February.
 
-// Weeks and months are offered as two separate choices, matching the Flutter
-// form, because they are two different questions. A delivery every 4 weeks is
-// not the same as one on the 1st of each month, and a single merged list makes
-// that difference invisible at the moment someone picks.
+// Weeks and months are separate choices: every 4 weeks is not the 1st of each month.
 export const RECURRING_WEEKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 export const RECURRING_MONTHS = [1, 2, 3, 6, 12] as const;
 
@@ -27,13 +14,8 @@ export const RECURRING_INTERVALS: { value: string; label: string }[] = [
   ...RECURRING_MONTHS.map((n) => ({ value: `${n}_months`, label: intervalLabel(`${n}_months`) })),
 ];
 
-/**
- * The canonical spelling of an interval, for seeding a picker.
- *
- * Records written before the list grew say `weekly` / `monthly` / `yearly`.
- * Those keep working everywhere else, but a picker needs the value it actually
- * offers or it renders with nothing selected.
- */
+/** The canonical spelling of an interval, for seeding a picker. Legacy records
+ *  say `weekly` / `monthly` / `yearly`; a picker needs the value it offers. */
 export function normalizeInterval(interval?: string | null): string {
   if (!interval) return '1_months';
   const w = weeksIn(interval);
@@ -49,7 +31,7 @@ export const parseLocalDate = (s: string): Date =>
   new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T00:00:00' : s);
 
 /** YYYY-MM-DD in the local zone, which is how every date is stored. */
-export const toLocalIso = (d: Date): string =>
+const toLocalIso = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Today as a local YYYY-MM-DD. `toISOString()` gives the UTC date, which
@@ -60,9 +42,7 @@ export const todayLocal = (): string => toLocalIso(new Date());
 const lastDayOf = (year: number, monthIndex: number): number =>
   new Date(year, monthIndex + 1, 0).getDate();
 
-/** Weeks for a week-based interval, or null. Accepts `1_week`..`12_weeks`
- *  plus the two legacy names, so records written before the list grew still
- *  work. */
+/** Weeks for a week-based interval, or null. Accepts the legacy names too. */
 function weeksIn(interval: string): number | null {
   if (interval === 'weekly') return 1;
   if (interval === 'biweekly') return 2;
@@ -83,23 +63,14 @@ function monthsIn(interval: string): number | null {
 
 function addMonths(from: Date, months: number, anchorDay?: number): Date {
   const target = new Date(from.getFullYear(), from.getMonth() + months, 1);
-  // An anchor read off an unparseable date is NaN, and NaN would propagate all
-  // the way to an Invalid Date and a "NaN-NaN-NaN" written into the ledger.
-  // Dart's tryParse returns null here; falling back to the current day is the
-  // same degradation.
+  // A NaN anchor (unparseable date) would write "NaN-NaN-NaN" into the ledger.
   const want = Number.isInteger(anchorDay) ? (anchorDay as number) : from.getDate();
   const day = Math.min(Math.max(want, 1), lastDayOf(target.getFullYear(), target.getMonth()));
   return new Date(target.getFullYear(), target.getMonth(), day);
 }
 
-/**
- * Advances [from] by one [interval].
- *
- * [anchorDay] is the day of the month the bill was originally set for, and it
- * is what makes month intervals sticky: without it a bill anchored on the 31st
- * becomes the 28th in February and then stays the 28th forever. With it,
- * February is the 28th and March is the 31st again.
- */
+/** Advances [from] by one [interval]. [anchorDay] is the day the bill was set
+ *  for; it keeps month intervals sticky across short months. */
 export function advanceInterval(from: Date, interval?: string, anchorDay?: number): Date {
   const key = interval || '';
   const weeks = weeksIn(key);
@@ -120,15 +91,8 @@ export function advanceIntervalStr(dateStr: string, interval?: string, anchorDay
   return toLocalIso(advanceInterval(parseLocalDate(dateStr), interval, anchorDay));
 }
 
-/**
- * Whether a recurring definition lands on [day].
- *
- * The calendar shows every recurring expense, and it has to agree with the
- * autopilot about when a cycle falls. So this walks the same [advanceInterval]
- * from the definition's own date, with the same anchor, rather than stepping
- * forward from `nextRecurringDate`: that field moves as the autopilot advances,
- * so a past month would lose the occurrence it definitely had.
- */
+/** Whether a recurring definition lands on [day]. Walks from the definition's
+ *  own date with the same anchor as the autopilot, so the two agree. */
 export function recurringOccursOn(
   source: { isRecurring?: boolean; recurringInterval?: string | null; date?: string },
   day: Date,
@@ -157,13 +121,7 @@ export function recurringOccursOn(
   return false;
 }
 
-/**
- * Every day in the given month that a recurring definition falls on.
- *
- * Same walk as [recurringOccursOn], done once for the month instead of once
- * per day: a calendar asking about all 31 days would otherwise re-walk the
- * whole schedule from the anchor 31 times.
- */
+/** Every day in the given month that a recurring definition falls on. */
 export function recurringDaysInMonth(
   source: { isRecurring?: boolean; recurringInterval?: string | null; date?: string },
   year: number,

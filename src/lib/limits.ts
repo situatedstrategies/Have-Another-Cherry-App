@@ -1,13 +1,7 @@
-// Value limits for money and percentage inputs - one place for the rules so
-// every surface refuses, rounds, and phrases things the same way. Mirrored in
-// the Flutter app's `lib/core/limits.dart`; change them together.
-//
-// The rules (deliberately not advertised in the UI):
-// - A percentage field accepts 0-500. The headroom above 100 exists for
-//   lending with interest; anything past 500 is treated as a typo.
-// - Dollar amounts save exactly up to $999,999. From $1,000,000 the value is
-//   rounded to the nearest $100,000 (a purchase that size is an estimate
-//   anyway). Past $999,999,999 is refused as a typo.
+// Value limits for money and percentage inputs, mirrored in the Flutter app's
+// lib/core/limits.dart. Percentages accept 0-500 (headroom for lending with
+// interest); amounts save exactly to $999,999, round to the nearest $100,000
+// from $1,000,000, and are refused past the hard cap as a typo.
 
 export const MAX_PERCENT = 500;
 export const MAX_EXACT_AMOUNT = 999_999;

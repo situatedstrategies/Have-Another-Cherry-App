@@ -1,13 +1,37 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, PaymentInstrument } from '../types';
-import { X, Calculator, Percent, DollarSign, Calendar, Tag, Repeat, Scale, Plus, Camera, Sparkles, EyeOff } from 'lucide-react';
+import {
+  X,
+  Calculator,
+  Percent,
+  DollarSign,
+  Calendar,
+  Tag,
+  Repeat,
+  Scale,
+  Plus,
+  Camera,
+  Sparkles,
+  EyeOff,
+} from 'lucide-react';
 import Modal from './Modal';
-import DarkCherryInfoModal, { hasSeenDarkCherryIntro, markDarkCherryIntroSeen } from './DarkCherryInfoModal';
+import DarkCherryInfoModal, {
+  hasSeenDarkCherryIntro,
+  markDarkCherryIntroSeen,
+} from './DarkCherryInfoModal';
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
-import { advanceIntervalStr, parseLocalDate, normalizeInterval, todayLocal, RECURRING_WEEKS, RECURRING_MONTHS } from '../lib/recurring';
+import { roundCurrency } from '../lib/money';
+import {
+  advanceIntervalStr,
+  parseLocalDate,
+  normalizeInterval,
+  todayLocal,
+  RECURRING_WEEKS,
+  RECURRING_MONTHS,
+} from '../lib/recurring';
 
 interface ExpenseFormProps {
   group: Group;
@@ -21,10 +45,18 @@ interface ExpenseFormProps {
   isPlus?: boolean;
 }
 
-export default function ExpenseForm({ group, activeUser, onClose, onSubmit, editingExpense, memberThresholds, isPlus }: ExpenseFormProps) {
+export default function ExpenseForm({
+  group,
+  activeUser,
+  onClose,
+  onSubmit,
+  editingExpense,
+  memberThresholds,
+  isPlus,
+}: ExpenseFormProps) {
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
-  
+
   const [title, setTitle] = useState(editingExpense?.title || '');
   const [amount, setAmount] = useState(editingExpense?.amount?.toString() || '');
   // Start empty so the placeholder shows and nothing "sticks" in the field.
@@ -42,7 +74,9 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const [instrumentLabel, setInstrumentLabel] = useState<string>(
     editingExpense?.contributions?.[0]?.label || ''
   );
-  const [splitType, setSplitType] = useState<SplitType>(editingExpense?.splitType || 'household_default');
+  const [splitType, setSplitType] = useState<SplitType>(
+    editingExpense?.splitType || 'household_default'
+  );
 
   // Dark Cherry (blind split): per-payment bounds + the first-use explainer.
   const [blindMin, setBlindMin] = useState(editingExpense?.blindMin?.toString() || '');
@@ -58,15 +92,17 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
   const applyItemAssignments = () => {
     const defaultSplit = getFullDefaultSplit(group);
     const totals: Record<string, number> = {};
-    members.forEach(m => { totals[m.uid] = 0; });
+    members.forEach((m) => {
+      totals[m.uid] = 0;
+    });
 
     const itemsSum = scannedItems.reduce((s, it) => s + it.price, 0);
     // Tax/tip/fees = whatever the receipt total exceeds the item lines by.
     const overhead = Math.max(0, numericAmount - itemsSum);
 
     const addShared = (value: number) => {
-      members.forEach(m => {
-        const pct = defaultSplit[m.uid] ?? (100 / members.length);
+      members.forEach((m) => {
+        const pct = defaultSplit[m.uid] ?? 100 / members.length;
         totals[m.uid] += (value * pct) / 100;
       });
     };
@@ -79,7 +115,9 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     addShared(overhead);
 
     const next: Record<string, string> = {};
-    members.forEach(m => { next[m.uid] = (Math.round(totals[m.uid] * 100) / 100).toFixed(2); });
+    members.forEach((m) => {
+      next[m.uid] = (Math.round(totals[m.uid] * 100) / 100).toFixed(2);
+    });
     setCustomAmt(next);
     setSplitType('custom_amount');
   };
@@ -104,26 +142,28 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
   const [thirdPersonName, setThirdPersonName] = useState(editingExpense?.thirdPersonName || '');
   const [thirdPersonEmail, setThirdPersonEmail] = useState(editingExpense?.thirdPersonEmail || '');
-  
+
   const [thirdPartyPct, setThirdPartyPct] = useState<Record<string, string>>({});
 
   // Per-transaction "cherries": extra people added only to this expense's split.
   const [guests, setGuests] = useState<{ id: string; name: string; pct: string }[]>([]);
-  const addGuest = () => setGuests(prev => [...prev, { id: crypto.randomUUID(), name: '', pct: '' }]);
+  const addGuest = () =>
+    setGuests((prev) => [...prev, { id: crypto.randomUUID(), name: '', pct: '' }]);
   const updateGuest = (id: string, field: 'name' | 'pct', val: string) =>
-    setGuests(prev => prev.map(g => (g.id === id ? { ...g, [field]: val } : g)));
-  const removeGuest = (id: string) => setGuests(prev => prev.filter(g => g.id !== id));
+    setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, [field]: val } : g)));
+  const removeGuest = (id: string) => setGuests((prev) => prev.filter((g) => g.id !== id));
 
   const [notes, setNotes] = useState(editingExpense?.notes || '');
   const [isRecurring, setIsRecurring] = useState(editingExpense?.isRecurring || false);
-  const [recurringInterval, setRecurringInterval] = useState<string>(normalizeInterval(editingExpense?.recurringInterval));
+  const [recurringInterval, setRecurringInterval] = useState<string>(
+    normalizeInterval(editingExpense?.recurringInterval)
+  );
   const [alreadySettled, setAlreadySettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // Read the chosen receipt photo, send it to the AI scan endpoint, and prefill
-  // the form from the result. Replaces the old mock that always returned $84.50.
+  // Send the chosen receipt photo to the scan endpoint and prefill the form.
   const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file later
@@ -146,14 +186,24 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       if (response.ok && result.success && result.data) {
         if (result.data.description) setTitle(String(result.data.description));
         const amt = Number(result.data.amount);
-        if (Number.isFinite(amt) && amt > 0) { setAmount(amt.toFixed(2)); setCustomAmt({}); }
+        if (Number.isFinite(amt) && amt > 0) {
+          setAmount(amt.toFixed(2));
+          setCustomAmt({});
+        }
         if (result.data.date) setDate(String(result.data.date));
         // Line items, for the who-had-what itemized split below.
         const items = Array.isArray(result.data.items) ? result.data.items : [];
-        setScannedItems(items.map((it: any) => ({ name: String(it.name || 'Item'), price: Number(it.price) || 0 })));
+        setScannedItems(
+          items.map((it: any) => ({
+            name: String(it.name || 'Item'),
+            price: Number(it.price) || 0,
+          }))
+        );
         setItemAssign({});
       } else {
-        setError('Could not read that receipt. Try a clearer photo, or enter the details manually.');
+        setError(
+          'Could not read that receipt. Try a clearer photo, or enter the details manually.'
+        );
       }
     } catch (err) {
       console.error('Scan failed', err);
@@ -187,11 +237,13 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         setCustomPct(pcts);
         // Restore any per-transaction guests as percentage lines.
         if (editingExpense.extraParticipants?.length) {
-          setGuests(editingExpense.extraParticipants.map(g => ({
-            id: crypto.randomUUID(),
-            name: g.name,
-            pct: total ? ((g.share / total) * 100).toFixed(2) : '0'
-          })));
+          setGuests(
+            editingExpense.extraParticipants.map((g) => ({
+              id: crypto.randomUUID(),
+              name: g.name,
+              pct: total ? ((g.share / total) * 100).toFixed(2) : '0',
+            }))
+          );
         }
       } else if (editingExpense.splitType === 'custom_amount') {
         const amts: Record<string, string> = {};
@@ -202,7 +254,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       } else if (editingExpense.splitType === 'third_party') {
         setThirdPersonName(editingExpense.thirdPersonName || '');
         setThirdPersonEmail(editingExpense.thirdPersonEmail || '');
-        
+
         const total = editingExpense.amount;
         const pcts: Record<string, string> = {};
         for (const uid in editingExpense.shares) {
@@ -216,7 +268,7 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       // pending seats (ghost_N), which group.defaultSplit alone leaves at 0.
       const fullSplit = getFullDefaultSplit(group);
       const initPct: Record<string, string> = {};
-      members.forEach(m => {
+      members.forEach((m) => {
         initPct[m.uid] = (fullSplit[m.uid] || 0).toString();
       });
       setCustomPct(initPct);
@@ -237,13 +289,28 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
       setCategory('Internet');
       setSplitType('household_default');
-    } else if (lowerTitle.includes('power') || lowerTitle.includes('water') || lowerTitle.includes('utility') || lowerTitle.includes('gas') || lowerTitle.includes('electric')) {
+    } else if (
+      lowerTitle.includes('power') ||
+      lowerTitle.includes('water') ||
+      lowerTitle.includes('utility') ||
+      lowerTitle.includes('gas') ||
+      lowerTitle.includes('electric')
+    ) {
       setCategory('Utilities');
       setSplitType('household_default');
-    } else if (lowerTitle.includes('grocery') || lowerTitle.includes('groceries') || lowerTitle.includes('food')) {
+    } else if (
+      lowerTitle.includes('grocery') ||
+      lowerTitle.includes('groceries') ||
+      lowerTitle.includes('food')
+    ) {
       setCategory('Groceries');
       setSplitType('equal');
-    } else if (lowerTitle.includes('dinner') || lowerTitle.includes('restaurant') || lowerTitle.includes('lunch') || lowerTitle.includes('cafe')) {
+    } else if (
+      lowerTitle.includes('dinner') ||
+      lowerTitle.includes('restaurant') ||
+      lowerTitle.includes('lunch') ||
+      lowerTitle.includes('cafe')
+    ) {
       setCategory('Dining Out');
       setSplitType('equal');
     }
@@ -253,53 +320,51 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
   // Perform split calculations on the fly for UI previews
   const previewShares: Record<string, number> = {};
-  let previewThirdPersonShare = 0;
 
-  members.forEach(m => previewShares[m.uid] = 0);
+  members.forEach((m) => (previewShares[m.uid] = 0));
 
   if (splitType === 'household_default') {
-    members.forEach(m => {
+    members.forEach((m) => {
       previewShares[m.uid] = numericAmount * ((getFullDefaultSplit(group)[m.uid] || 0) / 100);
     });
   } else if (splitType === 'equal') {
-    members.forEach(m => {
+    members.forEach((m) => {
       previewShares[m.uid] = numericAmount / members.length;
     });
   } else if (splitType === 'custom_percentage') {
-    members.forEach(m => {
+    members.forEach((m) => {
       const pct = parseFloat(customPct[m.uid]) || 0;
       previewShares[m.uid] = (numericAmount * pct) / 100;
     });
   } else if (splitType === 'custom_amount') {
-    members.forEach(m => {
+    members.forEach((m) => {
       previewShares[m.uid] = parseFloat(customAmt[m.uid]) || 0;
     });
   } else if (splitType === 'third_party') {
-    const tPct = parseFloat(thirdPartyPct['third_party']) || 0;
-    previewThirdPersonShare = (numericAmount * tPct) / 100;
-    members.forEach(m => {
+    members.forEach((m) => {
       const pct = parseFloat(thirdPartyPct[m.uid]) || 0;
       previewShares[m.uid] = (numericAmount * pct) / 100;
     });
   }
 
   // Debtors whose share on this expense exceeds their spending threshold.
-  const thresholdWarnings = members.filter(m =>
-    m.uid !== paidBy &&
-    (memberThresholds?.[m.uid] || 0) > 0 &&
-    (previewShares[m.uid] || 0) > (memberThresholds?.[m.uid] || 0)
+  const thresholdWarnings = members.filter(
+    (m) =>
+      m.uid !== paidBy &&
+      (memberThresholds?.[m.uid] || 0) > 0 &&
+      (previewShares[m.uid] || 0) > (memberThresholds?.[m.uid] || 0)
   );
 
   const handleCustomPctChange = (uid: string, val: string) => {
-    setCustomPct(prev => ({ ...prev, [uid]: val }));
+    setCustomPct((prev) => ({ ...prev, [uid]: val }));
   };
 
   const handleCustomAmtChange = (uid: string, val: string) => {
-    setCustomAmt(prev => ({ ...prev, [uid]: val }));
+    setCustomAmt((prev) => ({ ...prev, [uid]: val }));
   };
 
   const handleThirdPartyPctChange = (uid: string, val: string) => {
-    setThirdPartyPct(prev => ({ ...prev, [uid]: val }));
+    setThirdPartyPct((prev) => ({ ...prev, [uid]: val }));
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -326,21 +391,20 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
 
     // Heads-up if a debtor's share exceeds their spending threshold.
     if (thresholdWarnings.length > 0) {
-      const names = thresholdWarnings.map(m => m.name).join(', ');
+      const names = thresholdWarnings.map((m) => m.name).join(', ');
       const ok = window.confirm(
         `Heads up: this split exceeds ${names}'s spending threshold. They'll see a notification on their side. Log it anyway?`
       );
       if (!ok) return;
     }
 
-    let finalShares: Record<string, number> = {};
+    const finalShares: Record<string, number> = {};
     let finalThirdPersonShare: number | undefined = undefined;
     let finalExtraParticipants: { name: string; share: number }[] | undefined = undefined;
-    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
     // Dark Cherry: no per-person shares - just the pot target and payment bounds.
-    const blindMinNum = round2(parseFloat(blindMin) || 0);
-    const blindMaxNum = round2(parseFloat(blindMax) || 0);
+    const blindMinNum = roundCurrency(parseFloat(blindMin) || 0);
+    const blindMaxNum = roundCurrency(parseFloat(blindMax) || 0);
     if (splitType === 'dark_cherry') {
       if (blindMinNum <= 0) {
         setError('Set a minimum per payment greater than zero.');
@@ -359,21 +423,25 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
     if (splitType === 'household_default' || splitType === 'equal') {
       let runningTotal = 0;
       members.forEach((m, index) => {
-        const pct = splitType === 'household_default'
-          ? (getFullDefaultSplit(group)[m.uid] || 0)
-          : (100 / members.length);
-        const share = round2((numericAmount * pct) / 100);
+        const pct =
+          splitType === 'household_default'
+            ? getFullDefaultSplit(group)[m.uid] || 0
+            : 100 / members.length;
+        const share = roundCurrency((numericAmount * pct) / 100);
         // Adjust the last member's share to account for rounding errors
         if (index === members.length - 1) {
-          finalShares[m.uid] = round2(numericAmount - runningTotal);
+          finalShares[m.uid] = roundCurrency(numericAmount - runningTotal);
         } else {
           finalShares[m.uid] = share;
           runningTotal += share;
         }
       });
     } else if (splitType === 'custom_percentage') {
-      const guestEntries = guests.map(g => ({ name: g.name.trim(), pct: parseFloat(g.pct) || 0 }));
-      if (guestEntries.some(g => !g.name)) {
+      const guestEntries = guests.map((g) => ({
+        name: g.name.trim(),
+        pct: parseFloat(g.pct) || 0,
+      }));
+      if (guestEntries.some((g) => !g.name)) {
         setError('Please enter a name for each added cherry.');
         return;
       }
@@ -394,8 +462,8 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         }
       }
       let totalPct = 0;
-      members.forEach(m => (totalPct += parseFloat(customPct[m.uid]) || 0));
-      guestEntries.forEach(g => (totalPct += g.pct));
+      members.forEach((m) => (totalPct += parseFloat(customPct[m.uid]) || 0));
+      guestEntries.forEach((g) => (totalPct += g.pct));
       // Under 100% leaves part of the expense belonging to nobody. OVER 100%
       // is allowed on purpose: that is how interest is expressed - the shares
       // then intentionally sum past the amount.
@@ -406,46 +474,50 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       // Round each share, then absorb any leftover cent into the last line
       // so the parts sum exactly to what the percentages call for.
       let running = 0;
-      members.forEach(m => {
-        const share = round2((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
+      members.forEach((m) => {
+        const share = roundCurrency((numericAmount * (parseFloat(customPct[m.uid]) || 0)) / 100);
         finalShares[m.uid] = share;
         running += share;
       });
-      const guestShares = guestEntries.map(g => {
-        const share = round2((numericAmount * g.pct) / 100);
+      const guestShares = guestEntries.map((g) => {
+        const share = roundCurrency((numericAmount * g.pct) / 100);
         running += share;
         return { name: g.name, share };
       });
       // The reconciliation target is what the percentages call for - equal to
       // the amount at exactly 100%, above it when interest is in play.
-      const pctTarget = round2((numericAmount * totalPct) / 100);
-      const diff = round2(pctTarget - running);
+      const pctTarget = roundCurrency((numericAmount * totalPct) / 100);
+      const diff = roundCurrency(pctTarget - running);
       if (Math.abs(diff) >= 0.01) {
         if (guestShares.length) {
-          guestShares[guestShares.length - 1].share = round2(guestShares[guestShares.length - 1].share + diff);
+          guestShares[guestShares.length - 1].share = roundCurrency(
+            guestShares[guestShares.length - 1].share + diff
+          );
         } else if (members.length) {
           const lastUid = members[members.length - 1].uid;
-          finalShares[lastUid] = round2(finalShares[lastUid] + diff);
+          finalShares[lastUid] = roundCurrency(finalShares[lastUid] + diff);
         }
       }
       if (guestShares.length) finalExtraParticipants = guestShares;
     } else if (splitType === 'custom_amount') {
-      const amts = members.map(m => parseFloat(customAmt[m.uid]) || 0);
-      if (amts.some(a => a < 0)) {
+      const amts = members.map((m) => parseFloat(customAmt[m.uid]) || 0);
+      if (amts.some((a) => a < 0)) {
         setError('Individual shares cannot be negative.');
         return;
       }
-      const shareCapError = amts.map(a => amountError(a)).find(Boolean);
+      const shareCapError = amts.map((a) => amountError(a)).find(Boolean);
       if (shareCapError) {
         setError(shareCapError);
         return;
       }
       const totalAmt = amts.reduce((a, b) => a + b, 0);
       if (Math.abs(totalAmt - numericAmount) > 0.02) {
-        setError(`Individual shares ($${totalAmt.toFixed(2)}) must equal the total amount ($${numericAmount.toFixed(2)}).`);
+        setError(
+          `Individual shares ($${totalAmt.toFixed(2)}) must equal the total amount ($${numericAmount.toFixed(2)}).`
+        );
         return;
       }
-      members.forEach((m, i) => finalShares[m.uid] = amts[i]);
+      members.forEach((m, i) => (finalShares[m.uid] = amts[i]));
       // Absorb any sub-cent rounding into the last member so shares sum EXACTLY
       // to the expense amount (otherwise balances won't reconcile to the total).
       const lastUid = members[members.length - 1]?.uid;
@@ -455,27 +527,27 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       }
     } else if (splitType === 'third_party') {
       if (!thirdPersonName.trim()) {
-        setError('Please enter the third person\'s name.');
+        setError("Please enter the third person's name.");
         return;
       }
       if (!thirdPersonEmail.trim()) {
-        setError('Please enter the third person\'s email.');
+        setError("Please enter the third person's email.");
         return;
       }
-      let totalPct = (parseFloat(thirdPartyPct['third_party']) || 0);
-      members.forEach(m => totalPct += (parseFloat(thirdPartyPct[m.uid]) || 0));
-      
+      let totalPct = parseFloat(thirdPartyPct['third_party']) || 0;
+      members.forEach((m) => (totalPct += parseFloat(thirdPartyPct[m.uid]) || 0));
+
       if (Math.abs(totalPct - 100) > 0.01) {
         setError('Custom percentages must add up to 100%.');
         return;
       }
-      
+
       const tPct = parseFloat(thirdPartyPct['third_party']) || 0;
-      finalThirdPersonShare = Math.round((numericAmount * tPct) / 100 * 100) / 100;
+      finalThirdPersonShare = Math.round(((numericAmount * tPct) / 100) * 100) / 100;
       let runningTotal = finalThirdPersonShare;
       members.forEach((m, index) => {
         const pct = parseFloat(thirdPartyPct[m.uid]) || 0;
-        const share = Math.round((numericAmount * pct) / 100 * 100) / 100;
+        const share = Math.round(((numericAmount * pct) / 100) * 100) / 100;
         if (index === members.length - 1) {
           finalShares[m.uid] = Math.round((numericAmount - runningTotal) * 100) / 100;
         } else {
@@ -485,14 +557,19 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       });
     }
 
-    let finalCategory = category.trim();
+    const finalCategory = category.trim();
     if (!finalCategory) {
       setError('Please enter a category.');
       return;
     }
 
     let nextRecurDate = editingExpense?.nextRecurringDate || null;
-    if (isRecurring && (!editingExpense || !editingExpense.isRecurring || editingExpense.recurringInterval !== recurringInterval)) {
+    if (
+      isRecurring &&
+      (!editingExpense ||
+        !editingExpense.isRecurring ||
+        editingExpense.recurringInterval !== recurringInterval)
+    ) {
       // Anchored on this expense's own day, so a bill set for the 31st lands
       // on the 30th or the 28th in a short month and returns to the 31st
       // after. The autopilot and the calendar walk with the same anchor.
@@ -505,29 +582,33 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
       date,
       category: finalCategory,
       paidBy,
-      contributions: [{
-        userId: paidBy,
-        amount: numericAmount,
-        ...(instrumentType ? { instrumentType } : {}),
-        ...(instrumentLabel.trim() ? { label: instrumentLabel.trim() } : {})
-      }],
+      contributions: [
+        {
+          userId: paidBy,
+          amount: numericAmount,
+          ...(instrumentType ? { instrumentType } : {}),
+          ...(instrumentLabel.trim() ? { label: instrumentLabel.trim() } : {}),
+        },
+      ],
       splitType,
       shares: splitType === 'dark_cherry' ? {} : finalShares,
       blindMin: splitType === 'dark_cherry' ? blindMinNum : null,
       blindMax: splitType === 'dark_cherry' ? blindMaxNum : null,
-      thirdPersonName: splitType === 'third_party' ? (thirdPersonName.trim() || null) : null,
-      thirdPersonEmail: splitType === 'third_party' ? (thirdPersonEmail.trim() || null) : null,
+      thirdPersonName: splitType === 'third_party' ? thirdPersonName.trim() || null : null,
+      thirdPersonEmail: splitType === 'third_party' ? thirdPersonEmail.trim() || null : null,
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
-      extraParticipants: splitType === 'custom_percentage' ? (finalExtraParticipants || null) : null,
+      extraParticipants: splitType === 'custom_percentage' ? finalExtraParticipants || null : null,
       notes: notes.trim() || null,
       isRecurring,
-      ...(isRecurring ? { recurringInterval, nextRecurringDate: nextRecurDate } : { recurringInterval: null, nextRecurringDate: null }),
+      ...(isRecurring
+        ? { recurringInterval, nextRecurringDate: nextRecurDate }
+        : { recurringInterval: null, nextRecurringDate: null }),
       // Quick settle: only meaningful when creating a new expense.
       quickSettle: !editingExpense && alreadySettled,
     };
 
     // Remove any strictly undefined values just in case, though we used null
-    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+    Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
 
     onSubmit(payload);
   };
@@ -557,733 +638,935 @@ export default function ExpenseForm({ group, activeUser, onClose, onSubmit, edit
         </div>
       }
     >
-        {/* Form Body */}
-        <form onSubmit={handleFormSubmit} className="p-6 space-y-5" id="expense-form">
-          {error && (
-            <div className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold" id="form-error">
-              {error}
-            </div>
-          )}
-
-          
-          {/* AI Smart Scan Placeholder */}
-          <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
-                <Sparkles size={16} className="text-natural-primary" /> Smart Scan
-              </h3>
-              <p className="text-xs text-natural-muted mt-1">Auto-fill details by scanning a receipt.</p>
-            </div>
-            <input
-              ref={scanInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleScanFile}
-            />
-            <button
-              type="button"
-              onClick={() => scanInputRef.current?.click()}
-              disabled={scanning}
-              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
-            >
-              <Camera size={16} /> {scanning ? 'Scanning...' : 'Scan Receipt'}
-            </button>
+      {/* Form Body */}
+      <form onSubmit={handleFormSubmit} className="p-6 space-y-5" id="expense-form">
+        {error && (
+          <div
+            className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold"
+            id="form-error"
+          >
+            {error}
           </div>
+        )}
 
-          {/* Itemized split: assign scanned line items to people */}
-          {scannedItems.length > 0 && (
-            <div className="bg-natural-sidebar/40 border border-natural-border rounded-2xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-150" id="itemized-split">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-text uppercase tracking-wider">Who Had What?</span>
-                <button
-                  type="button"
-                  onClick={() => { setScannedItems([]); setItemAssign({}); }}
-                  className="text-xs font-semibold text-natural-muted hover:text-natural-text"
-                >
-                  Dismiss
-                </button>
-              </div>
-              <p className="text-xs text-natural-muted leading-relaxed">
-                We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the receipt. Assign
-                each one, leave it shared, then apply - tax and tip get shared automatically.
-              </p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {scannedItems.map((it, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 bg-white border border-natural-border/60 rounded-xl px-3 py-1.5">
-                    <span className="text-xs font-medium text-natural-text truncate flex-1">{it.name}</span>
-                    <span className="text-xs font-mono font-semibold text-natural-text shrink-0">${it.price.toFixed(2)}</span>
-                    <select
-                      value={itemAssign[i] || 'shared'}
-                      onChange={(e) => setItemAssign(prev => ({ ...prev, [i]: e.target.value }))}
-                      className="text-xs bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
-                    >
-                      <option value="shared">Shared</option>
-                      {members.map(m => (
-                        <option key={m.uid} value={m.uid}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
+        {/* AI Smart Scan Placeholder */}
+        <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-1">
+            <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
+              <Sparkles size={16} className="text-natural-primary" /> Smart Scan
+            </h3>
+            <p className="text-xs text-natural-muted mt-1">
+              Auto-fill details by scanning a receipt.
+            </p>
+          </div>
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleScanFile}
+          />
+          <button
+            type="button"
+            onClick={() => scanInputRef.current?.click()}
+            disabled={scanning}
+            className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+          >
+            <Camera size={16} /> {scanning ? 'Scanning...' : 'Scan Receipt'}
+          </button>
+        </div>
+
+        {/* Itemized split: assign scanned line items to people */}
+        {scannedItems.length > 0 && (
+          <div
+            className="bg-natural-sidebar/40 border border-natural-border rounded-2xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-150"
+            id="itemized-split"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-natural-text uppercase tracking-wider">
+                Who Had What?
+              </span>
               <button
                 type="button"
-                onClick={applyItemAssignments}
-                disabled={numericAmount <= 0}
-                className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
+                onClick={() => {
+                  setScannedItems([]);
+                  setItemAssign({});
+                }}
+                className="text-xs font-semibold text-natural-muted hover:text-natural-text"
               >
-                Apply Items to Split
+                Dismiss
               </button>
             </div>
-          )}
-
-          {/* Spending threshold heads-up */}
-          {thresholdWarnings.length > 0 && numericAmount > 0 && (
-            <div className="flex items-start gap-2 p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl">
-              <span className="text-natural-primary shrink-0 font-bold">!</span>
-              <p className="text-xs text-natural-text leading-relaxed">
-                {thresholdWarnings.map(m => `${m.name}'s share ($${(previewShares[m.uid] || 0).toFixed(2)}) is over their spending threshold of $${(memberThresholds?.[m.uid] || 0).toFixed(0)}`).join('; ')}. They'll get a heads-up on their side.
-              </p>
+            <p className="text-xs text-natural-muted leading-relaxed">
+              We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the
+              receipt. Assign each one, leave it shared, then apply - tax and tip get shared
+              automatically.
+            </p>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {scannedItems.map((it, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-2 bg-white border border-natural-border/60 rounded-xl px-3 py-1.5"
+                >
+                  <span className="text-xs font-medium text-natural-text truncate flex-1">
+                    {it.name}
+                  </span>
+                  <span className="text-xs font-mono font-semibold text-natural-text shrink-0">
+                    ${it.price.toFixed(2)}
+                  </span>
+                  <select
+                    value={itemAssign[i] || 'shared'}
+                    onChange={(e) => setItemAssign((prev) => ({ ...prev, [i]: e.target.value }))}
+                    className="text-xs bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
+                  >
+                    <option value="shared">Shared</option>
+                    {members.map((m) => (
+                      <option key={m.uid} value={m.uid}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
             </div>
-          )}
+            <button
+              type="button"
+              onClick={applyItemAssignments}
+              disabled={numericAmount <= 0}
+              className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
+            >
+              Apply Items to Split
+            </button>
+          </div>
+        )}
 
-          {/* Description */}
+        {/* Spending threshold heads-up */}
+        {thresholdWarnings.length > 0 && numericAmount > 0 && (
+          <div className="flex items-start gap-2 p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl">
+            <span className="text-natural-primary shrink-0 font-bold">!</span>
+            <p className="text-xs text-natural-text leading-relaxed">
+              {thresholdWarnings
+                .map(
+                  (m) =>
+                    `${m.name}'s share ($${(previewShares[m.uid] || 0).toFixed(2)}) is over their spending threshold of $${(memberThresholds?.[m.uid] || 0).toFixed(0)}`
+                )
+                .join('; ')}
+              . They'll get a heads-up on their side.
+            </p>
+          </div>
+        )}
+
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+            Description / Title
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              className="w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all"
+              id="expense-title-input"
+            />
+          </div>
+        </div>
+
+        {/* Amount & Date Grid */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Description / Title</label>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              Amount ($)
+            </label>
             <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted font-medium">
+                $
+              </span>
               <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Title"
-                className="w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all"
-                id="expense-title-input"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setCustomAmt({});
+                }}
+                placeholder="0.00"
+                className="w-full pl-8 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-mono text-sm outline-none transition-all"
+                id="expense-amount-input"
               />
             </div>
           </div>
 
-          {/* Amount & Date Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Amount ($)</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted font-medium">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={amount}
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                    setCustomAmt({});
-                  }}
-                  placeholder="0.00"
-                  className="w-full pl-8 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-mono text-sm outline-none transition-all"
-                  id="expense-amount-input"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Date</label>
-              <div className="relative">
-                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all cursor-pointer"
-                  id="expense-date-input"
-                />
-              </div>
-
-              {/* Recurring Toggle */}
-              <div className="mt-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
-                  />
-                  <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5"><Repeat size={14} className="text-natural-muted" /> Recurring Expense</span>
-                </label>
-                
-                {isRecurring && (
-                  // Weeks and months are asked separately, matching the mobile
-                  // form: every 4 weeks is not the same as the 1st of every
-                  // month, and one merged list hides that difference at exactly
-                  // the moment someone is choosing.
-                  <div className="mt-3 pl-6 space-y-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">Every so many weeks</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {RECURRING_WEEKS.map((w) => (
-                          <button
-                            key={`w${w}`}
-                            type="button"
-                            onClick={() => setRecurringInterval(`${w}_weeks`)}
-                            aria-pressed={recurringInterval === `${w}_weeks`}
-                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                              recurringInterval === `${w}_weeks`
-                                ? 'bg-natural-primary text-white border-natural-primary'
-                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
-                            }`}
-                          >
-                            {w}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">Or every so many months</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {RECURRING_MONTHS.map((m) => (
-                          <button
-                            key={`m${m}`}
-                            type="button"
-                            onClick={() => setRecurringInterval(`${m}_months`)}
-                            aria-pressed={recurringInterval === `${m}_months`}
-                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                              recurringInterval === `${m}_months`
-                                ? 'bg-natural-primary text-white border-natural-primary'
-                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
-                            }`}
-                          >
-                            {m === 12 ? 'Year' : m}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Transaction Payment Type */}
-          <div className="pb-4">
-
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Transaction Payment Type</label>
-              <div className="flex flex-wrap gap-1.5">
-                {(['CASH', 'CREDIT', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE', 'OTHER'] as PaymentInstrument[]).map(inst => (
-                  <button
-                    key={inst}
-                    type="button"
-                    onClick={() => setInstrumentType(inst)}
-                    className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-full border transition-all cursor-pointer ${
-                      instrumentType === inst
-                        ? 'bg-natural-primary border-natural-primary text-white shadow-sm'
-                        : 'bg-white border-natural-border text-natural-muted hover:bg-natural-sidebar'
-                    }`}
-                  >
-                    {inst === 'TRANSFER' ? 'BANK' : inst}
-                  </button>
-                ))}
-              </div>
-              {['CREDIT', 'DEBIT', 'OTHER'].includes(instrumentType) && (
-                <div className="mt-2 relative">
-                  <input
-                    type="text"
-                    value={instrumentLabel}
-                    onChange={(e) => setInstrumentLabel(e.target.value)}
-                    placeholder="Card name"
-                    aria-label="Card or account name"
-                    className="w-full pl-3 pr-3 py-2 text-xs bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text outline-none transition-all"
-                  />
-                </div>
-              )}
-            
-          </div>
-
-          {/* Category & Payer Grid */}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Category</label>
-              <div className="relative">
-                <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
-                <input
-                  ref={categoryInputRef}
-                  type="text"
-                  value={category}
-                  onChange={handleCategoryChange}
-                  placeholder="Category"
-                  list="category-options"
-                  className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
-                  id="expense-category-input"
-                  autoComplete="off"
-                />
-                <datalist id="category-options">
-                  {categories.map((c, i) => (
-                    <option key={`${c}-${i}`} value={c} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Paid By</label>
-              <div className="flex flex-wrap gap-2 bg-natural-sidebar p-1.5 rounded-xl w-full">
-                {members.map(m => (
-                  <button
-                    key={m.uid}
-                    type="button"
-                    onClick={() => setPaidBy(m.uid)}
-                    className={`flex-1 min-w-[60px] py-2 px-2 text-xs font-semibold rounded-lg transition-all cursor-pointer truncate ${
-                      paidBy === m.uid
-                        ? 'bg-white text-natural-text font-bold shadow-sm border border-natural-border/50'
-                        : 'text-natural-muted hover:text-natural-text hover:bg-black/5'
-                    }`}
-                    title={m.name}
-                  >
-                    {m.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Split Rule Selector */}
           <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Split Rules</label>
-            <div className="space-y-2" id="split-rules-group">
-              {/* Default split option */}
-              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'household_default' ? 'border-natural-border bg-natural-sidebar/40 font-medium' : 'border-natural-border'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="splitType"
-                    checked={splitType === 'household_default'}
-                    onChange={() => setSplitType('household_default')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-default"
-                  />
-                  <div>
-                    <span className="block text-sm font-semibold text-natural-text">Standard Split</span>
-                    <span className="block text-xs text-natural-muted">Default split</span>
-                  </div>
-                </div>
-                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center"><Scale className="w-4 h-4 transform -rotate-12" /></span>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all cursor-pointer"
+                id="expense-date-input"
+              />
+            </div>
+
+            {/* Recurring Toggle */}
+            <div className="mt-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
+                />
+                <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5">
+                  <Repeat size={14} className="text-natural-muted" /> Recurring Expense
+                </span>
               </label>
 
-              {/* Equal split option */}
-              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'equal' ? 'border-natural-border bg-natural-sidebar/40 font-medium' : 'border-natural-border'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="splitType"
-                    checked={splitType === 'equal'}
-                    onChange={() => setSplitType('equal')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-5050"
-                  />
+              {isRecurring && (
+                // Weeks and months are asked separately, matching the mobile
+                // form: every 4 weeks is not the same as the 1st of every
+                // month, and one merged list hides that difference at exactly
+                // the moment someone is choosing.
+                <div className="mt-3 pl-6 space-y-3">
                   <div>
-                    <span className="block text-sm font-semibold text-natural-text">Even Split</span>
-                    <span className="block text-xs text-natural-muted">Equal split among members</span>
-                  </div>
-                </div>
-                <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">=</span>
-              </label>
-
-              {/* Custom Percentage split option */}
-              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'custom_percentage' ? 'border-natural-border bg-natural-sidebar/40 font-medium' : 'border-natural-border'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="splitType"
-                    checked={splitType === 'custom_percentage'}
-                    onChange={() => setSplitType('custom_percentage')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-custom-pct"
-                  />
-                  <div>
-                    <span className="block text-sm font-semibold text-natural-text">Custom Percentages</span>
-                    <span className="block text-xs text-natural-muted">Manually set custom split percentages</span>
-                  </div>
-                </div>
-                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center"><Percent className="w-4 h-4" /></span>
-              </label>
-
-              {/* Custom Amount split option */}
-              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'custom_amount' ? 'border-natural-border bg-natural-sidebar/40 font-medium' : 'border-natural-border'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="splitType"
-                    checked={splitType === 'custom_amount'}
-                    onChange={() => setSplitType('custom_amount')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-custom-amt"
-                  />
-                  <div>
-                    <span className="block text-sm font-semibold text-natural-text">Custom Amounts</span>
-                    <span className="block text-xs text-natural-muted">Manually specify individual flat shares</span>
-                  </div>
-                </div>
-                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center"><DollarSign className="w-4 h-4" /></span>
-              </label>
-
-              {/* Third Party split option */}
-              {members.length === 2 && (
-                <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                  splitType === 'third_party' ? 'border-natural-border bg-natural-sidebar/40 font-medium' : 'border-natural-border'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="splitType"
-                      checked={splitType === 'third_party'}
-                      onChange={() => setSplitType('third_party')}
-                      className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                      id="rule-third-party"
-                    />
-                    <div>
-                      <span className="block text-sm font-semibold text-natural-text">Add Third Person</span>
-                      <span className="block text-xs text-natural-muted">Split with an additional person</span>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
+                      Every so many weeks
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {RECURRING_WEEKS.map((w) => (
+                        <button
+                          key={`w${w}`}
+                          type="button"
+                          onClick={() => setRecurringInterval(`${w}_weeks`)}
+                          aria-pressed={recurringInterval === `${w}_weeks`}
+                          className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                            recurringInterval === `${w}_weeks`
+                              ? 'bg-natural-primary text-white border-natural-primary'
+                              : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center"><Plus className="w-4 h-4" /></span>
-                </label>
-              )}
-
-              {/* Dark Cherry (blind split) option - Plus feature */}
-              <label className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'dark_cherry' ? 'border-natural-primary bg-natural-primary/5 font-medium' : 'border-natural-border'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="splitType"
-                    checked={splitType === 'dark_cherry'}
-                    onChange={selectDarkCherry}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-dark-cherry"
-                  />
                   <div>
-                    <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
-                      Dark Cherry
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowCherryPlus(true); }}
-                        className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
-                        title="About Cherry +"
-                      >
-                        Cherry +
-                      </button>
-                    </span>
-                    <span className="block text-xs text-natural-muted">
-                      Blind split - others contribute what they can, no numbers shown.{' '}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); setShowDarkIntro(true); }}
-                        className="text-natural-primary font-semibold hover:underline"
-                      >
-                        What's this?
-                      </button>
-                    </span>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
+                      Or every so many months
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {RECURRING_MONTHS.map((m) => (
+                        <button
+                          key={`m${m}`}
+                          type="button"
+                          onClick={() => setRecurringInterval(`${m}_months`)}
+                          aria-pressed={recurringInterval === `${m}_months`}
+                          className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                            recurringInterval === `${m}_months`
+                              ? 'bg-natural-primary text-white border-natural-primary'
+                              : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                          }`}
+                        >
+                          {m === 12 ? 'Year' : m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <span className="w-8 h-8 text-natural-text bg-natural-dark/90 text-white rounded-lg flex items-center justify-center"><EyeOff className="w-4 h-4" /></span>
-              </label>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Dark Cherry bounds (Conditional) */}
-          {splitType === 'dark_cherry' && (
-            <div className="bg-natural-dark/5 p-4 rounded-2xl border border-natural-dark/20 space-y-3 animate-in slide-in-from-top-2 duration-150" id="dark-cherry-inputs">
-              <span className="block text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
-                <EyeOff className="h-3.5 w-3.5" /> Blind Split Settings
-              </span>
-              <p className="text-xs text-natural-muted leading-relaxed">
-                The amount above is what settles this cherry. Group members will only see the
-                payment range you set here - never the total, the remainder, or who paid what.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-natural-muted mb-1">Minimum per payment</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={blindMin}
-                      onChange={(e) => setBlindMin(e.target.value)}
-                      placeholder="Amount"
-                      className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-natural-muted mb-1">Maximum per payment</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={blindMax}
-                      onChange={(e) => setBlindMax(e.target.value)}
-                      placeholder="Amount"
-                      className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
-                    />
-                  </div>
-                </div>
-              </div>
+        {/* Transaction Payment Type */}
+        <div className="pb-4">
+          <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+            Transaction Payment Type
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                'CASH',
+                'CREDIT',
+                'DEBIT',
+                'TRANSFER',
+                'VENMO',
+                'ZELLE',
+                'OTHER',
+              ] as PaymentInstrument[]
+            ).map((inst) => (
+              <button
+                key={inst}
+                type="button"
+                onClick={() => setInstrumentType(inst)}
+                className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-full border transition-all cursor-pointer ${
+                  instrumentType === inst
+                    ? 'bg-natural-primary border-natural-primary text-white shadow-sm'
+                    : 'bg-white border-natural-border text-natural-muted hover:bg-natural-sidebar'
+                }`}
+              >
+                {inst === 'TRANSFER' ? 'BANK' : inst}
+              </button>
+            ))}
+          </div>
+          {['CREDIT', 'DEBIT', 'OTHER'].includes(instrumentType as string) && (
+            <div className="mt-2 relative">
+              <input
+                type="text"
+                value={instrumentLabel}
+                onChange={(e) => setInstrumentLabel(e.target.value)}
+                placeholder="Card name"
+                aria-label="Card or account name"
+                className="w-full pl-3 pr-3 py-2 text-xs bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text outline-none transition-all"
+              />
             </div>
           )}
+        </div>
 
-          {/* Custom Percentage Inputs (Conditional) */}
-          {splitType === 'custom_percentage' && (() => {
-            const memberPctTotal = members.reduce((s, m) => s + (parseFloat(customPct[m.uid]) || 0), 0);
+        {/* Category & Payer Grid */}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              Category
+            </label>
+            <div className="relative">
+              <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
+              <input
+                ref={categoryInputRef}
+                type="text"
+                value={category}
+                onChange={handleCategoryChange}
+                placeholder="Category"
+                list="category-options"
+                className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
+                id="expense-category-input"
+                autoComplete="off"
+              />
+              <datalist id="category-options">
+                {categories.map((c, i) => (
+                  <option key={`${c}-${i}`} value={c} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              Paid By
+            </label>
+            <div className="flex flex-wrap gap-2 bg-natural-sidebar p-1.5 rounded-xl w-full">
+              {members.map((m) => (
+                <button
+                  key={m.uid}
+                  type="button"
+                  onClick={() => setPaidBy(m.uid)}
+                  className={`flex-1 min-w-[60px] py-2 px-2 text-xs font-semibold rounded-lg transition-all cursor-pointer truncate ${
+                    paidBy === m.uid
+                      ? 'bg-white text-natural-text font-bold shadow-sm border border-natural-border/50'
+                      : 'text-natural-muted hover:text-natural-text hover:bg-black/5'
+                  }`}
+                  title={m.name}
+                >
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Split Rule Selector */}
+        <div>
+          <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+            Split Rules
+          </label>
+          <div className="space-y-2" id="split-rules-group">
+            {/* Default split option */}
+            <label
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'household_default'
+                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                  : 'border-natural-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="splitType"
+                  checked={splitType === 'household_default'}
+                  onChange={() => setSplitType('household_default')}
+                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                  id="rule-default"
+                />
+                <div>
+                  <span className="block text-sm font-semibold text-natural-text">
+                    Standard Split
+                  </span>
+                  <span className="block text-xs text-natural-muted">Default split</span>
+                </div>
+              </div>
+              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                <Scale className="w-4 h-4 transform -rotate-12" />
+              </span>
+            </label>
+
+            {/* Equal split option */}
+            <label
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'equal'
+                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                  : 'border-natural-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="splitType"
+                  checked={splitType === 'equal'}
+                  onChange={() => setSplitType('equal')}
+                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                  id="rule-5050"
+                />
+                <div>
+                  <span className="block text-sm font-semibold text-natural-text">Even Split</span>
+                  <span className="block text-xs text-natural-muted">
+                    Equal split among members
+                  </span>
+                </div>
+              </div>
+              <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                =
+              </span>
+            </label>
+
+            {/* Custom Percentage split option */}
+            <label
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'custom_percentage'
+                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                  : 'border-natural-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="splitType"
+                  checked={splitType === 'custom_percentage'}
+                  onChange={() => setSplitType('custom_percentage')}
+                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                  id="rule-custom-pct"
+                />
+                <div>
+                  <span className="block text-sm font-semibold text-natural-text">
+                    Custom Percentages
+                  </span>
+                  <span className="block text-xs text-natural-muted">
+                    Manually set custom split percentages
+                  </span>
+                </div>
+              </div>
+              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                <Percent className="w-4 h-4" />
+              </span>
+            </label>
+
+            {/* Custom Amount split option */}
+            <label
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'custom_amount'
+                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                  : 'border-natural-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="splitType"
+                  checked={splitType === 'custom_amount'}
+                  onChange={() => setSplitType('custom_amount')}
+                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                  id="rule-custom-amt"
+                />
+                <div>
+                  <span className="block text-sm font-semibold text-natural-text">
+                    Custom Amounts
+                  </span>
+                  <span className="block text-xs text-natural-muted">
+                    Manually specify individual flat shares
+                  </span>
+                </div>
+              </div>
+              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                <DollarSign className="w-4 h-4" />
+              </span>
+            </label>
+
+            {/* Third Party split option */}
+            {members.length === 2 && (
+              <label
+                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                  splitType === 'third_party'
+                    ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                    : 'border-natural-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'third_party'}
+                    onChange={() => setSplitType('third_party')}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-third-party"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-natural-text">
+                      Add Third Person
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      Split with an additional person
+                    </span>
+                  </div>
+                </div>
+                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                  <Plus className="w-4 h-4" />
+                </span>
+              </label>
+            )}
+
+            {/* Dark Cherry (blind split) option - Plus feature */}
+            <label
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                splitType === 'dark_cherry'
+                  ? 'border-natural-primary bg-natural-primary/5 font-medium'
+                  : 'border-natural-border'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="splitType"
+                  checked={splitType === 'dark_cherry'}
+                  onChange={selectDarkCherry}
+                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                  id="rule-dark-cherry"
+                />
+                <div>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
+                    Dark Cherry
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowCherryPlus(true);
+                      }}
+                      className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
+                      title="About Cherry +"
+                    >
+                      Cherry +
+                    </button>
+                  </span>
+                  <span className="block text-xs text-natural-muted">
+                    Blind split - others contribute what they can, no numbers shown.{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowDarkIntro(true);
+                      }}
+                      className="text-natural-primary font-semibold hover:underline"
+                    >
+                      What's this?
+                    </button>
+                  </span>
+                </div>
+              </div>
+              <span className="w-8 h-8 text-natural-text bg-natural-dark/90 text-white rounded-lg flex items-center justify-center">
+                <EyeOff className="w-4 h-4" />
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Dark Cherry bounds (Conditional) */}
+        {splitType === 'dark_cherry' && (
+          <div
+            className="bg-natural-dark/5 p-4 rounded-2xl border border-natural-dark/20 space-y-3 animate-in slide-in-from-top-2 duration-150"
+            id="dark-cherry-inputs"
+          >
+            <span className="block text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
+              <EyeOff className="h-3.5 w-3.5" /> Blind Split Settings
+            </span>
+            <p className="text-xs text-natural-muted leading-relaxed">
+              The amount above is what settles this cherry. Group members will only see the payment
+              range you set here - never the total, the remainder, or who paid what.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-natural-muted mb-1">
+                  Minimum per payment
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={blindMin}
+                    onChange={(e) => setBlindMin(e.target.value)}
+                    placeholder="Amount"
+                    className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-natural-muted mb-1">
+                  Maximum per payment
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={blindMax}
+                    onChange={(e) => setBlindMax(e.target.value)}
+                    placeholder="Amount"
+                    className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Percentage Inputs (Conditional) */}
+        {splitType === 'custom_percentage' &&
+          (() => {
+            const memberPctTotal = members.reduce(
+              (s, m) => s + (parseFloat(customPct[m.uid]) || 0),
+              0
+            );
             const guestPctTotal = guests.reduce((s, g) => s + (parseFloat(g.pct) || 0), 0);
             const pctTotal = memberPctTotal + guestPctTotal;
             const balanced = Math.abs(pctTotal - 100) <= 0.01;
             return (
-            <div className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150" id="custom-pct-inputs">
-              <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">Set Split Percentages</span>
-              <div className="grid grid-cols-2 gap-4">
-                {members.map(m => (
-                  <div key={`pct-${m.uid}`}>
-                    <label className="block text-xs text-natural-muted mb-1 font-semibold">{m.name}'s %</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={customPct[m.uid] || ''}
-                        onChange={(e) => handleCustomPctChange(m.uid, e.target.value)}
-                        className="w-full pr-8 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Per-transaction guests ("cherries") */}
-              {guests.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-natural-border/60">
-                  <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider">Added for this expense only</span>
-                  {guests.map(g => (
-                    <div key={g.id} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={g.name}
-                        onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
-                        placeholder="Name"
-                        aria-label="Guest name"
-                        className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
-                      />
-                      <div className="relative w-24 shrink-0">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={g.pct}
-                          onChange={(e) => updateGuest(g.id, 'pct', e.target.value)}
-                          placeholder="0"
-                          className="w-full pr-7 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
-                        />
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
-                      </div>
-                      <button type="button" onClick={() => removeGuest(g.id)} className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0" title="Remove" aria-label={`Remove ${g.name.trim() || 'this guest'}`}>
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={addGuest}
-                  className="flex items-center gap-1.5 text-xs font-bold text-natural-primary hover:text-natural-dark"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add a cherry
-                </button>
-                <span className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}>
-                  Total: {pctTotal.toFixed(1)}%{balanced ? ' ✓' : ' / 100%'}
+              <div
+                className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150"
+                id="custom-pct-inputs"
+              >
+                <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
+                  Set Split Percentages
                 </span>
-              </div>
-            </div>
-            );
-          })()}
-
-          {/* Custom Amount Inputs (Conditional) */}
-          {splitType === 'custom_amount' && (
-            <div className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150" id="custom-amt-inputs">
-              <div className="flex items-center justify-between">
-                <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">Specify Shares</span>
-                <span className="text-xs text-natural-muted font-mono">Total expense: ${numericAmount.toFixed(2)}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                {members.map(m => (
-                  <div key={`amt-${m.uid}`}>
-                    <label className="block text-xs text-natural-muted mb-1 font-semibold">{m.name}'s Share ($)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max={numericAmount}
-                        value={customAmt[m.uid] || ''}
-                        onChange={(e) => handleCustomAmtChange(m.uid, e.target.value)}
-                        className="w-full pl-6 pr-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Third Party Inputs (Conditional) */}
-          {splitType === 'third_party' && (
-            <div className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-4 animate-in slide-in-from-top-2 duration-150" id="third-party-inputs">
-              <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">Third Person Details</span>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-natural-muted mb-1 font-semibold">Name</label>
-                  <input
-                    type="text"
-                    value={thirdPersonName}
-                    onChange={(e) => setThirdPersonName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                    placeholder="Name"
-                    id="third-person-name-input"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-natural-muted mb-1 font-semibold">Email</label>
-                  <input
-                    type="email"
-                    value={thirdPersonEmail}
-                    onChange={(e) => setThirdPersonEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                    placeholder="Email"
-                    id="third-person-email-input"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-natural-border">
-                <span className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">Set 3-Way Split Percentages</span>
                 <div className="grid grid-cols-2 gap-4">
-                  {members.map(m => (
-                    <div key={`third-pct-${m.uid}`}>
-                      <label className="block text-xs text-natural-muted mb-1 font-semibold">{m.name}</label>
+                  {members.map((m) => (
+                    <div key={`pct-${m.uid}`}>
+                      <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                        {m.name}'s %
+                      </label>
                       <div className="relative">
                         <input
                           type="number"
-                          step="0.01"
                           min="0"
                           max="100"
-                          value={thirdPartyPct[m.uid] || ''}
-                          onChange={(e) => handleThirdPartyPctChange(m.uid, e.target.value)}
+                          value={customPct[m.uid] || ''}
+                          onChange={(e) => handleCustomPctChange(m.uid, e.target.value)}
                           className="w-full pr-8 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">
+                          %
+                        </span>
                       </div>
                     </div>
                   ))}
-                  <div>
-                    <label className="block text-xs text-natural-muted mb-1 font-semibold">{thirdPersonName || 'Third Person'}</label>
+                </div>
+
+                {/* Per-transaction guests ("cherries") */}
+                {guests.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-natural-border/60">
+                    <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider">
+                      Added for this expense only
+                    </span>
+                    {guests.map((g) => (
+                      <div key={g.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={g.name}
+                          onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
+                          placeholder="Name"
+                          aria-label="Guest name"
+                          className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
+                        />
+                        <div className="relative w-24 shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={g.pct}
+                            onChange={(e) => updateGuest(g.id, 'pct', e.target.value)}
+                            placeholder="0"
+                            className="w-full pr-7 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">
+                            %
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeGuest(g.id)}
+                          className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0"
+                          title="Remove"
+                          aria-label={`Remove ${g.name.trim() || 'this guest'}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={addGuest}
+                    className="flex items-center gap-1.5 text-xs font-bold text-natural-primary hover:text-natural-dark"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add a cherry
+                  </button>
+                  <span
+                    className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}
+                  >
+                    Total: {pctTotal.toFixed(1)}%{balanced ? ' ✓' : ' / 100%'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+        {/* Custom Amount Inputs (Conditional) */}
+        {splitType === 'custom_amount' && (
+          <div
+            className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-3 animate-in slide-in-from-top-2 duration-150"
+            id="custom-amt-inputs"
+          >
+            <div className="flex items-center justify-between">
+              <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
+                Specify Shares
+              </span>
+              <span className="text-xs text-natural-muted font-mono">
+                Total expense: ${numericAmount.toFixed(2)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {members.map((m) => (
+                <div key={`amt-${m.uid}`}>
+                  <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                    {m.name}'s Share ($)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={numericAmount}
+                      value={customAmt[m.uid] || ''}
+                      onChange={(e) => handleCustomAmtChange(m.uid, e.target.value)}
+                      className="w-full pl-6 pr-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Third Party Inputs (Conditional) */}
+        {splitType === 'third_party' && (
+          <div
+            className="bg-natural-sidebar/50 p-4 rounded-2xl border border-natural-border space-y-4 animate-in slide-in-from-top-2 duration-150"
+            id="third-party-inputs"
+          >
+            <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
+              Third Person Details
+            </span>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-natural-muted mb-1 font-semibold">Name</label>
+                <input
+                  type="text"
+                  value={thirdPersonName}
+                  onChange={(e) => setThirdPersonName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
+                  placeholder="Name"
+                  id="third-person-name-input"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-natural-muted mb-1 font-semibold">Email</label>
+                <input
+                  type="email"
+                  value={thirdPersonEmail}
+                  onChange={(e) => setThirdPersonEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
+                  placeholder="Email"
+                  id="third-person-email-input"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-natural-border">
+              <span className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">
+                Set 3-Way Split Percentages
+              </span>
+              <div className="grid grid-cols-2 gap-4">
+                {members.map((m) => (
+                  <div key={`third-pct-${m.uid}`}>
+                    <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                      {m.name}
+                    </label>
                     <div className="relative">
                       <input
                         type="number"
                         step="0.01"
                         min="0"
                         max="100"
-                        value={thirdPartyPct['third_party'] || ''}
-                        onChange={(e) => handleThirdPartyPctChange('third_party', e.target.value)}
+                        value={thirdPartyPct[m.uid] || ''}
+                        onChange={(e) => handleThirdPartyPctChange(m.uid, e.target.value)}
                         className="w-full pr-8 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">%</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">
+                        %
+                      </span>
                     </div>
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                    {thirdPersonName || 'Third Person'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={thirdPartyPct['third_party'] || ''}
+                      onChange={(e) => handleThirdPartyPctChange('third_party', e.target.value)}
+                      className="w-full pr-8 pl-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-mono text-sm outline-none transition-all"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs font-mono">
+                      %
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Split Detail Preview Box (not for Dark Cherry - there are no shares) */}
-          {numericAmount > 0 && splitType !== 'dark_cherry' && (
-            <div className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2" id="split-preview">
-              <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1">
-                <Calculator className="h-3 w-3" /> Split Breakdown
-              </span>
-              <div className="grid grid-cols-2 gap-4 pt-1">
-                {members.map(m => (
-                  <div key={`preview-${m.uid}`} className="flex flex-col">
-                    <span className="text-xs text-natural-muted font-semibold">{m.name}'s Share ({Math.round(((previewShares[m.uid] || 0) / numericAmount) * 100) || 0}%)</span>
-                    <span className="text-lg font-display font-semibold text-natural-text">
-                      ${(previewShares[m.uid] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs text-natural-text font-medium">
-                      {paidBy === m.uid ? 'Paid - No debt' : 'Owes payer'}
-                    </span>
-                  </div>
-                ))}
-                {splitType === 'custom_percentage' && guests.filter(g => g.name.trim() || g.pct).map(g => (
-                  <div key={`preview-${g.id}`} className="flex flex-col">
-                    <span className="text-xs text-natural-muted font-semibold">{g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)</span>
-                    <span className="text-lg font-display font-semibold text-natural-text">
-                      ${((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs text-natural-text font-medium">Guest (this expense)</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quick settle (new expenses only) */}
-          {!editingExpense && (
-            <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
-              <input
-                type="checkbox"
-                checked={alreadySettled}
-                onChange={(e) => setAlreadySettled(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
-              />
-              <span>
-                <span className="block text-sm font-bold text-natural-text">Already settled</span>
-                <span className="block text-xs text-natural-muted mt-0.5">
-                  Everyone's paid up on this one - log it as fully settled (no balances owed). Great for recording a
-                  past expense that's already been paid back.
-                </span>
-              </span>
-            </label>
-          )}
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Private Notes (Optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes"
-              rows={2}
-              className="w-full p-3 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all resize-none"
-              id="expense-notes-input"
-            />
           </div>
-        </form>
+        )}
+
+        {/* Split Detail Preview Box (not for Dark Cherry - there are no shares) */}
+        {numericAmount > 0 && splitType !== 'dark_cherry' && (
+          <div
+            className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2"
+            id="split-preview"
+          >
+            <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1">
+              <Calculator className="h-3 w-3" /> Split Breakdown
+            </span>
+            <div className="grid grid-cols-2 gap-4 pt-1">
+              {members.map((m) => (
+                <div key={`preview-${m.uid}`} className="flex flex-col">
+                  <span className="text-xs text-natural-muted font-semibold">
+                    {m.name}'s Share (
+                    {Math.round(((previewShares[m.uid] || 0) / numericAmount) * 100) || 0}%)
+                  </span>
+                  <span className="text-lg font-display font-semibold text-natural-text">
+                    $
+                    {(previewShares[m.uid] || 0).toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span className="text-xs text-natural-text font-medium">
+                    {paidBy === m.uid ? 'Paid - No debt' : 'Owes payer'}
+                  </span>
+                </div>
+              ))}
+              {splitType === 'custom_percentage' &&
+                guests
+                  .filter((g) => g.name.trim() || g.pct)
+                  .map((g) => (
+                    <div key={`preview-${g.id}`} className="flex flex-col">
+                      <span className="text-xs text-natural-muted font-semibold">
+                        {g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)
+                      </span>
+                      <span className="text-lg font-display font-semibold text-natural-text">
+                        $
+                        {((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString(
+                          'en-US',
+                          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                        )}
+                      </span>
+                      <span className="text-xs text-natural-text font-medium">
+                        Guest (this expense)
+                      </span>
+                    </div>
+                  ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick settle (new expenses only) */}
+        {!editingExpense && (
+          <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
+            <input
+              type="checkbox"
+              checked={alreadySettled}
+              onChange={(e) => setAlreadySettled(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
+            />
+            <span>
+              <span className="block text-sm font-bold text-natural-text">Already settled</span>
+              <span className="block text-xs text-natural-muted mt-0.5">
+                Everyone's paid up on this one - log it as fully settled (no balances owed). Great
+                for recording a past expense that's already been paid back.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {/* Notes */}
+        <div>
+          <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+            Private Notes (Optional)
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes"
+            rows={2}
+            className="w-full p-3 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all resize-none"
+            id="expense-notes-input"
+          />
+        </div>
+      </form>
 
       {showDarkIntro && (
         <DarkCherryInfoModal

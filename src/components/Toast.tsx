@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Bell } from 'lucide-react';
 
@@ -30,7 +30,13 @@ export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   );
 }
 
-function ToastItem({ toast, removeToast }: { toast: ToastMessage, removeToast: (id: string) => void }) {
+function ToastItem({
+  toast,
+  removeToast,
+}: {
+  toast: ToastMessage;
+  removeToast: (id: string) => void;
+}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       removeToast(toast.id);

@@ -12,10 +12,7 @@ export const SUPPORT_EMAIL = 'support@haveanothercherry.com';
 // continueUrl arrives in a URL anyone can craft, and it hangs off a link users
 // are trained to trust, so anything not on this list is dropped rather than
 // followed. Without this check the handler would be an open redirect.
-export const ALLOWED_CONTINUE_HOSTS = new Set([
-  'app.haveanothercherry.com',
-  'haveanothercherry.com',
-]);
+const ALLOWED_CONTINUE_HOSTS = new Set(['app.haveanothercherry.com', 'haveanothercherry.com']);
 
 export function sanitizeContinueUrl(raw: string | null | undefined, origin: string): string | null {
   if (!raw) return null;

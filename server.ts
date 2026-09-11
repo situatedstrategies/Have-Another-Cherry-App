@@ -1,123 +1,120 @@
-import "dotenv/config";
-import { createHash, timingSafeEqual } from "crypto";
-import express from "express";
-import path from "path";
-import cors from "cors";
-import { createServer as createViteServer } from "vite";
-import { reminderTargetDate, reminderPayload } from "./src/lib/reminders";
-import { sendInviteEmail, sendResetEmail, sendVerificationEmail, sendWaitlistNotification, sendBetaSignupNotification, sendReminderEmail, sendSupportRequest } from "./src/lib/resend";
-import { actionHandlerBase, retargetActionLink } from "./src/lib/actionLink";
-import { addWaitlistLeadToNotion, deviceFromUserAgent } from "./src/lib/notion";
-import firebaseConfig from "./firebase-applet-config.json";
+import 'dotenv/config';
+import { createHash, timingSafeEqual } from 'crypto';
+import express from 'express';
+import path from 'path';
+import cors from 'cors';
+import { reminderTargetDate, reminderPayload } from './src/lib/reminders';
+import {
+  sendInviteEmail,
+  sendResetEmail,
+  sendVerificationEmail,
+  sendWaitlistNotification,
+  sendBetaSignupNotification,
+  sendReminderEmail,
+  sendSupportRequest,
+} from './src/lib/resend';
+import { actionHandlerBase, retargetActionLink } from './src/lib/actionLink';
+import { addWaitlistLeadToNotion, deviceFromUserAgent } from './src/lib/notion';
+import firebaseConfig from './firebase-applet-config.json';
+import type { GoogleGenAI, Type } from '@google/genai';
+
+const PROJECT_ID = 'gen-lang-client-0987674990';
 
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Behind App Hosting / Cloud Run every request arrives via Google's front-end
-  // proxy; trust it so req.ip reflects the real client (X-Forwarded-For) and the
-  // rate limiter buckets per user instead of collapsing to one global bucket.
-  //
-  // Exactly ONE hop, not `true`: Google's proxy appends the real client IP as
-  // the last X-Forwarded-For entry, so trusting one hop reads that entry.
-  // Trusting every hop would read the FIRST entry, which the client writes
-  // itself, letting an abuser rotate fake IPs past the per-IP rate limits.
-  app.set("trust proxy", 1);
+  // Behind App Hosting every request arrives through Google's proxy. Trust
+  // exactly one hop: that reads the client IP Google appends to
+  // X-Forwarded-For. Trusting every hop would read the first entry, which the
+  // client writes itself and could use to dodge the per-IP rate limits.
+  app.set('trust proxy', 1);
 
-  // Constant-time string comparison for secrets (gate password, webhook auth),
-  // so a mismatch reveals nothing about how much of the value was right.
+  // Constant-time comparison for secrets, so a mismatch leaks nothing.
   const safeEqual = (a: string, b: string) => {
     const ab = Buffer.from(a);
     const bb = Buffer.from(b);
     return ab.length === bb.length && timingSafeEqual(ab, bb);
   };
 
-  // Baseline security headers on every response. No Content-Security-Policy
-  // here yet: the SPA pulls Firebase, reCAPTCHA and Google Fonts, so a CSP
-  // must be introduced deliberately and tested, not bolted on.
+  // ---- Middleware ----
+  // No Content-Security-Policy yet: the SPA pulls Firebase, reCAPTCHA and
+  // Google Fonts, so a CSP has to be introduced deliberately and tested.
   app.use((req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    // The Firebase auth helper pages under /__/ render inside our own iframe
-    // during sign-in, so they are the one place framing must stay allowed.
-    if (!req.path.startsWith("/__/")) {
-      res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // The Firebase auth helper pages under /__/ render inside our own iframe.
+    if (!req.path.startsWith('/__/')) {
+      res.setHeader('X-Frame-Options', 'DENY');
     }
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()");
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
     next();
   });
 
-  // Restrict cross-origin browser access to our own app origins (the SPA is
-  // same-origin, so this doesn't affect it - it just blocks other sites).
+  // Cross-origin browser access is limited to our own origins plus the
+  // marketing site, whose beta form posts to /api/beta-signup.
   const allowedOrigins = (
     process.env.ALLOWED_ORIGINS ||
-    "https://app.haveanothercherry.com,https://have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app,http://localhost:3000," +
-    // Marketing site origins: the beta signup form on these pages posts to
-    // /api/beta-signup cross-origin.
-    "https://haveanothercherry.com,https://www.haveanothercherry.com,https://have-another-cherry-marketing.pages.dev"
-  ).split(",").map(o => o.trim()).filter(Boolean);
-  app.use(cors({
-    origin: (origin, cb) => {
-      // Allow same-origin / non-browser requests (no Origin header) and our list.
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(null, false);
-    },
-  }));
+    `https://app.haveanothercherry.com,https://have-another-cherry--${PROJECT_ID}.us-east4.hosted.app,http://localhost:3000,` +
+      'https://haveanothercherry.com,https://www.haveanothercherry.com,https://have-another-cherry-marketing.pages.dev'
+  )
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        // No Origin header means same-origin or a non-browser client.
+        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        return cb(null, false);
+      },
+    })
+  );
 
   // Receipt images are sent as base64, so allow a generous body size.
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: false }));
 
-  // ---- Retired beta host -----------------------------------------------------
-  // beta.haveanothercherry.com used to be a second deployment on its own
-  // Firebase project. It is gone: anyone who still has the old link, a saved
-  // bookmark, or an invite email that names it lands on the real app instead
-  // of a dead host or, worse, a stale copy with its own user pool. Permanent
-  // so browsers and crawlers stop asking.
+  // beta.haveanothercherry.com was a second deployment. Old links, bookmarks
+  // and invite emails that name it land on the real app.
   app.use((req, res, next) => {
-    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    const host = String(req.headers.host || '')
+      .split(':')[0]
+      .toLowerCase();
     if (/^beta[.-]/.test(host)) {
-      return res.redirect(301, "https://app.haveanothercherry.com" + req.originalUrl);
+      return res.redirect(301, 'https://app.haveanothercherry.com' + req.originalUrl);
     }
     return next();
   });
 
-  // ---- Production view gate ------------------------------------------------
-  // An optional password wall for app.haveanothercherry.com. OFF by default:
-  // the app is live and open, and every request goes straight through. Set
-  // SITE_GATE_ENABLED=1 in apphosting.yaml to put the wall back (for example
-  // before a launch), and SITE_GATE_PASSWORD_HASH to change the password; only
-  // the password's SHA-256 hash ever lives here, never the password itself.
-  // Local dev is never gated, and webhooks are exempt because they arrive
+  // ---- Site gate ----
+  // Optional password wall, off by default. SITE_GATE_ENABLED=1 turns it on
+  // and SITE_GATE_PASSWORD_HASH is the SHA-256 of the password. Local dev is
+  // never gated; webhooks and Apple's CDN are exempt because they arrive
   // without cookies.
-  const GATE_COOKIE = "hac_gate";
+  const GATE_COOKIE = 'hac_gate';
   const gateHash =
     process.env.SITE_GATE_PASSWORD_HASH ||
-    "7d93884ca2bb3700085c9ba2892bd9fce9c119ac7a9d7555f4e44230137d6c38";
+    '7d93884ca2bb3700085c9ba2892bd9fce9c119ac7a9d7555f4e44230137d6c38';
   const GATE_HOSTS = new Set([
-    "app.haveanothercherry.com",
-    "have-another-cherry--gen-lang-client-0987674990.us-east4.hosted.app",
+    'app.haveanothercherry.com',
+    `have-another-cherry--${PROJECT_ID}.us-east4.hosted.app`,
   ]);
   const GATE_EXEMPT_PATHS = new Set([
-    "/api/revenuecat-webhook",
-    "/api/apple-notifications",
-    // Apple's CDN fetches this to verify the app/domain association; it
-    // arrives with no cookies and must never see the gate.
-    "/.well-known/apple-app-site-association",
-    "/apple-app-site-association",
-    // The push service worker is fetched by the browser's SW machinery and
-    // must load even when the page itself sits behind the gate.
-    "/firebase-messaging-sw.js",
-    // App Store server notifications arrive from Apple with no cookies.
-    "/api/apple-purchase-notifications",
-    "/api/recaptcha-health",
-    "/api/beta-signup",
-    "/cherry2transparent.png",
-    "/icon.svg",
-    "/favicon.ico",
+    '/api/revenuecat-webhook',
+    '/api/apple-notifications',
+    '/.well-known/apple-app-site-association',
+    '/apple-app-site-association',
+    '/firebase-messaging-sw.js',
+    '/api/apple-purchase-notifications',
+    '/api/recaptcha-health',
+    '/api/beta-signup',
+    '/cherry2transparent.png',
+    '/icon.svg',
+    '/favicon.ico',
   ]);
-  const sha256Hex = (value: string) => createHash("sha256").update(value).digest("hex");
+  const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
 
   const gatePage = (wrongPassword: boolean) => `<!doctype html>
 <html lang="en">
@@ -161,7 +158,7 @@ async function startServer() {
     <img src="/cherry2transparent.png" alt="Have Another Cherry">
     <h1>You're early. Sweet.</h1>
     <p>Have Another Cherry isn't open to everyone just yet. If you have the site password, come on in.</p>
-    ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ""}
+    ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ''}
     <form method="POST" action="/gate/unlock">
       <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">
       <button type="submit">Come on in</button>
@@ -172,73 +169,71 @@ async function startServer() {
 </html>`;
 
   app.use((req, res, next) => {
-    if (process.env.SITE_GATE_ENABLED !== "1") return next();
-    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+    if (process.env.SITE_GATE_ENABLED !== '1') return next();
+    const host = String(req.headers.host || '')
+      .split(':')[0]
+      .toLowerCase();
     if (!GATE_HOSTS.has(host)) return next();
     if (GATE_EXEMPT_PATHS.has(req.path)) return next();
-    // Firebase reserved namespace: the sign-in popup and iframe load
-    // /__/auth/* on our domain (authDomain), which must never see the gate.
-    if (req.path.startsWith("/__/")) return next();
+    // The Firebase sign-in popup and iframe load /__/auth/* on our domain.
+    if (req.path.startsWith('/__/')) return next();
 
-    const cookieHeader = req.headers.cookie || "";
+    const cookieHeader = req.headers.cookie || '';
     const cookie = cookieHeader
-      .split(";")
-      .map(part => part.trim())
-      .find(part => part.startsWith(`${GATE_COOKIE}=`));
-    const cookieValue = cookie ? decodeURIComponent(cookie.slice(GATE_COOKIE.length + 1)) : "";
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${GATE_COOKIE}=`));
+    const cookieValue = cookie ? decodeURIComponent(cookie.slice(GATE_COOKIE.length + 1)) : '';
     if (safeEqual(cookieValue, gateHash)) return next();
 
-    if (req.method === "POST" && req.path === "/gate/unlock") {
-      const password = String((req.body as any)?.password ?? "");
+    if (req.method === 'POST' && req.path === '/gate/unlock') {
+      const password = String((req.body as any)?.password ?? '');
       if (password && safeEqual(sha256Hex(password), gateHash)) {
         res.setHeader(
-          "Set-Cookie",
+          'Set-Cookie',
           `${GATE_COOKIE}=${gateHash}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`
         );
-        return res.redirect(303, "/");
+        return res.redirect(303, '/');
       }
       return res.status(401).send(gatePage(true));
     }
 
     return res.status(401).send(gatePage(false));
   });
-  // ---- end production view gate -------------------------------------------
 
-  // Firebase auth helpers. With authDomain set to our own domain, the Google
-  // sign-in popup opens https://<our domain>/__/auth/handler. Firebase Hosting
-  // serves those helper pages automatically but App Hosting (Cloud Run) does
-  // not, so proxy the reserved /__/auth namespace to the Firebase project's
-  // own domain.
-  app.use("/__/auth", async (req, res) => {
+  // ---- Firebase auth helper proxy ----
+  // With authDomain set to our own domain the sign-in popup opens
+  // /__/auth/handler here. Firebase Hosting serves those pages itself; App
+  // Hosting does not, so proxy the reserved namespace to the project domain.
+  app.use('/__/auth', async (req, res) => {
     try {
-      const upstreamOrigin = "https://gen-lang-client-0987674990.firebaseapp.com";
+      const upstreamOrigin = `https://${PROJECT_ID}.firebaseapp.com`;
       const upstream = await fetch(upstreamOrigin + req.originalUrl, {
         method: req.method,
-        headers: { accept: String(req.headers.accept || "*/*") },
+        headers: { accept: String(req.headers.accept || '*/*') },
       });
       res.status(upstream.status);
       upstream.headers.forEach((value, key) => {
-        if (!["content-encoding", "transfer-encoding", "content-length", "connection"].includes(key)) {
+        if (
+          !['content-encoding', 'transfer-encoding', 'content-length', 'connection'].includes(key)
+        ) {
           res.setHeader(key, value);
         }
       });
       res.send(Buffer.from(await upstream.arrayBuffer()));
     } catch (err: any) {
-      console.error("Auth handler proxy error:", err.message);
-      res.status(502).send("Auth handler unavailable. Please try again.");
+      console.error('Auth handler proxy error:', err.message);
+      res.status(502).send('Auth handler unavailable. Please try again.');
     }
   });
 
-
-  // Lightweight Alpha Lite abuse protection for public email endpoints.
-  // App Hosting instances may have separate memory, so production launch
-  // should eventually use managed rate limiting.
+  // ---- Shared helpers ----
+  // In-memory per-instance rate limiting. App Hosting instances do not share
+  // it, so this is abuse protection rather than a hard quota.
   const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
-  // House style: no em dashes anywhere, including AI-generated copy. The
-  // prompts also forbid them, but the model slips sometimes, so every parsed
-  // response is scrubbed before it reaches a client.
-  const stripEmDashes = (value: string): string => value.replace(/\s*[\u2014\u2013]\s*/g, " - ");
+  // House style forbids em dashes. The prompts say so too, but the model slips.
+  const stripEmDashes = (value: string): string => value.replace(/\s*[\u2014\u2013]\s*/g, ' - ');
   let lastSweep = 0;
 
   // Drop expired buckets occasionally so the map can't grow without bound.
@@ -248,42 +243,67 @@ async function startServer() {
     for (const [k, b] of requestBuckets) if (now >= b.resetAt) requestBuckets.delete(k);
   };
 
-  // Per-endpoint rate limiter, keyed on the real client IP so one abuser is
-  // isolated instead of throttling everyone. Each `name` gets its own quota.
-  const rateLimit = (name: string, maxRequests = 5, windowMs = 15 * 60 * 1000) =>
+  // Per-endpoint limiter keyed on client IP, so one abuser is isolated.
+  const rateLimit =
+    (name: string, maxRequests = 5, windowMs = 15 * 60 * 1000) =>
     (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const now = Date.now();
       sweepBuckets(now);
-      const key = `${name}:${req.ip || req.socket.remoteAddress || "unknown"}`;
+      const key = `${name}:${req.ip || req.socket.remoteAddress || 'unknown'}`;
       const bucket = requestBuckets.get(key);
       if (!bucket || now >= bucket.resetAt) {
         requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
         return next();
       }
       if (bucket.count >= maxRequests) {
-        return res.status(429).json({ error: "Too many requests. Please wait before trying again." });
+        return res
+          .status(429)
+          .json({ error: 'Too many requests. Please wait before trying again.' });
       }
       bucket.count += 1;
       next();
     };
 
-  // Only the image types phones and browsers actually produce. Anything else
-  // (an SVG, a PDF, a made-up type) collapses to JPEG rather than being passed
-  // through to the model verbatim.
-  const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+  // Anything but the image types phones produce collapses to JPEG.
+  const ALLOWED_IMAGE_MIME = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+  ]);
   const cleanImageMime = (v: unknown): string =>
-    typeof v === "string" && ALLOWED_IMAGE_MIME.has(v.toLowerCase()) ? v.toLowerCase() : "image/jpeg";
+    typeof v === 'string' && ALLOWED_IMAGE_MIME.has(v.toLowerCase())
+      ? v.toLowerCase()
+      : 'image/jpeg';
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isValidEmail = (value: unknown): value is string =>
+    typeof value === 'string' && EMAIL_RE.test(value);
+
+  // One Vertex AI client per process, built on first use.
+  let vertexClient: { ai: GoogleGenAI; Type: typeof Type } | null = null;
+  const getVertexClient = async () => {
+    if (!vertexClient) {
+      const { GoogleGenAI, Type } = await import('@google/genai');
+      vertexClient = {
+        ai: new GoogleGenAI({
+          vertexai: true,
+          project: process.env.GOOGLE_CLOUD_PROJECT || PROJECT_ID,
+          location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+        }),
+        Type,
+      };
+    }
+    return vertexClient;
+  };
 
   // Lazily initialize the Firebase Admin SDK (ADC) once, shared across endpoints.
   const ensureAdminApp = async () => {
-    const { getApps, initializeApp, applicationDefault } = await import("firebase-admin/app");
+    const { getApps, initializeApp, applicationDefault } = await import('firebase-admin/app');
     if (!getApps().length) {
-      // With projectId omitted, ADC resolves the project the service is actually
-      // running in, which is always the correct one.
-      const projectId =
-        process.env.GOOGLE_CLOUD_PROJECT ||
-        process.env.GCLOUD_PROJECT ||
-        undefined;
+      // With projectId omitted, ADC resolves the project the service runs in.
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || undefined;
 
       initializeApp({
         credential: applicationDefault(),
@@ -291,46 +311,49 @@ async function startServer() {
       });
 
       console.log(
-        "Firebase Admin initialized for project:",
-        projectId || "(resolved from application default credentials)"
+        'Firebase Admin initialized for project:',
+        projectId || '(resolved from application default credentials)'
       );
     }
   };
 
-  // Require a valid Firebase ID token. Protects the billed AI endpoints and the
-  // authenticated email endpoint from anonymous abuse.
-  const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Requires a valid Firebase ID token; guards the billed AI and email routes.
+  const requireAuth = async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
     try {
-      const header = req.headers.authorization || "";
-      const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-      if (!token) return res.status(401).json({ error: "Authentication required." });
+      const header = req.headers.authorization || '';
+      const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+      if (!token) return res.status(401).json({ error: 'Authentication required.' });
       await ensureAdminApp();
-      const { getAuth } = await import("firebase-admin/auth");
+      const { getAuth } = await import('firebase-admin/auth');
       const decoded = await getAuth().verifyIdToken(token);
       (req as any).uid = decoded.uid;
       (req as any).firebaseUser = decoded;
       next();
     } catch (e: any) {
-      console.error("Auth verification failed:", e?.message || e);
-      return res.status(401).json({ error: "Authentication required." });
+      console.error('Auth verification failed:', e?.message || e);
+      return res.status(401).json({ error: 'Authentication required.' });
     }
   };
 
-  // Once profile_log reaches CATALOG_TARGET entries, the catalog is "frozen":
-  // stop generating new AI profiles and always serve from that finite set.
-  // Before then, AI failures fall back to a random logged profile once the log
-  // has at least MIN_LOG_FALLBACK entries (else the curated list).
+  // Once profile_log holds CATALOG_TARGET entries the catalog is frozen and
+  // profiles are served from it instead of generated. Before then, an AI
+  // failure falls back to a logged profile once the log has MIN_LOG_FALLBACK
+  // entries, else to the curated list.
   const CATALOG_TARGET = 250;
   const MIN_LOG_FALLBACK = 20;
 
   const getLogCount = async (): Promise<number> => {
     try {
       await ensureAdminApp();
-      const { getFirestore } = await import("firebase-admin/firestore");
-      const snap = await getFirestore().collection("profile_log").count().get();
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const snap = await getFirestore().collection('profile_log').count().get();
       return snap.data().count;
     } catch (e: any) {
-      console.error("profile_log count failed:", e?.message || e);
+      console.error('profile_log count failed:', e?.message || e);
       return -1; // unknown -> behave as if not yet full
     }
   };
@@ -338,86 +361,83 @@ async function startServer() {
   const getRandomFromLog = async (): Promise<any | null> => {
     try {
       await ensureAdminApp();
-      const { getFirestore } = await import("firebase-admin/firestore");
+      const { getFirestore } = await import('firebase-admin/firestore');
       const snap = await getFirestore()
-        .collection("profile_log")
-        .orderBy("createdAt", "desc")
+        .collection('profile_log')
+        .orderBy('createdAt', 'desc')
         .limit(500)
         .get();
       if (snap.empty) return null;
       const pick: any = snap.docs[Math.floor(Math.random() * snap.size)].data();
       const { createdAt, source, uid, ...profile } = pick;
-      return { ...profile, greetingTone: profile.greetingTone || "harmonious" };
+      return { ...profile, greetingTone: profile.greetingTone || 'harmonious' };
     } catch (e: any) {
-      console.error("profile_log read failed:", e?.message || e);
+      console.error('profile_log read failed:', e?.message || e);
       return null;
     }
   };
 
   const getCuratedProfile = async () => {
-    const { FINANCIAL_PROFILES } = await import("./src/lib/profiles.js");
+    const { FINANCIAL_PROFILES } = await import('./src/lib/profiles.js');
     const f = FINANCIAL_PROFILES[Math.floor(Math.random() * FINANCIAL_PROFILES.length)];
-    return { ...f, greetingTone: "harmonious" };
+    return { ...f, greetingTone: 'harmonious' };
   };
 
-  // 1. Gemini Multimodal API (Receipt Scanning) via Vertex AI (ADC).
-  app.post("/api/scan-receipt", requireAuth, rateLimit("scan", 60), async (req, res) => {
+  // ---- AI: receipt scan and vault extract ----
+  app.post('/api/scan-receipt', requireAuth, rateLimit('scan', 60), async (req, res) => {
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const base64Image = req.body?.image;
-      if (!base64Image || typeof base64Image !== "string") {
-        return res.status(400).json({ error: "No receipt image was provided." });
+      if (!base64Image || typeof base64Image !== 'string') {
+        return res.status(400).json({ error: 'No receipt image was provided.' });
       }
       {
-        const base64Data = base64Image.includes(",") ? base64Image.split(",")[1] : base64Image;
+        const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
         const mimeType = cleanImageMime(req.body?.mimeType);
 
-        console.log("Analyzing uploaded receipt image with Gemini API (Vertex)...");
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: 'gemini-2.5-flash',
           contents: [
             { inlineData: { data: base64Data, mimeType } },
-            "Extract the total amount, date, description, and the individual line items from this receipt. " +
-            "Line items are the purchased products/services with their prices (exclude tax, tip, subtotal, and total rows). " +
-            "Return ONLY valid JSON."
+            'Extract the total amount, date, description, and the individual line items from this receipt. ' +
+              'Line items are the purchased products/services with their prices (exclude tax, tip, subtotal, and total rows). ' +
+              'Return ONLY valid JSON.',
           ],
           config: {
-            responseMimeType: "application/json",
+            responseMimeType: 'application/json',
             responseSchema: {
               type: Type.OBJECT,
               properties: {
-                amount: { type: Type.NUMBER, description: "Total amount on the receipt" },
-                description: { type: Type.STRING, description: "Short descriptive name of the merchant/store" },
-                date: { type: Type.STRING, description: "Date in YYYY-MM-DD format if available" },
+                amount: { type: Type.NUMBER, description: 'Total amount on the receipt' },
+                description: {
+                  type: Type.STRING,
+                  description: 'Short descriptive name of the merchant/store',
+                },
+                date: { type: Type.STRING, description: 'Date in YYYY-MM-DD format if available' },
                 items: {
                   type: Type.ARRAY,
-                  description: "Individual purchased line items (no tax/tip/subtotal/total rows)",
+                  description: 'Individual purchased line items (no tax/tip/subtotal/total rows)',
                   items: {
                     type: Type.OBJECT,
                     properties: {
                       name: { type: Type.STRING },
-                      price: { type: Type.NUMBER }
+                      price: { type: Type.NUMBER },
                     },
-                    required: ["name", "price"]
-                  }
-                }
+                    required: ['name', 'price'],
+                  },
+                },
               },
-              required: ["amount", "description"]
-            }
-          }
+              required: ['amount', 'description'],
+            },
+          },
         });
 
         if (response.text) {
           const parsed = JSON.parse(stripEmDashes(response.text.trim()));
           const items = (Array.isArray(parsed.items) ? parsed.items : [])
             .map((it: any) => ({
-              name: String(it?.name || "Item").slice(0, 80),
+              name: String(it?.name || 'Item').slice(0, 80),
               price: Math.max(0, Number(it?.price) || 0),
             }))
             .filter((it: any) => it.price > 0)
@@ -426,56 +446,47 @@ async function startServer() {
             success: true,
             data: {
               amount: Math.max(0, Number(parsed.amount) || 0),
-              description: parsed.description || "Receipt Scan",
+              description: parsed.description || 'Receipt Scan',
               date: parsed.date || new Date().toISOString().split('T')[0],
-              items
-            }
+              items,
+            },
           });
         }
       }
 
-      // The model returned nothing usable.
-      return res.status(422).json({ error: "Could not read the receipt. Please enter the details manually." });
+      return res
+        .status(422)
+        .json({ error: 'Could not read the receipt. Please enter the details manually.' });
     } catch (err: any) {
-      console.error("Receipt Scan Error:", err);
-      res.status(500).json({ error: "Could not scan the receipt. Please try again." });
+      console.error('Receipt Scan Error:', err);
+      res.status(500).json({ error: 'Could not scan the receipt. Please try again.' });
     }
   });
 
-  // 4b. Household Vault extraction. Turns a free-form note, or a photo of a
-  // bill/statement, into structured fields the client can confirm and save.
-  //
-  // Privacy contract (see privacy.html section 7): this endpoint is STATELESS.
-  // The submitted text/image is used to produce the extraction and is never
-  // written to a database, never logged as content, and never used for
-  // training. The client encrypts the result before storing it, so nothing
-  // readable is persisted anywhere by this request.
-  app.post("/api/vault-extract", requireAuth, rateLimit("vault", 30), async (req, res) => {
+  // Stateless by contract (privacy policy, section 7): the submitted text or
+  // image is never stored, never logged as content and never used for
+  // training. The client encrypts the result before saving it.
+  app.post('/api/vault-extract', requireAuth, rateLimit('vault', 30), async (req, res) => {
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
-      const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-      const image = typeof req.body?.image === "string" ? req.body.image : "";
-      // What the user said they want kept, e.g. "just the due date and amount".
-      const intent = typeof req.body?.intent === "string" ? req.body.intent.trim().slice(0, 400) : "";
+      const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+      const image = typeof req.body?.image === 'string' ? req.body.image : '';
+      const intent =
+        typeof req.body?.intent === 'string' ? req.body.intent.trim().slice(0, 400) : '';
       const categories: string[] = Array.isArray(req.body?.categories)
-        ? req.body.categories.filter((c: any) => typeof c === "string").slice(0, 40)
+        ? req.body.categories.filter((c: any) => typeof c === 'string').slice(0, 40)
         : [];
 
       if (!text && !image) {
-        return res.status(400).json({ error: "Nothing to organise. Add a note or a photo." });
+        return res.status(400).json({ error: 'Nothing to organise. Add a note or a photo.' });
       }
 
       const parts: any[] = [];
       if (image) {
         parts.push({
           inlineData: {
-            data: image.includes(",") ? image.split(",")[1] : image,
+            data: image.includes(',') ? image.split(',')[1] : image,
             mimeType: cleanImageMime(req.body?.mimeType),
           },
         });
@@ -483,40 +494,52 @@ async function startServer() {
       if (text) parts.push(`Here is what the user wrote:\n${text.slice(0, 8000)}`);
       if (intent) parts.push(`The user asked specifically for: ${intent}`);
       if (categories.length) {
-        parts.push(`Prefer one of the household's existing categories when it fits: ${categories.join(", ")}.`);
+        parts.push(
+          `Prefer one of the household's existing categories when it fits: ${categories.join(', ')}.`
+        );
       }
       parts.push(
-        "Turn this into one structured household record. Write `body` as clean, readable prose " +
-        "Keep every fact, drop filler, do not invent anything. " +
-        "Only fill a field if the source actually supports it; leave it out otherwise. " +
-        "Set confidence to `high` only when the value is stated outright, `medium` when it is " +
-        "strongly implied, and `low` when you are guessing. Dates must be YYYY-MM-DD. " +
-        "Return ONLY valid JSON."
+        'Turn this into one structured household record. Write `body` as clean, readable prose ' +
+          'Keep every fact, drop filler, do not invent anything. ' +
+          'Only fill a field if the source actually supports it; leave it out otherwise. ' +
+          'Set confidence to `high` only when the value is stated outright, `medium` when it is ' +
+          'strongly implied, and `low` when you are guessing. Dates must be YYYY-MM-DD. ' +
+          'Return ONLY valid JSON.'
       );
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: 'gemini-2.5-flash',
         contents: parts,
         config: {
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING, description: "Short title, e.g. 'Con Ed, August'" },
-              body: { type: Type.STRING, description: "The note itself, cleaned up. Never invent facts." },
+              body: {
+                type: Type.STRING,
+                description: 'The note itself, cleaned up. Never invent facts.',
+              },
               vendor: { type: Type.STRING, description: "Who it is with, e.g. 'Con Edison'" },
-              amount: { type: Type.NUMBER, description: "Amount due, if stated" },
-              dueDate: { type: Type.STRING, description: "YYYY-MM-DD, if stated or clearly implied" },
+              amount: { type: Type.NUMBER, description: 'Amount due, if stated' },
+              dueDate: {
+                type: Type.STRING,
+                description: 'YYYY-MM-DD, if stated or clearly implied',
+              },
               recurrence: {
                 type: Type.STRING,
-                description: "one of: none, weekly, biweekly, monthly, quarterly, yearly",
+                description: 'one of: none, weekly, biweekly, monthly, quarterly, yearly',
               },
-              accountHint: { type: Type.STRING, description: "Which account pays it, e.g. 'joint Chase'. Never a full account number." },
+              accountHint: {
+                type: Type.STRING,
+                description:
+                  "Which account pays it, e.g. 'joint Chase'. Never a full account number.",
+              },
               category: { type: Type.STRING },
               tags: { type: Type.ARRAY, items: { type: Type.STRING } },
               confidence: {
                 type: Type.OBJECT,
-                description: "high | medium | low per field that was filled",
+                description: 'high | medium | low per field that was filled',
                 properties: {
                   amount: { type: Type.STRING },
                   dueDate: { type: Type.STRING },
@@ -527,33 +550,38 @@ async function startServer() {
                 },
               },
             },
-            required: ["title", "body"],
+            required: ['title', 'body'],
           },
         },
       });
 
       if (!response.text) {
-        return res.status(422).json({ error: "Could not make sense of that. Try adding a little more detail." });
+        return res
+          .status(422)
+          .json({ error: 'Could not make sense of that. Try adding a little more detail.' });
       }
 
       const parsed = JSON.parse(stripEmDashes(response.text.trim()));
-      const allowedRecurrence = ["none", "weekly", "biweekly", "monthly", "quarterly", "yearly"];
-      const isoDate = (v: any) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-      const conf = (v: any) => (["high", "medium", "low"].includes(v) ? v : undefined);
+      const allowedRecurrence = ['none', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
+      const isoDate = (v: any) =>
+        typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+      const conf = (v: any) => (['high', 'medium', 'low'].includes(v) ? v : undefined);
 
       return res.status(200).json({
         success: true,
         data: {
-          title: String(parsed.title || "Untitled").slice(0, 120),
-          body: String(parsed.body || "").slice(0, 8000),
+          title: String(parsed.title || 'Untitled').slice(0, 120),
+          body: String(parsed.body || '').slice(0, 8000),
           vendor: parsed.vendor ? String(parsed.vendor).slice(0, 120) : undefined,
-          amount: Number.isFinite(Number(parsed.amount)) && Number(parsed.amount) > 0
-            ? Math.round(Number(parsed.amount) * 100) / 100
-            : undefined,
+          amount:
+            Number.isFinite(Number(parsed.amount)) && Number(parsed.amount) > 0
+              ? Math.round(Number(parsed.amount) * 100) / 100
+              : undefined,
           dueDate: isoDate(parsed.dueDate),
-          recurrence: allowedRecurrence.includes(parsed.recurrence) && parsed.recurrence !== "none"
-            ? parsed.recurrence
-            : undefined,
+          recurrence:
+            allowedRecurrence.includes(parsed.recurrence) && parsed.recurrence !== 'none'
+              ? parsed.recurrence
+              : undefined,
           accountHint: parsed.accountHint ? String(parsed.accountHint).slice(0, 80) : undefined,
           category: parsed.category ? String(parsed.category).slice(0, 60) : undefined,
           tags: (Array.isArray(parsed.tags) ? parsed.tags : [])
@@ -572,16 +600,16 @@ async function startServer() {
       });
     } catch (err: any) {
       // Deliberately does not log the submitted content.
-      console.error("Vault extract error:", err?.message || err);
-      res.status(500).json({ error: "Could not organise that right now. Please try again." });
+      console.error('Vault extract error:', err?.message || err);
+      res.status(500).json({ error: 'Could not organise that right now. Please try again.' });
     }
   });
 
-  // 5. reCAPTCHA Enterprise assessment via ADC (no API key - org policy).
+  // ---- reCAPTCHA (Enterprise, via ADC) ----
   const createRecaptchaAssessment = async (token: string, action?: string) => {
-    const { GoogleAuth } = await import("google-auth-library");
+    const { GoogleAuth } = await import('google-auth-library');
     const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
     const client = await auth.getClient();
     const project = process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
@@ -589,7 +617,7 @@ async function startServer() {
 
     return client.request({
       url: `https://recaptchaenterprise.googleapis.com/v1/projects/${project}/assessments`,
-      method: "POST",
+      method: 'POST',
       data: {
         event: {
           token,
@@ -600,14 +628,12 @@ async function startServer() {
     }) as Promise<any>;
   };
 
-  // Rate limited: each call is a billed Enterprise assessment, and this runs
-  // pre-auth by nature, so per-IP quota is the only thing between the endpoint
-  // and someone burning assessment quota for sport.
-  app.post("/api/verify-recaptcha", rateLimit("recaptcha", 30), async (req, res) => {
+  // Pre-auth by nature and every call is billed, so the per-IP quota is all there is.
+  app.post('/api/verify-recaptcha', rateLimit('recaptcha', 30), async (req, res) => {
     try {
       const { token, action } = req.body;
       if (!token) {
-        return res.status(400).json({ error: "Missing token" });
+        return res.status(400).json({ error: 'Missing token' });
       }
 
       const assessment = await createRecaptchaAssessment(token, action);
@@ -616,14 +642,12 @@ async function startServer() {
       const score = assessment.data?.riskAnalysis?.score;
       const valid = props?.valid === true;
       const actionMatches = !action || props?.action === action;
-      // Google's recommended default threshold is 0.5.
-      // Authentication must not be hard-blocked solely by the risk score.
-      // Require a valid reCAPTCHA token and matching action; retain the score
-      // for monitoring while the Enterprise key establishes a reliable baseline.
+      // Only token validity and action are enforced. The score is returned for
+      // monitoring while the Enterprise key builds a baseline.
       const allowed = valid && actionMatches;
 
       if (!allowed) {
-        console.warn("[reCAPTCHA] Blocked:", {
+        console.warn('[reCAPTCHA] Blocked:', {
           valid,
           invalidReason: props?.invalidReason,
           expectedAction: action,
@@ -635,27 +659,23 @@ async function startServer() {
 
       res.status(200).json({ success: true, allowed, score });
     } catch (err: any) {
-      console.error("reCAPTCHA Assessment Error:", err.message);
+      console.error('reCAPTCHA Assessment Error:', err.message);
       // Fail open: an assessment outage should not lock users out of auth.
       res.status(200).json({ success: true, allowed: true, error: err.message });
     }
   });
 
-  // 5b. reCAPTCHA health check: runs a dummy assessment so operators can
-  // confirm the Enterprise API, IAM role, and site key are wired up without
-  // needing a real browser token. Reports status only, never user data.
-  app.get("/api/recaptcha-health", rateLimit("recaptcha-health", 10), async (_req, res) => {
-    const healthProject =
-      process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
+  // Runs a dummy assessment so operators can confirm the API, IAM role and site key. Status only, never user data.
+  app.get('/api/recaptcha-health', rateLimit('recaptcha-health', 10), async (_req, res) => {
+    const healthProject = process.env.GOOGLE_CLOUD_PROJECT || firebaseConfig.projectId;
     const healthConfig = firebaseConfig;
     try {
-      const assessment = await createRecaptchaAssessment("health-check-dummy-token", "HEALTH");
+      const assessment = await createRecaptchaAssessment('health-check-dummy-token', 'HEALTH');
       const props = assessment.data?.tokenProperties;
-      // A dummy token is expected to be invalid. Reaching this line means the
-      // assessment API accepted the call, so auth and IAM are working.
+      // A dummy token is expected to be invalid; reaching here means auth and IAM work.
       res.status(200).json({
         ok: true,
-        assessmentApi: "reachable",
+        assessmentApi: 'reachable',
         project: healthProject,
         siteKey: healthConfig.recaptchaSiteKey,
         dummyTokenValid: props?.valid === true,
@@ -664,7 +684,7 @@ async function startServer() {
     } catch (err: any) {
       res.status(200).json({
         ok: false,
-        assessmentApi: "error",
+        assessmentApi: 'error',
         project: healthProject,
         siteKey: healthConfig.recaptchaSiteKey,
         error: err.message,
@@ -672,19 +692,17 @@ async function startServer() {
     }
   });
 
-  // 6. Resend Invite Endpoint
-  app.post("/api/send-invite", requireAuth, rateLimit("invite"), async (req, res) => {
+  // ---- Auth: invites, account lookup, password reset, verification ----
+  app.post('/api/send-invite', requireAuth, rateLimit('invite'), async (req, res) => {
     try {
       const { email, groupName, inviteCode, recipientName, fromName, split } = req.body || {};
-      if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: "A valid recipient email is required." });
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: 'A valid recipient email is required.' });
       }
-      // The template escapes HTML, so these caps are about size, not markup:
-      // an authenticated caller should not be able to mail a megabyte of text
-      // to an arbitrary address under our sending domain.
-      const cap = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+      // The template escapes HTML; the caps bound size, not markup.
+      const cap = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
       if (split && JSON.stringify(split).length > 4000) {
-        return res.status(400).json({ error: "Split details are too large." });
+        return res.status(400).json({ error: 'Split details are too large.' });
       }
 
       const data = await sendInviteEmail(
@@ -697,60 +715,52 @@ async function startServer() {
       );
       res.status(200).json({ success: true, data });
     } catch (err: any) {
-      console.error("Server Invite Error:", err);
-      res.status(500).json({ error: "Could not send the invite. Please try again." });
+      console.error('Server Invite Error:', err);
+      res.status(500).json({ error: 'Could not send the invite. Please try again.' });
     }
   });
 
-  // Whether an account exists for an address. Product decision, 10 September
-  // 2026: someone typing an address that has no account is told so, on sign-in
-  // and on reset, rather than being left with "doesn't match" or a reset email
-  // that never comes. That is a deliberate trade against address enumeration,
-  // so it is rate limited like the other unauthenticated endpoints.
+  // Saying that an address has no account is a deliberate trade against
+  // enumeration, so the endpoint is rate limited like the other anonymous ones.
   const NO_ACCOUNT_MESSAGE =
-    "We could not find an account for that email. Check the spelling, or create one.";
+    'We could not find an account for that email. Check the spelling, or create one.';
 
-  app.post("/api/account-lookup", rateLimit("lookup", 20), async (req, res) => {
+  app.post('/api/account-lookup', rateLimit('lookup', 20), async (req, res) => {
     const { email } = req.body || {};
-    if (!email || typeof email !== "string") {
-      return res.status(400).json({ error: "Email is required" });
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email is required' });
     }
     try {
       await ensureAdminApp();
-      const { getAuth } = await import("firebase-admin/auth");
+      const { getAuth } = await import('firebase-admin/auth');
       const user = await getAuth().getUserByEmail(email.trim());
       return res.status(200).json({
         exists: true,
         providers: (user.providerData || []).map((p) => p.providerId),
       });
     } catch (err: any) {
-      if (err?.code === "auth/user-not-found" || err?.code === "auth/email-not-found") {
+      if (err?.code === 'auth/user-not-found' || err?.code === 'auth/email-not-found') {
         return res.status(200).json({ exists: false });
       }
-      console.error("Account lookup error:", err?.message || err);
-      return res.status(500).json({ error: "Could not check that address right now." });
+      console.error('Account lookup error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not check that address right now.' });
     }
   });
 
-  // 6b. Password Reset Endpoint (Resend + Firebase Admin SDK)
-  // Generates a Firebase password-reset link server-side (Admin SDK via ADC) and
-  // delivers it via Resend from reset@haveanothercherry.com. An address with no
-  // account gets a 404 that says so (see /api/account-lookup for why).
-  app.post("/api/send-password-reset", rateLimit("reset"), async (req, res) => {
+  // An address with no account gets a 404 that says so (see account-lookup).
+  app.post('/api/send-password-reset', rateLimit('reset'), async (req, res) => {
     const rawEmail = req.body?.email;
-    const email = typeof rawEmail === "string" ? rawEmail.trim() : "";
+    const email = typeof rawEmail === 'string' ? rawEmail.trim() : '';
     if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+      return res.status(400).json({ error: 'Email is required' });
     }
-    // Same shape check as send-invite, before the Admin SDK sees it: a
-    // malformed address should be a 400 here, not an opaque SDK error.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
 
     try {
       await ensureAdminApp();
-      const { getAuth } = await import("firebase-admin/auth");
+      const { getAuth } = await import('firebase-admin/auth');
 
       let resetLink: string;
       try {
@@ -759,8 +769,8 @@ async function startServer() {
           actionHandlerBase(req.headers, process.env.AUTH_ACTION_URL)
         );
       } catch (linkErr: any) {
-        if (linkErr?.code === "auth/user-not-found" || linkErr?.code === "auth/email-not-found") {
-          return res.status(404).json({ error: NO_ACCOUNT_MESSAGE, code: "no-account" });
+        if (linkErr?.code === 'auth/user-not-found' || linkErr?.code === 'auth/email-not-found') {
+          return res.status(404).json({ error: NO_ACCOUNT_MESSAGE, code: 'no-account' });
         }
         throw linkErr;
       }
@@ -768,27 +778,21 @@ async function startServer() {
       await sendResetEmail(email, resetLink);
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      console.error("Password Reset Error:", err?.message || err);
-      return res.status(500).json({ error: "Unable to send reset email. Please try again later." });
+      console.error('Password Reset Error:', err?.message || err);
+      return res.status(500).json({ error: 'Unable to send reset email. Please try again later.' });
     }
   });
 
-  // 6c. Email Verification Endpoint (Resend + Firebase Admin SDK)
-  // Generates a Firebase verification link server-side and delivers it via Resend
-  // from verify@haveanothercherry.com, so Firebase never sends its own copy.
-  //
-  // Authenticated on purpose, and the address comes from the caller's own ID
-  // token rather than the request body. Taking it from the body would turn this
-  // into an open relay for mailing arbitrary strangers a Have Another Cherry
-  // email. Password reset can be anonymous because it only ever mails an address
-  // that already has an account; this one cannot.
-  app.post("/api/send-verification", requireAuth, rateLimit("verify"), async (req, res) => {
+  // Authenticated on purpose: the address comes from the caller's ID token,
+  // never the body, so this cannot mail arbitrary strangers. Reset can be
+  // anonymous because it only ever mails an address that has an account.
+  app.post('/api/send-verification', requireAuth, rateLimit('verify'), async (req, res) => {
     try {
       const decoded = (req as any).firebaseUser;
       const email = decoded?.email;
 
       if (!email) {
-        return res.status(400).json({ error: "This account has no email address to confirm." });
+        return res.status(400).json({ error: 'This account has no email address to confirm.' });
       }
 
       // Nothing to do for Google accounts, or anyone who already confirmed.
@@ -796,80 +800,73 @@ async function startServer() {
         return res.status(200).json({ success: true, alreadyVerified: true });
       }
 
-      const { getAuth } = await import("firebase-admin/auth");
+      const { getAuth } = await import('firebase-admin/auth');
       const verifyLink = retargetActionLink(
         await getAuth().generateEmailVerificationLink(email),
         actionHandlerBase(req.headers, process.env.AUTH_ACTION_URL)
       );
 
-      const name = typeof req.body?.name === "string" ? req.body.name : undefined;
+      const name = typeof req.body?.name === 'string' ? req.body.name : undefined;
       await sendVerificationEmail(email, verifyLink, name);
 
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      console.error("Verification Email Error:", err?.message || err);
+      console.error('Verification Email Error:', err?.message || err);
       return res
         .status(500)
-        .json({ error: "Unable to send verification email. Please try again later." });
+        .json({ error: 'Unable to send verification email. Please try again later.' });
     }
   });
 
-  // 8. Financial Profile Generation API - generates a UNIQUE, bespoke profile
-  //    from the quiz answers, analyzed holistically/interconnected.
-  app.post("/api/generate-profile", requireAuth, rateLimit("profile", 30), async (req, res) => {
+  // ---- AI: profile, greeting, conversation starter ----
+  app.post('/api/generate-profile', requireAuth, rateLimit('profile', 30), async (req, res) => {
     const { answers } = req.body || {};
-    // Cap the user-supplied answers that get embedded in the AI prompt, to bound
-    // token usage and limit prompt-injection surface.
+    // Bounds token usage and the prompt-injection surface.
     if (answers && JSON.stringify(answers).length > 4000) {
-      return res.status(400).json({ error: "Quiz answers are too large." });
+      return res.status(400).json({ error: 'Quiz answers are too large.' });
     }
     const logCount = await getLogCount();
 
-    // Catalog frozen at CATALOG_TARGET entries: stop generating and always
-    // serve a random profile from the finite log.
     if (logCount >= CATALOG_TARGET) {
       const catalogProfile = await getRandomFromLog();
       if (catalogProfile) {
-        return res.status(200).json({ success: true, source: "catalog", data: catalogProfile });
+        return res.status(200).json({ success: true, source: 'catalog', data: catalogProfile });
       }
       // If the read unexpectedly failed, fall through to generation below.
     }
 
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const prompt =
-        "You are a behavioral-economics-informed relationship finance analyst for \"Have Another Cherry\", " +
-        "a warm, non-judgmental household expense-splitting app.\n\n" +
+        'You are a behavioral-economics-informed relationship finance analyst for "Have Another Cherry", ' +
+        'a warm, non-judgmental household expense-splitting app.\n\n' +
         "Analyze these quiz answers HOLISTICALLY and as an INTERCONNECTED whole - for example, how the person's " +
-        "credit-card and cash habits relate to how they feel about money, and to how they prefer to talk about it. " +
-        "Look for tension or harmony between answers (e.g., a spender who avoids money talk, or a saver who loves it).\n\n" +
-        "Quiz answers (JSON):\n" + JSON.stringify(answers, null, 2) + "\n\n" +
-        "Generate ONE unique, bespoke financial-personality profile that feels tailor-made for THIS combination of answers. " +
+        'credit-card and cash habits relate to how they feel about money, and to how they prefer to talk about it. ' +
+        'Look for tension or harmony between answers (e.g., a spender who avoids money talk, or a saver who loves it).\n\n' +
+        'Quiz answers (JSON):\n' +
+        JSON.stringify(answers, null, 2) +
+        '\n\n' +
+        'Generate ONE unique, bespoke financial-personality profile that feels tailor-made for THIS combination of answers. ' +
         "Invent a distinctive, evocative 'type' name of 2-4 words (do not reuse generic textbook labels). " +
-        "Write in warm, encouraging second person. Be specific to their answers, insightful, and never judgmental.\n\n" +
-        "Return JSON with fields: " +
-        "type (2-4 word name), " +
-        "description (2-3 sentences, second person), " +
-        "quote (a real, correctly-attributed quote about money, sharing, or relationships, formatted as: \"<quote>\" - <Author>), " +
-        "traits (an array of 3-5 short descriptive phrases), " +
-        "strengths (one encouraging sentence), " +
-        "watchouts (one gentle, constructive sentence), " +
-        "communicationStyle (one sentence about how this person likely prefers to discuss money with the people they share a home with), " +
-        "greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous). " +
-        "Never use em dashes in any field; use commas, periods, or hyphens instead.";
+        'Write in warm, encouraging second person. Be specific to their answers, insightful, and never judgmental.\n\n' +
+        'Return JSON with fields: ' +
+        'type (2-4 word name), ' +
+        'description (2-3 sentences, second person), ' +
+        'quote (a real, correctly-attributed quote about money, sharing, or relationships, formatted as: "<quote>" - <Author>), ' +
+        'traits (an array of 3-5 short descriptive phrases), ' +
+        'strengths (one encouraging sentence), ' +
+        'watchouts (one gentle, constructive sentence), ' +
+        'communicationStyle (one sentence about how this person likely prefers to discuss money with the people they share a home with), ' +
+        'greetingTone (exactly ONE lowercase word chosen from: playful, pragmatic, nurturing, analytical, adventurous, harmonious, thrifty, generous). ' +
+        'Never use em dashes in any field; use commas, periods, or hyphens instead.';
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           temperature: 1.0,
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -880,261 +877,254 @@ async function startServer() {
               strengths: { type: Type.STRING },
               watchouts: { type: Type.STRING },
               communicationStyle: { type: Type.STRING },
-              greetingTone: { type: Type.STRING }
+              greetingTone: { type: Type.STRING },
             },
-            required: ["type", "description", "quote", "greetingTone"]
-          }
-        }
+            required: ['type', 'description', 'quote', 'greetingTone'],
+          },
+        },
       });
 
       if (response.text) {
         const parsed = JSON.parse(stripEmDashes(response.text.trim()));
-        return res.status(200).json({ success: true, source: "ai", data: parsed });
+        return res.status(200).json({ success: true, source: 'ai', data: parsed });
       }
 
-      throw new Error("Failed to generate profile");
+      throw new Error('Failed to generate profile');
     } catch (err: any) {
-      console.error("Profile Gen Error:", err);
+      console.error('Profile Gen Error:', err);
       const data =
         (logCount >= MIN_LOG_FALLBACK ? await getRandomFromLog() : null) ||
         (await getCuratedProfile());
-      return res.status(200).json({ success: true, source: "fallback", data });
+      return res.status(200).json({ success: true, source: 'fallback', data });
     }
   });
 
-  // 9. Weekly Dashboard Greeting - a short, warm, cherry-themed, relationship-
-  //    focused line tailored to group size and the user's profile tone.
-  app.post("/api/generate-greeting", requireAuth, rateLimit("greeting", 60), async (req, res) => {
+  app.post('/api/generate-greeting', requireAuth, rateLimit('greeting', 60), async (req, res) => {
     const { memberCount, profileType: rawProfileType, greetingTone: rawTone } = req.body || {};
     const count = Number(memberCount) || 1;
-    // Validate/sanitize the user-influenced fields before they enter the prompt.
-    const ALLOWED_TONES = ["playful", "pragmatic", "nurturing", "analytical", "adventurous", "harmonious", "thrifty", "generous"];
-    const greetingTone = ALLOWED_TONES.includes(rawTone) ? rawTone : "harmonious";
-    const profileType = typeof rawProfileType === "string" ? rawProfileType.slice(0, 60) : "";
+    const ALLOWED_TONES = [
+      'playful',
+      'pragmatic',
+      'nurturing',
+      'analytical',
+      'adventurous',
+      'harmonious',
+      'thrifty',
+      'generous',
+    ];
+    const greetingTone = ALLOWED_TONES.includes(rawTone) ? rawTone : 'harmonious';
+    const profileType = typeof rawProfileType === 'string' ? rawProfileType.slice(0, 60) : '';
 
-    // Curated fallback lines (used if the AI call fails).
+    // Used when the AI call fails.
     const fallbackBySize: Record<string, string> = {
       solo: "A cherry's sweeter shared - but savoring your own bowl today is just as ripe. 🍒",
-      pair: "Two cherries on one stem: share the sweet, split the pits, and keep it fair. 🍒",
-      group: "A bowl of cherries is best passed around - here's to sharing every sweet bite together. 🍒",
+      pair: 'Two cherries on one stem: share the sweet, split the pits, and keep it fair. 🍒',
+      group:
+        "A bowl of cherries is best passed around - here's to sharing every sweet bite together. 🍒",
     };
-    const sizeKey = count <= 1 ? "solo" : count === 2 ? "pair" : "group";
+    const sizeKey = count <= 1 ? 'solo' : count === 2 ? 'pair' : 'group';
 
     try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      const { ai, Type } = await getVertexClient();
 
       const audience =
-        count <= 1 ? "one person managing their own bowl"
-        : count === 2 ? "a pair sharing everything"
-        : `a household of ${count} people sharing together`;
+        count <= 1
+          ? 'one person managing their own bowl'
+          : count === 2
+            ? 'a pair sharing everything'
+            : `a household of ${count} people sharing together`;
 
       const prompt =
-        "Write a VERY short greeting for the home screen of \"Have Another Cherry\", a warm household " +
-        "expense-sharing app. Requirements:\n" +
-        "- 1 to 2 lines, roughly 20 words maximum.\n" +
-        "- Positive and relationship-focused, about sharing/fairness/togetherness.\n" +
-        "- Must charmingly reference cherries (sharing cherries). A tiny rhyme or limerick feel is welcome.\n" +
+        'Write a VERY short greeting for the home screen of "Have Another Cherry", a warm household ' +
+        'expense-sharing app. Requirements:\n' +
+        '- 1 to 2 lines, roughly 20 words maximum.\n' +
+        '- Positive and relationship-focused, about sharing/fairness/togetherness.\n' +
+        '- Must charmingly reference cherries (sharing cherries). A tiny rhyme or limerick feel is welcome.\n' +
         `- Written for ${audience}.\n` +
-        `- Match this tone: ${greetingTone || "harmonious"}.\n` +
-        (profileType ? `- Subtly fit someone whose money style is "${profileType}".\n` : "") +
-        "- At most one 🍒 emoji. No hashtags, no surrounding quotes.\n" +
-        "- Never use an em dash; use commas, periods, or hyphens instead.\n" +
-        "Output ONLY the greeting text.";
+        `- Match this tone: ${greetingTone || 'harmonious'}.\n` +
+        (profileType ? `- Subtly fit someone whose money style is "${profileType}".\n` : '') +
+        '- At most one 🍒 emoji. No hashtags, no surrounding quotes.\n' +
+        '- Never use an em dash; use commas, periods, or hyphens instead.\n' +
+        'Output ONLY the greeting text.';
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           temperature: 1.1,
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: { greeting: { type: Type.STRING } },
-            required: ["greeting"]
-          }
-        }
+            required: ['greeting'],
+          },
+        },
       });
 
       if (response.text) {
         const parsed = JSON.parse(stripEmDashes(response.text.trim()));
-        const greeting = (parsed.greeting || "").trim();
+        const greeting = (parsed.greeting || '').trim();
         if (greeting) return res.status(200).json({ success: true, greeting });
       }
-      throw new Error("Empty greeting");
+      throw new Error('Empty greeting');
     } catch (err: any) {
-      console.error("Greeting Gen Error:", err?.message || err);
+      console.error('Greeting Gen Error:', err?.message || err);
       return res.status(200).json({ success: true, greeting: fallbackBySize[sizeKey] });
     }
   });
 
-  // 10. Financial-Alignment Conversation Starter - a short, warm opener for the
-  //     "your reported income and your partner's estimate disagree" check-in,
-  //     tuned to how large the gap is and to each person's money-talk style.
-  app.post("/api/generate-conversation-starter", requireAuth, rateLimit("starter", 30), async (req, res) => {
-    const { severityPct: rawSeverity, styles: rawStyles } = req.body || {};
+  app.post(
+    '/api/generate-conversation-starter',
+    requireAuth,
+    rateLimit('starter', 30),
+    async (req, res) => {
+      const { severityPct: rawSeverity, styles: rawStyles } = req.body || {};
 
-    // Sanitize user-influenced fields before they enter the prompt.
-    const severityPct = Math.min(500, Math.max(0, Math.round(Number(rawSeverity) || 0)));
-    const styles = (Array.isArray(rawStyles) ? rawStyles : [])
-      .slice(0, 5)
-      .map((s: any) => ({
-        name: typeof s?.name === "string" ? s.name.slice(0, 40) : "A member",
-        type: typeof s?.type === "string" ? s.type.slice(0, 60) : "",
-        communicationStyle: typeof s?.communicationStyle === "string" ? s.communicationStyle.slice(0, 200) : "",
+      const severityPct = Math.min(500, Math.max(0, Math.round(Number(rawSeverity) || 0)));
+      const styles = (Array.isArray(rawStyles) ? rawStyles : []).slice(0, 5).map((s: any) => ({
+        name: typeof s?.name === 'string' ? s.name.slice(0, 40) : 'A member',
+        type: typeof s?.type === 'string' ? s.type.slice(0, 60) : '',
+        communicationStyle:
+          typeof s?.communicationStyle === 'string' ? s.communicationStyle.slice(0, 200) : '',
       }));
 
-    // Curated fallbacks by severity, used if the AI call fails.
-    const fallback =
-      severityPct >= 50
-        ? "It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven't had the full conversation yet. Maybe start with: \"What does a fair split feel like to you, and what would you want me to know about your situation?\""
-        : severityPct >= 25
-        ? "The income estimates don't quite line up. A gentle way in: \"I think I have been guessing at your numbers. Can we compare notes so the split feels fair to everyone?\""
-        : "You're close, but not quite in sync on the numbers. Try: \"Quick money check-in - want to make sure our split still matches reality?\"";
+      // Used when the AI call fails.
+      const fallback =
+        severityPct >= 50
+          ? 'It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven\'t had the full conversation yet. Maybe start with: "What does a fair split feel like to you, and what would you want me to know about your situation?"'
+          : severityPct >= 25
+            ? 'The income estimates don\'t quite line up. A gentle way in: "I think I have been guessing at your numbers. Can we compare notes so the split feels fair to everyone?"'
+            : 'You\'re close, but not quite in sync on the numbers. Try: "Quick money check-in - want to make sure our split still matches reality?"';
 
-    try {
-      const { GoogleGenAI, Type } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        vertexai: true,
-        project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990",
-        location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
-      });
+      try {
+        const { ai, Type } = await getVertexClient();
 
-      const severityBand =
-        severityPct >= 50 ? "large (over 50% apart) - be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation"
-        : severityPct >= 25 ? "moderate (25-50% apart) - warm and direct, normalize the mismatch, invite swapping real numbers"
-        : "small (10-25% apart) - light and easy, frame it as a quick sync-up";
+        const severityBand =
+          severityPct >= 50
+            ? 'large (over 50% apart) - be extra gentle, acknowledge it may feel loaded, suggest a structured, unhurried conversation'
+            : severityPct >= 25
+              ? 'moderate (25-50% apart) - warm and direct, normalize the mismatch, invite swapping real numbers'
+              : 'small (10-25% apart) - light and easy, frame it as a quick sync-up';
 
-      const styleLines = styles
-        .map(s => `- ${s.name}: money style "${s.type || "unknown"}"${s.communicationStyle ? `; prefers to talk about money like this: ${s.communicationStyle}` : ""}`)
-        .join("\n");
+        const styleLines = styles
+          .map(
+            (s) =>
+              `- ${s.name}: money style "${s.type || 'unknown'}"${s.communicationStyle ? `; prefers to talk about money like this: ${s.communicationStyle}` : ''}`
+          )
+          .join('\n');
 
-      const prompt =
-        "You write conversation starters for \"Have Another Cherry\", a warm, non-judgmental household " +
-        "expense-splitting app. A household's members reported their own incomes and estimated each " +
-        "other's, and the numbers disagree.\n\n" +
-        `Gap severity: ${severityPct}% - ${severityBand}.\n\n` +
-        "The people, and how they each prefer to talk about money:\n" + (styleLines || "- (no profiles available)") + "\n\n" +
-        "Write ONE conversation starter (2-4 sentences) they could actually say to each other to open a " +
-        "kind, blame-free talk about getting their real numbers in sync so their expense split feels fair. " +
-        "Adapt the tone to the severity band and bridge their communication styles. Include one concrete " +
-        "opening line in quotes they can borrow. Never scold, never assume anyone lied, never mention " +
-        "specific dollar amounts, and don't use the word \"discrepancy\".\n\n" +
-        "Never use em dashes; use commas, periods, or hyphens instead. " +
-        "Return JSON with a single field: starter.";
+        const prompt =
+          'You write conversation starters for "Have Another Cherry", a warm, non-judgmental household ' +
+          "expense-splitting app. A household's members reported their own incomes and estimated each " +
+          "other's, and the numbers disagree.\n\n" +
+          `Gap severity: ${severityPct}% - ${severityBand}.\n\n` +
+          'The people, and how they each prefer to talk about money:\n' +
+          (styleLines || '- (no profiles available)') +
+          '\n\n' +
+          'Write ONE conversation starter (2-4 sentences) they could actually say to each other to open a ' +
+          'kind, blame-free talk about getting their real numbers in sync so their expense split feels fair. ' +
+          'Adapt the tone to the severity band and bridge their communication styles. Include one concrete ' +
+          'opening line in quotes they can borrow. Never scold, never assume anyone lied, never mention ' +
+          'specific dollar amounts, and don\'t use the word "discrepancy".\n\n' +
+          'Never use em dashes; use commas, periods, or hyphens instead. ' +
+          'Return JSON with a single field: starter.';
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.9,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: { starter: { type: Type.STRING } },
-            required: ["starter"]
-          }
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            temperature: 0.9,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: { starter: { type: Type.STRING } },
+              required: ['starter'],
+            },
+          },
+        });
+
+        if (response.text) {
+          const parsed = JSON.parse(stripEmDashes(response.text.trim()));
+          const starter = (parsed.starter || '').trim();
+          if (starter) return res.status(200).json({ success: true, starter });
         }
-      });
-
-      if (response.text) {
-        const parsed = JSON.parse(stripEmDashes(response.text.trim()));
-        const starter = (parsed.starter || "").trim();
-        if (starter) return res.status(200).json({ success: true, starter });
+        throw new Error('Empty starter');
+      } catch (err: any) {
+        console.error('Conversation Starter Gen Error:', err?.message || err);
+        return res.status(200).json({ success: true, starter: fallback });
       }
-      throw new Error("Empty starter");
-    } catch (err: any) {
-      console.error("Conversation Starter Gen Error:", err?.message || err);
-      return res.status(200).json({ success: true, starter: fallback });
     }
-  });
+  );
 
-  // 10b. Support requests from inside the app. Delivered to
-  //      help@haveanothercherry.com with replyTo set to the sender, so a reply
-  //      goes straight back to them.
-  //
-  //      Signed in only, and rate limited: this endpoint sends mail to a human
-  //      inbox, which is exactly the shape of thing that gets abused. The body
-  //      is capped because a support form is not a file upload.
-  app.post("/api/support-request", requireAuth, rateLimit("support", 5), async (req, res) => {
+  // ---- Support ----
+  // Mails a human inbox with replyTo set to the sender, so it is signed-in
+  // only, rate limited and capped.
+  app.post('/api/support-request', requireAuth, rateLimit('support', 5), async (req, res) => {
     const { message, context, email, name } = req.body || {};
 
-    if (typeof message !== "string" || message.trim().length < 5) {
-      return res.status(400).json({ error: "Please describe what happened." });
+    if (typeof message !== 'string' || message.trim().length < 5) {
+      return res.status(400).json({ error: 'Please describe what happened.' });
     }
     if (message.length > 5000) {
-      return res.status(400).json({ error: "That message is too long to send." });
+      return res.status(400).json({ error: 'That message is too long to send.' });
     }
 
-    // Prefer the verified address on the token over anything the client sends,
-    // so a reply cannot be aimed somewhere the sender does not control.
+    // The verified token address wins, so a reply cannot be aimed elsewhere.
     const fromEmail =
-      (req as any).firebaseUser?.email ||
-      (typeof email === "string" ? email.trim() : "");
-    if (!fromEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
-      return res.status(400).json({ error: "A valid email address is required." });
+      (req as any).firebaseUser?.email || (typeof email === 'string' ? email.trim() : '');
+    if (!isValidEmail(fromEmail)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
     try {
       await sendSupportRequest({
         fromEmail,
-        fromName: typeof name === "string" ? name.slice(0, 120) : undefined,
+        fromName: typeof name === 'string' ? name.slice(0, 120) : undefined,
         message,
-        context: typeof context === "string" ? context.slice(0, 2000) : undefined,
+        context: typeof context === 'string' ? context.slice(0, 2000) : undefined,
       });
       return res.json({ success: true });
     } catch (err: any) {
-      console.error("Support request error:", err?.message || err);
-      return res.status(500).json({ error: "Could not send that just now." });
+      console.error('Support request error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not send that just now.' });
     }
   });
 
-  // 11. Cherry + Waitlist - signups from the coming-soon page. Every signup is
-  //     forwarded to poolside@haveanothercherry.com via Resend; if Mailchimp
-  //     env vars are configured, the address is also subscribed to that
-  //     audience directly.
-  // 11c. Cherry + promo allowlist. PLUS_PROMO_EMAILS (apphosting.yaml) is a
-  //      comma-separated list of sign-in emails that get Cherry + without
-  //      paying: the owner, review accounts for Apple and Google, a friend.
-  //      Every client calls this once after sign-in. The email comes from the
-  //      verified ID token, never the request body, and the write goes through
-  //      the Admin SDK because the rules forbid clients from touching
-  //      isPlus / plusEntitlement at all. Removing an address from the list
-  //      revokes on the next sign-in; a paid entitlement is never touched.
-  const PROMO_PRODUCT = "promo_allowlist";
+  // ---- Cherry + promo allowlist ----
+  // PLUS_PROMO_EMAILS lists sign-in emails that get Cherry + without paying.
+  // The email comes from the verified token and the write goes through the
+  // Admin SDK because the rules forbid clients from touching isPlus. Removing
+  // an address revokes on the next sign-in; a paid entitlement is never touched.
+  const PROMO_PRODUCT = 'promo_allowlist';
   const promoEmails = () =>
     new Set(
-      String(process.env.PLUS_PROMO_EMAILS || "")
-        .split(",")
+      String(process.env.PLUS_PROMO_EMAILS || '')
+        .split(',')
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean)
     );
 
-  app.post("/api/plus-promo-sync", requireAuth, rateLimit("plus-promo", 20), async (req, res) => {
+  app.post('/api/plus-promo-sync', requireAuth, rateLimit('plus-promo', 20), async (req, res) => {
     try {
       const uid = (req as any).uid as string;
-      const email = String((req as any).firebaseUser?.email || "").toLowerCase();
+      const email = String((req as any).firebaseUser?.email || '').toLowerCase();
       const listed = !!email && promoEmails().has(email);
 
-      const { getFirestore } = await import("firebase-admin/firestore");
-      const ref = getFirestore().collection("users").doc(uid);
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const ref = getFirestore().collection('users').doc(uid);
       const snap = await ref.get();
       const data = snap.data() || {};
       const current = data.plusEntitlement || {};
-      const heldByPromo = current.source === "promo" && current.productId === PROMO_PRODUCT;
+      const heldByPromo = current.source === 'promo' && current.productId === PROMO_PRODUCT;
 
       if (listed) {
-        // Never downgrade a paid entitlement to a promo one; only fill a gap.
+        // Only fills a gap; a paid entitlement is never replaced by promo.
         if (!data.isPlus || heldByPromo) {
           await ref.set(
             {
               isPlus: true,
               plusEntitlement: {
-                source: "promo",
+                source: 'promo',
                 productId: PROMO_PRODUCT,
                 updatedAt: new Date().toISOString(),
               },
@@ -1142,33 +1132,34 @@ async function startServer() {
             { merge: true }
           );
         }
-        return res.json({ isPlus: true, source: data.isPlus && !heldByPromo ? current.source : "promo" });
+        return res.json({
+          isPlus: true,
+          source: data.isPlus && !heldByPromo ? current.source : 'promo',
+        });
       }
 
       if (heldByPromo) {
-        const { FieldValue } = await import("firebase-admin/firestore");
-        await ref.set(
-          { isPlus: false, plusEntitlement: FieldValue.delete() },
-          { merge: true }
-        );
+        const { FieldValue } = await import('firebase-admin/firestore');
+        await ref.set({ isPlus: false, plusEntitlement: FieldValue.delete() }, { merge: true });
         return res.json({ isPlus: false, revoked: true });
       }
       return res.json({ isPlus: !!data.isPlus });
     } catch (err: any) {
-      console.error("Promo sync error:", err?.message || err);
-      return res.status(500).json({ error: "Could not check Cherry + status." });
+      console.error('Promo sync error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not check Cherry + status.' });
     }
   });
 
-  app.post("/api/plus-waitlist", requireAuth, rateLimit("waitlist", 5), async (req, res) => {
+  // ---- Waitlist and beta signup ----
+
+  app.post('/api/plus-waitlist', requireAuth, rateLimit('waitlist', 5), async (req, res) => {
     const { email } = req.body || {};
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: "A valid email address is required." });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
     let subscribed = false;
-    // Optional Mailchimp subscribe (set MAILCHIMP_API_KEY, MAILCHIMP_SERVER_PREFIX
-    // e.g. "us21", and MAILCHIMP_AUDIENCE_ID in Secret Manager / apphosting.yaml).
+    // Optional: MAILCHIMP_API_KEY, MAILCHIMP_SERVER_PREFIX and MAILCHIMP_AUDIENCE_ID.
     const mcKey = process.env.MAILCHIMP_API_KEY;
     const mcServer = process.env.MAILCHIMP_SERVER_PREFIX;
     const mcAudience = process.env.MAILCHIMP_AUDIENCE_ID;
@@ -1177,93 +1168,87 @@ async function startServer() {
         const mcRes = await fetch(
           `https://${mcServer}.api.mailchimp.com/3.0/lists/${mcAudience}/members`,
           {
-            method: "POST",
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
+              'Content-Type': 'application/json',
               Authorization: `Bearer ${mcKey}`,
             },
-            body: JSON.stringify({ email_address: email, status: "pending", tags: ["cherry-plus-waitlist"] }),
+            body: JSON.stringify({
+              email_address: email,
+              status: 'pending',
+              tags: ['cherry-plus-waitlist'],
+            }),
           }
         );
         // "Member Exists" (400) still counts as on the list.
         subscribed = mcRes.ok || mcRes.status === 400;
         if (!mcRes.ok && mcRes.status !== 400) {
-          console.error("Mailchimp subscribe failed:", mcRes.status, await mcRes.text().catch(() => ""));
+          console.error(
+            'Mailchimp subscribe failed:',
+            mcRes.status,
+            await mcRes.text().catch(() => '')
+          );
         }
       } catch (e: any) {
-        console.error("Mailchimp subscribe error:", e?.message || e);
+        console.error('Mailchimp subscribe error:', e?.message || e);
       }
     }
 
-    // Same Notion database as the marketing site's waitlist, so there is one
-    // list of people waiting on the mobile apps rather than two. Best-effort
-    // for the same reason as the site form: a Notion outage must never cost
-    // the lead, and the email is the system of record.
+    // Same Notion database as the site form. Best effort; the email is the record.
     try {
       await addWaitlistLeadToNotion({
         email,
-        formType: "Waitlist",
-        source: "cherry-plus (web app)",
-        notes: "Asked for a Cherry + feature in the web app",
+        formType: 'Waitlist',
+        source: 'cherry-plus (web app)',
+        notes: 'Asked for a Cherry + feature in the web app',
         consent: true,
-        device: deviceFromUserAgent(req.get("user-agent"), {
-          platform: req.get("sec-ch-ua-platform"),
-          mobile: req.get("sec-ch-ua-mobile"),
+        device: deviceFromUserAgent(req.get('user-agent'), {
+          platform: req.get('sec-ch-ua-platform'),
+          mobile: req.get('sec-ch-ua-mobile'),
         }),
       });
     } catch (e: any) {
-      console.error("Notion mirror failed for plus-waitlist:", e?.message || e);
+      console.error('Notion mirror failed for plus-waitlist:', e?.message || e);
     }
 
     try {
       await sendWaitlistNotification(email);
       return res.status(200).json({ success: true, subscribed });
     } catch (err: any) {
-      console.error("Waitlist Error:", err?.message || err);
-      // If Mailchimp got them, the signup still succeeded.
+      console.error('Waitlist Error:', err?.message || err);
+      // Mailchimp having them still counts as a signup.
       if (subscribed) return res.status(200).json({ success: true, subscribed });
-      return res.status(500).json({ error: "Could not save your signup. Please try again." });
+      return res.status(500).json({ error: 'Could not save your signup. Please try again.' });
     }
   });
 
-  // 11a2. Beta signup (public). The marketing site's beta form posts here
-  //      cross-origin (see the marketing origins in ALLOWED_ORIGINS and the
-  //      gate exemption above). No auth: visitors are anonymous. Each signup
-  //      is forwarded to the poolside@ inbox via Resend. Rate limited per IP
-  //      to keep the public endpoint from being abused.
-  app.post("/api/beta-signup", rateLimit("beta-signup", 5), async (req, res) => {
+  // Public: the marketing site posts here cross-origin, so no auth, but rate limited.
+  app.post('/api/beta-signup', rateLimit('beta-signup', 5), async (req, res) => {
     const body = req.body || {};
     const clean = (v: unknown, max: number) =>
-      typeof v === "string" ? v.trim().slice(0, max) : "";
+      typeof v === 'string' ? v.trim().slice(0, max) : '';
 
     const email = clean(body.email, 254);
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: "A valid email address is required." });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'A valid email address is required.' });
     }
-    if (body.consent !== "yes") {
-      return res.status(400).json({ error: "Consent is required so we know we can email you." });
+    if (body.consent !== 'yes') {
+      return res.status(400).json({ error: 'Consent is required so we know we can email you.' });
     }
 
-    // Bot filters. Both must run here, not in the browser: a scripted post
-    // never executes our JS, so a client-side check catches nothing that
-    // matters.
-    //
-    // Answer 200 rather than 4xx. A bot that gets an error learns which field
-    // betrayed it and retries without it; one that gets a success moves on. The
-    // visitor sees the normal confirmation either way, and no lead is written.
-    const honeypot = typeof body.company === "string" ? body.company.trim() : "";
+    // Bot filters answer 200 rather than 4xx: a bot that gets an error learns
+    // which field betrayed it. The visitor sees the normal confirmation and
+    // no lead is written.
+    const honeypot = typeof body.company === 'string' ? body.company.trim() : '';
     if (honeypot) {
-      console.warn("[signup] honeypot filled, dropped");
+      console.warn('[signup] honeypot filled, dropped');
       return res.status(200).json({ success: true });
     }
 
-    // Humans do not read, type and submit in under two seconds. Missing or
-    // unparseable elapsed time is allowed through: it means an older cached
-    // page, not necessarily a bot, and silently dropping real people is worse
-    // than letting a few through.
+    // Missing or unparseable timing is let through: an older cached page, not a bot.
     const elapsedMs = Number(body.elapsedMs);
     if (Number.isFinite(elapsedMs) && elapsedMs >= 0 && elapsedMs < 2000) {
-      console.warn("[signup] submitted in " + elapsedMs + "ms, dropped");
+      console.warn('[signup] submitted in ' + elapsedMs + 'ms, dropped');
       return res.status(200).json({ success: true });
     }
 
@@ -1281,13 +1266,11 @@ async function startServer() {
         source,
       });
     } catch (err: any) {
-      console.error("Beta signup error:", err?.message || err);
-      return res.status(500).json({ error: "Could not save your signup. Please try again." });
+      console.error('Beta signup error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not save your signup. Please try again.' });
     }
 
-    // Mirror into Notion after the email has gone. The email is the system of
-    // record; a Notion outage must not cost us the lead or show the visitor an
-    // error for something already saved.
+    // After the email has gone; a Notion outage must not cost the lead.
     try {
       await addWaitlistLeadToNotion({
         email,
@@ -1297,143 +1280,137 @@ async function startServer() {
         referrer: clean(body.referrer, 500),
         consent: true,
         notes,
-        formType: clean(body.formType, 20) === "Beta" ? "Beta" : "Waitlist",
-        device: deviceFromUserAgent(req.get("user-agent"), {
-          platform: req.get("sec-ch-ua-platform"),
-          mobile: req.get("sec-ch-ua-mobile"),
+        formType: clean(body.formType, 20) === 'Beta' ? 'Beta' : 'Waitlist',
+        device: deviceFromUserAgent(req.get('user-agent'), {
+          platform: req.get('sec-ch-ua-platform'),
+          mobile: req.get('sec-ch-ua-mobile'),
         }),
       });
     } catch (err: any) {
-      console.error("Notion waitlist mirror failed:", err?.message || err);
+      console.error('Notion waitlist mirror failed:', err?.message || err);
     }
 
     return res.status(200).json({ success: true });
   });
 
-  // 11b. Payment Reminder (Cherry +). Sends a gentle nudge email from
-  //     tartcherry@haveanothercherry.com to a group member who still owes the
-  //     caller money. Server-enforced: the caller must hold the Cherry +
-  //     entitlement and both parties must be members of the same group. The
-  //     amount and item titles come from the caller's own (E2E-encrypted)
-  //     ledger: sending them in a reminder is the sender's deliberate choice.
-  app.post("/api/send-reminder", requireAuth, rateLimit("remind", 10), async (req, res) => {
+  // ---- Payment reminder email (Cherry +) ----
+  // Server-enforced: the caller must hold Cherry + and both people must be
+  // members of the group.
+  app.post('/api/send-reminder', requireAuth, rateLimit('remind', 10), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
       const { debtorUid, groupId } = req.body || {};
 
-      if (!debtorUid || typeof debtorUid !== "string" || !groupId || typeof groupId !== "string") {
-        return res.status(400).json({ error: "Missing debtor or group." });
+      if (!debtorUid || typeof debtorUid !== 'string' || !groupId || typeof groupId !== 'string') {
+        return res.status(400).json({ error: 'Missing debtor or group.' });
       }
       if (debtorUid === callerUid) {
         return res.status(400).json({ error: "You can't remind yourself." });
       }
       await ensureAdminApp();
-      const { getFirestore } = await import("firebase-admin/firestore");
-      const { getAuth } = await import("firebase-admin/auth");
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const { getAuth } = await import('firebase-admin/auth');
       const fs = getFirestore();
 
-      // Cherry + enforcement: reminders are a premium feature.
-      const callerDoc = await fs.collection("users").doc(callerUid).get();
+      const callerDoc = await fs.collection('users').doc(callerUid).get();
       const caller = callerDoc.data() || {};
       const entExpiry = caller?.plusEntitlement?.expiresAt;
-      const callerHasPlus = !!caller.isPlus && (!entExpiry || new Date(entExpiry).getTime() > Date.now());
+      const callerHasPlus =
+        !!caller.isPlus && (!entExpiry || new Date(entExpiry).getTime() > Date.now());
       if (!callerHasPlus) {
-        return res.status(403).json({ error: "Payment reminders are a Cherry + feature." });
+        return res.status(403).json({ error: 'Payment reminders are a Cherry + feature.' });
       }
 
-      // Both people must belong to the group.
-      const groupDoc = await fs.collection("groups").doc(groupId).get();
+      const groupDoc = await fs.collection('groups').doc(groupId).get();
       const groupData = groupDoc.data() || {};
       const memberIds: string[] = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
       if (!memberIds.includes(callerUid) || !memberIds.includes(debtorUid)) {
-        return res.status(403).json({ error: "Both people must be members of this group." });
+        return res.status(403).json({ error: 'Both people must be members of this group.' });
       }
 
       // The debtor's real email lives in Firebase Auth (Firestore only stores a hash).
-      const debtorAuth = await getAuth().getUser(debtorUid).catch(() => null);
+      const debtorAuth = await getAuth()
+        .getUser(debtorUid)
+        .catch(() => null);
       if (!debtorAuth?.email) {
-        return res.status(404).json({ error: "That member has no email on file." });
+        return res.status(404).json({ error: 'That member has no email on file.' });
       }
 
       const nameOf = (uid: string) =>
-        (Array.isArray(groupData.members) ? groupData.members : []).find((m: any) => m?.uid === uid)?.name || "A member";
+        (Array.isArray(groupData.members) ? groupData.members : []).find((m: any) => m?.uid === uid)
+          ?.name || 'A member';
 
-      // PRIVACY: no amounts or item details are accepted or emailed. The
-      // ledger is E2E-encrypted and Resend's logs are operator-visible, so
-      // the reminder only says an open balance exists.
+      // No amounts or item details: the email only says an open balance exists.
       await sendReminderEmail(
         debtorAuth.email,
         nameOf(debtorUid),
         nameOf(callerUid),
-        groupData.name || "your group"
+        groupData.name || 'your group'
       );
 
       return res.status(200).json({ success: true });
     } catch (err: any) {
-      console.error("Reminder Error:", err?.message || err);
-      return res.status(500).json({ error: "Could not send the reminder. Please try again." });
+      console.error('Reminder Error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not send the reminder. Please try again.' });
     }
   });
 
-  // 12. Cherry + entitlement webhook (RevenueCat) - THE activation point for
-  //     paid subscriptions. The iOS/Android apps (not yet built) will sell the
-  //     "plus" entitlement through RevenueCat with appUserID = Firebase uid;
-  //     RevenueCat then calls this endpoint on every subscription event and we
-  //     mirror the entitlement onto users/{uid}, which every client reads via
-  //     lib/entitlements.hasPlus().
-  //
-  //     Dormant until REVENUECAT_WEBHOOK_AUTH is set (Secret Manager +
-  //     apphosting.yaml, same pattern as RESEND_API_KEY). Configure the same
-  //     value under Authorization in RevenueCat's webhook settings.
-  app.post("/api/revenuecat-webhook", async (req, res) => {
-    // "disabled" means the same as unset: App Hosting rejects an empty value,
-    // so a named sentinel is how the webhook is switched off in config.
+  // ---- Billing: RevenueCat webhook ----
+  // The activation point for paid subscriptions. RevenueCat calls this with
+  // appUserID = Firebase uid and the entitlement is mirrored onto users/{uid},
+  // which every client reads through hasPlus(). Dormant until
+  // REVENUECAT_WEBHOOK_AUTH is set; the same value goes in RevenueCat's
+  // webhook settings.
+  app.post('/api/revenuecat-webhook', async (req, res) => {
+    // App Hosting rejects an empty value, so "disabled" is the off switch.
     const expectedAuth = process.env.REVENUECAT_WEBHOOK_AUTH;
-    if (!expectedAuth || expectedAuth === "disabled") {
-      return res.status(503).json({ error: "Cherry + billing is not configured yet." });
+    if (!expectedAuth || expectedAuth === 'disabled') {
+      return res.status(503).json({ error: 'Cherry + billing is not configured yet.' });
     }
-    if (!safeEqual(String(req.headers.authorization || ""), expectedAuth)) {
-      return res.status(401).json({ error: "Unauthorized" });
+    if (!safeEqual(String(req.headers.authorization || ''), expectedAuth)) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     try {
       const event = req.body?.event;
       const uid = event?.app_user_id;
-      if (!uid || typeof uid !== "string" || uid.startsWith("$RCAnonymousID")) {
-        // Anonymous purchasers can't be mapped to an account; RevenueCat will
-        // resend once the app aliases the user. Acknowledge so it doesn't retry forever.
-        return res.status(200).json({ received: true, ignored: "no mappable app_user_id" });
+      if (!uid || typeof uid !== 'string' || uid.startsWith('$RCAnonymousID')) {
+        // Not mappable to an account; acknowledge so RevenueCat stops retrying.
+        return res.status(200).json({ received: true, ignored: 'no mappable app_user_id' });
       }
 
-      const type = String(event?.type || "");
-      const ACTIVATING = ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"];
-      const DEACTIVATING = ["EXPIRATION"];
+      const type = String(event?.type || '');
+      const ACTIVATING = [
+        'INITIAL_PURCHASE',
+        'RENEWAL',
+        'UNCANCELLATION',
+        'PRODUCT_CHANGE',
+        'NON_RENEWING_PURCHASE',
+      ];
+      const DEACTIVATING = ['EXPIRATION'];
       if (!ACTIVATING.includes(type) && !DEACTIVATING.includes(type)) {
-        // CANCELLATION etc. leave the entitlement active until EXPIRATION fires.
+        // CANCELLATION and the rest leave the entitlement active until EXPIRATION.
         return res.status(200).json({ received: true, ignored: type });
       }
 
       await ensureAdminApp();
-      const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
-      const userRef = getFirestore().collection("users").doc(uid);
+      const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+      const userRef = getFirestore().collection('users').doc(uid);
 
       if (DEACTIVATING.includes(type)) {
-        await userRef.set(
-          { isPlus: false, plusEntitlement: FieldValue.delete() },
-          { merge: true }
-        );
+        await userRef.set({ isPlus: false, plusEntitlement: FieldValue.delete() }, { merge: true });
       } else {
         await userRef.set(
           {
             isPlus: true,
             plusEntitlement: {
               source:
-                event?.store === "PLAY_STORE"
-                  ? "revenuecat_android"
-                  : event?.store === "STRIPE" || event?.store === "RC_BILLING"
-                    ? "revenuecat_web"
-                    : "revenuecat_ios",
-              productId: event?.product_id || "",
+                event?.store === 'PLAY_STORE'
+                  ? 'revenuecat_android'
+                  : event?.store === 'STRIPE' || event?.store === 'RC_BILLING'
+                    ? 'revenuecat_web'
+                    : 'revenuecat_ios',
+              productId: event?.product_id || '',
               ...(event?.expiration_at_ms
                 ? { expiresAt: new Date(Number(event.expiration_at_ms)).toISOString() }
                 : {}),
@@ -1446,233 +1423,240 @@ async function startServer() {
 
       return res.status(200).json({ received: true });
     } catch (err: any) {
-      console.error("RevenueCat webhook error:", err?.message || err);
-      return res.status(500).json({ error: "Webhook processing failed" });
+      console.error('RevenueCat webhook error:', err?.message || err);
+      return res.status(500).json({ error: 'Webhook processing failed' });
     }
   });
 
-  // ---- Push notifications (FCM via the Admin SDK, ADC - no keys) ----------
-  //
-  // Same privacy rule as email (see CLAUDE.md): a push lands on a lock screen
-  // and travels through FCM, so it must NEVER contain amounts, balances, or
-  // expense titles. First names and the group name only; the details stay
-  // behind the app's encryption.
-  //
-  // Clients register FCM device tokens on their own user doc as a map
-  // `fcmTokens: { [token]: updatedAtIso }`. Sends fan out to every token a
-  // recipient has; tokens FCM reports dead are pruned so the map cannot fill
-  // with corpses.
+  // ---- Push notifications ----
+  // Same privacy rule as email: a push lands on a lock screen, so it never
+  // carries amounts, balances or expense titles. Clients register FCM tokens
+  // on their user doc as fcmTokens: { [token]: updatedAtIso }; dead tokens
+  // are pruned on send.
   const sendPushToUsers = async (
     uids: string[],
     title: string,
     body: string,
-    // Opaque routing hints for a tapped notification (which group, which bill,
-    // which screen). Values must be strings: FCM rejects a data payload that
-    // is not Record<string, string>, and it fails the whole send, not the one
-    // field. Nothing here may carry an amount or a name; see the note above.
-    data?: Record<string, string>,
+    // Routing hints for a tapped notification. FCM rejects any non-string
+    // value, and nothing here may carry an amount or a name.
+    data?: Record<string, string>
   ): Promise<number> => {
     if (!uids.length) return 0;
     await ensureAdminApp();
-    const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
-    const { getMessaging } = await import("firebase-admin/messaging");
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+    const { getMessaging } = await import('firebase-admin/messaging');
     const fs = getFirestore();
 
     const tokenOwners: { token: string; uid: string }[] = [];
-    await Promise.all(uids.map(async uid => {
-      const snap = await fs.collection("users").doc(uid).get();
-      const tokens = snap.data()?.fcmTokens;
-      if (tokens && typeof tokens === "object") {
-        for (const token of Object.keys(tokens)) tokenOwners.push({ token, uid });
-      }
-    }));
+    await Promise.all(
+      uids.map(async (uid) => {
+        const snap = await fs.collection('users').doc(uid).get();
+        const tokens = snap.data()?.fcmTokens;
+        if (tokens && typeof tokens === 'object') {
+          for (const token of Object.keys(tokens)) tokenOwners.push({ token, uid });
+        }
+      })
+    );
     if (!tokenOwners.length) return 0;
 
     const res = await getMessaging().sendEachForMulticast({
-      tokens: tokenOwners.map(t => t.token),
+      tokens: tokenOwners.map((t) => t.token),
       notification: { title, body },
       ...(data ? { data } : {}),
-      apns: { payload: { aps: { sound: "default" } } },
-      // Android icon and accent color come from the app's manifest defaults
-      // (the cherry mark and #C41200), so nothing brand-shaped is set here.
+      apns: { payload: { aps: { sound: 'default' } } },
     });
 
     // Prune tokens FCM says are gone (uninstalled app, rotated token).
     const dead = res.responses
       .map((r, i) => ({ r, t: tokenOwners[i] }))
       .filter(({ r }) => {
-        const code = (r.error as any)?.code || "";
-        return code.includes("registration-token-not-registered") || code.includes("invalid-argument");
+        const code = (r.error as any)?.code || '';
+        return (
+          code.includes('registration-token-not-registered') || code.includes('invalid-argument')
+        );
       });
-    await Promise.allSettled(dead.map(({ t }) =>
-      fs.collection("users").doc(t.uid).update({ [`fcmTokens.${t.token}`]: FieldValue.delete() })
-    ));
+    await Promise.allSettled(
+      dead.map(({ t }) =>
+        fs
+          .collection('users')
+          .doc(t.uid)
+          .update({ [`fcmTokens.${t.token}`]: FieldValue.delete() })
+      )
+    );
 
     return res.successCount;
   };
 
-  // A little variety so the lock screen does not read like a robot, but a
-  // small, fixed pool so the voice stays consistent. No amounts, no titles.
-  const LEDGER_PUSH_COPY: Record<string, ((name: string, group: string) => { title: string; body: string })[]> = {
+  // A small fixed pool of copy, so the voice stays consistent.
+  const LEDGER_PUSH_COPY: Record<
+    string,
+    ((name: string, group: string) => { title: string; body: string })[]
+  > = {
     expense_logged: [
-      (n, g) => ({ title: "New on the ledger", body: `${n} logged a shared expense in ${g}.` }),
-      (n, g) => ({ title: "Fresh cherry", body: `${n} added something to the ${g} ledger. Peek when you have a sec.` }),
-      (n, g) => ({ title: "New shared expense", body: `${n} just logged one for ${g}.` }),
+      (n, g) => ({ title: 'New on the ledger', body: `${n} logged a shared expense in ${g}.` }),
+      (n, g) => ({
+        title: 'Fresh cherry',
+        body: `${n} added something to the ${g} ledger. Peek when you have a sec.`,
+      }),
+      (n, g) => ({ title: 'New shared expense', body: `${n} just logged one for ${g}.` }),
     ],
     payment_logged: [
-      (n, g) => ({ title: "Payment logged", body: `${n} paid something back in ${g}. One step closer to settled.` }),
-      (n, g) => ({ title: "Cherry progress", body: `${n} logged a payment in ${g}.` }),
-      (n, g) => ({ title: "Money moved", body: `${n} recorded a payment in ${g}. Sweet.` }),
+      (n, g) => ({
+        title: 'Payment logged',
+        body: `${n} paid something back in ${g}. One step closer to settled.`,
+      }),
+      (n, g) => ({ title: 'Cherry progress', body: `${n} logged a payment in ${g}.` }),
+      (n, g) => ({ title: 'Money moved', body: `${n} recorded a payment in ${g}. Sweet.` }),
     ],
   };
 
   const NUDGE_PUSH_COPY: ((name: string, group: string) => { title: string; body: string })[] = [
-    (n, g) => ({ title: "A gentle nudge", body: `${n} sent a gentle reminder: the ${g} ledger could use a look.` }),
-    (n, g) => ({ title: "Gentle reminder", body: `A friendly poke from ${n}: there is an open balance in ${g}.` }),
-    (n, g) => ({ title: "When you have a moment", body: `${n} would love to settle up in ${g}. No rush, just a nudge.` }),
+    (n, g) => ({
+      title: 'A gentle nudge',
+      body: `${n} sent a gentle reminder: the ${g} ledger could use a look.`,
+    }),
+    (n, g) => ({
+      title: 'Gentle reminder',
+      body: `A friendly poke from ${n}: there is an open balance in ${g}.`,
+    }),
+    (n, g) => ({
+      title: 'When you have a moment',
+      body: `${n} would love to settle up in ${g}. No rush, just a nudge.`,
+    }),
   ];
 
-  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  // Loads the group, confirms the caller belongs to it, and returns what the
-  // notification copy needs. Membership is enforced HERE, not trusted from
-  // the client, so nobody can push-spam a group they are not in.
+  // Membership is enforced here, not trusted from the client.
   const loadGroupForNotify = async (groupId: string, callerUid: string) => {
     await ensureAdminApp();
-    const { getFirestore } = await import("firebase-admin/firestore");
-    const snap = await getFirestore().collection("groups").doc(groupId).get();
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const snap = await getFirestore().collection('groups').doc(groupId).get();
     const data = snap.data();
     const memberIds: string[] = Array.isArray(data?.memberIds) ? data!.memberIds : [];
     if (!data || !memberIds.includes(callerUid)) return null;
     const members: any[] = Array.isArray(data.members) ? data.members : [];
-    const callerName = members.find((m: any) => m?.uid === callerUid)?.name || "A member";
-    return { memberIds, callerName, groupName: String(data.name || "your group") };
+    const callerName = members.find((m: any) => m?.uid === callerUid)?.name || 'A member';
+    return { memberIds, callerName, groupName: String(data.name || 'your group') };
   };
 
-  // 14. Ledger event push: called by a client right after it logs an expense
-  //     or a payment, so the rest of the group hears about it. Deliberately
-  //     content-free (see the privacy note above); the event kind is all the
-  //     server ever learns.
-  app.post("/api/notify-ledger-event", requireAuth, rateLimit("notify", 60), async (req, res) => {
+  // Called by a client after it logs an expense or payment. The event kind is all the server learns.
+  app.post('/api/notify-ledger-event', requireAuth, rateLimit('notify', 60), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
       const { groupId, kind } = req.body || {};
-      if (typeof groupId !== "string" || !LEDGER_PUSH_COPY[kind]) {
-        return res.status(400).json({ error: "Missing group or unknown event kind." });
+      if (typeof groupId !== 'string' || !LEDGER_PUSH_COPY[kind]) {
+        return res.status(400).json({ error: 'Missing group or unknown event kind.' });
       }
       const groupInfo = await loadGroupForNotify(groupId, callerUid);
-      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+      if (!groupInfo) return res.status(403).json({ error: 'Not a member of this group.' });
 
-      const recipients = groupInfo.memberIds.filter(id => id !== callerUid);
-      const { title, body } = pick(LEDGER_PUSH_COPY[kind])(groupInfo.callerName, groupInfo.groupName);
+      const recipients = groupInfo.memberIds.filter((id) => id !== callerUid);
+      const { title, body } = pick(LEDGER_PUSH_COPY[kind])(
+        groupInfo.callerName,
+        groupInfo.groupName
+      );
       const sent = await sendPushToUsers(recipients, title, body);
       return res.status(200).json({ success: true, sent });
     } catch (err: any) {
-      console.error("Ledger notify error:", err?.message || err);
-      return res.status(500).json({ error: "Could not send notifications." });
+      console.error('Ledger notify error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not send notifications.' });
     }
   });
 
-  // 15. Gently remind: a member manually nudges specific group members (or
-  //     everyone else) that the ledger could use a look. Tightly rate limited
-  //     because a nudge someone can spam stops being gentle.
-  app.post("/api/send-nudge", requireAuth, rateLimit("nudge", 10), async (req, res) => {
+  // Tightly rate limited: a nudge that can be spammed stops being gentle.
+  app.post('/api/send-nudge', requireAuth, rateLimit('nudge', 10), async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
       const { groupId } = req.body || {};
       const toUids: string[] = Array.isArray(req.body?.toUids)
-        ? req.body.toUids.filter((u: any) => typeof u === "string").slice(0, 10)
+        ? req.body.toUids.filter((u: any) => typeof u === 'string').slice(0, 10)
         : [];
-      if (typeof groupId !== "string") {
-        return res.status(400).json({ error: "Missing group." });
+      if (typeof groupId !== 'string') {
+        return res.status(400).json({ error: 'Missing group.' });
       }
       const groupInfo = await loadGroupForNotify(groupId, callerUid);
-      if (!groupInfo) return res.status(403).json({ error: "Not a member of this group." });
+      if (!groupInfo) return res.status(403).json({ error: 'Not a member of this group.' });
 
       // Only fellow members can be nudged; an empty list means everyone else.
-      const recipients = (toUids.length ? toUids : groupInfo.memberIds)
-        .filter(id => id !== callerUid && groupInfo.memberIds.includes(id));
+      const recipients = (toUids.length ? toUids : groupInfo.memberIds).filter(
+        (id) => id !== callerUid && groupInfo.memberIds.includes(id)
+      );
       if (!recipients.length) {
-        return res.status(400).json({ error: "Nobody to remind." });
+        return res.status(400).json({ error: 'Nobody to remind.' });
       }
 
       const { title, body } = pick(NUDGE_PUSH_COPY)(groupInfo.callerName, groupInfo.groupName);
       const sent = await sendPushToUsers(recipients, title, body);
       return res.status(200).json({ success: true, sent });
     } catch (err: any) {
-      console.error("Nudge error:", err?.message || err);
-      return res.status(500).json({ error: "Could not send the reminder." });
+      console.error('Nudge error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not send the reminder.' });
     }
   });
 
-  // 12b. Scheduled bill reminders. Hit once a day by Cloud Scheduler, not by
-  //      any client, which is why it authenticates on a shared secret rather
-  //      than a user token.
-  //
-  //      The privacy shape is the whole design: the ledger and the Vault are
-  //      encrypted client-side, so the server cannot work out when anything is
-  //      due. Clients publish a deliberately impoverished index to
-  //      reminder_schedules/{groupId}: a date, an opaque id, and which screen
-  //      to open. The push repeats none of it: the body is fixed and says only
-  //      that something is due. The app fills in the rest after it opens and
-  //      can decrypt.
-  //
-  //      Timezones: due dates are date-only and households are not all in one
-  //      zone, so "tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS (default
-  //      UTC) and the schedule should be set for the early evening of the zone
-  //      most households are in. Per-household zones would mean the server
-  //      learning where people live, which is a worse trade than a reminder
-  //      arriving a few hours off.
+  // ---- Scheduled bill reminders ----
+  // Hit once a day by Cloud Scheduler on a shared secret. The ledger and the
+  // Vault are encrypted client-side, so clients publish a minimal index to
+  // reminder_schedules/{groupId} (a date, an opaque id, a target screen) and
+  // the push body is fixed. "Tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS
+  // for everyone: per-household zones would mean the server learning where
+  // people live.
   const REMINDER_BODY =
-    "A household bill is due tomorrow. Open Have Another Cherry to see the details.";
+    'A household bill is due tomorrow. Open Have Another Cherry to see the details.';
 
-  app.post("/api/send-bill-reminders", async (req, res) => {
+  app.post('/api/send-bill-reminders', async (req, res) => {
     try {
       const secret = process.env.REMINDER_CRON_SECRET;
-      // Fail closed. An unset secret must not mean an open endpoint that any
-      // caller can use to push every household on the platform.
+      // Fail closed: an unset secret must not mean an open endpoint.
       if (!secret) {
-        console.error("Bill reminders: REMINDER_CRON_SECRET is not set.");
-        return res.status(503).json({ error: "Reminders are not configured." });
+        console.error('Bill reminders: REMINDER_CRON_SECRET is not set.');
+        return res.status(503).json({ error: 'Reminders are not configured.' });
       }
-      const offered = String(req.header("x-cherry-cron") || "");
+      const offered = String(req.header('x-cherry-cron') || '');
       if (!safeEqual(offered, secret)) {
-        return res.status(401).json({ error: "Unauthorized." });
+        return res.status(401).json({ error: 'Unauthorized.' });
       }
 
       await ensureAdminApp();
-      const { getFirestore } = await import("firebase-admin/firestore");
+      const { getFirestore } = await import('firebase-admin/firestore');
       const fs = getFirestore();
 
       const target = reminderTargetDate(
-        new Date(), Number(process.env.REMINDER_TZ_OFFSET_HOURS || 0));
+        new Date(),
+        Number(process.env.REMINDER_TZ_OFFSET_HOURS || 0)
+      );
 
       // Single-field, so no composite index to deploy.
-      const due = await fs.collection("reminder_schedules")
-        .where("dueDates", "array-contains", target)
+      const due = await fs
+        .collection('reminder_schedules')
+        .where('dueDates', 'array-contains', target)
         .get();
 
       let groups = 0;
       let sent = 0;
       for (const snap of due.docs) {
         const data = snap.data() || {};
-        // Idempotent: Cloud Scheduler retries on any non-2xx, and a retry must
-        // not remind the same household twice for the same day.
+        // Idempotent across Cloud Scheduler retries.
         if (data.lastRemindedFor === target) continue;
 
-        const groupSnap = await fs.collection("groups").doc(snap.id).get();
+        const groupSnap = await fs.collection('groups').doc(snap.id).get();
         const memberIds: string[] = Array.isArray(groupSnap.data()?.memberIds)
-          ? groupSnap.data()!.memberIds : [];
+          ? groupSnap.data()!.memberIds
+          : [];
         if (!memberIds.length) continue;
 
         const entries: any[] = Array.isArray(data.entries) ? data.entries : [];
-        const dueTomorrow = entries.filter(e => e?.dueDate === target);
+        const dueTomorrow = entries.filter((e) => e?.dueDate === target);
         if (!dueTomorrow.length) continue;
 
-        // One push per household per day, not one per bill: three bills due on
-        // the same day is a reason for one notification, not three.
-        const count = await sendPushToUsers(memberIds, "Due tomorrow", REMINDER_BODY,
-          reminderPayload(snap.id, target, dueTomorrow));
+        // One push per household per day, not one per bill.
+        const count = await sendPushToUsers(
+          memberIds,
+          'Due tomorrow',
+          REMINDER_BODY,
+          reminderPayload(snap.id, target, dueTomorrow)
+        );
 
         await snap.ref.update({ lastRemindedFor: target });
         groups++;
@@ -1681,258 +1665,231 @@ async function startServer() {
 
       return res.status(200).json({ success: true, date: target, groups, sent });
     } catch (err: any) {
-      console.error("Bill reminder error:", err?.message || err);
-      return res.status(500).json({ error: "Could not send reminders." });
+      console.error('Bill reminder error:', err?.message || err);
+      return res.status(500).json({ error: 'Could not send reminders.' });
     }
   });
 
-  // 13. Sign in with Apple server-to-server notifications. Configured in the
-  //     Apple Developer portal (Identifiers -> the App ID -> Sign in with
-  //     Apple -> Edit -> Server-to-Server Notification Endpoint) as
-  //     https://app.haveanothercherry.com/api/apple-notifications
-  //
-  //     Apple POSTs { payload: <JWT> } signed with its published keys whenever
-  //     a user changes the relationship: revokes consent for the app, deletes
-  //     their Apple ID outright, or toggles Hide My Email forwarding. Nothing
-  //     in the request is trusted until the JWT verifies against Apple's JWKS
-  //     with the right issuer and one of our client ids as audience.
-  //
-  //     Data handling on consent-revoked / account-delete: if Apple was the
-  //     account's ONLY sign-in method, the account is wiped (the Auth user and
-  //     the users/{uid} profile document). If the account can still sign in
-  //     another way (password, Google), only the Apple link is removed and all
-  //     sessions are revoked, so the person keeps the account they still have
-  //     access to. Group documents and the E2E-encrypted ledger are shared
-  //     data and are not touched from here.
+  // ---- Apple: Sign in with Apple notifications, associated domains ----
+  // Apple POSTs { payload: <JWT> } when a user revokes consent, deletes their
+  // Apple ID or toggles Hide My Email. Nothing is trusted until the JWT
+  // verifies against Apple's JWKS with our client ids as audience. If Apple
+  // was the only sign-in method the account is wiped (Auth user and profile
+  // doc); otherwise only the Apple link is removed and sessions are revoked.
+  // Shared group data and the encrypted ledger are never touched from here.
   const APPLE_NOTIFICATION_AUDIENCES = (
     process.env.APPLE_CLIENT_IDS ||
-    "com.situatedstrategies.haveAnotherCherry,com.situatedstrategies.haveAnotherCherry.web"
-  ).split(",").map(s => s.trim()).filter(Boolean);
+    'com.situatedstrategies.haveAnotherCherry,com.situatedstrategies.haveAnotherCherry.web'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  app.post("/api/apple-notifications", async (req, res) => {
-    const token = typeof req.body?.payload === "string" ? req.body.payload : "";
-    if (!token) return res.status(400).json({ error: "Missing payload" });
+  app.post('/api/apple-notifications', async (req, res) => {
+    const token = typeof req.body?.payload === 'string' ? req.body.payload : '';
+    if (!token) return res.status(400).json({ error: 'Missing payload' });
 
     let event: any;
     try {
-      const { createRemoteJWKSet, jwtVerify } = await import("jose");
-      const jwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+      const { createRemoteJWKSet, jwtVerify } = await import('jose');
+      const jwks = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
       const { payload } = await jwtVerify(token, jwks, {
-        issuer: "https://appleid.apple.com",
+        issuer: 'https://appleid.apple.com',
         audience: APPLE_NOTIFICATION_AUDIENCES,
       });
       const rawEvents = (payload as any).events;
-      event = typeof rawEvents === "string" ? JSON.parse(rawEvents) : rawEvents;
+      event = typeof rawEvents === 'string' ? JSON.parse(rawEvents) : rawEvents;
     } catch (err: any) {
-      console.warn("Apple notification rejected:", err?.message || err);
-      return res.status(401).json({ error: "Invalid notification" });
+      console.warn('Apple notification rejected:', err?.message || err);
+      return res.status(401).json({ error: 'Invalid notification' });
     }
 
-    const type = String(event?.type || "");
-    const appleSub = String(event?.sub || "");
-    // email-disabled / email-enabled need no action; acknowledge so Apple
-    // stops retrying.
-    if (!appleSub || (type !== "consent-revoked" && type !== "account-delete")) {
-      return res.status(200).json({ received: true, ignored: type || "no event" });
+    const type = String(event?.type || '');
+    const appleSub = String(event?.sub || '');
+    // email-disabled and email-enabled need no action.
+    if (!appleSub || (type !== 'consent-revoked' && type !== 'account-delete')) {
+      return res.status(200).json({ received: true, ignored: type || 'no event' });
     }
 
     try {
       await ensureAdminApp();
-      const { getAuth } = await import("firebase-admin/auth");
-      const { getFirestore } = await import("firebase-admin/firestore");
+      const { getAuth } = await import('firebase-admin/auth');
+      const { getFirestore } = await import('firebase-admin/firestore');
       const adminAuth = getAuth();
 
-      const found = await adminAuth.getUsers([
-        { providerId: "apple.com", providerUid: appleSub },
-      ]);
+      const found = await adminAuth.getUsers([{ providerId: 'apple.com', providerUid: appleSub }]);
       const user = found.users[0];
       if (!user) {
-        return res.status(200).json({ received: true, ignored: "no matching account" });
+        return res.status(200).json({ received: true, ignored: 'no matching account' });
       }
 
-      const hasOtherSignIn = user.providerData.some(p => p.providerId !== "apple.com");
+      const hasOtherSignIn = user.providerData.some((p) => p.providerId !== 'apple.com');
       if (hasOtherSignIn) {
-        await adminAuth.updateUser(user.uid, { providersToUnlink: ["apple.com"] });
+        await adminAuth.updateUser(user.uid, { providersToUnlink: ['apple.com'] });
         await adminAuth.revokeRefreshTokens(user.uid);
-        console.log(`Apple ${type}: unlinked apple.com from ${user.uid}, sessions revoked`);
       } else {
-        await getFirestore().collection("users").doc(user.uid).delete();
+        await getFirestore().collection('users').doc(user.uid).delete();
         await adminAuth.deleteUser(user.uid);
-        console.log(`Apple ${type}: wiped account ${user.uid}`);
       }
       return res.status(200).json({ received: true });
     } catch (err: any) {
-      console.error("Apple notification error:", err?.message || err);
+      console.error('Apple notification error:', err?.message || err);
       // Non-2xx so Apple retries; a deletion request must not be lost silently.
-      return res.status(500).json({ error: "Processing failed" });
+      return res.status(500).json({ error: 'Processing failed' });
     }
   });
 
-  // 16. Associated domains. Apple (via its CDN) fetches this file to verify
-  //     that this domain and the iOS app belong together, which unlocks
-  //     universal links (https links that open the app when installed) and
-  //     shared password autofill between the web app and the iOS app.
-  //
-  //     The app id needs the Apple Team ID prefix, which only exists once
-  //     Developer Program enrollment completes, so it comes from the
-  //     APPLE_TEAM_ID env var (a plain value in apphosting.yaml, not a
-  //     secret: this file is public by design). Until the var is set the
-  //     route 404s, which Apple simply reads as "not associated yet".
-  //
-  //     Universal links deliberately cover ONLY /expense/* for now. Auth
-  //     action links (password reset, verification) must keep opening in the
-  //     browser, where the handler pages live.
+  // Apple fetches this to verify the domain and app belong together, which
+  // unlocks universal links and shared password autofill. APPLE_TEAM_ID is a
+  // plain env var; until it is set the route 404s, which Apple reads as "not
+  // associated". Universal links cover only /expense/* so auth action links
+  // keep opening in the browser, where the handler pages live.
   app.get(
-    ["/.well-known/apple-app-site-association", "/apple-app-site-association"],
+    ['/.well-known/apple-app-site-association', '/apple-app-site-association'],
     (_req, res) => {
       const teamId = process.env.APPLE_TEAM_ID;
-      if (!teamId) return res.status(404).json({ error: "Not configured yet" });
+      if (!teamId) return res.status(404).json({ error: 'Not configured yet' });
       const appId = `${teamId}.com.situatedstrategies.haveAnotherCherry`;
-      res.setHeader("Content-Type", "application/json");
+      res.setHeader('Content-Type', 'application/json');
       return res.status(200).json({
         applinks: {
-          details: [{ appIDs: [appId], components: [{ "/": "/expense/*" }] }],
+          details: [{ appIDs: [appId], components: [{ '/': '/expense/*' }] }],
         },
         webcredentials: { apps: [appId] },
       });
     }
   );
 
-  // 17. Push service worker. FCM's web SDK registers /firebase-messaging-sw.js
-  //     to display notifications that arrive while the tab is closed or in
-  //     the background. Served dynamically rather than as a static file so
-  //     the Firebase config is written once, in firebase-applet-config.json.
-  //     Only public identifiers are embedded.
-  // /favicon.ico, which browsers request whether or not the page asks them to.
-  // Without this the SPA catch-all answers it with index.html, the browser gets
-  // HTML where it expected an image, and the tab shows no icon.
-  app.get("/favicon.ico", (_req, res) => {
-    res.redirect(301, "/favicon-32.png");
+  // ---- Service worker and favicon ----
+  // Browsers request /favicon.ico unasked; without this the SPA catch-all
+  // answers with index.html.
+  app.get('/favicon.ico', (_req, res) => {
+    res.redirect(301, '/favicon-32.png');
   });
 
-  app.get("/firebase-messaging-sw.js", (_req, res) => {
+  // Registered by FCM's web SDK to show notifications while the tab is in
+  // the background. Served dynamically so the Firebase config lives in one
+  // place; only public identifiers are embedded.
+  app.get('/firebase-messaging-sw.js', (_req, res) => {
     const cfg = firebaseConfig;
-    res.setHeader("Content-Type", "application/javascript");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-cache');
     res.send(
       `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");\n` +
-      `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");\n` +
-      `firebase.initializeApp(${JSON.stringify({
-        apiKey: cfg.apiKey,
-        authDomain: cfg.authDomain,
-        projectId: cfg.projectId,
-        messagingSenderId: cfg.messagingSenderId,
-        appId: cfg.appId,
-      })});\n` +
-      // Instantiating messaging is what wires the background handler that
-      // displays incoming notification payloads.
-      `firebase.messaging();\n`
+        `importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");\n` +
+        `firebase.initializeApp(${JSON.stringify({
+          apiKey: cfg.apiKey,
+          authDomain: cfg.authDomain,
+          projectId: cfg.projectId,
+          messagingSenderId: cfg.messagingSenderId,
+          appId: cfg.appId,
+        })});\n` +
+        // Instantiating messaging wires the background handler.
+        `firebase.messaging();\n`
     );
   });
 
-  // 18. App Store server notifications (in-app purchase events: renewals,
-  //     refunds, billing issues). Apple POSTs { signedPayload: <JWS> } to the
-  //     URL configured in App Store Connect. This endpoint is a RELAY, not a
-  //     second entitlement pipeline: RevenueCat stays the system of record
-  //     for Cherry + (Apple -> here -> RevenueCat -> /api/revenuecat-webhook
-  //     -> users/{uid}.isPlus). Owning the URL means Apple's config points
-  //     at our domain, we get a log line per event, and the processor behind
-  //     it can change without touching App Store Connect.
-  //
-  //     Set APPLE_ASN_FORWARD_URL to RevenueCat's Apple server notification
-  //     URL (RevenueCat dashboard -> the Apple app's settings). RevenueCat
-  //     verifies the JWS signature itself, so the relay forwards the payload
-  //     untouched; the decode below is for logging only and trusts nothing.
-  //
-  //     Reachable two ways, same handler: the path on any of our hosts, and
-  //     the bare root of the purchasestatus. subdomain so the URL given to
-  //     Apple can be simply https://purchasestatus.haveanothercherry.com/
-  //     once that custom domain is attached to this backend.
+  // ---- App Store server notifications ----
+  // A relay, not a second entitlement pipeline: RevenueCat stays the system of
+  // record (Apple -> here -> RevenueCat -> /api/revenuecat-webhook). Set
+  // APPLE_ASN_FORWARD_URL to RevenueCat's Apple notification URL; RevenueCat
+  // verifies the JWS itself, so the payload is forwarded untouched. Reachable
+  // at the path on any host and at the bare root of the purchasestatus.
+  // subdomain.
   const handleApplePurchaseNotification = async (req: express.Request, res: express.Response) => {
     const signedPayload = req.body?.signedPayload;
-    if (typeof signedPayload !== "string" || !signedPayload) {
-      return res.status(400).json({ error: "Missing signedPayload" });
+    if (typeof signedPayload !== 'string' || !signedPayload) {
+      return res.status(400).json({ error: 'Missing signedPayload' });
     }
 
-    // Best-effort peek at the notification type for the log line. Unverified
-    // by design: nothing here acts on it.
-    let notificationType = "unknown";
+    // Unverified peek at the type, for the log line only.
+    let notificationType = 'unknown';
     try {
-      const claims = JSON.parse(Buffer.from(signedPayload.split(".")[1], "base64url").toString("utf8"));
-      notificationType = String(claims?.notificationType || "unknown");
+      const claims = JSON.parse(
+        Buffer.from(signedPayload.split('.')[1], 'base64url').toString('utf8')
+      );
+      notificationType = String(claims?.notificationType || 'unknown');
       if (claims?.subtype) notificationType += `/${String(claims.subtype)}`;
-    } catch { /* opaque payload; still forwarded */ }
+    } catch {
+      /* opaque payload; still forwarded */
+    }
 
     const forwardUrl = process.env.APPLE_ASN_FORWARD_URL;
     if (!forwardUrl) {
-      // Not wired to a processor yet. Acknowledge so Apple does not mark the
-      // endpoint as failing; RevenueCat still learns about purchases through
-      // receipt validation, just without the instant nudge.
-      console.warn(`App Store notification received (${notificationType}) but APPLE_ASN_FORWARD_URL is not set; acknowledged without forwarding.`);
+      // Acknowledge so Apple does not mark the endpoint as failing.
+      console.warn(
+        `App Store notification received (${notificationType}) but APPLE_ASN_FORWARD_URL is not set; acknowledged without forwarding.`
+      );
       return res.status(200).json({ received: true, forwarded: false });
     }
 
     try {
       const upstream = await fetch(forwardUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signedPayload }),
       });
       if (!upstream.ok) {
-        console.error(`App Store notification forward failed: ${upstream.status} (${notificationType})`);
+        console.error(
+          `App Store notification forward failed: ${upstream.status} (${notificationType})`
+        );
         // Non-2xx so Apple retries; a purchase event must not be lost.
-        return res.status(502).json({ error: "Forward failed" });
+        return res.status(502).json({ error: 'Forward failed' });
       }
       console.log(`App Store notification relayed: ${notificationType}`);
       return res.status(200).json({ received: true });
     } catch (err: any) {
-      console.error("App Store notification relay error:", err?.message || err);
-      return res.status(502).json({ error: "Forward failed" });
+      console.error('App Store notification relay error:', err?.message || err);
+      return res.status(502).json({ error: 'Forward failed' });
     }
   };
 
-  app.post("/api/apple-purchase-notifications", handleApplePurchaseNotification);
-  app.post("/", (req, res, next) => {
-    const host = String(req.headers.host || "").split(":")[0].toLowerCase();
-    if (!host.startsWith("purchasestatus.")) return next();
+  app.post('/api/apple-purchase-notifications', handleApplePurchaseNotification);
+  app.post('/', (req, res, next) => {
+    const host = String(req.headers.host || '')
+      .split(':')[0]
+      .toLowerCase();
+    if (!host.startsWith('purchasestatus.')) return next();
     return handleApplePurchaseNotification(req, res);
   });
 
-  // Unknown API routes should return JSON 404, not fall through to the SPA HTML.
-  app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
+  // ---- Static serving ----
+  // Unknown API routes get a JSON 404 rather than the SPA HTML.
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith("index.html")) {
-          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-          // Only Vite's content-hashed bundles are safe to cache forever.
-          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        } else {
-          // Un-hashed public/ files (logo.svg, icons, manifest) keep their
-          // names when their content changes, so cap how long a stale copy
-          // can outlive a deploy.
-          res.setHeader("Cache-Control", "public, max-age=3600, must-revalidate");
-        }
-      },
-    }));
-    app.get("*", (req, res) => {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.sendFile(path.join(distPath, "index.html"));
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+          } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            // Only Vite's content-hashed bundles are safe to cache forever.
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else {
+            // Un-hashed public/ files keep their names across deploys.
+            res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+          }
+        },
+      })
+    );
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log("Server running on http://localhost:" + PORT);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log('Server running on http://localhost:' + PORT);
   });
 }
 
 startServer().catch((e) => {
-  console.error("Fatal startup error:", e);
+  console.error('Fatal startup error:', e);
   process.exit(1);
 });

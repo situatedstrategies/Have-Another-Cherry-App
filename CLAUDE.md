@@ -3,9 +3,11 @@
 Project context for Claude Code. Read this first before making changes.
 
 ## What this is
+
 A household expense-splitter web app ("Have Another Cherry"). Users create a group, set a percentage split between members, log shared expenses, and settle up. There's also AI receipt scanning and a financial-profile quiz.
 
 ## Stack
+
 - Frontend: React 19 + Vite 6 + TypeScript, Tailwind CSS v4 (`@tailwindcss/vite`).
 - Backend: Express server in `server.ts` (run with `tsx`). In dev it uses Vite middleware; in prod it serves the built SPA from `dist/`.
 - Data/auth: Firebase (Auth + Firestore, client SDK). `firebase-admin` is a dependency but the server currently uses ADC, not the Admin SDK.
@@ -14,6 +16,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - Deploy: Firebase App Hosting (Cloud Run under the hood), auto-deploys from GitHub `main`.
 
 ## Repo layout
+
 - `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry).
 - `src/components/*.tsx` - screens (GroupSetup, ExpenseForm, ExpenseList, ExpenseDetail, SettleUpModal, ProfileSetup, StatsSection, AuthScreen, etc.).
 - `src/lib/*.ts` - helpers (resend, crypto, members, profiles, accounting, mismatch).
@@ -25,11 +28,12 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).
 
 ## Commands
-- Install: `bun install` (repo uses Bun; `npm install` also works).
+
+- Install: `npm install` (App Hosting uses npm).
 - Dev: `npm run dev` (starts `tsx server.ts`; open http://localhost:3000).
 - Build: `npm run build` (`vite build` + esbuild bundles the server to `dist/server.cjs`).
 - Start built app: `npm run start`.
-- Typecheck: `npm run lint` (`tsc --noEmit`).
+- Lint and typecheck: `npm run lint` (ESLint, then `tsc --noEmit`). Tests: `npm test`. Formatting: `npm run format` / `npm run format:check`.
 
 ## Check live backend state before assuming it (hard rule)
 
@@ -64,6 +68,7 @@ When a deploy looks wrong, get the real error rather than inferring one:
 returns the actual build failure, including a Cloud Build log link.
 
 ## Google Cloud / Firebase project
+
 - Project: "Have Another Cherry SSLLC" = `gen-lang-client-0987674990`.
 - Firestore: `(default)` database (nam5). Security rules in `firestore.rules`.
 - App Hosting backend: `have-another-cherry`, region `us-east4`.
@@ -72,6 +77,7 @@ returns the actual build failure, including a Cloud Build log link.
 - The site password wall in `server.ts` is OFF by default (the app is public). `SITE_GATE_ENABLED=1` in `apphosting.yaml` turns it back on.
 
 ## Retired beta environment
+
 There is no beta any more. It was a second App Hosting backend on its own Firebase
 project (`have-another-cherry-beta`) at beta.haveanothercherry.com, and it split the
 user base in two. `server.ts` now 301-redirects any `beta.*` host to
@@ -79,13 +85,16 @@ app.haveanothercherry.com. Do not reintroduce `firebase-applet-config.beta.json`
 `apphosting.beta.yaml`, or a `VITE_APP_ENV` switch; one project, one backend.
 
 ## AI (Gemini via Vertex) - important
+
 This project's Google Cloud org blocks standalone Gemini API keys (they must be service-account-bound and don't work with the Developer API). So the app uses **Vertex AI + ADC** and needs **no API key**.
+
 - Code pattern: `new GoogleGenAI({ vertexai: true, project: process.env.GOOGLE_CLOUD_PROJECT || "gen-lang-client-0987674990", location: "us-central1" })`.
 - Prod auth: the App Hosting compute service account (`firebase-app-hosting-compute@gen-lang-client-0987674990.iam.gserviceaccount.com`) has role `Vertex AI User` (roles/aiplatform.user).
 - Local dev auth: run `gcloud auth application-default login` and `gcloud config set project gen-lang-client-0987674990`.
 - DO NOT reintroduce a `GEMINI_API_KEY` - it will not work in this org.
 
 ## Email (Resend) - important
+
 - `RESEND_API_KEY` lives in **Cloud Secret Manager**, referenced in `apphosting.yaml` (env var backed by `secret:`), not as a plaintext env var.
 - The App Hosting compute SA has both `Secret Manager Secret Accessor` and `Secret Manager Viewer` on that secret (Viewer is needed so the build can resolve the `latest` version).
 - Senders (hard rule, all verified on Resend): `poolside@haveanothercherry.com` for human-flavored email (invites, waitlist replies). `tartcherry@haveanothercherry.com` for payment reminders. `notifications@haveanothercherry.com` for system notifications (e.g. waitlist signups forwarded to the poolside inbox). `reset@haveanothercherry.com` for password resets and `verify@haveanothercherry.com` for email verification. `help@haveanothercherry.com` reaches a real person: it is the support/unsubscribe contact, never a sender.
@@ -93,15 +102,18 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Invite flow: `GroupSetup.tsx` (collects recipient name + email, computes fromName and split) -> `POST /api/send-invite` -> `sendInviteEmail(...)`.
 
 ## Data model note (the "split")
+
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
 - Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
 
 ## Design system (match this for UI work)
+
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).
 - Palette (Tailwind `natural-*` tokens defined in `src/index.css`): cherry red `#C41200` (primary accent), text `#18181B`, background `#F4F4F5`, borders `#D4D4D8`, muted `#52525B`. Aesthetic: minimal, high-contrast.
 - Logo: `/cherry2transparent.png` (in `public/`). The old Squarespace logo URL is dead - do not use it.
 
 ## Deploy flow
+
 - **`main` is the deployed branch.** Push (or merge) to `main` -> Firebase App Hosting builds and deploys automatically (~4-5 min). `development/web-production` is retired; do not push there.
 - The backend's live branch is set in the Firebase console (App Hosting -> backend -> settings). If a push to `main` does not roll out, check that setting first (see the hard rule above about querying live state).
 - Watch rollouts: Firebase Console -> App Hosting -> Backend `have-another-cherry` -> Rollouts.
@@ -117,6 +129,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   app ever disagree, users hit "Missing or insufficient permissions".
 
 ## Email privacy (hard rule)
+
 - Everything sent through Resend is stored in the Resend dashboard and visible to
   the account operator. The operator must NOT be able to read users' financial
   data, so transactional emails must never contain amounts, balances, expense
@@ -128,6 +141,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   visibility by minimizing Resend's data retention in the dashboard settings.
 
 ## Writing style (hard rule)
+
 - **NO EM DASHES. EVER.** No em dash and no en dash anywhere in this codebase or its
   output: not in UI copy, error messages, emails, comments, commit messages, AI
   prompts, or AI-generated text. Use periods, hyphens (-), and colons only.
@@ -136,6 +150,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   in place when adding new AI endpoints.
 
 ## Conventions / gotchas
+
 - Source of truth is GitHub `main` - that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.

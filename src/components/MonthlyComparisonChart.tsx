@@ -1,14 +1,38 @@
-import React, { useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useMemo, useState } from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import { Expense, User } from '../types';
 import { parseLocalDate } from '../lib/recurring';
+import { roundCurrency } from '../lib/money';
+import { nameOf } from '../lib/members';
 
 interface MonthlyComparisonChartProps {
   expenses: Expense[];
   members: User[];
 }
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 const RANGES: { key: string; label: string; months: number }[] = [
   { key: '1M', label: '1M', months: 1 },
@@ -17,8 +41,6 @@ const RANGES: { key: string; label: string; months: number }[] = [
   { key: '1Y', label: '1Y', months: 12 },
 ];
 
-const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
-
 // Tooltip for the lending chart: shows who lent and who borrowed that month.
 function LendingTooltip({ active, payload, label, compare }: any) {
   if (!active || !payload || !payload.length) return null;
@@ -26,25 +48,58 @@ function LendingTooltip({ active, payload, label, compare }: any) {
   const lentBy: Record<string, number> = d.lentBy || {};
   const borrowedBy: Record<string, number> = d.borrowedBy || {};
   return (
-    <div style={{ borderRadius: 8, border: '1px solid #E4E4E7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: '#fff', padding: '10px 12px', fontSize: 12 }}>
+    <div
+      style={{
+        borderRadius: 8,
+        border: '1px solid #E4E4E7',
+        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+        background: '#fff',
+        padding: '10px 12px',
+        fontSize: 12,
+      }}
+    >
       <p style={{ fontWeight: 700, color: '#18181B', marginBottom: 4 }}>{label}</p>
-      <p style={{ color: '#18181B', fontWeight: 600 }}>Total lent: ${Number(d.lending || 0).toFixed(2)}</p>
+      <p style={{ color: '#18181B', fontWeight: 600 }}>
+        Total lent: ${Number(d.lending || 0).toFixed(2)}
+      </p>
       {compare && (
         <p style={{ color: '#A1A1AA' }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
       )}
       {Object.keys(lentBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <p style={{ color: '#71717A', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Lent by</p>
+          <p
+            style={{
+              color: '#71717A',
+              textTransform: 'uppercase',
+              fontSize: 10,
+              letterSpacing: '0.05em',
+            }}
+          >
+            Lent by
+          </p>
           {Object.entries(lentBy).map(([name, amt]) => (
-            <p key={name} style={{ color: '#18181B' }}>{name}: <strong>${Number(amt).toFixed(2)}</strong></p>
+            <p key={name} style={{ color: '#18181B' }}>
+              {name}: <strong>${Number(amt).toFixed(2)}</strong>
+            </p>
           ))}
         </div>
       )}
       {Object.keys(borrowedBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <p style={{ color: '#71717A', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em' }}>Borrowed by</p>
+          <p
+            style={{
+              color: '#71717A',
+              textTransform: 'uppercase',
+              fontSize: 10,
+              letterSpacing: '0.05em',
+            }}
+          >
+            Borrowed by
+          </p>
           {Object.entries(borrowedBy).map(([name, amt]) => (
-            <p key={name} style={{ color: '#18181B' }}>{name}: <strong>${Number(amt).toFixed(2)}</strong></p>
+            <p key={name} style={{ color: '#18181B' }}>
+              {name}: <strong>${Number(amt).toFixed(2)}</strong>
+            </p>
           ))}
         </div>
       )}
@@ -56,15 +111,13 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
   const [rangeKey, setRangeKey] = useState('6M');
   const [compare, setCompare] = useState(false);
 
-  const months = RANGES.find(r => r.key === rangeKey)?.months || 6;
+  const months = RANGES.find((r) => r.key === rangeKey)?.months || 6;
 
   const chartData = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const withYear = months >= 12;
-
-    const nameOf = (uid: string) => members.find(m => m.uid === uid)?.name || 'Someone';
 
     // Build `months` monthly buckets ending this month, shifted back by periodOffset periods.
     const buildBuckets = (periodOffset: number) =>
@@ -73,7 +126,9 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
         return {
           year: d.getFullYear(),
           month: d.getMonth(),
-          label: MONTH_NAMES[d.getMonth()].substring(0, 3) + (withYear ? ` '${String(d.getFullYear()).slice(2)}` : ''),
+          label:
+            MONTH_NAMES[d.getMonth()].substring(0, 3) +
+            (withYear ? ` '${String(d.getFullYear()).slice(2)}` : ''),
         };
       });
 
@@ -85,10 +140,16 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
     const prevMap = new Map<string, number>();
     prevBuckets.forEach((b, i) => prevMap.set(`${b.year}-${b.month}`, i));
 
-    const cur = curBuckets.map(b => ({ ...b, spending: 0, lending: 0, lentBy: {} as Record<string, number>, borrowedBy: {} as Record<string, number> }));
-    const prev = prevBuckets.map(b => ({ ...b, spending: 0, lending: 0 }));
+    const cur = curBuckets.map((b) => ({
+      ...b,
+      spending: 0,
+      lending: 0,
+      lentBy: {} as Record<string, number>,
+      borrowedBy: {} as Record<string, number>,
+    }));
+    const prev = prevBuckets.map((b) => ({ ...b, spending: 0, lending: 0 }));
 
-    expenses.forEach(exp => {
+    expenses.forEach((exp) => {
       // Date-only strings parse as UTC midnight, which lands the 1st of a
       // month in the previous month anywhere west of Greenwich.
       const d = parseLocalDate(exp.date);
@@ -98,27 +159,27 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       // but nobody lent anything: there is no payer to owe.
       const claimed = !!exp.paidBy;
       const payerShare = exp.shares?.[exp.paidBy] || 0;
-      const lent = claimed ? Math.max(0, round2(amount - payerShare)) : 0; // what everyone else owes the payer
+      const lent = claimed ? Math.max(0, roundCurrency(amount - payerShare)) : 0; // what everyone else owes the payer
 
       if (curMap.has(key)) {
         const b = cur[curMap.get(key)!];
         b.spending += amount;
         b.lending += lent;
         if (claimed) {
-          const payerName = nameOf(exp.paidBy);
-          if (lent > 0) b.lentBy[payerName] = round2((b.lentBy[payerName] || 0) + lent);
+          const payerName = nameOf(exp.paidBy, members);
+          if (lent > 0) b.lentBy[payerName] = roundCurrency((b.lentBy[payerName] || 0) + lent);
           Object.entries(exp.shares || {}).forEach(([uid, s]) => {
             if (uid !== exp.paidBy && (s || 0) > 0) {
-              const n = nameOf(uid);
-              b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + (s || 0));
+              const n = nameOf(uid, members);
+              b.borrowedBy[n] = roundCurrency((b.borrowedBy[n] || 0) + (s || 0));
             }
           });
           if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
             const n = exp.thirdPersonName || 'Third person';
-            b.borrowedBy[n] = round2((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
+            b.borrowedBy[n] = roundCurrency((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
           }
-          (exp.extraParticipants || []).forEach(g => {
-            b.borrowedBy[g.name] = round2((b.borrowedBy[g.name] || 0) + g.share);
+          (exp.extraParticipants || []).forEach((g) => {
+            b.borrowedBy[g.name] = roundCurrency((b.borrowedBy[g.name] || 0) + g.share);
           });
         }
       } else if (prevMap.has(key)) {
@@ -130,28 +191,33 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
 
     return cur.map((b, i) => ({
       name: b.label,
-      spending: round2(b.spending),
-      lending: round2(b.lending),
-      prevSpending: round2(prev[i]?.spending || 0),
-      prevLending: round2(prev[i]?.lending || 0),
+      spending: roundCurrency(b.spending),
+      lending: roundCurrency(b.lending),
+      prevSpending: roundCurrency(prev[i]?.spending || 0),
+      prevLending: roundCurrency(prev[i]?.lending || 0),
       lentBy: b.lentBy,
       borrowedBy: b.borrowedBy,
     }));
   }, [expenses, members, months]);
 
-  const rangeLabel = RANGES.find(r => r.key === rangeKey)?.months === 1 ? 'Last month' : `Last ${months} months`;
-  const subtitle = compare ? `${rangeLabel} vs previous ${months === 1 ? 'month' : `${months} months`}` : rangeLabel;
+  const rangeLabel =
+    RANGES.find((r) => r.key === rangeKey)?.months === 1 ? 'Last month' : `Last ${months} months`;
+  const subtitle = compare
+    ? `${rangeLabel} vs previous ${months === 1 ? 'month' : `${months} months`}`
+    : rangeLabel;
 
   const Controls = (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex gap-1 bg-natural-sidebar rounded-lg p-1">
-        {RANGES.map(r => (
+        {RANGES.map((r) => (
           <button
             key={r.key}
             type="button"
             onClick={() => setRangeKey(r.key)}
             className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-              rangeKey === r.key ? 'bg-white text-natural-text shadow-sm' : 'text-natural-muted hover:text-natural-text'
+              rangeKey === r.key
+                ? 'bg-white text-natural-text shadow-sm'
+                : 'text-natural-muted hover:text-natural-text'
             }`}
           >
             {r.label}
@@ -160,9 +226,11 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       </div>
       <button
         type="button"
-        onClick={() => setCompare(c => !c)}
+        onClick={() => setCompare((c) => !c)}
         className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
-          compare ? 'bg-natural-primary text-white border-natural-primary' : 'bg-white text-natural-muted border-natural-border hover:border-natural-primary/50'
+          compare
+            ? 'bg-natural-primary text-white border-natural-primary'
+            : 'bg-white text-natural-muted border-natural-border hover:border-natural-primary/50'
         }`}
       >
         Compare previous
@@ -174,7 +242,9 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
     <div className="space-y-4 mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-natural-text uppercase tracking-wider">Spending &amp; Lending Trends</h3>
+          <h3 className="text-sm font-bold text-natural-text uppercase tracking-wider">
+            Spending &amp; Lending Trends
+          </h3>
           <p className="text-xs text-natural-muted mt-1">{subtitle}</p>
         </div>
         {Controls}
@@ -183,20 +253,59 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Spending */}
         <div className="bg-white rounded-xl border border-natural-border shadow-sm p-6">
-          <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">Monthly Spending</h4>
+          <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">
+            Monthly Spending
+          </h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} tickFormatter={(val) => `$${val}`} width={45} />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#71717A' }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tickFormatter={(val) => `$${val}`}
+                  width={45}
+                />
                 <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #E4E4E7', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number, name: string) => [`$${Number(value).toFixed(2)}`, name === 'prevSpending' ? 'Previous' : 'This period']}
+                  contentStyle={{
+                    borderRadius: '8px',
+                    border: '1px solid #E4E4E7',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                  formatter={(value: any, name: any) => [
+                    `$${Number(value).toFixed(2)}`,
+                    name === 'prevSpending' ? 'Previous' : 'This period',
+                  ]}
                 />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                <Line type="monotone" dataKey="spending" name="This period" stroke="#C41200" strokeWidth={3} dot={{ r: 4, fill: '#C41200' }} activeDot={{ r: 6 }} />
-                {compare && <Line type="monotone" dataKey="prevSpending" name="Previous" stroke="#C41200" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 3 }} strokeOpacity={0.5} />}
+                <Line
+                  type="monotone"
+                  dataKey="spending"
+                  name="This period"
+                  stroke="#C41200"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#C41200' }}
+                  activeDot={{ r: 6 }}
+                />
+                {compare && (
+                  <Line
+                    type="monotone"
+                    dataKey="prevSpending"
+                    name="Previous"
+                    stroke="#C41200"
+                    strokeDasharray="4 4"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    strokeOpacity={0.5}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -204,17 +313,49 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
 
         {/* Lending */}
         <div className="bg-white rounded-xl border border-natural-border shadow-sm p-6">
-          <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">Monthly Lending</h4>
+          <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">
+            Monthly Lending
+          </h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E4E4E7" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#71717A' }} tickFormatter={(val) => `$${val}`} width={45} />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#71717A' }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#71717A' }}
+                  tickFormatter={(val) => `$${val}`}
+                  width={45}
+                />
                 <Tooltip content={<LendingTooltip compare={compare} />} />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                <Line type="monotone" dataKey="lending" name="This period" stroke="#18181B" strokeWidth={3} dot={{ r: 4, fill: '#18181B' }} activeDot={{ r: 6 }} />
-                {compare && <Line type="monotone" dataKey="prevLending" name="Previous" stroke="#18181B" strokeDasharray="4 4" strokeWidth={2} dot={{ r: 3 }} strokeOpacity={0.5} />}
+                <Line
+                  type="monotone"
+                  dataKey="lending"
+                  name="This period"
+                  stroke="#18181B"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#18181B' }}
+                  activeDot={{ r: 6 }}
+                />
+                {compare && (
+                  <Line
+                    type="monotone"
+                    dataKey="prevLending"
+                    name="Previous"
+                    stroke="#18181B"
+                    strokeDasharray="4 4"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    strokeOpacity={0.5}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>

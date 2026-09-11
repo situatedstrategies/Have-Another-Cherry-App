@@ -1,7 +1,13 @@
 import { Expense, Group } from '../types';
-import { isUnclaimed, getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, roundCurrency } from '../lib/money';
+import {
+  isUnclaimed,
+  getRemainingSettlementAmount,
+  getTotalRemainingOwedToPayer,
+  isExpenseFullySettled,
+  roundCurrency,
+} from '../lib/money';
 import { joinedUids } from '../lib/members';
-import { CreditCard, CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react';
+import { CreditCard, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface StatsSectionProps {
   expenses: Expense[];
@@ -17,7 +23,13 @@ interface StatsSectionProps {
   onCardClick?: (card: 'you_owe' | 'owed_to_you') => void;
 }
 
-export default function StatsSection({ expenses, group, activeUser, orientation = 'band', onCardClick }: StatsSectionProps) {
+export default function StatsSection({
+  expenses,
+  group,
+  activeUser,
+  orientation = 'band',
+  onCardClick,
+}: StatsSectionProps) {
   let youOweAmount = 0;
   let othersOweYouAmount = 0;
   let youOweCount = 0;
@@ -35,7 +47,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
   // For them the settled spend is simply what those items cost.
   const solo = joinedUids(group).length <= 1;
 
-  expenses.forEach(exp => {
+  expenses.forEach((exp) => {
     // Unclaimed: nobody has said they paid it, so it is owed by nobody to
     // nobody. Without this it falls to the else branch below, where the
     // current user's share is counted as something they owe, inflating You Owe
@@ -47,7 +59,9 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
     if (exp.paidBy === activeUser) {
       const totalRemaining = getTotalRemainingOwedToPayer(exp, false);
       // Difference between confirmed-only and pending-inclusive = amount in-flight.
-      othersOwePending = roundCurrency(othersOwePending + Math.max(0, totalRemaining - getTotalRemainingOwedToPayer(exp, true)));
+      othersOwePending = roundCurrency(
+        othersOwePending + Math.max(0, totalRemaining - getTotalRemainingOwedToPayer(exp, true))
+      );
 
       if (!isFullySettled && totalRemaining > 0.01) {
         othersOweYouCount++;
@@ -55,7 +69,10 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
       }
     } else {
       const remainingForMe = getRemainingSettlementAmount(exp, activeUser, false);
-      youOwePending = roundCurrency(youOwePending + Math.max(0, remainingForMe - getRemainingSettlementAmount(exp, activeUser, true)));
+      youOwePending = roundCurrency(
+        youOwePending +
+          Math.max(0, remainingForMe - getRemainingSettlementAmount(exp, activeUser, true))
+      );
 
       if (!isFullySettled && remainingForMe > 0.01) {
         youOweCount++;
@@ -69,7 +86,7 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
       // Using amount - payerShare wrongly folded in guest / third-party portions
       // that are part of the amount but never actually settled to the payer.
       const memberDebt = solo
-        ? (Number(exp.amount) || 0)
+        ? Number(exp.amount) || 0
         : Object.entries(exp.shares || {})
             .filter(([uid]) => uid !== exp.paidBy)
             .reduce((total, [, share]) => total + (Number(share) || 0), 0);
@@ -95,14 +112,20 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         title="See what you still owe"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">You Owe</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+            You Owe
+          </span>
           <div className="p-2.5 bg-natural-sidebar text-natural-text rounded-2xl">
             <CreditCard className="h-5 w-5" />
           </div>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-display font-semibold text-natural-text">
-            ${youOweAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {youOweAmount.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         </div>
         <p className="text-xs text-natural-muted mt-2 font-mono">
@@ -110,7 +133,12 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         </p>
         {youOwePending > 0.01 && (
           <p className="text-xs text-natural-primary mt-1 font-medium">
-            ${youOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} awaiting confirmation
+            $
+            {youOwePending.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{' '}
+            awaiting confirmation
           </p>
         )}
       </button>
@@ -124,14 +152,20 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         title="See who still owes you"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">Others Owe You</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+            Others Owe You
+          </span>
           <div className="p-2.5 bg-natural-sage text-natural-primary rounded-2xl">
             <TrendingUp className="h-5 w-5" />
           </div>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-display font-semibold text-natural-text">
-            ${othersOweYouAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {othersOweYouAmount.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         </div>
         <p className="text-xs text-natural-text mt-2 font-mono">
@@ -139,15 +173,25 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
         </p>
         {othersOwePending > 0.01 && (
           <p className="text-xs text-natural-primary mt-1 font-medium">
-            ${othersOwePending.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending your confirmation
+            $
+            {othersOwePending.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{' '}
+            pending your confirmation
           </p>
         )}
       </button>
 
       {/* Settled Audit Summary */}
-      <div className="bg-natural-sidebar rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200" id="stat-card-settled">
+      <div
+        className="bg-natural-sidebar rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md transition-all duration-200"
+        id="stat-card-settled"
+      >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">Fully Settled Items</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+            Fully Settled Items
+          </span>
           <div className="p-2.5 bg-white text-natural-primary rounded-2xl border border-natural-border">
             <CheckCircle2 className="h-5 w-5" />
           </div>
@@ -159,7 +203,11 @@ export default function StatsSection({ expenses, group, activeUser, orientation 
           <span className="text-sm text-natural-muted font-medium">items</span>
         </div>
         <p className="text-xs text-natural-muted mt-2 font-mono">
-          Total settled spend: ${settledTotalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          Total settled spend: $
+          {settledTotalAmount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </p>
       </div>
     </div>

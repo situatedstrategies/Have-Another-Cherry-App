@@ -9,17 +9,12 @@ import {
   isPasswordValid,
 } from '../lib/password';
 import { SUPPORT_EMAIL, describeCodeError, sanitizeContinueUrl } from '../lib/authAction';
+import CherryLogo from './CherryLogo';
 
-// Handles the Firebase Auth email action links that used to land on
-// <project>.firebaseapp.com/__/auth/action. App Hosting is Cloud Run based and
-// does not serve Firebase's built-in handler, so we implement it ourselves and
-// point Authentication -> Templates -> "Customize action URL" here.
-//
-// That console setting is global across every email template, so this page has
-// to cope with every mode Firebase might send, not just password resets.
-//
-// The oobCode in the query string is a single-use credential. It is never
-// logged, never put in an error message, and never forwarded anywhere.
+// The Firebase Auth email action handler. App Hosting does not serve
+// Firebase's built-in one, so this page is what Authentication -> Templates ->
+// "Customize action URL" points at. That setting is global across every email
+// template, so this page copes with every mode Firebase might send.
 
 type Phase =
   | { kind: 'loading' }
@@ -27,12 +22,6 @@ type Phase =
   | { kind: 'success'; heading: string; message: string }
   | { kind: 'error'; message: string; offerNewLink: boolean }
   | { kind: 'unsupported' };
-
-function CherryLogo({ className = 'h-10 w-10' }: { className?: string }) {
-  return (
-    <img src="/logo.svg" alt="Have Another Cherry logo" className={className} style={{ objectFit: 'contain' }} />
-  );
-}
 
 export default function AuthActionHandler() {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
@@ -65,7 +54,8 @@ export default function AuthActionHandler() {
     if (!mode) {
       setPhase({
         kind: 'error',
-        message: 'This link is incomplete. Please open the most recent email we sent you, or request a new link.',
+        message:
+          'This link is incomplete. Please open the most recent email we sent you, or request a new link.',
         offerNewLink: true,
       });
       return;
@@ -74,7 +64,8 @@ export default function AuthActionHandler() {
     if (!oobCode) {
       setPhase({
         kind: 'error',
-        message: 'This link is missing the code it needs to work. It may have been cut off by your email client - try opening it from the original email, or request a new link.',
+        message:
+          'This link is missing the code it needs to work. It may have been cut off by your email client - try opening it from the original email, or request a new link.',
         offerNewLink: mode === 'resetPassword',
       });
       return;
@@ -98,7 +89,8 @@ export default function AuthActionHandler() {
               setPhase({
                 kind: 'success',
                 heading: 'Email verified',
-                message: 'Your email address is confirmed. You can head back to Have Another Cherry.',
+                message:
+                  'Your email address is confirmed. You can head back to Have Another Cherry.',
               });
             }
             break;
@@ -199,7 +191,7 @@ export default function AuthActionHandler() {
       setNewLinkError(
         err instanceof TypeError
           ? 'Could not reach the server. Check your connection and try again.'
-          : (err?.message || 'Unable to send reset email. Please try again later.')
+          : err?.message || 'Unable to send reset email. Please try again later.'
       );
     } finally {
       setSendingNewLink(false);
@@ -234,8 +226,8 @@ export default function AuthActionHandler() {
               <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                 <span className="shrink-0">⚠️</span>
                 <span>
-                  We do not recognise this type of link. If you were sent here from one of our emails, contact{' '}
-                  {SUPPORT_EMAIL} and we will sort it out.
+                  We do not recognise this type of link. If you were sent here from one of our
+                  emails, contact {SUPPORT_EMAIL} and we will sort it out.
                 </span>
               </div>
               <a
@@ -305,7 +297,10 @@ export default function AuthActionHandler() {
               ) : null}
 
               <p className="text-center text-sm text-natural-muted mt-6">
-                <a href="/" className="text-natural-text hover:underline font-medium transition-colors">
+                <a
+                  href="/"
+                  className="text-natural-text hover:underline font-medium transition-colors"
+                >
                   Back to Have Another Cherry
                 </a>
               </p>
@@ -337,7 +332,8 @@ export default function AuthActionHandler() {
               </div>
 
               <p className="text-sm text-natural-muted mb-4">
-                Setting a new password for <span className="font-medium text-natural-text">{phase.email}</span>.
+                Setting a new password for{' '}
+                <span className="font-medium text-natural-text">{phase.email}</span>.
               </p>
 
               {formError && (
@@ -366,7 +362,9 @@ export default function AuthActionHandler() {
                     />
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs font-semibold text-natural-text mb-1">Create a password with:</p>
+                    <p className="text-xs font-semibold text-natural-text mb-1">
+                      Create a password with:
+                    </p>
                     <ul className="space-y-1">
                       {PASSWORD_REQUIREMENTS.map((req) => (
                         <li
@@ -411,7 +409,10 @@ export default function AuthActionHandler() {
               </form>
 
               <p className="text-center text-sm text-natural-muted mt-6">
-                <a href="/" className="text-natural-text hover:underline font-medium transition-colors">
+                <a
+                  href="/"
+                  className="text-natural-text hover:underline font-medium transition-colors"
+                >
                   Back to log in
                 </a>
               </p>

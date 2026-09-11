@@ -1,0 +1,11 @@
+dist
+node_modules
+docs/brand-guide.html
+package-lock.json
+src/templates
+apphosting.yaml
+firebase.json
+.firebaserc
+firebase-applet-config.json
+firestore.rules
+.github

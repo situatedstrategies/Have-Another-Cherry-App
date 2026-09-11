@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Cloud, Download, Shield, Key, RefreshCw, Check, Sparkles } from 'lucide-react';
 import { doc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -18,9 +18,30 @@ interface BackupModalProps {
 }
 
 const WORDS = [
-  'cherry', 'maple', 'orbit', 'river', 'ember', 'willow', 'cobalt', 'harbor',
-  'meadow', 'saffron', 'lantern', 'pebble', 'thistle', 'comet', 'juniper', 'marble',
-  'sparrow', 'velvet', 'pinecone', 'copper', 'dune', 'lagoon', 'quartz', 'basil',
+  'cherry',
+  'maple',
+  'orbit',
+  'river',
+  'ember',
+  'willow',
+  'cobalt',
+  'harbor',
+  'meadow',
+  'saffron',
+  'lantern',
+  'pebble',
+  'thistle',
+  'comet',
+  'juniper',
+  'marble',
+  'sparrow',
+  'velvet',
+  'pinecone',
+  'copper',
+  'dune',
+  'lagoon',
+  'quartz',
+  'basil',
 ];
 
 // Normalize a key the same way for hashing AND encryption so a "matching" key
@@ -29,14 +50,20 @@ const normalizeKey = (k: string) => k.trim().toLowerCase();
 
 function generateKey(): string {
   const rand = crypto.getRandomValues(new Uint32Array(4));
-  const parts = Array.from(rand).map(n => WORDS[n % WORDS.length]);
+  const parts = Array.from(rand).map((n) => WORDS[n % WORDS.length]);
   return parts.join('-');
 }
 
 function formatDate(iso?: string | null): string {
   if (!iso) return 'Never';
   try {
-    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return 'Never';
   }
@@ -44,7 +71,16 @@ function formatDate(iso?: string | null): string {
 
 type Msg = { text: string; type: 'success' | 'error' | 'info' } | null;
 
-export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash, localExpenses, setLocalExpenses, groupSecret, setGroupSecret }: BackupModalProps) {
+export default function BackupModal({
+  onClose,
+  activeUser,
+  groupId,
+  groupKeyHash,
+  localExpenses,
+  setLocalExpenses,
+  groupSecret,
+  setGroupSecret,
+}: BackupModalProps) {
   const [keyInput, setKeyInput] = useState(groupSecret || '');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
@@ -60,20 +96,29 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       try {
         const snap = await getDoc(doc(db, 'users', activeUser));
         if (!cancelled && snap.exists()) setLastBackup(snap.data().backupDate || null);
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeUser]);
 
   // Does the entered key match the group's saved key hash?
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!groupKeyHash || !keyInput.trim()) { setKeyMatches(null); return; }
+      if (!groupKeyHash || !keyInput.trim()) {
+        setKeyMatches(null);
+        return;
+      }
       const h = await hashString(normalizeKey(keyInput));
       if (!cancelled) setKeyMatches(h === groupKeyHash);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [keyInput, groupKeyHash]);
 
   const handleGenerate = () => {
@@ -83,14 +128,20 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
 
   const handleSaveKey = async () => {
     const key = normalizeKey(keyInput);
-    if (key.length < 8) { show('Your group key must be at least 8 characters.', 'error'); return; }
+    if (key.length < 8) {
+      show('Your group key must be at least 8 characters.', 'error');
+      return;
+    }
     setLoading(true);
     try {
       setGroupSecret(key);
       localStorage.setItem(`group_secret_${activeUser}`, key);
       const h = await hashString(key);
       await updateDoc(doc(db, 'groups', groupId), { keyHash: h });
-      show('Group key saved - stored hashed in the cloud so it can be verified and reset. Share the exact phrase with your group.', 'success');
+      show(
+        'Group key saved - stored hashed in the cloud so it can be verified and reset. Share the exact phrase with your group.',
+        'success'
+      );
     } catch (e) {
       console.error(e);
       show('Could not save the key. Please check your connection and try again.', 'error');
@@ -99,9 +150,12 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
   };
 
   const handleResetKey = async () => {
-    if (!window.confirm(
-      "Reset your group key? This clears the key on this device and its cloud reference. Anything already backed up or synced with the OLD key will still need the old key to read. You'll then set a new shared key with your group and back up again."
-    )) return;
+    if (
+      !window.confirm(
+        "Reset your group key? This clears the key on this device and its cloud reference. Anything already backed up or synced with the OLD key will still need the old key to read. You'll then set a new shared key with your group and back up again."
+      )
+    )
+      return;
     setLoading(true);
     try {
       setGroupSecret('');
@@ -118,11 +172,18 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
 
   const handleBackup = async () => {
     const key = normalizeKey(groupSecret || keyInput);
-    if (key.length < 8) { show('Save a group key first, then back up.', 'error'); return; }
+    if (key.length < 8) {
+      show('Save a group key first, then back up.', 'error');
+      return;
+    }
     // Guard against overwriting a good backup with an empty ledger.
-    if (localExpenses.length === 0 && !window.confirm(
-      'Your ledger is currently empty. Backing up now will overwrite any previous cloud backup with an empty one. Continue?'
-    )) return;
+    if (
+      localExpenses.length === 0 &&
+      !window.confirm(
+        'Your ledger is currently empty. Backing up now will overwrite any previous cloud backup with an empty one. Continue?'
+      )
+    )
+      return;
     setLoading(true);
     try {
       const encrypted = CryptoJS.AES.encrypt(JSON.stringify(localExpenses), key).toString();
@@ -130,7 +191,10 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       // Firestore caps a document at ~1MB and the backup shares the user doc,
       // so refuse clearly instead of failing with an opaque write error.
       if (encrypted.length > 900_000) {
-        show(`This ledger is too large for a cloud backup (${Math.round(encrypted.length / 1024)}KB encrypted, limit ~900KB). Export a CSV from Privacy & Security as a fallback and let us know - larger backups are on the roadmap.`, 'error');
+        show(
+          `This ledger is too large for a cloud backup (${Math.round(encrypted.length / 1024)}KB encrypted, limit ~900KB). Export a CSV from Privacy & Security as a fallback and let us know - larger backups are on the roadmap.`,
+          'error'
+        );
         setLoading(false);
         return;
       }
@@ -145,7 +209,9 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       let verified = false;
       if (stored) {
         try {
-          const roundTrip = JSON.parse(CryptoJS.AES.decrypt(stored, key).toString(CryptoJS.enc.Utf8));
+          const roundTrip = JSON.parse(
+            CryptoJS.AES.decrypt(stored, key).toString(CryptoJS.enc.Utf8)
+          );
           verified = Array.isArray(roundTrip) && roundTrip.length === localExpenses.length;
         } catch {
           verified = false;
@@ -153,13 +219,19 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
       }
 
       if (!verified) {
-        show('The backup was written but could not be verified. Please try again - do not rely on this backup.', 'error');
+        show(
+          'The backup was written but could not be verified. Please try again - do not rely on this backup.',
+          'error'
+        );
         setLoading(false);
         return;
       }
 
       setLastBackup(date);
-      show(`Backed up and verified: ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'} in the cloud (${Math.round(encrypted.length / 1024)}KB, encrypted with your group key). We read it back from Firestore to confirm.`, 'success');
+      show(
+        `Backed up and verified: ${localExpenses.length} item${localExpenses.length === 1 ? '' : 's'} in the cloud (${Math.round(encrypted.length / 1024)}KB, encrypted with your group key). We read it back from Firestore to confirm.`,
+        'success'
+      );
     } catch (e) {
       console.error(e);
       show('Backup failed. Check your connection and try again.', 'error');
@@ -169,23 +241,47 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
 
   const handleRestore = async () => {
     const key = normalizeKey(groupSecret || keyInput);
-    if (key.length < 8) { show('Enter or save your group key first, then restore.', 'error'); return; }
-    if (!window.confirm(
-      'Restore will REPLACE your current local ledger with the cloud backup. Any local changes since the last backup will be lost. Continue?'
-    )) return;
+    if (key.length < 8) {
+      show('Enter or save your group key first, then restore.', 'error');
+      return;
+    }
+    if (
+      !window.confirm(
+        'Restore will REPLACE your current local ledger with the cloud backup. Any local changes since the last backup will be lost. Continue?'
+      )
+    )
+      return;
     setLoading(true);
     try {
       const snap = await getDoc(doc(db, 'users', activeUser));
       const encrypted = snap.exists() ? snap.data().backup : null;
-      if (!encrypted) { show('No cloud backup found for this account yet.', 'error'); setLoading(false); return; }
+      if (!encrypted) {
+        show('No cloud backup found for this account yet.', 'error');
+        setLoading(false);
+        return;
+      }
       const bytes = CryptoJS.AES.decrypt(encrypted, key);
       const str = bytes.toString(CryptoJS.enc.Utf8);
-      if (!str) { show('Could not decrypt the backup - is the group key correct?', 'error'); setLoading(false); return; }
+      if (!str) {
+        show('Could not decrypt the backup - is the group key correct?', 'error');
+        setLoading(false);
+        return;
+      }
       const parsed = JSON.parse(str);
-      if (!Array.isArray(parsed)) { show('The backup looks corrupted, so restore was cancelled to protect your ledger.', 'error'); setLoading(false); return; }
+      if (!Array.isArray(parsed)) {
+        show(
+          'The backup looks corrupted, so restore was cancelled to protect your ledger.',
+          'error'
+        );
+        setLoading(false);
+        return;
+      }
       setLocalExpenses(parsed);
       localStorage.setItem(`expenses_${groupId}`, JSON.stringify(parsed));
-      show(`Ledger restored - ${parsed.length} item${parsed.length === 1 ? '' : 's'} loaded from your backup.`, 'success');
+      show(
+        `Ledger restored - ${parsed.length} item${parsed.length === 1 ? '' : 's'} loaded from your backup.`,
+        'success'
+      );
     } catch (e) {
       console.error(e);
       show('Restore failed. Double-check your group key and try again.', 'error');
@@ -197,86 +293,125 @@ export default function BackupModal({ onClose, activeUser, groupId, groupKeyHash
 
   return (
     <Modal onClose={onClose} title="Backup & Recovery">
-        <div className="space-y-6">
-          {msg && (
-            <div className={`p-3 text-sm rounded-xl border ${
-              msg.type === 'success' ? 'bg-natural-sidebar text-natural-text border-natural-border'
-              : msg.type === 'error' ? 'bg-natural-primary/5 text-natural-primary border-natural-primary/25'
-              : 'bg-natural-sidebar text-natural-text border-natural-border'
-            }`}>
-              {msg.text}
-            </div>
-          )}
+      <div className="space-y-6">
+        {msg && (
+          <div
+            className={`p-3 text-sm rounded-xl border ${
+              msg.type === 'success'
+                ? 'bg-natural-sidebar text-natural-text border-natural-border'
+                : msg.type === 'error'
+                  ? 'bg-natural-primary/5 text-natural-primary border-natural-primary/25'
+                  : 'bg-natural-sidebar text-natural-text border-natural-border'
+            }`}
+          >
+            {msg.text}
+          </div>
+        )}
 
-          {/* Group key */}
-          <div className="space-y-3">
-            <h3 className="font-bold text-sm text-natural-text flex items-center gap-2">
-              <Key className="h-4 w-4 text-natural-primary" /> Secret Group Key
-            </h3>
-            <p className="text-xs text-natural-muted">
-              Your ledger is encrypted with this key before it ever leaves your device. Save it, share the exact phrase with your group, and keep it somewhere safe - it's the only way to restore a backup.
-            </p>
+        {/* Group key */}
+        <div className="space-y-3">
+          <h3 className="font-bold text-sm text-natural-text flex items-center gap-2">
+            <Key className="h-4 w-4 text-natural-primary" /> Secret Group Key
+          </h3>
+          <p className="text-xs text-natural-muted">
+            Your ledger is encrypted with this key before it ever leaves your device. Save it, share
+            the exact phrase with your group, and keep it somewhere safe - it's the only way to
+            restore a backup.
+          </p>
 
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-natural-sidebar text-natural-text' : 'bg-natural-primary/10 text-natural-primary'}`}>
-                {hasKey ? 'Key set on this device' : 'No key yet'}
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-xs font-bold px-2 py-1 rounded-full ${hasKey ? 'bg-natural-sidebar text-natural-text' : 'bg-natural-primary/10 text-natural-primary'}`}
+            >
+              {hasKey ? 'Key set on this device' : 'No key yet'}
+            </span>
+            {keyMatches === true && (
+              <span className="text-xs font-bold text-natural-text flex items-center gap-1">
+                <Check className="h-3 w-3" /> Matches your group
               </span>
-              {keyMatches === true && <span className="text-xs font-bold text-natural-text flex items-center gap-1"><Check className="h-3 w-3" /> Matches your group</span>}
-              {keyMatches === false && <span className="text-xs font-bold text-natural-primary">Doesn't match your group's saved key</span>}
-            </div>
+            )}
+            {keyMatches === false && (
+              <span className="text-xs font-bold text-natural-primary">
+                Doesn't match your group's saved key
+              </span>
+            )}
+          </div>
 
-            <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">Group Key</label>
-              <input
-                type="text"
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="Group key"
-                autoComplete="off"
-                spellCheck={false}
-                className="w-full px-4 py-3 bg-natural-bg/50 border border-natural-border rounded-xl text-natural-text text-sm outline-none focus:border-natural-primary font-mono"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              Group Key
+            </label>
+            <input
+              type="text"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="Group key"
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full px-4 py-3 bg-natural-bg/50 border border-natural-border rounded-xl text-natural-text text-sm outline-none focus:border-natural-primary font-mono"
+            />
+          </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button onClick={handleGenerate} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                <Sparkles className="h-4 w-4 text-natural-primary" /> Generate
-              </button>
-              <button onClick={handleSaveKey} disabled={loading} className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-natural-primary-ink rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                <Check className="h-4 w-4" /> Save Key
-              </button>
-            </div>
-            <button onClick={handleResetKey} disabled={loading} className="w-full py-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50">
-              <RefreshCw className="h-3.5 w-3.5" /> Reset key (lost or forgotten)
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="flex-1 min-w-[120px] py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4 text-natural-primary" /> Generate
+            </button>
+            <button
+              onClick={handleSaveKey}
+              disabled={loading}
+              className="flex-1 min-w-[120px] py-2.5 bg-natural-primary text-white hover:bg-natural-primary-ink rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Check className="h-4 w-4" /> Save Key
             </button>
           </div>
-
-          {/* Backup / restore */}
-          <div className="pt-4 border-t border-natural-border space-y-3">
-            <h3 className="font-bold text-sm text-natural-text flex items-center gap-2">
-              <Cloud className="h-4 w-4 text-natural-primary" /> Encrypted Cloud Backup
-            </h3>
-            <p className="text-xs text-natural-muted">
-              Back up your local ledger to the cloud, encrypted with your group key. Only someone with the key can read it - not other members, not us.
-            </p>
-            <div className="flex items-center justify-between text-xs bg-natural-bg/50 border border-natural-border rounded-lg px-3 py-2">
-              <span className="text-natural-muted">Last backup</span>
-              <span className="font-semibold text-natural-text">{formatDate(lastBackup)}</span>
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button onClick={handleBackup} disabled={loading} className="flex-1 py-2.5 bg-natural-primary text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                <Cloud className="h-4 w-4" /> Back up now
-              </button>
-              <button onClick={handleRestore} disabled={loading} className="flex-1 py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                <Download className="h-4 w-4" /> Restore
-              </button>
-            </div>
-            <p className="text-xs text-natural-muted flex items-start gap-1.5">
-              <Shield className="h-3.5 w-3.5 text-natural-primary shrink-0 mt-0.5" />
-              Restoring replaces your current ledger - you'll be asked to confirm first.
-            </p>
-          </div>
+          <button
+            onClick={handleResetKey}
+            disabled={loading}
+            className="w-full py-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Reset key (lost or forgotten)
+          </button>
         </div>
+
+        {/* Backup / restore */}
+        <div className="pt-4 border-t border-natural-border space-y-3">
+          <h3 className="font-bold text-sm text-natural-text flex items-center gap-2">
+            <Cloud className="h-4 w-4 text-natural-primary" /> Encrypted Cloud Backup
+          </h3>
+          <p className="text-xs text-natural-muted">
+            Back up your local ledger to the cloud, encrypted with your group key. Only someone with
+            the key can read it - not other members, not us.
+          </p>
+          <div className="flex items-center justify-between text-xs bg-natural-bg/50 border border-natural-border rounded-lg px-3 py-2">
+            <span className="text-natural-muted">Last backup</span>
+            <span className="font-semibold text-natural-text">{formatDate(lastBackup)}</span>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={handleBackup}
+              disabled={loading}
+              className="flex-1 py-2.5 bg-natural-primary text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Cloud className="h-4 w-4" /> Back up now
+            </button>
+            <button
+              onClick={handleRestore}
+              disabled={loading}
+              className="flex-1 py-2.5 bg-white border border-natural-border text-natural-text hover:bg-natural-sidebar rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> Restore
+            </button>
+          </div>
+          <p className="text-xs text-natural-muted flex items-start gap-1.5">
+            <Shield className="h-3.5 w-3.5 text-natural-primary shrink-0 mt-0.5" />
+            Restoring replaces your current ledger - you'll be asked to confirm first.
+          </p>
+        </div>
+      </div>
     </Modal>
   );
 }

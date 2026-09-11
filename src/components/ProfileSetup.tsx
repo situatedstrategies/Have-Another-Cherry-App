@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { db, authHeader } from '../firebase';
 import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 
@@ -27,8 +27,20 @@ const STEPS: Step[] = [
     title: 'Income & instincts',
     subtitle: "Let's start with the big picture.",
     questions: [
-      { key: 'income', type: 'number', label: 'Your approximate annual income', placeholder: 'Amount' },
-      { key: 'partnerIncome', type: 'number', label: 'Income of the person you share with (if any)', placeholder: 'Amount', optional: true, help: 'Leave it blank if you are keeping this ledger on your own.' },
+      {
+        key: 'income',
+        type: 'number',
+        label: 'Your approximate annual income',
+        placeholder: 'Amount',
+      },
+      {
+        key: 'partnerIncome',
+        type: 'number',
+        label: 'Income of the person you share with (if any)',
+        placeholder: 'Amount',
+        optional: true,
+        help: 'Leave it blank if you are keeping this ledger on your own.',
+      },
       {
         key: 'spendingStyle',
         type: 'select',
@@ -65,7 +77,7 @@ const STEPS: Step[] = [
         options: [
           { value: 'none', label: 'No, none are' },
           { value: 'mine', label: 'Yes, mine are' },
-          { value: 'partners', label: "Yes, someone I share with has one" },
+          { value: 'partners', label: 'Yes, someone I share with has one' },
           { value: 'some_not_all', label: 'Some cards are, but not all' },
           { value: 'not_sure', label: 'Not sure' },
         ],
@@ -180,7 +192,8 @@ const STEPS: Step[] = [
       {
         key: 'conflictStyle',
         type: 'select',
-        label: 'When you and the person or people you share with disagree about money, you tend to...',
+        label:
+          'When you and the person or people you share with disagree about money, you tend to...',
         options: [
           { value: 'compromise', label: 'Look for a middle-ground compromise' },
           { value: 'data', label: 'Pull up the numbers and get specific' },
@@ -205,7 +218,7 @@ const STEPS: Step[] = [
   },
 ];
 
-const INITIAL_ANSWERS: Record<string, string> = STEPS.flatMap(s => s.questions).reduce(
+const INITIAL_ANSWERS: Record<string, string> = STEPS.flatMap((s) => s.questions).reduce(
   (acc, q) => ({ ...acc, [q.key]: '' }),
   {}
 );
@@ -216,10 +229,11 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
   const [submitError, setSubmitError] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>(INITIAL_ANSWERS);
 
-  const setAnswer = (key: string, value: string) => setAnswers(prev => ({ ...prev, [key]: value }));
+  const setAnswer = (key: string, value: string) =>
+    setAnswers((prev) => ({ ...prev, [key]: value }));
 
   const currentStep = STEPS[step];
-  const isStepComplete = currentStep.questions.every(q => {
+  const isStepComplete = currentStep.questions.every((q) => {
     const raw = (answers[q.key] ?? '').toString().trim();
     if (raw === '') return !!q.optional;
     // Numeric answers (income) must be a sane, non-negative number.
@@ -237,7 +251,8 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     const fallbackProfile = {
       type: 'The Pragmatic Planner',
       description: 'You prefer stable financial boundaries and clear, kind communication.',
-      quote: '"Do not save what is left after spending, but spend what is left after saving." - Warren Buffett',
+      quote:
+        '"Do not save what is left after spending, but spend what is left after saving." - Warren Buffett',
       greetingTone: 'harmonious',
     };
     try {
@@ -256,7 +271,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         addDoc(collection(db, 'profile_log'), {
           ...result.data,
           createdAt: new Date().toISOString(),
-        }).catch(e => console.error('profile_log write failed', e));
+        }).catch((e) => console.error('profile_log write failed', e));
       }
 
       await setDoc(
@@ -289,7 +304,9 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         // answers never reached the account. Say so rather than dropping
         // back to the quiz as if nothing happened.
         console.error('Profile save failed', innerErr);
-        setSubmitError('Your answers could not be saved. Check your connection and try again; nothing you entered has been lost.');
+        setSubmitError(
+          'Your answers could not be saved. Check your connection and try again; nothing you entered has been lost.'
+        );
         setLoading(false);
       }
     }
@@ -300,7 +317,9 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-natural-border border-t-natural-text rounded-full animate-spin mx-auto"></div>
-          <h2 className="text-xl font-display font-semibold text-natural-text">Crafting your financial style...</h2>
+          <h2 className="text-xl font-display font-semibold text-natural-text">
+            Crafting your financial style...
+          </h2>
           <p className="text-sm text-natural-muted">Reading between the lines of your answers.</p>
         </div>
       </div>
@@ -311,12 +330,19 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
       <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-display font-semibold text-natural-text mb-1">Financial Profile Quiz</h1>
-          <p className="text-sm text-natural-muted">{currentStep.subtitle || "Let's tailor the app to your habits."}</p>
+          <h1 className="text-2xl font-display font-semibold text-natural-text mb-1">
+            Financial Profile Quiz
+          </h1>
+          <p className="text-sm text-natural-muted">
+            {currentStep.subtitle || "Let's tailor the app to your habits."}
+          </p>
           {/* Progress */}
           <div className="flex gap-1.5 mt-4">
             {STEPS.map((_, i) => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-natural-primary' : 'bg-natural-border'}`} />
+              <div
+                key={i}
+                className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-natural-primary' : 'bg-natural-border'}`}
+              />
             ))}
           </div>
           <p className="text-[11px] font-bold text-natural-muted uppercase tracking-wider mt-3">
@@ -332,19 +358,23 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         )}
 
         <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-          {currentStep.questions.map(q => (
+          {currentStep.questions.map((q) => (
             <div key={q.key}>
-              <label className="block text-sm font-semibold text-natural-text mb-2">{q.label}</label>
+              <label className="block text-sm font-semibold text-natural-text mb-2">
+                {q.label}
+              </label>
               {q.type === 'number' ? (
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted">
+                    $
+                  </span>
                   <input
                     type="number"
                     min="0"
                     max="100000000"
                     step="1000"
                     value={answers[q.key] || ''}
-                    onChange={e => setAnswer(q.key, e.target.value)}
+                    onChange={(e) => setAnswer(q.key, e.target.value)}
                     placeholder={q.placeholder}
                     className="w-full pl-7 p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                   />
@@ -352,12 +382,14 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               ) : (
                 <select
                   value={answers[q.key] || ''}
-                  onChange={e => setAnswer(q.key, e.target.value)}
+                  onChange={(e) => setAnswer(q.key, e.target.value)}
                   className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                 >
                   <option value="">Select...</option>
-                  {q.options?.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                  {q.options?.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               )}
@@ -368,7 +400,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
           <div className="flex gap-3 pt-2">
             {step > 0 && (
               <button
-                onClick={() => setStep(s => s - 1)}
+                onClick={() => setStep((s) => s - 1)}
                 className="w-1/3 bg-natural-border text-natural-text font-medium py-3 px-4 rounded-md hover:bg-natural-border/80"
               >
                 Back
@@ -376,7 +408,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
             )}
             {!isLastStep ? (
               <button
-                onClick={() => setStep(s => s + 1)}
+                onClick={() => setStep((s) => s + 1)}
                 disabled={!isStepComplete}
                 className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary/90 disabled:opacity-50`}
               >

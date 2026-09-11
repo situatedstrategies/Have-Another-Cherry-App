@@ -4,18 +4,18 @@
 // down or unconfigured. The email to poolside@ is the system of record; Notion
 // is the working surface on top of it. If NOTION_TOKEN is unset this is a no-op,
 // so the form keeps working before the integration is wired up.
-const NOTION_VERSION = "2022-06-28";
+const NOTION_VERSION = '2022-06-28';
 
 export type WaitlistLead = {
   email: string;
   name?: string;
-  platform?: string;   // "iOS" | "Android" | "Either"
+  platform?: string; // "iOS" | "Android" | "Either"
   source?: string;
   referrer?: string;
   consent?: boolean;
   notes?: string;
-  formType?: string;   // "Waitlist" | "Beta"
-  device?: string;     // "iPhone" | "iPad" | "Android" | "Mac" | "Windows" | "Other"
+  formType?: string; // "Waitlist" | "Beta"
+  device?: string; // "iPhone" | "iPad" | "Android" | "Mac" | "Windows" | "Other"
 };
 
 // Derived from request headers rather than sent by the client: a
@@ -30,28 +30,28 @@ export type WaitlistLead = {
 // as a fallback: Chromium sends Sec-CH-UA-Platform and Sec-CH-UA-Mobile by
 // default on secure origins, and between them they answer the same question.
 export function deviceFromUserAgent(ua?: string, hints?: DeviceHints): string {
-  const s = (ua || "").toLowerCase();
+  const s = (ua || '').toLowerCase();
 
   if (s) {
-    if (/iphone|ipod/.test(s)) return "iPhone";
-    if (/ipad/.test(s)) return "iPad";
+    if (/iphone|ipod/.test(s)) return 'iPhone';
+    if (/ipad/.test(s)) return 'iPad';
     // iPadOS reports as desktop Safari; the touch-capable Mac signature is an iPad.
-    if (/macintosh/.test(s) && /mobile/.test(s)) return "iPad";
-    if (/android/.test(s)) return "Android";
-    if (/macintosh|mac os x/.test(s)) return "Mac";
-    if (/windows/.test(s)) return "Windows";
+    if (/macintosh/.test(s) && /mobile/.test(s)) return 'iPad';
+    if (/android/.test(s)) return 'Android';
+    if (/macintosh|mac os x/.test(s)) return 'Mac';
+    if (/windows/.test(s)) return 'Windows';
   }
 
   // Values arrive quoted, e.g. Sec-CH-UA-Platform: "macOS", and mobile is the
   // literal "?1" / "?0".
-  const platform = (hints?.platform || "").toLowerCase().replace(/"/g, "").trim();
-  const mobile = (hints?.mobile || "").includes("1");
-  if (platform === "ios") return mobile ? "iPhone" : "iPad";
-  if (platform === "android") return "Android";
-  if (platform === "macos") return "Mac";
-  if (platform === "windows") return "Windows";
+  const platform = (hints?.platform || '').toLowerCase().replace(/"/g, '').trim();
+  const mobile = (hints?.mobile || '').includes('1');
+  if (platform === 'ios') return mobile ? 'iPhone' : 'iPad';
+  if (platform === 'android') return 'Android';
+  if (platform === 'macos') return 'Mac';
+  if (platform === 'windows') return 'Windows';
 
-  return "Other";
+  return 'Other';
 }
 
 /** Chromium client hints, read from the request headers. */
@@ -62,9 +62,9 @@ export type DeviceHints = {
   mobile?: string;
 };
 
-const PLATFORMS = new Set(["iOS", "Android", "Either"]);
-const FORM_TYPES = new Set(["Waitlist", "Beta"]);
-const DEVICES = new Set(["iPhone", "iPad", "Android", "Mac", "Windows", "Other"]);
+const PLATFORMS = new Set(['iOS', 'Android', 'Either']);
+const FORM_TYPES = new Set(['Waitlist', 'Beta']);
+const DEVICES = new Set(['iPhone', 'iPad', 'Android', 'Mac', 'Windows', 'Other']);
 
 export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void> {
   const token = process.env.NOTION_TOKEN;
@@ -73,7 +73,7 @@ export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void>
   // "disabled" turns the mirror off explicitly. App Hosting rejects an empty
   // string as a value, so a named sentinel is the off switch, and it beats
   // letting a placeholder through to fail one API call per signup.
-  if (!token || !databaseId || token.toLowerCase() === "disabled") return;
+  if (!token || !databaseId || token.toLowerCase() === 'disabled') return;
 
   const text = (v?: string) =>
     v && v.trim() ? { rich_text: [{ text: { content: v.trim().slice(0, 1900) } }] } : undefined;
@@ -81,7 +81,7 @@ export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void>
   const properties: Record<string, unknown> = {
     Email: { title: [{ text: { content: lead.email.slice(0, 254) } }] },
     Consent: { checkbox: lead.consent === true },
-    Status: { status: { name: "Not started" } },
+    Status: { status: { name: 'Not started' } },
   };
   const name = text(lead.name);
   if (name) properties.Name = name;
@@ -103,15 +103,17 @@ export async function addWaitlistLeadToNotion(lead: WaitlistLead): Promise<void>
   if (lead.referrer) {
     try {
       properties.Referrer = { url: new URL(lead.referrer).toString() };
-    } catch { /* not a URL; omit */ }
+    } catch {
+      /* not a URL; omit */
+    }
   }
 
-  const res = await fetch("https://api.notion.com/v1/pages", {
-    method: "POST",
+  const res = await fetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      "Notion-Version": NOTION_VERSION,
-      "Content-Type": "application/json",
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ parent: { database_id: databaseId }, properties }),
   });

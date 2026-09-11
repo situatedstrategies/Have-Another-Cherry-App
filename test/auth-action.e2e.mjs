@@ -33,15 +33,23 @@ const check = (label, ok, detail = '') => {
 
 const api = async (path, body) => {
   const r = await fetch(`${EMU}/identitytoolkit.googleapis.com/v1/${path}?key=${KEY}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   return { status: r.status, json: await r.json().catch(() => ({})) };
 };
-const oobCodes = async () => (await (await fetch(`${EMU}/emulator/v1/projects/${PROJ}/oobCodes`)).json()).oobCodes;
+const oobCodes = async () =>
+  (await (await fetch(`${EMU}/emulator/v1/projects/${PROJ}/oobCodes`)).json()).oobCodes;
 const getUser = async (email) => {
-  const r = await fetch(`${EMU}/identitytoolkit.googleapis.com/v1/projects/${PROJ}/accounts:query`, {
-    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: '{}',
-  });
+  const r = await fetch(
+    `${EMU}/identitytoolkit.googleapis.com/v1/projects/${PROJ}/accounts:query`,
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+      body: '{}',
+    }
+  );
   const j = await r.json().catch(() => ({}));
   return (j.userInfo || []).find((u) => u.email === email);
 };
@@ -71,7 +79,8 @@ for (const host of ['identitytoolkit.googleapis.com', 'securetoken.googleapis.co
       body: req.postData() || undefined,
     });
     await route.fulfill({
-      status: res.status, headers: { ...cors, 'content-type': 'application/json' },
+      status: res.status,
+      headers: { ...cors, 'content-type': 'application/json' },
       body: await res.text(),
     });
   });
@@ -83,7 +92,11 @@ const open = async (query) => {
   page.on('console', (m) => logs.push(m.text()));
   page.on('pageerror', (e) => logs.push('PAGEERROR: ' + e.message));
   await page.goto(`${APP}/auth/action?${query}`, { waitUntil: 'domcontentloaded' });
-  return { page, logs, text: async () => (await page.locator('#root').innerText()).replace(/\s+/g, ' ').trim() };
+  return {
+    page,
+    logs,
+    text: async () => (await page.locator('#root').innerText()).replace(/\s+/g, ' ').trim(),
+  };
 };
 
 const EMAIL = 'tester@example.com';
@@ -130,18 +143,36 @@ check('success screen shown', /password updated/i.test(t), t.slice(0, 200));
 check('no raw firebase code on screen', !/auth\/[a-z-]+/.test(t));
 
 console.log('\n=== 5. the password actually changed in Firebase ===');
-const withNew = await api('accounts:signInWithPassword', { email: EMAIL, password: NEW_PW, returnSecureToken: true });
-check('sign-in with NEW password succeeds', withNew.status === 200 && !!withNew.json.idToken,
-  JSON.stringify(withNew.json).slice(0, 160));
-const withOld = await api('accounts:signInWithPassword', { email: EMAIL, password: OLD_PW, returnSecureToken: true });
-check('sign-in with OLD password now fails', withOld.status !== 200,
-  JSON.stringify(withOld.json).slice(0, 160));
+const withNew = await api('accounts:signInWithPassword', {
+  email: EMAIL,
+  password: NEW_PW,
+  returnSecureToken: true,
+});
+check(
+  'sign-in with NEW password succeeds',
+  withNew.status === 200 && !!withNew.json.idToken,
+  JSON.stringify(withNew.json).slice(0, 160)
+);
+const withOld = await api('accounts:signInWithPassword', {
+  email: EMAIL,
+  password: OLD_PW,
+  returnSecureToken: true,
+});
+check(
+  'sign-in with OLD password now fails',
+  withOld.status !== 200,
+  JSON.stringify(withOld.json).slice(0, 160)
+);
 
 console.log('\n=== 6. reusing the same code is refused ===');
 ({ page, logs, text } = await open(`mode=resetPassword&oobCode=${code}`));
 await page.waitForTimeout(2500);
 t = await text();
-check('friendly "no longer valid" message', /no longer valid|already been used/i.test(t), t.slice(0, 220));
+check(
+  'friendly "no longer valid" message',
+  /no longer valid|already been used/i.test(t),
+  t.slice(0, 220)
+);
 check('no raw firebase code on screen', !/auth\/[a-z-]+/.test(t));
 check('offers a way to request a new link', /send a new link/i.test(t));
 
@@ -149,11 +180,18 @@ console.log('\n=== 7. verifyEmail with a real code ===');
 // A fresh user: completing a password reset marks an address verified (the user
 // proved inbox control), so EMAIL is already verified by this point.
 const VEMAIL = 'verifyme@example.com';
-const vSignUp = await api('accounts:signUp', { email: VEMAIL, password: OLD_PW, returnSecureToken: true });
+const vSignUp = await api('accounts:signUp', {
+  email: VEMAIL,
+  password: OLD_PW,
+  returnSecureToken: true,
+});
 await api('accounts:sendOobCode', { requestType: 'VERIFY_EMAIL', idToken: vSignUp.json.idToken });
 const vcode = (await oobCodes()).filter((c) => c.requestType === 'VERIFY_EMAIL').pop().oobCode;
-check('user starts unverified', (await getUser(VEMAIL))?.emailVerified !== true,
-  JSON.stringify(await getUser(VEMAIL)));
+check(
+  'user starts unverified',
+  (await getUser(VEMAIL))?.emailVerified !== true,
+  JSON.stringify(await getUser(VEMAIL))
+);
 ({ page, logs, text } = await open(`mode=verifyEmail&oobCode=${vcode}`));
 await page.waitForTimeout(2500);
 t = await text();
@@ -164,51 +202,94 @@ console.log('\n=== 8. reusing a verifyEmail code is refused ===');
 ({ page, logs, text } = await open(`mode=verifyEmail&oobCode=${vcode}`));
 await page.waitForTimeout(2500);
 t = await text();
-check('friendly failure, no raw code', /no longer valid|already been used|did not work/i.test(t) && !/auth\/[a-z-]+/.test(t), t.slice(0, 200));
+check(
+  'friendly failure, no raw code',
+  /no longer valid|already been used|did not work/i.test(t) && !/auth\/[a-z-]+/.test(t),
+  t.slice(0, 200)
+);
 
 console.log('\n=== 9. recoverEmail with a real code ===');
-const si2 = await api('accounts:signInWithPassword', { email: EMAIL, password: NEW_PW, returnSecureToken: true });
-const changed = await api('accounts:update', { idToken: si2.json.idToken, email: 'changed@example.com', returnSecureToken: true });
+const si2 = await api('accounts:signInWithPassword', {
+  email: EMAIL,
+  password: NEW_PW,
+  returnSecureToken: true,
+});
+const changed = await api('accounts:update', {
+  idToken: si2.json.idToken,
+  email: 'changed@example.com',
+  returnSecureToken: true,
+});
 const rcodes = (await oobCodes()).filter((c) => c.requestType === 'RECOVER_EMAIL');
 if (!rcodes.length) {
-  console.log('SKIP  emulator produced no RECOVER_EMAIL code (update status ' + changed.status + ')');
+  console.log(
+    'SKIP  emulator produced no RECOVER_EMAIL code (update status ' + changed.status + ')'
+  );
 } else {
   const rcode = rcodes.pop().oobCode;
   ({ page, logs, text } = await open(`mode=recoverEmail&oobCode=${rcode}`));
   await page.waitForTimeout(2500);
   t = await text();
   check('recover success screen', /restored/i.test(t), t.slice(0, 200));
-  check('email rolled back in Firebase', !!(await getUser(EMAIL)), 'expected ' + EMAIL + ' to exist again');
+  check(
+    'email rolled back in Firebase',
+    !!(await getUser(EMAIL)),
+    'expected ' + EMAIL + ' to exist again'
+  );
 }
 
 console.log('\n=== 10. continueUrl is honoured only when safe ===');
-await api('accounts:sendOobCode', { requestType: 'PASSWORD_RESET', email: (await getUser(EMAIL)) ? EMAIL : 'changed@example.com' });
+await api('accounts:sendOobCode', {
+  requestType: 'PASSWORD_RESET',
+  email: (await getUser(EMAIL)) ? EMAIL : 'changed@example.com',
+});
 const c2 = (await oobCodes()).filter((c) => c.requestType === 'PASSWORD_RESET').pop().oobCode;
-({ page, logs, text } = await open(`mode=resetPassword&oobCode=${c2}&continueUrl=${encodeURIComponent('https://evil.example.com/pwn')}`));
+({ page, logs, text } = await open(
+  `mode=resetPassword&oobCode=${c2}&continueUrl=${encodeURIComponent('https://evil.example.com/pwn')}`
+));
 await page.waitForSelector('input[type=password]', { timeout: 15000 });
 await page.locator('input[type=password]').first().fill('AnotherPw7#');
 await page.locator('input[type=password]').nth(1).fill('AnotherPw7#');
 await page.getByRole('button', { name: /set new password/i }).click();
 await page.waitForTimeout(2500);
-const hrefs = await page.locator('#root a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-check('hostile continueUrl not rendered as a link', !hrefs.some((h) => (h || '').includes('evil.example.com')), JSON.stringify(hrefs));
+const hrefs = await page
+  .locator('#root a')
+  .evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+check(
+  'hostile continueUrl not rendered as a link',
+  !hrefs.some((h) => (h || '').includes('evil.example.com')),
+  JSON.stringify(hrefs)
+);
 
 console.log('\n=== 11. expired code (fault-injected: real SDK, forced EXPIRED_OOB_CODE) ===');
 // Codes expire on a clock the emulator will not fast-forward, so force the
 // server response Firebase sends for a stale code and let the real SDK map it.
 const expiredCtx = await browser.newContext();
 await expiredCtx.route('https://identitytoolkit.googleapis.com/**', async (route) => {
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST,GET,OPTIONS' };
-  if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors, body: '' });
+  const cors = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': '*',
+    'access-control-allow-methods': 'POST,GET,OPTIONS',
+  };
+  if (route.request().method() === 'OPTIONS')
+    return route.fulfill({ status: 204, headers: cors, body: '' });
   await route.fulfill({
-    status: 400, headers: { ...cors, 'content-type': 'application/json' },
-    body: JSON.stringify({ error: { code: 400, message: 'EXPIRED_OOB_CODE', errors: [{ message: 'EXPIRED_OOB_CODE', domain: 'global', reason: 'invalid' }] } }),
+    status: 400,
+    headers: { ...cors, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      error: {
+        code: 400,
+        message: 'EXPIRED_OOB_CODE',
+        errors: [{ message: 'EXPIRED_OOB_CODE', domain: 'global', reason: 'invalid' }],
+      },
+    }),
   });
 });
 const ep = await expiredCtx.newPage();
 const eLogs = [];
 ep.on('console', (m) => eLogs.push(m.text()));
-await ep.goto(`${APP}/auth/action?mode=resetPassword&oobCode=SOME_STALE_CODE`, { waitUntil: 'domcontentloaded' });
+await ep.goto(`${APP}/auth/action?mode=resetPassword&oobCode=SOME_STALE_CODE`, {
+  waitUntil: 'domcontentloaded',
+});
 await ep.waitForTimeout(2500);
 const et = (await ep.locator('#root').innerText()).replace(/\s+/g, ' ').trim();
 check('expired code shows the "expired" wording', /expired/i.test(et), et.slice(0, 220));

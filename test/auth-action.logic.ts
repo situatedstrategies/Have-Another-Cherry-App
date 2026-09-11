@@ -7,25 +7,51 @@ let fails = 0;
 function eq(label: string, actual: unknown, expected: unknown) {
   const ok = JSON.stringify(actual) === JSON.stringify(expected);
   if (!ok) fails++;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : `\n        got=${JSON.stringify(actual)} want=${JSON.stringify(expected)}`}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : `\n        got=${JSON.stringify(actual)} want=${JSON.stringify(expected)}`}`
+  );
 }
 
 console.log('--- continueUrl sanitizer (open-redirect defence) ---');
 eq('absent', sanitizeContinueUrl(null, ORIGIN), null);
 eq('empty', sanitizeContinueUrl('', ORIGIN), null);
-eq('same-origin absolute', sanitizeContinueUrl(`${ORIGIN}/dashboard`, ORIGIN), `${ORIGIN}/dashboard`);
+eq(
+  'same-origin absolute',
+  sanitizeContinueUrl(`${ORIGIN}/dashboard`, ORIGIN),
+  `${ORIGIN}/dashboard`
+);
 eq('relative path', sanitizeContinueUrl('/dashboard?x=1', ORIGIN), `${ORIGIN}/dashboard?x=1`);
-eq('allowlisted apex', sanitizeContinueUrl('https://haveanothercherry.com/welcome', ORIGIN), 'https://haveanothercherry.com/welcome');
+eq(
+  'allowlisted apex',
+  sanitizeContinueUrl('https://haveanothercherry.com/welcome', ORIGIN),
+  'https://haveanothercherry.com/welcome'
+);
 eq('foreign host BLOCKED', sanitizeContinueUrl('https://evil.example.com/pwn', ORIGIN), null);
 eq('javascript: BLOCKED', sanitizeContinueUrl('javascript:alert(1)', ORIGIN), null);
 eq('data: BLOCKED', sanitizeContinueUrl('data:text/html,<script>alert(1)</script>', ORIGIN), null);
 eq('protocol-relative BLOCKED', sanitizeContinueUrl('//evil.example.com/pwn', ORIGIN), null);
-eq('userinfo spoof BLOCKED', sanitizeContinueUrl('https://app.haveanothercherry.com@evil.example.com/', ORIGIN), null);
-eq('suffix spoof BLOCKED', sanitizeContinueUrl('https://haveanothercherry.com.evil.example.com/', ORIGIN), null);
-eq('subdomain not allowlisted BLOCKED', sanitizeContinueUrl('https://other.haveanothercherry.com/x', ORIGIN), null);
+eq(
+  'userinfo spoof BLOCKED',
+  sanitizeContinueUrl('https://app.haveanothercherry.com@evil.example.com/', ORIGIN),
+  null
+);
+eq(
+  'suffix spoof BLOCKED',
+  sanitizeContinueUrl('https://haveanothercherry.com.evil.example.com/', ORIGIN),
+  null
+);
+eq(
+  'subdomain not allowlisted BLOCKED',
+  sanitizeContinueUrl('https://other.haveanothercherry.com/x', ORIGIN),
+  null
+);
 // Garbage resolves as a relative path against our own origin, so it stays
 // same-origin. Harmless, and not a redirect off the site.
-eq('garbage stays same-origin', sanitizeContinueUrl('ht!tp://[[[', ORIGIN)?.startsWith(ORIGIN + '/'), true);
+eq(
+  'garbage stays same-origin',
+  sanitizeContinueUrl('ht!tp://[[[', ORIGIN)?.startsWith(ORIGIN + '/'),
+  true
+);
 
 console.log('\n--- firebase error mapping (never leak a raw code) ---');
 const codes = [
@@ -61,7 +87,13 @@ eq('no lowercase', isPasswordValid('ABCDEFG1!'), false);
 eq('plus is not an allowed special', isPasswordValid('Abcdefg1+'), false);
 eq('demo password shape passes', isPasswordValid('Haveanother1?!!'), true);
 eq('valid', isPasswordValid('Abcdefg1!'), true);
-eq('checks shape', checkPassword('Abcdefg1!'), { length: true, lowercase: true, uppercase: true, number: true, special: true });
+eq('checks shape', checkPassword('Abcdefg1!'), {
+  length: true,
+  lowercase: true,
+  uppercase: true,
+  number: true,
+  special: true,
+});
 
 console.log(fails === 0 ? '\nALL PASSED' : `\n${fails} FAILURES`);
 process.exit(fails === 0 ? 0 : 1);

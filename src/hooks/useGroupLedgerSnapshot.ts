@@ -13,12 +13,7 @@ interface Props {
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
 }
 
-export function useGroupLedgerSnapshot({
-  activeUser,
-  groupId,
-  expenses,
-  setExpenses,
-}: Props) {
+export function useGroupLedgerSnapshot({ activeUser, groupId, expenses, setExpenses }: Props) {
   const hydratedRef = useRef(false);
   const groupRef = useRef<string | undefined>(undefined);
 
@@ -68,10 +63,7 @@ export function useGroupLedgerSnapshot({
         let remoteExpenses: Expense[] = [];
 
         if (snapshot.exists() && snapshot.data()?.payload) {
-          const decrypted = await decryptData(
-            snapshot.data().payload,
-            groupId
-          );
+          const decrypted = await decryptData(snapshot.data().payload, groupId);
 
           if (Array.isArray(decrypted)) {
             remoteExpenses = decrypted as Expense[];
@@ -88,9 +80,7 @@ export function useGroupLedgerSnapshot({
         // history has a document per month to decrypt.
         let archived: Expense[] = [];
         try {
-          const months = await getDocs(
-            collection(db, 'group_ledgers', groupId, 'archive')
-          );
+          const months = await getDocs(collection(db, 'group_ledgers', groupId, 'archive'));
           for (const month of months.docs) {
             const payload = month.data()?.payload;
             if (!payload) continue;
@@ -109,19 +99,13 @@ export function useGroupLedgerSnapshot({
           console.error('Ledger archive read failed', error);
         }
 
-        const merged = mergeExpenseLists(
-          localExpenses,
-          remoteExpenses.concat(archived)
-        );
+        const merged = mergeExpenseLists(localExpenses, remoteExpenses.concat(archived));
 
         if (!cancelled && groupRef.current === groupId) {
           setExpenses(merged);
 
           try {
-            localStorage.setItem(
-              `expenses_${groupId}`,
-              JSON.stringify(merged)
-            );
+            localStorage.setItem(`expenses_${groupId}`, JSON.stringify(merged));
           } catch (error) {
             console.error('Failed to persist hydrated ledger', error);
           }
@@ -148,12 +132,7 @@ export function useGroupLedgerSnapshot({
 
   // Keep an encrypted group snapshot current after hydration.
   useEffect(() => {
-    if (
-      !activeUser ||
-      !groupId ||
-      !hydratedRef.current ||
-      groupRef.current !== groupId
-    ) {
+    if (!activeUser || !groupId || !hydratedRef.current || groupRef.current !== groupId) {
       return;
     }
 
@@ -162,28 +141,18 @@ export function useGroupLedgerSnapshot({
     const persist = async () => {
       try {
         // Never write an empty ledger over a remote one that has content.
-        //
-        // Hydration can finish empty for reasons that have nothing to do with
-        // the household deleting anything: one failed Firestore read, one
-        // payload that does not decrypt, an offline first load. Persist is
-        // gated on hydration having happened, not on it having found
-        // anything, so an empty result used to be written straight over the
-        // good snapshot. That is unrecoverable: the ciphertext it replaced is
-        // gone, and every device that syncs afterwards agrees the ledger is
-        // empty.
-        //
-        // The cost of this guard is the one case it cannot tell apart:
-        // deleting the very last expense in a household leaves a stale entry
-        // in the remote snapshot until the next write. That self-heals the
-        // moment anything else is logged. Losing a household's entire history
-        // does not self-heal.
+        // Hydration can finish empty for reasons unrelated to deletion (a
+        // failed read, a payload that does not decrypt, an offline first
+        // load), and overwriting the snapshot is unrecoverable. The cost is
+        // that deleting the very last expense leaves a stale remote entry
+        // until the next write, which self-heals.
         if (expenses.length === 0) {
           const existingSnap = await getDoc(doc(db, 'group_ledgers', groupId));
           if (existingSnap.data()?.payload) {
             console.warn(
               'Refusing to overwrite a non-empty ledger with an empty one. ' +
-              'The local ledger is empty, which usually means a read or ' +
-              'decrypt failed rather than that everything was deleted.'
+                'The local ledger is empty, which usually means a read or ' +
+                'decrypt failed rather than that everything was deleted.'
             );
             return;
           }
