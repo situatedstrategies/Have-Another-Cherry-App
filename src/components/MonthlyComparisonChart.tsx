@@ -13,6 +13,7 @@ import { Expense, User } from '../types';
 import { parseLocalDate } from '../lib/recurring';
 import { roundCurrency } from '../lib/money';
 import { nameOf } from '../lib/members';
+import { colors } from '../lib/ui';
 
 interface MonthlyComparisonChartProps {
   expenses: Expense[];
@@ -51,15 +52,15 @@ function LendingTooltip({ active, payload, label, compare }: any) {
     <div
       style={{
         borderRadius: 8,
-        border: '1px solid #E4E4E7',
+        border: `1px solid ${colors.sidebar}`,
         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
         background: '#fff',
         padding: '10px 12px',
         fontSize: 12,
       }}
     >
-      <p style={{ fontWeight: 700, color: '#18181B', marginBottom: 4 }}>{label}</p>
-      <p style={{ color: '#18181B', fontWeight: 600 }}>
+      <p style={{ fontWeight: 700, color: colors.text, marginBottom: 4 }}>{label}</p>
+      <p style={{ color: colors.text, fontWeight: 600 }}>
         Total lent: ${Number(d.lending || 0).toFixed(2)}
       </p>
       {compare && (
@@ -69,7 +70,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
         <div style={{ marginTop: 6 }}>
           <p
             style={{
-              color: '#71717A',
+              color: colors.accent,
               textTransform: 'uppercase',
               fontSize: 10,
               letterSpacing: '0.05em',
@@ -78,7 +79,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
             Lent by
           </p>
           {Object.entries(lentBy).map(([name, amt]) => (
-            <p key={name} style={{ color: '#18181B' }}>
+            <p key={name} style={{ color: colors.text }}>
               {name}: <strong>${Number(amt).toFixed(2)}</strong>
             </p>
           ))}
@@ -88,7 +89,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
         <div style={{ marginTop: 6 }}>
           <p
             style={{
-              color: '#71717A',
+              color: colors.accent,
               textTransform: 'uppercase',
               fontSize: 10,
               letterSpacing: '0.05em',
@@ -97,7 +98,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
             Borrowed by
           </p>
           {Object.entries(borrowedBy).map(([name, amt]) => (
-            <p key={name} style={{ color: '#18181B' }}>
+            <p key={name} style={{ color: colors.text }}>
               {name}: <strong>${Number(amt).toFixed(2)}</strong>
             </p>
           ))}
@@ -276,7 +277,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                 <Tooltip
                   contentStyle={{
                     borderRadius: '8px',
-                    border: '1px solid #E4E4E7',
+                    border: `1px solid ${colors.sidebar}`,
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                   }}
                   formatter={(value: any, name: any) => [

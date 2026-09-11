@@ -7,6 +7,7 @@ import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 import CherryLogo from './CherryLogo';
+import { labelClass } from '../lib/ui';
 
 const NUMBER_WORDS = [
   'One',
@@ -437,9 +438,7 @@ export default function GroupSetup({
             </div>
 
             <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
-              <p className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">
-                Invite Code
-              </p>
+              <p className={`${labelClass} mb-3`}>Invite Code</p>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">
                   {createdGroupInfo.inviteCode}
@@ -518,7 +517,7 @@ export default function GroupSetup({
           <div className="p-8">
             <button
               onClick={() => (onCancel ? onCancel() : (forgetKeepSignedIn(), signOut(auth)))}
-              className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
+              className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
             >
               <ArrowLeft size={16} /> {onCancel ? 'Cancel' : 'Back'}
             </button>
@@ -591,7 +590,7 @@ export default function GroupSetup({
         <div className="p-8">
           <button
             onClick={() => setMode('choose')}
-            className="text-natural-muted hover:text-natural-primary text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-1 transition-colors"
+            className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
           >
             <ArrowLeft size={16} /> Back
           </button>
@@ -612,9 +611,7 @@ export default function GroupSetup({
           {mode === 'create' ? (
             <form onSubmit={handleCreateGroup} className="space-y-6">
               <div>
-                <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
-                  Group Name
-                </label>
+                <label className={`${labelClass} block mb-1.5`}>Group Name</label>
                 <input
                   type="text"
                   value={groupName}
@@ -626,7 +623,7 @@ export default function GroupSetup({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
+                <label className={`${labelClass} block mb-1.5`}>
                   How many people are in this group?
                 </label>
                 <p className="text-xs text-natural-muted mb-4 font-medium">
@@ -661,9 +658,7 @@ export default function GroupSetup({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
-                  Split Percentages
-                </label>
+                <label className={`${labelClass} block mb-1.5`}>Split Percentages</label>
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">
@@ -801,9 +796,7 @@ export default function GroupSetup({
           ) : (
             <form onSubmit={handleJoinGroup} className="space-y-6">
               <div>
-                <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
-                  Enter Invite Code
-                </label>
+                <label className={`${labelClass} block mb-1.5`}>Enter Invite Code</label>
                 <input
                   type="text"
                   required

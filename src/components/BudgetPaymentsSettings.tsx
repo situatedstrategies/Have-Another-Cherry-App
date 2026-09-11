@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Wallet } from 'lucide-react';
+import { labelClass } from '../lib/ui';
 
 interface Props {
   isPlus: boolean;
@@ -37,9 +38,7 @@ export default function BudgetPaymentsSettings({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider">
-          Budget & Payments
-        </h3>
+        <h3 className={labelClass}>Budget & Payments</h3>
         <button
           onClick={() => setShowCherryPlus(true)}
           className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
@@ -50,7 +49,7 @@ export default function BudgetPaymentsSettings({
       </div>
       <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
         <div>
-          <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-2">
+          <label className={`${labelClass} block mb-1 flex items-center gap-2`}>
             Spending threshold
             {!isPlus && (
               <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
@@ -102,7 +101,7 @@ export default function BudgetPaymentsSettings({
         </div>
 
         <div className="border-t border-natural-primary/10 pt-3">
-          <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1 flex items-center gap-1.5">
+          <label className={`${labelClass} block mb-1 flex items-center gap-1.5`}>
             <Wallet size={12} /> How people pay you
           </label>
           <p className="text-xs text-natural-muted mb-2">

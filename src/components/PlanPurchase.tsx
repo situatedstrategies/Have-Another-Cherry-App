@@ -4,6 +4,7 @@ import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { roundCurrency } from '../lib/money';
 import { computeNetBetween } from '../lib/balances';
 import { X, Sparkles, TrendingUp, MessageCircle, Cherry } from 'lucide-react';
+import { labelClass } from '../lib/ui';
 
 interface PlanPurchaseProps {
   group: Group;
@@ -268,7 +269,7 @@ export default function PlanPurchase({
           {result && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+                <span className={labelClass}>
                   {otherName}'s share ({theirPct}%)
                 </span>
                 <span className="text-lg font-display font-semibold text-natural-text">
@@ -310,9 +311,7 @@ export default function PlanPurchase({
           {solo && numericAmount > 0 && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-2 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
-                  Your share (100%)
-                </span>
+                <span className={labelClass}>Your share (100%)</span>
                 <span className="text-lg font-display font-semibold text-natural-text">
                   ${numericAmount.toFixed(2)}
                 </span>

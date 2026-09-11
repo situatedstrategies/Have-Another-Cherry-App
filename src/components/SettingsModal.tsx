@@ -24,6 +24,7 @@ import {
 } from '../lib/members';
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import Modal from './Modal';
+import { labelClass } from '../lib/ui';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -247,9 +248,7 @@ export default function SettingsModal({
       {/* Notifications (web push) */}
       {pushState !== 'unavailable' && (
         <div>
-          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-            Notifications
-          </h3>
+          <h3 className={`${labelClass} mb-2`}>Notifications</h3>
           <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <Bell className="h-4 w-4 text-natural-primary mt-0.5 shrink-0" />
@@ -284,9 +283,7 @@ export default function SettingsModal({
           terms is not agreeing to a newsletter. The privacy policy points
           people here to change their mind. */}
       <div>
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-          Email
-        </h3>
+        <h3 className={`${labelClass} mb-2`}>Email</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border">
           <label className="flex items-start gap-2.5 cursor-pointer select-none">
             <input
@@ -309,9 +306,7 @@ export default function SettingsModal({
 
       {/* User profile */}
       <div>
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-          User Profile
-        </h3>
+        <h3 className={`${labelClass} mb-2`}>User Profile</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
           <div className="flex justify-between items-center gap-2">
             <span className="text-sm text-natural-muted">Name</span>
@@ -424,9 +419,7 @@ export default function SettingsModal({
 
       {/* Group details */}
       <div>
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-          Group Details
-        </h3>
+        <h3 className={`${labelClass} mb-2`}>Group Details</h3>
         <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-natural-muted">Group Name</span>
@@ -659,9 +652,7 @@ export default function SettingsModal({
 
       {/* Local ledger + legal */}
       <div>
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-          Local Ledger
-        </h3>
+        <h3 className={`${labelClass} mb-2`}>Local Ledger</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3 mb-4">
           <button
             onClick={onOpenBackup}
@@ -672,9 +663,7 @@ export default function SettingsModal({
             </span>
           </button>
         </div>
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-          Legal & Privacy
-        </h3>
+        <h3 className={`${labelClass} mb-2`}>Legal & Privacy</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3">
           <button
             onClick={onOpenPrivacy}

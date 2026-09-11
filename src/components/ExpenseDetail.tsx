@@ -36,6 +36,7 @@ import DarkCherryInfoModal, {
 import ReflectionsSection from './ReflectionsSection';
 import { intervalLabel } from '../lib/recurring';
 import { formatDate, formatDateTime } from '../lib/format';
+import { labelClass } from '../lib/ui';
 
 interface ExpenseDetailProps {
   expense: Expense;
@@ -650,9 +651,7 @@ export default function ExpenseDetail({
               is made: there is nobody to pay. */}
           {isUnclaimed(expense) && (
             <div className="bg-natural-sidebar/60 border border-natural-border rounded-2xl p-4 mb-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-                Nobody has paid this yet
-              </p>
+              <p className={labelClass}>Nobody has paid this yet</p>
               <p className="text-sm text-natural-muted mt-1.5 leading-relaxed">
                 This bill came around again. Whoever covered it takes it on, and the split below
                 applies from there.

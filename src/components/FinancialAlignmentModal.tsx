@@ -3,6 +3,7 @@ import { Sparkles, MessageCircleHeart, RefreshCcw } from 'lucide-react';
 import Modal from './Modal';
 import { authHeader } from '../firebase';
 import { User } from '../types';
+import { labelClass } from '../lib/ui';
 
 interface Props {
   members: Pick<User, 'uid' | 'name' | 'income' | 'partnerIncome' | 'financialProfile'>[];
@@ -87,9 +88,7 @@ export default function FinancialAlignmentModal({
       <div className="space-y-6">
         {/* Narrative profiles only - no scores, no quiz answers. */}
         <section>
-          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-            Your Financial Styles
-          </h3>
+          <h3 className={`${labelClass} mb-2`}>Your Financial Styles</h3>
           <div className="space-y-3">
             {members.map((m) => (
               <div
@@ -128,9 +127,7 @@ export default function FinancialAlignmentModal({
 
         {/* The raw numbers, side by side. */}
         <section>
-          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-            What You Each Reported
-          </h3>
+          <h3 className={`${labelClass} mb-2`}>What You Each Reported</h3>
           <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-xl p-4 space-y-3">
             {members.map((m) => {
               const own = currency(m.income);
@@ -173,9 +170,7 @@ export default function FinancialAlignmentModal({
 
         {/* AI conversation starter, tuned to severity + styles. */}
         <section>
-          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-wider mb-2">
-            A Way to Start the Conversation
-          </h3>
+          <h3 className={`${labelClass} mb-2`}>A Way to Start the Conversation</h3>
           <div className="bg-white border border-natural-border rounded-xl p-4 flex gap-3 items-start shadow-sm">
             <MessageCircleHeart className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             {loadingStarter ? (

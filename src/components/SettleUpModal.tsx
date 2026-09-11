@@ -11,6 +11,7 @@ import {
 } from '../lib/money';
 import { venmoTarget, zelleTarget } from '../lib/paymentLinks';
 import Modal from './Modal';
+import { labelClass } from '../lib/ui';
 
 interface SettleUpModalProps {
   expense: Expense;
@@ -169,9 +170,7 @@ export default function SettleUpModal({
 
           {isCreditor ? (
             <div className="pt-2 border-t border-natural-border/60">
-              <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-1.5">
-                Payment Received From
-              </label>
+              <label className={`${labelClass} block mb-1.5`}>Payment Received From</label>
               <select
                 value={selectedDebtor}
                 onChange={(e) => handleDebtorChange(e.target.value)}

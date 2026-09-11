@@ -10,6 +10,7 @@ import {
   manageSubscriptionUrl,
   type PlusPlan,
 } from '../lib/billing';
+import { labelClass } from '../lib/ui';
 
 // The Cherry + page. Today Cherry + is bought in the iOS/Android apps and the
 // web only reads the entitlement (see the note rendered below) - that keeps
@@ -196,9 +197,7 @@ export default function CherryPlusModal({
               </div>
             ) : (
               <form onSubmit={handleWaitlist} className="max-w-sm mx-auto space-y-2">
-                <label className="block text-xs font-bold text-natural-muted uppercase tracking-wider">
-                  Get updates when Cherry + launches
-                </label>
+                <label className={`${labelClass} block`}>Get updates when Cherry + launches</label>
                 <div className="flex gap-2">
                   <input
                     type="email"

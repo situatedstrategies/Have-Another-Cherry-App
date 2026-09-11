@@ -8,6 +8,7 @@ import {
 } from '../lib/money';
 import { joinedUids } from '../lib/members';
 import { CreditCard, CheckCircle2, TrendingUp } from 'lucide-react';
+import { labelClass } from '../lib/ui';
 
 interface StatsSectionProps {
   expenses: Expense[];
@@ -112,9 +113,7 @@ export default function StatsSection({
         title="See what you still owe"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-            You Owe
-          </span>
+          <span className={labelClass}>You Owe</span>
           <div className="p-2.5 bg-natural-sidebar text-natural-text rounded-2xl">
             <CreditCard className="h-5 w-5" />
           </div>
@@ -152,9 +151,7 @@ export default function StatsSection({
         title="See who still owes you"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-            Others Owe You
-          </span>
+          <span className={labelClass}>Others Owe You</span>
           <div className="p-2.5 bg-natural-sage text-natural-primary rounded-2xl">
             <TrendingUp className="h-5 w-5" />
           </div>
@@ -189,9 +186,7 @@ export default function StatsSection({
         id="stat-card-settled"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-            Fully Settled Items
-          </span>
+          <span className={labelClass}>Fully Settled Items</span>
           <div className="p-2.5 bg-white text-natural-primary rounded-2xl border border-natural-border">
             <CheckCircle2 className="h-5 w-5" />
           </div>
