@@ -22,9 +22,7 @@ const RAW_KEY: string = ((import.meta as any).env?.VITE_RC_WEB_KEY || '').trim()
 // so a backend that must not sell is switched off with a real string, and
 // that string has to mean off.
 const VALID_KEY_PREFIXES = ['strp_', 'rcb_', 'test_'];
-const API_KEY: string = VALID_KEY_PREFIXES.some((p) => RAW_KEY.startsWith(p))
-  ? RAW_KEY
-  : '';
+const API_KEY: string = VALID_KEY_PREFIXES.some((p) => RAW_KEY.startsWith(p)) ? RAW_KEY : '';
 
 export const isSandboxBilling = API_KEY.startsWith('test_');
 
@@ -134,8 +132,7 @@ export async function purchasePlus(
 // Stripe's hosted customer portal: the fallback when RevenueCat returns no
 // managementURL. Public by design; it identifies nobody until an address is
 // entered and verified by Stripe.
-const STRIPE_PORTAL_URL =
-  'https://billing.stripe.com/p/login/bJe8wR3Xt08M1Ce889d7q00';
+const STRIPE_PORTAL_URL = 'https://billing.stripe.com/p/login/bJe8wR3Xt08M1Ce889d7q00';
 
 // Stores that manage their own subscriptions; Stripe's portal cannot help their customers.
 const SELF_MANAGED_STORES = ['app_store', 'mac_app_store', 'play_store', 'amazon'];
@@ -149,7 +146,8 @@ export async function manageSubscriptionUrl(): Promise<string | null> {
     // Only offer the Stripe portal to someone who could plausibly be in it.
     const active = Object.values(info.entitlements.active);
     const boughtElsewhere = active.some((e) =>
-      SELF_MANAGED_STORES.includes((e as { store?: string }).store ?? ''));
+      SELF_MANAGED_STORES.includes((e as { store?: string }).store ?? '')
+    );
     return boughtElsewhere ? null : STRIPE_PORTAL_URL;
   } catch {
     return null;

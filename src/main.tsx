@@ -1,5 +1,5 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import AuthActionHandler from './components/AuthActionHandler.tsx';
 import './index.css';
@@ -14,7 +14,5 @@ import './index.css';
 const isAuthAction = window.location.pathname.replace(/\/+$/, '') === '/auth/action';
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    {isAuthAction ? <AuthActionHandler /> : <App />}
-  </StrictMode>,
+  <StrictMode>{isAuthAction ? <AuthActionHandler /> : <App />}</StrictMode>
 );

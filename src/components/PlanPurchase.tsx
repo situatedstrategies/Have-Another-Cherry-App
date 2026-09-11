@@ -16,7 +16,7 @@ interface PlanPurchaseProps {
 export function computeNetBetween(expenses: Expense[], activeUser: string, otherUid: string) {
   let theyOweYou = 0;
   let youOweThem = 0;
-  expenses.forEach(e => {
+  expenses.forEach((e) => {
     if (e.paidBy === activeUser) {
       theyOweYou += getRemainingSettlementAmount(e, otherUid, false);
     } else if (e.paidBy === otherUid) {
@@ -30,20 +30,53 @@ export function computeNetBetween(expenses: Expense[], activeUser: string, other
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-type Juice = { level: string; cherries: number; recommended: boolean; blurb: string; color: string };
+type Juice = {
+  level: string;
+  cherries: number;
+  recommended: boolean;
+  blurb: string;
+  color: string;
+};
 
 // Turn a 0-100 score into a "juiciness" verdict.
 function juiceFor(score: number): Juice {
-  if (score >= 75) return { level: 'Extra juicy', cherries: 2, recommended: true, color: 'text-natural-primary', blurb: 'Great time to bring this up - the balance is in your favor.' };
-  if (score >= 55) return { level: 'Juicy', cherries: 1, recommended: true, color: 'text-natural-primary', blurb: 'This looks reasonable to propose right now.' };
-  if (score >= 35) return { level: 'A little juice', cherries: 1, recommended: false, color: 'text-natural-text', blurb: 'Doable, but worth a gentle, considerate conversation first.' };
-  return { level: 'No juice', cherries: 0, recommended: false, color: 'text-natural-muted', blurb: 'Maybe hold off, or plan to cover more of it yourself for now.' };
+  if (score >= 75)
+    return {
+      level: 'Extra juicy',
+      cherries: 2,
+      recommended: true,
+      color: 'text-natural-primary',
+      blurb: 'Great time to bring this up - the balance is in your favor.',
+    };
+  if (score >= 55)
+    return {
+      level: 'Juicy',
+      cherries: 1,
+      recommended: true,
+      color: 'text-natural-primary',
+      blurb: 'This looks reasonable to propose right now.',
+    };
+  if (score >= 35)
+    return {
+      level: 'A little juice',
+      cherries: 1,
+      recommended: false,
+      color: 'text-natural-text',
+      blurb: 'Doable, but worth a gentle, considerate conversation first.',
+    };
+  return {
+    level: 'No juice',
+    cherries: 0,
+    recommended: false,
+    color: 'text-natural-muted',
+    blurb: 'Maybe hold off, or plan to cover more of it yourself for now.',
+  };
 }
 
 const STARTERS: Record<string, string[]> = {
   good: [
     "Hey, I've been eyeing {item} for us - want to split it {theirPct}%/{yourPct}%? Your part would be about ${theirShare}.",
-    "I think {item} would be a great add for the place. Fair split puts you around ${theirShare} - how does that sit with you?",
+    'I think {item} would be a great add for the place. Fair split puts you around ${theirShare} - how does that sit with you?',
     "Been thinking about {item}. Given how things have balanced out, splitting it feels fair - you'd be at ~${theirShare}. Thoughts?",
   ],
   careful: [
@@ -52,13 +85,19 @@ const STARTERS: Record<string, string[]> = {
   ],
   hold: [
     "I've been wanting {item}, but I know things are a bit tight - no rush. Maybe we revisit it next month?",
-    "Thinking ahead to {item} (~${theirShare} for your part). Totally fine to wait. Want to set a target date instead?",
+    'Thinking ahead to {item} (~${theirShare} for your part). Totally fine to wait. Want to set a target date instead?',
   ],
 };
 
-export default function PlanPurchase({ group, activeUser, groupUsers, expenses, onClose }: PlanPurchaseProps) {
+export default function PlanPurchase({
+  group,
+  activeUser,
+  groupUsers,
+  expenses,
+  onClose,
+}: PlanPurchaseProps) {
   const members = useMemo(() => getFullMembers(group), [group]);
-  const others = members.filter(m => m.uid !== activeUser && !m.uid.startsWith('ghost_'));
+  const others = members.filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'));
 
   const [otherUid, setOtherUid] = useState(others[0]?.uid || '');
   const [item, setItem] = useState('');
@@ -73,14 +112,16 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
   }, [otherUid, firstOtherUid]);
 
   const defaultSplit = getFullDefaultSplit(group);
-  const theirPct = Math.round(defaultSplit[otherUid] ?? (others.length ? 100 / (others.length + 1) : 50));
+  const theirPct = Math.round(
+    defaultSplit[otherUid] ?? (others.length ? 100 / (others.length + 1) : 50)
+  );
   const yourPct = 100 - theirPct;
 
   const numericAmount = parseFloat(amount) || 0;
   const theirShare = roundCurrency((numericAmount * theirPct) / 100);
 
   const other = groupUsers[otherUid] || {};
-  const otherName = members.find(m => m.uid === otherUid)?.name || 'The other person';
+  const otherName = members.find((m) => m.uid === otherUid)?.name || 'The other person';
   const otherIncome = Number(other.income) || 0;
   const otherThreshold = Number(other.recurringThreshold) || 0;
 
@@ -122,7 +163,17 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
       .replace(/\{theirShare\}/g, theirShare.toFixed(2));
 
     return { score, juice, starter };
-  }, [otherUid, numericAmount, theirShare, net, otherIncome, otherThreshold, item, theirPct, yourPct]);
+  }, [
+    otherUid,
+    numericAmount,
+    theirShare,
+    net,
+    otherIncome,
+    otherThreshold,
+    item,
+    theirPct,
+    yourPct,
+  ]);
 
   return (
     <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -131,7 +182,11 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-natural-primary" /> Plan a Purchase
           </h2>
-          <button onClick={onClose} aria-label="Close" className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -144,11 +199,13 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           </p>
 
           <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">What is it?</label>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
+              What is it?
+            </label>
             <input
               type="text"
               value={item}
-              onChange={e => setItem(e.target.value)}
+              onChange={(e) => setItem(e.target.value)}
               placeholder="Item"
               className="w-full px-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-xl text-sm outline-none"
             />
@@ -156,23 +213,37 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
 
           {others.length > 1 && (
             <div>
-              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">With whom?</label>
-              <select value={otherUid} onChange={e => setOtherUid(e.target.value)} className="w-full px-3 py-2.5 bg-white border border-natural-border rounded-xl text-sm outline-none">
-                {others.map(o => <option key={o.uid} value={o.uid}>{o.name}</option>)}
+              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
+                With whom?
+              </label>
+              <select
+                value={otherUid}
+                onChange={(e) => setOtherUid(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-natural-border rounded-xl text-sm outline-none"
+              >
+                {others.map((o) => (
+                  <option key={o.uid} value={o.uid}>
+                    {o.name}
+                  </option>
+                ))}
               </select>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">Total price</label>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
+              Total price
+            </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted">$</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted">
+                $
+              </span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 className="w-full pl-8 pr-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-xl font-mono text-sm outline-none"
               />
@@ -180,44 +251,73 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           </div>
 
           {/* Balance snapshot */}
-          {!solo && <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-xs font-bold text-natural-muted uppercase">They owe you</span>
-              <span className="block text-sm font-bold text-natural-text mt-0.5">${theyOweYou.toFixed(2)}</span>
+          {!solo && (
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
+                <span className="block text-xs font-bold text-natural-muted uppercase">
+                  They owe you
+                </span>
+                <span className="block text-sm font-bold text-natural-text mt-0.5">
+                  ${theyOweYou.toFixed(2)}
+                </span>
+              </div>
+              <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
+                <span className="block text-xs font-bold text-natural-muted uppercase">
+                  You owe them
+                </span>
+                <span className="block text-sm font-bold text-natural-text mt-0.5">
+                  ${youOweThem.toFixed(2)}
+                </span>
+              </div>
+              <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
+                <span className="block text-xs font-bold text-natural-muted uppercase">Net</span>
+                <span
+                  className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}
+                >
+                  {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                </span>
+              </div>
             </div>
-            <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-xs font-bold text-natural-muted uppercase">You owe them</span>
-              <span className="block text-sm font-bold text-natural-text mt-0.5">${youOweThem.toFixed(2)}</span>
-            </div>
-            <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-              <span className="block text-xs font-bold text-natural-muted uppercase">Net</span>
-              <span className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}>{net >= 0 ? '+' : ''}${net.toFixed(2)}</span>
-            </div>
-          </div>}
+          )}
 
           {result && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">{otherName}'s share ({theirPct}%)</span>
-                <span className="text-lg font-display font-semibold text-natural-text">${theirShare.toFixed(2)}</span>
+                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+                  {otherName}'s share ({theirPct}%)
+                </span>
+                <span className="text-lg font-display font-semibold text-natural-text">
+                  ${theirShare.toFixed(2)}
+                </span>
               </div>
               <div className="text-center py-1">
                 <span className="inline-flex items-center justify-center gap-1">
-                  {result.juice.cherries > 0
-                    ? Array.from({ length: result.juice.cherries }).map((_, i) => (
-                        <Cherry key={i} className="h-6 w-6 text-natural-primary" />
-                      ))
-                    : <Cherry className="h-6 w-6 text-natural-border" />}
+                  {result.juice.cherries > 0 ? (
+                    Array.from({ length: result.juice.cherries }).map((_, i) => (
+                      <Cherry key={i} className="h-6 w-6 text-natural-primary" />
+                    ))
+                  ) : (
+                    <Cherry className="h-6 w-6 text-natural-border" />
+                  )}
                 </span>
-                <p className={`text-lg font-display font-semibold ${result.juice.color}`}>{result.juice.level}</p>
+                <p className={`text-lg font-display font-semibold ${result.juice.color}`}>
+                  {result.juice.level}
+                </p>
                 <p className="text-xs text-natural-muted mt-1">{result.juice.blurb}</p>
                 {otherThreshold > 0 && theirShare > otherThreshold && (
-                  <p className="text-xs text-natural-primary mt-1 font-semibold">Note: this exceeds {otherName}'s spending threshold (${otherThreshold.toFixed(0)}).</p>
+                  <p className="text-xs text-natural-primary mt-1 font-semibold">
+                    Note: this exceeds {otherName}'s spending threshold ($
+                    {otherThreshold.toFixed(0)}).
+                  </p>
                 )}
               </div>
               <div className="bg-white rounded-xl p-3 border border-natural-border/60">
-                <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider flex items-center gap-1.5"><MessageCircle className="h-3 w-3" /> Conversation starter</span>
-                <p className="text-sm text-natural-text mt-1.5 italic leading-relaxed">"{result.starter}"</p>
+                <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <MessageCircle className="h-3 w-3" /> Conversation starter
+                </span>
+                <p className="text-sm text-natural-text mt-1.5 italic leading-relaxed">
+                  "{result.starter}"
+                </p>
               </div>
             </div>
           )}
@@ -225,11 +325,16 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           {solo && numericAmount > 0 && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-2 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">Your share (100%)</span>
-                <span className="text-lg font-display font-semibold text-natural-text">${numericAmount.toFixed(2)}</span>
+                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+                  Your share (100%)
+                </span>
+                <span className="text-lg font-display font-semibold text-natural-text">
+                  ${numericAmount.toFixed(2)}
+                </span>
               </div>
               <p className="text-xs text-natural-muted">
-                Nobody has joined yet, so this is all yours for now. Invite someone from Settings and this turns into a split and a conversation starter.
+                Nobody has joined yet, so this is all yours for now. Invite someone from Settings
+                and this turns into a split and a conversation starter.
               </p>
             </div>
           )}
@@ -237,7 +342,9 @@ export default function PlanPurchase({ group, activeUser, groupUsers, expenses, 
           {!result && !(solo && numericAmount > 0) && (
             <div className="text-center text-xs text-natural-muted py-4 flex flex-col items-center gap-2">
               <Sparkles className="h-5 w-5 text-natural-primary/40" />
-              {solo ? 'Enter a price to see what it would cost you.' : "Enter a price to see whether it's a juicy time to ask."}
+              {solo
+                ? 'Enter a price to see what it would cost you.'
+                : "Enter a price to see whether it's a juicy time to ask."}
             </div>
           )}
         </div>

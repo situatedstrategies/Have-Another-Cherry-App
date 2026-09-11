@@ -30,7 +30,13 @@ export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   );
 }
 
-function ToastItem({ toast, removeToast }: { toast: ToastMessage, removeToast: (id: string) => void }) {
+function ToastItem({
+  toast,
+  removeToast,
+}: {
+  toast: ToastMessage;
+  removeToast: (id: string) => void;
+}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       removeToast(toast.id);

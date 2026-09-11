@@ -39,10 +39,7 @@ export default function CherryPlusModal({
     if (!billingAvailable()) return;
     let cancelled = false;
     (async () => {
-      const [offerings, portal] = await Promise.all([
-        plusOfferings(),
-        manageSubscriptionUrl(),
-      ]);
+      const [offerings, portal] = await Promise.all([plusOfferings(), manageSubscriptionUrl()]);
       if (!cancelled) {
         setPlans(offerings);
         setManageUrl(portal);
@@ -106,9 +103,12 @@ export default function CherryPlusModal({
 
         {purchaseState === 'purchased' ? (
           <div className="space-y-3">
-            <h3 className="text-xl font-display font-semibold text-natural-text">Welcome to Cherry +</h3>
+            <h3 className="text-xl font-display font-semibold text-natural-text">
+              Welcome to Cherry +
+            </h3>
             <div className="bg-natural-sage/40 border border-natural-primary/20 rounded-xl p-4 flex items-center justify-center gap-2 text-sm font-bold text-natural-primary">
-              <Check className="h-4 w-4" /> Everything is unlocked - the vault, blind splits, insights, and more.
+              <Check className="h-4 w-4" /> Everything is unlocked - the vault, blind splits,
+              insights, and more.
             </div>
             <button
               onClick={onClose}
@@ -120,10 +120,12 @@ export default function CherryPlusModal({
         ) : storeReady ? (
           <div className="space-y-4">
             <div>
-              <h3 className="text-xl font-display font-semibold text-natural-text">The vault, blind splits and deeper insight.</h3>
+              <h3 className="text-xl font-display font-semibold text-natural-text">
+                The vault, blind splits and deeper insight.
+              </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                Everything in Free, plus the Household Vault, Dark Cherry blind splits,
-                spending thresholds, rhythm streaks, insights, and backups.
+                Everything in Free, plus the Household Vault, Dark Cherry blind splits, spending
+                thresholds, rhythm streaks, insights, and backups.
               </p>
             </div>
             <div className="space-y-2 max-w-sm mx-auto">
@@ -135,15 +137,23 @@ export default function CherryPlusModal({
                   className="w-full flex items-center justify-between bg-white border border-natural-border hover:border-natural-primary rounded-xl px-4 py-3 transition-colors disabled:opacity-50 text-left"
                 >
                   <span>
-                    <span className="block text-sm font-bold text-natural-text capitalize">{plan.key}</span>
-                    <span className="block text-xs text-natural-muted">{PLAN_BLURB[plan.key] || plan.title}</span>
+                    <span className="block text-sm font-bold text-natural-text capitalize">
+                      {plan.key}
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      {PLAN_BLURB[plan.key] || plan.title}
+                    </span>
                   </span>
-                  <span className="text-sm font-bold text-natural-primary shrink-0">{plan.price}</span>
+                  <span className="text-sm font-bold text-natural-primary shrink-0">
+                    {plan.price}
+                  </span>
                 </button>
               ))}
             </div>
             {purchaseState === 'error' && (
-              <p className="text-xs text-natural-primary font-medium max-w-sm mx-auto">{purchaseError}</p>
+              <p className="text-xs text-natural-primary font-medium max-w-sm mx-auto">
+                {purchaseError}
+              </p>
             )}
             {manageUrl && (
               <a
@@ -161,9 +171,9 @@ export default function CherryPlusModal({
               </p>
             )}
             <p className="text-[10px] text-natural-muted max-w-sm mx-auto">
-              Prices subject to change with notice. Taxes may apply. Payments are
-              processed by RevenueCat; we never see your card. Cherry + follows
-              your account everywhere, apps included.
+              Prices subject to change with notice. Taxes may apply. Payments are processed by
+              RevenueCat; we never see your card. Cherry + follows your account everywhere, apps
+              included.
             </p>
           </div>
         ) : plans === null ? (
@@ -171,10 +181,12 @@ export default function CherryPlusModal({
         ) : (
           <>
             <div>
-              <h3 className="text-xl font-display font-semibold text-natural-text">This tree is still growing.</h3>
+              <h3 className="text-xl font-display font-semibold text-natural-text">
+                This tree is still growing.
+              </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                Cherry + will bring deeper budgeting tools and more ways to keep money
-                conversations kind. Keep in touch - and always stay sweet.
+                Cherry + will bring deeper budgeting tools and more ways to keep money conversations
+                kind. Keep in touch - and always stay sweet.
               </p>
             </div>
 
@@ -202,11 +214,17 @@ export default function CherryPlusModal({
                     className="bg-natural-primary hover:bg-natural-primary-ink text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
                     aria-label="Sign up for updates"
                   >
-                    {status === 'sending' ? <span className="animate-spin inline-block text-xs">◌</span> : <Send size={16} />}
+                    {status === 'sending' ? (
+                      <span className="animate-spin inline-block text-xs">◌</span>
+                    ) : (
+                      <Send size={16} />
+                    )}
                   </button>
                 </div>
                 {status === 'error' && (
-                  <p className="text-xs text-natural-primary font-medium">Couldn't save that - please try again.</p>
+                  <p className="text-xs text-natural-primary font-medium">
+                    Couldn't save that - please try again.
+                  </p>
                 )}
                 <p className="text-xs text-natural-muted">
                   Just launch news - no spam, and never your ledger.
@@ -222,9 +240,8 @@ export default function CherryPlusModal({
             <div className="flex items-start gap-3 text-left bg-natural-pebble/60 border border-natural-border rounded-xl p-3.5 max-w-sm mx-auto">
               <Smartphone className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-muted leading-relaxed">
-                Cherry + lives in the iPhone and Android apps. Subscribe there once
-                and it unlocks here too, on the same account. There is nothing to
-                buy on the web.
+                Cherry + lives in the iPhone and Android apps. Subscribe there once and it unlocks
+                here too, on the same account. There is nothing to buy on the web.
               </p>
             </div>
           </>

@@ -42,5 +42,4 @@ export const PASSWORD_REQUIREMENTS: { key: keyof PasswordChecks; label: string }
   { key: 'special', label: 'A special character (e.g. ! ? @ # $ %)' },
 ];
 
-export const PASSWORD_POLICY_MESSAGE =
-  `Password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters and include a lowercase letter, an uppercase letter, a number, and a special character.`;
+export const PASSWORD_POLICY_MESSAGE = `Password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters and include a lowercase letter, an uppercase letter, a number, and a special character.`;

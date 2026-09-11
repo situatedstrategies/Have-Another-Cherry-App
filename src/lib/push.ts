@@ -42,7 +42,7 @@ export async function enableWebPush(uid: string): Promise<PushStatus> {
       await setDoc(
         doc(db, 'users', uid),
         { fcmTokens: { [token]: new Date().toISOString() } },
-        { merge: true },
+        { merge: true }
       );
     }
   } catch (e) {
@@ -59,7 +59,9 @@ export async function disableWebPush(uid: string): Promise<void> {
     const messaging = getMessaging(app);
     const token = await getToken(messaging, { vapidKey: fcmVapidKey }).catch(() => null);
     if (token) {
-      await updateDoc(doc(db, 'users', uid), { [`fcmTokens.${token}`]: deleteField() }).catch(() => {});
+      await updateDoc(doc(db, 'users', uid), { [`fcmTokens.${token}`]: deleteField() }).catch(
+        () => {}
+      );
       await deleteToken(messaging).catch(() => {});
     }
   } catch {
@@ -71,11 +73,11 @@ export async function disableWebPush(uid: string): Promise<void> {
 // by the browser; surface them through the app's own toast instead. Returns
 // an unsubscribe function.
 export async function listenForegroundPush(
-  cb: (title: string, body: string) => void,
+  cb: (title: string, body: string) => void
 ): Promise<() => void> {
   if (!(await webPushSupported()) || Notification.permission !== 'granted') return () => {};
   try {
-    return onMessage(getMessaging(app), payload => {
+    return onMessage(getMessaging(app), (payload) => {
       const n = payload.notification;
       if (n?.title || n?.body) cb(n?.title || 'Have Another Cherry', n?.body || '');
     });

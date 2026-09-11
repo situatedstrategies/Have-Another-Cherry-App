@@ -18,13 +18,9 @@ const SETTLEMENT_STATUS_RANK: Record<string, number> = {
   voided: 2,
 };
 
-const settlementRank = (s: Settlement): number =>
-  SETTLEMENT_STATUS_RANK[s.status] ?? 0;
+const settlementRank = (s: Settlement): number => SETTLEMENT_STATUS_RANK[s.status] ?? 0;
 
-function mergeSettlements(
-  local: Settlement[] = [],
-  incoming: Settlement[] = []
-): Settlement[] {
+function mergeSettlements(local: Settlement[] = [], incoming: Settlement[] = []): Settlement[] {
   const byId = new Map<string, Settlement>();
   for (const s of local) byId.set(s.id, s);
   for (const s of incoming) {
@@ -42,10 +38,7 @@ function mergeSettlements(
   return Array.from(byId.values());
 }
 
-function mergeComments(
-  local: Comment[] = [],
-  incoming: Comment[] = []
-): Comment[] {
+function mergeComments(local: Comment[] = [], incoming: Comment[] = []): Comment[] {
   const byId = new Map<string, Comment>();
   for (const c of local) byId.set(c.id, c);
   for (const c of incoming) {
@@ -70,9 +63,7 @@ const contentVersion = (e: Expense): number => {
 // and comments are unioned by id with forward-only settlement status.
 export function mergeExpense(local: Expense, incoming: Expense): Expense {
   const [base, other] =
-    contentVersion(incoming) >= contentVersion(local)
-      ? [incoming, local]
-      : [local, incoming];
+    contentVersion(incoming) >= contentVersion(local) ? [incoming, local] : [local, incoming];
 
   const merged: Expense = {
     ...other,
@@ -86,10 +77,7 @@ export function mergeExpense(local: Expense, incoming: Expense): Expense {
 
 // Merge two whole ledgers (used by the group snapshot backfill), newest-dated
 // expense first, same ordering the app keeps everywhere else.
-export function mergeExpenseLists(
-  local: Expense[] = [],
-  remote: Expense[] = []
-): Expense[] {
+export function mergeExpenseLists(local: Expense[] = [], remote: Expense[] = []): Expense[] {
   const byId = new Map<string, Expense>();
   for (const e of local) byId.set(e.id, e);
   for (const e of remote) {

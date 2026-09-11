@@ -114,4 +114,3 @@ export async function authHeader(): Promise<Record<string, string>> {
     return {};
   }
 }
-

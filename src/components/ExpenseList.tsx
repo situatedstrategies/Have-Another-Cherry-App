@@ -1,8 +1,25 @@
 import { useState, useMemo } from 'react';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
-import { getRemainingSettlementAmount, getTotalRemainingOwedToPayer, isExpenseFullySettled, getNormalizedExpenseStatus, isDarkCherry, getDarkCherryRemaining } from '../lib/money';
-import { Search, ArrowUpDown, ChevronRight, AlertCircle, Clock, CheckCircle2, RefreshCw, Repeat, Cherry } from 'lucide-react';
+import {
+  getRemainingSettlementAmount,
+  getTotalRemainingOwedToPayer,
+  isExpenseFullySettled,
+  getNormalizedExpenseStatus,
+  isDarkCherry,
+  getDarkCherryRemaining,
+} from '../lib/money';
+import {
+  Search,
+  ArrowUpDown,
+  ChevronRight,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  RefreshCw,
+  Repeat,
+  Cherry,
+} from 'lucide-react';
 import { intervalLabel } from '../lib/recurring';
 import { formatCurrency, formatDate } from '../lib/format';
 
@@ -16,11 +33,18 @@ interface ExpenseListProps {
 type SortField = 'date' | 'amount' | 'title';
 type SortOrder = 'asc' | 'desc';
 
-export default function ExpenseList({ expenses, group, activeUser, onExpenseClick }: ExpenseListProps) {
+export default function ExpenseList({
+  expenses,
+  group,
+  activeUser,
+  onExpenseClick,
+}: ExpenseListProps) {
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED'>(
+    'all'
+  );
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -32,12 +56,14 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
 
   // Sort and Filter logic
   const filteredExpenses = expenses
-    .filter(exp => {
+    .filter((exp) => {
       // Search
-      const matchesSearch = exp.title.toLowerCase().includes(search.toLowerCase()) || 
-                            exp.category.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        exp.title.toLowerCase().includes(search.toLowerCase()) ||
+        exp.category.toLowerCase().includes(search.toLowerCase());
       // Status
-      const matchesStatus = statusFilter === 'all' || getNormalizedExpenseStatus(exp) === statusFilter;
+      const matchesStatus =
+        statusFilter === 'all' || getNormalizedExpenseStatus(exp) === statusFilter;
       // Category
       const matchesCategory = categoryFilter === 'all' || exp.category === categoryFilter;
 
@@ -45,7 +71,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
     })
     .sort((a, b) => {
       const multiplier = sortOrder === 'desc' ? -1 : 1;
-      
+
       if (sortField === 'date') {
         return multiplier * (new Date(a.date).getTime() - new Date(b.date).getTime());
       }
@@ -73,14 +99,22 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-natural-border shadow-sm overflow-hidden" id="expense-list-section">
+    <div
+      className="bg-white rounded-3xl border border-natural-border shadow-sm overflow-hidden"
+      id="expense-list-section"
+    >
       {/* Controls Header */}
       <div className="p-5 border-b border-natural-border space-y-4" id="list-controls-header">
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <h2 className="text-xl font-display font-semibold text-natural-text">Itemized Transactions</h2>
-          
+          <h2 className="text-xl font-display font-semibold text-natural-text">
+            Itemized Transactions
+          </h2>
+
           {/* Quick Filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0" id="status-filters">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
+            id="status-filters"
+          >
             {(['all', 'OPEN', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
               <button
                 key={status}
@@ -129,8 +163,10 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
               id="category-filter-select"
             >
               <option value="all">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
               ))}
             </select>
           </div>
@@ -146,7 +182,8 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
               }`}
               id="sort-date-btn"
             >
-              <ArrowUpDown className="h-3 w-3" /> Date {sortField === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <ArrowUpDown className="h-3 w-3" /> Date{' '}
+              {sortField === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button
               onClick={() => toggleSort('amount')}
@@ -157,7 +194,8 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
               }`}
               id="sort-amount-btn"
             >
-              <ArrowUpDown className="h-3 w-3" /> Amount {sortField === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
+              <ArrowUpDown className="h-3 w-3" /> Amount{' '}
+              {sortField === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
           </div>
         </div>
@@ -169,10 +207,16 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
           <div className="p-12 text-center" id="empty-list-state">
             <AlertCircle className="h-10 w-10 text-natural-muted mx-auto mb-3" />
             <p className="text-natural-text font-semibold text-sm">No expenses found</p>
-            <p className="text-natural-muted text-xs mt-1">Try relaxing your search terms or filters.</p>
+            <p className="text-natural-muted text-xs mt-1">
+              Try relaxing your search terms or filters.
+            </p>
             {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
               <button
-                onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
+                onClick={() => {
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                  setSearch('');
+                }}
                 className="mt-3 text-natural-primary hover:underline text-xs font-bold inline-flex items-center gap-1"
               >
                 <RefreshCw className="h-3 w-3" /> Clear filters
@@ -181,7 +225,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
           </div>
         ) : (
           filteredExpenses.slice(0, visibleCount).map((exp) => {
-            const payerMember = members.find(m => m.uid === exp.paidBy);
+            const payerMember = members.find((m) => m.uid === exp.paidBy);
             const payerName = payerMember?.name || 'Someone';
             const isPayerActive = exp.paidBy === activeUser;
             const isFullySettled = isExpenseFullySettled(exp);
@@ -196,29 +240,36 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
 
             if (isFullySettled) {
               balanceText = 'Fully Settled';
-              balanceStyle = 'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
+              balanceStyle =
+                'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
             } else if (isDark) {
               if (isPayerActive) {
                 balanceText = `Pot: $${getDarkCherryRemaining(exp, false).toFixed(2)} to go`;
-                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
+                balanceStyle =
+                  'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
                 balanceText = 'Chip in when you can';
-                balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
+                balanceStyle =
+                  'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
               }
             } else if (isPayerActive) {
               if (totalRemainingToPayer > 0.01) {
                 balanceText = `Others owe you $${totalRemainingToPayer.toFixed(2)}`;
-                balanceStyle = 'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
+                balanceStyle =
+                  'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
                 balanceText = 'No balance for you';
-                balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
+                balanceStyle =
+                  'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
               }
             } else if (myRemainingBalance > 0.01) {
               balanceText = `You owe ${payerName} $${myRemainingBalance.toFixed(2)}`;
-              balanceStyle = 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
+              balanceStyle =
+                'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
             } else {
               balanceText = 'No balance for you';
-              balanceStyle = 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
+              balanceStyle =
+                'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
             }
 
             return (
@@ -264,11 +315,18 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                       <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate max-w-full">
                         {exp.title}
                       </span>
-                      <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}>
+                      <span
+                        className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}
+                      >
                         {exp.category}
                       </span>
                       {exp.isRecurring && (
-                        <span role="img" aria-label={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`} className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1" title={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}>
+                        <span
+                          role="img"
+                          aria-label={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}
+                          className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                          title={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}
+                        >
                           <Repeat size={10} />
                         </span>
                       )}
@@ -277,27 +335,52 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-natural-muted">
                       <span className="font-mono">{formatDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
-                      <span>Paid by <strong className="capitalize text-natural-text font-medium">{payerName}</strong></span>
+                      <span>
+                        Paid by{' '}
+                        <strong className="capitalize text-natural-text font-medium">
+                          {payerName}
+                        </strong>
+                      </span>
                       <span className="text-natural-border">•</span>
                       <span className="font-mono text-xs">
-                        {isDark
-                          ? 'Dark Cherry · blind split'
-                          : <>Split: {members.map(m => `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`).join(' / ')}
-                            {exp.splitType === 'third_party' && ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}</>}
+                        {isDark ? (
+                          'Dark Cherry · blind split'
+                        ) : (
+                          <>
+                            Split:{' '}
+                            {members
+                              .map(
+                                (m) =>
+                                  `${m.name} ${Math.round(((exp.shares?.[m.uid] || 0) / exp.amount) * 100) || 0}%`
+                              )
+                              .join(' / ')}
+                            {exp.splitType === 'third_party' &&
+                              ` / ${exp.thirdPersonName} ${Math.round(((exp.thirdPersonShare || 0) / exp.amount) * 100) || 0}%`}
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right (desktop) / bottom (mobile): amount + share balance */}
-                <div className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0" id={`expense-balance-${exp.id}`}>
+                <div
+                  className="flex items-center justify-between gap-3 pl-11 sm:pl-4 sm:justify-end sm:gap-4 sm:shrink-0"
+                  id={`expense-balance-${exp.id}`}
+                >
                   <div className="sm:text-right">
                     <span className="block text-base font-display font-semibold text-natural-text">
-                      {maskNumbers
-                        ? <span className="inline-flex items-center gap-1"><Cherry className="h-4 w-4 text-natural-primary" /> •••</span>
-                        : formatCurrency(exp.amount)}
+                      {maskNumbers ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Cherry className="h-4 w-4 text-natural-primary" /> •••
+                        </span>
+                      ) : (
+                        formatCurrency(exp.amount)
+                      )}
                     </span>
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}>
+                    <span
+                      className={`inline-block text-xs px-2 py-0.5 rounded-lg border mt-1 ${balanceStyle}`}
+                    >
                       {balanceText}
                     </span>
                   </div>
@@ -313,7 +396,7 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
       {filteredExpenses.length > visibleCount && (
         <div className="p-3 border-t border-natural-border text-center">
           <button
-            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
             className="text-xs font-bold text-natural-primary hover:text-natural-dark bg-natural-sage/30 hover:bg-natural-sage/50 border border-natural-primary/20 px-5 py-2 rounded-full transition-all cursor-pointer"
             id="show-more-expenses-btn"
           >
@@ -324,11 +407,21 @@ export default function ExpenseList({ expenses, group, activeUser, onExpenseClic
 
       {/* Stats Counter Footer */}
       {filteredExpenses.length > 0 && (
-        <div className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl" id="list-footer-stats">
-          <span className="font-medium font-mono">Showing {Math.min(visibleCount, filteredExpenses.length)} of {expenses.length} expense items</span>
+        <div
+          className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex items-center justify-between text-xs text-natural-muted rounded-b-3xl"
+          id="list-footer-stats"
+        >
+          <span className="font-medium font-mono">
+            Showing {Math.min(visibleCount, filteredExpenses.length)} of {expenses.length} expense
+            items
+          </span>
           {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
-            <button 
-              onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); setSearch(''); }}
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                setCategoryFilter('all');
+                setSearch('');
+              }}
               className="text-natural-text hover:text-natural-primary font-bold flex items-center gap-1 cursor-pointer"
               id="clear-filters-footer-btn"
             >

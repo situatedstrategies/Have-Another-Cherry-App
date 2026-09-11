@@ -17,7 +17,11 @@ export const formatAmount = (value: number): string =>
 /** "Mar 3, 2026". Empty string for a missing date. */
 export const formatDate = (dateStr?: string): string => {
   if (!dateStr) return '';
-  return parseDateInput(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return parseDateInput(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 };
 
 /** "Mar 3". */
@@ -27,5 +31,10 @@ export const formatShortDate = (dateStr: string): string =>
 /** "Mar 3, 02:15 PM". Empty string for a missing timestamp. */
 export const formatDateTime = (dateStr?: string): string => {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };

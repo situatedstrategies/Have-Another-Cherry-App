@@ -5,8 +5,22 @@ import { encryptData, decryptData } from '../lib/crypto';
 import { Expense, VaultBill, VaultDocMeta, VaultData, DEFAULT_CATEGORIES } from '../types';
 import Modal from './Modal';
 import {
-  Vault, CalendarDays, ReceiptText, FileText, Upload, Download, Trash2,
-  ChevronLeft, ChevronRight, Plus, RefreshCcw, Repeat, Lock, Search, Pencil, X
+  Vault,
+  CalendarDays,
+  ReceiptText,
+  FileText,
+  Upload,
+  Download,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  RefreshCcw,
+  Repeat,
+  Lock,
+  Search,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { recurringDaysInMonth } from '../lib/recurring';
 
@@ -27,7 +41,20 @@ const MAX_FILE_BYTES = 400 * 1024;
 
 const EMPTY_VAULT: VaultData = { bills: [], docs: [] };
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const ordinal = (n: number) => {
@@ -36,7 +63,14 @@ const ordinal = (n: number) => {
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 };
 
-export default function HouseholdVault({ groupId, activeUser, expenses, memberNames, categories, onClose }: HouseholdVaultProps) {
+export default function HouseholdVault({
+  groupId,
+  activeUser,
+  expenses,
+  memberNames,
+  categories,
+  onClose,
+}: HouseholdVaultProps) {
   const [tab, setTab] = useState<'calendar' | 'bills' | 'docs'>('calendar');
   const [vault, setVault] = useState<VaultData>(EMPTY_VAULT);
   const [loading, setLoading] = useState(true);
@@ -45,8 +79,11 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const billNameRef = useRef<HTMLInputElement>(null);
-  const categoryOptions = categories && categories.length > 0 ? categories : [...DEFAULT_CATEGORIES];
-  const defaultBillCategory = categoryOptions.includes('Utilities') ? 'Utilities' : (categoryOptions[1] || categoryOptions[0] || 'Utilities');
+  const categoryOptions =
+    categories && categories.length > 0 ? categories : [...DEFAULT_CATEGORIES];
+  const defaultBillCategory = categoryOptions.includes('Utilities')
+    ? 'Utilities'
+    : categoryOptions[1] || categoryOptions[0] || 'Utilities';
 
   // Calendar month being viewed.
   const now = new Date();
@@ -75,18 +112,24 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   const q = search.trim().toLowerCase();
   const inCategory = (c?: string) => categoryFilter === null || c === categoryFilter;
   const filteredBills = vault.bills
-    .filter(b => inCategory(b.category))
-    .filter(b => !q || [b.name, b.category || '', b.notes || ''].join(' ').toLowerCase().includes(q))
+    .filter((b) => inCategory(b.category))
+    .filter(
+      (b) => !q || [b.name, b.category || '', b.notes || ''].join(' ').toLowerCase().includes(q)
+    )
     .sort((a, b) => a.dueDay - b.dueDay);
   const filteredDocs = vault.docs
-    .filter(d => inCategory(d.category))
-    .filter(d => !q || [d.name, d.category || ''].join(' ').toLowerCase().includes(q));
+    .filter((d) => inCategory(d.category))
+    .filter((d) => !q || [d.name, d.category || ''].join(' ').toLowerCase().includes(q));
   // Only categories in use on the tab being viewed: a chip that filters the
   // visible list down to nothing is noise.
-  const categoriesInUse = Array.from(new Set(
-    (tab === 'bills' ? vault.bills.map(b => b.category) : vault.docs.map(d => d.category))
-      .filter((c): c is string => !!c)
-  )).sort();
+  const categoriesInUse = Array.from(
+    new Set(
+      (tab === 'bills'
+        ? vault.bills.map((b) => b.category)
+        : vault.docs.map((d) => d.category)
+      ).filter((c): c is string => !!c)
+    )
+  ).sort();
   const filtering = !!q || categoryFilter !== null;
 
   // ---- Load / persist (E2E-encrypted with the group key, like the ledger) ----
@@ -111,7 +154,9 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [groupId]);
 
   // Optimistic: the new state shows at once and is rolled back if the write
@@ -122,12 +167,16 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     setVault(next);
     try {
       const payload = await encryptData(next, groupId);
-      await setDoc(doc(db, 'group_vault', groupId), {
-        groupId,
-        payload,
-        updatedAt: new Date().toISOString(),
-        updatedBy: activeUser,
-      }, { merge: true });
+      await setDoc(
+        doc(db, 'group_vault', groupId),
+        {
+          groupId,
+          payload,
+          updatedAt: new Date().toISOString(),
+          updatedBy: activeUser,
+        },
+        { merge: true }
+      );
       return true;
     } catch (e) {
       console.error('Vault save failed', e);
@@ -139,7 +188,10 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
 
   // ---- Bills ----
   const resetBillForm = () => {
-    setBillName(''); setBillAmount(''); setBillDueDay('1'); setBillNotes('');
+    setBillName('');
+    setBillAmount('');
+    setBillDueDay('1');
+    setBillNotes('');
     setBillCategory(defaultBillCategory);
     setEditingBillId(null);
   };
@@ -160,7 +212,10 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     if (savingBill) return;
     setError('');
     const dueDay = Math.min(31, Math.max(1, Math.round(Number(billDueDay) || 1)));
-    if (!billName.trim()) { setError('Give the bill a name.'); return; }
+    if (!billName.trim()) {
+      setError('Give the bill a name.');
+      return;
+    }
     const bill: VaultBill = {
       id: editingBillId || crypto.randomUUID(),
       name: billName.trim(),
@@ -170,7 +225,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
       ...(billNotes.trim() ? { notes: billNotes.trim() } : {}),
     };
     const bills = editingBillId
-      ? vault.bills.map(b => (b.id === editingBillId ? bill : b))
+      ? vault.bills.map((b) => (b.id === editingBillId ? bill : b))
       : [...vault.bills, bill];
     setSavingBill(true);
     try {
@@ -182,7 +237,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
 
   const removeBill = async (id: string) => {
     if (editingBillId === id) resetBillForm();
-    await persistVault({ ...vault, bills: vault.bills.filter(b => b.id !== id) });
+    await persistVault({ ...vault, bills: vault.bills.filter((b) => b.id !== id) });
   };
 
   // ---- Document name and category ----
@@ -196,11 +251,16 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     e.preventDefault();
     if (!editingDocId) return;
     const name = docName.trim();
-    if (!name) { setError('Give the document a name.'); return; }
+    if (!name) {
+      setError('Give the document a name.');
+      return;
+    }
     setError('');
-    const docs = vault.docs.map(d => d.id === editingDocId
-      ? { ...d, name, ...(docCategory ? { category: docCategory } : { category: undefined }) }
-      : d);
+    const docs = vault.docs.map((d) =>
+      d.id === editingDocId
+        ? { ...d, name, ...(docCategory ? { category: docCategory } : { category: undefined }) }
+        : d
+    );
     if (await persistVault({ ...vault, docs })) setEditingDocId(null);
   };
 
@@ -211,7 +271,9 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     if (!file) return;
     setError('');
     if (file.size > MAX_FILE_BYTES) {
-      setError(`That file is ${(file.size / 1024).toFixed(0)}KB - the vault currently holds files up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB. Larger storage is coming.`);
+      setError(
+        `That file is ${(file.size / 1024).toFixed(0)}KB - the vault currently holds files up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB. Larger storage is coming.`
+      );
       return;
     }
     setBusy(true);
@@ -232,7 +294,10 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
         uploadedAt: new Date().toISOString(),
       };
 
-      const filePayload = await encryptData({ name: meta.name, mimeType: meta.mimeType, dataBase64 }, groupId);
+      const filePayload = await encryptData(
+        { name: meta.name, mimeType: meta.mimeType, dataBase64 },
+        groupId
+      );
       await setDoc(doc(db, 'group_vault', groupId, 'files', meta.id), {
         payload: filePayload,
         uploadedBy: activeUser,
@@ -256,7 +321,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
       const decrypted = await decryptData(snap.data().payload, groupId);
       if (!decrypted?.dataBase64) throw new Error('bad payload');
 
-      const bytes = Uint8Array.from(atob(decrypted.dataBase64), c => c.charCodeAt(0));
+      const bytes = Uint8Array.from(atob(decrypted.dataBase64), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: decrypted.mimeType || meta.mimeType });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -279,7 +344,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     setBusy(true);
     try {
       await deleteDoc(doc(db, 'group_vault', groupId, 'files', meta.id));
-      await persistVault({ ...vault, docs: vault.docs.filter(d => d.id !== meta.id) });
+      await persistVault({ ...vault, docs: vault.docs.filter((d) => d.id !== meta.id) });
     } catch (err) {
       console.error('Vault delete failed', err);
       setError('Could not delete that document. Please try again.');
@@ -293,7 +358,8 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
 
   const dueByDay = useMemo(() => {
-    const map: Record<number, { label: string; amount?: number; source: 'bill' | 'expense' }[]> = {};
+    const map: Record<number, { label: string; amount?: number; source: 'bill' | 'expense' }[]> =
+      {};
 
     for (const bill of vault.bills) {
       const day = Math.min(bill.dueDay, daysInMonth);
@@ -317,7 +383,10 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
   }, [vault.bills, expenses, viewYear, viewMonth, daysInMonth]);
 
   const monthTotal = useMemo(
-    () => Object.values(dueByDay).flat().reduce((s, item) => s + (item.amount || 0), 0),
+    () =>
+      Object.values(dueByDay)
+        .flat()
+        .reduce((s, item) => s + (item.amount || 0), 0),
     [dueByDay]
   );
 
@@ -339,16 +408,23 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
     >
       {/* Tabs */}
       <div className="flex items-center gap-1.5 px-6 pt-4">
-        {([
-          { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} /> },
-          { key: 'bills', label: 'Recurring Bills', icon: <ReceiptText size={14} /> },
-          { key: 'docs', label: 'Documents', icon: <FileText size={14} /> },
-        ] as const).map(t => (
+        {(
+          [
+            { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} /> },
+            { key: 'bills', label: 'Recurring Bills', icon: <ReceiptText size={14} /> },
+            { key: 'docs', label: 'Documents', icon: <FileText size={14} /> },
+          ] as const
+        ).map((t) => (
           <button
             key={t.key}
-            onClick={() => { setTab(t.key); setCategoryFilter(null); }}
+            onClick={() => {
+              setTab(t.key);
+              setCategoryFilter(null);
+            }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${
-              tab === t.key ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'
+              tab === t.key
+                ? 'bg-natural-primary text-white shadow-sm'
+                : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'
             }`}
           >
             {t.icon} {t.label}
@@ -358,7 +434,9 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
 
       <div className="p-6 space-y-4">
         {error && (
-          <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">{error}</div>
+          <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">
+            {error}
+          </div>
         )}
 
         {!loading && tab !== 'calendar' && (
@@ -374,7 +452,12 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                 className="w-full pl-9 pr-9 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
               />
               {search && (
-                <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted hover:text-natural-text">
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted hover:text-natural-text"
+                >
                   <X size={14} />
                 </button>
               )}
@@ -388,7 +471,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                 >
                   Everything
                 </button>
-                {categoriesInUse.map(c => (
+                {categoriesInUse.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -410,21 +493,41 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
         ) : tab === 'calendar' ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <button onClick={() => shiftMonth(-1)} aria-label="Previous month" className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"><ChevronLeft size={16} /></button>
+              <button
+                onClick={() => shiftMonth(-1)}
+                aria-label="Previous month"
+                className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"
+              >
+                <ChevronLeft size={16} />
+              </button>
               <div className="text-center">
-                <span className="text-sm font-display font-semibold text-natural-text">{MONTH_NAMES[viewMonth]} {viewYear}</span>
+                <span className="text-sm font-display font-semibold text-natural-text">
+                  {MONTH_NAMES[viewMonth]} {viewYear}
+                </span>
                 {monthTotal > 0 && (
-                  <span className="block text-xs font-mono text-natural-muted">~${monthTotal.toFixed(2)} in recurring costs</span>
+                  <span className="block text-xs font-mono text-natural-muted">
+                    ~${monthTotal.toFixed(2)} in recurring costs
+                  </span>
                 )}
               </div>
-              <button onClick={() => shiftMonth(1)} aria-label="Next month" className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"><ChevronRight size={16} /></button>
+              <button
+                onClick={() => shiftMonth(1)}
+                aria-label="Next month"
+                className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center">
               {WEEKDAYS.map((d, i) => (
-                <span key={i} className="text-xs font-bold text-natural-muted uppercase py-1">{d}</span>
+                <span key={i} className="text-xs font-bold text-natural-muted uppercase py-1">
+                  {d}
+                </span>
               ))}
-              {Array.from({ length: firstWeekday }).map((_, i) => <span key={`pad-${i}`} />)}
+              {Array.from({ length: firstWeekday }).map((_, i) => (
+                <span key={`pad-${i}`} />
+              ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const items = dueByDay[day] || [];
@@ -433,18 +536,33 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                   <div
                     key={day}
                     className={`min-h-11 rounded-lg border p-1 text-left ${
-                      isToday ? 'border-natural-primary bg-natural-sage/30' : items.length ? 'border-natural-primary/30 bg-natural-primary/5' : 'border-natural-border/40'
+                      isToday
+                        ? 'border-natural-primary bg-natural-sage/30'
+                        : items.length
+                          ? 'border-natural-primary/30 bg-natural-primary/5'
+                          : 'border-natural-border/40'
                     }`}
-                    title={items.map(x => `${x.label}${x.amount ? ` ($${x.amount.toFixed(2)})` : ''}`).join('\n')}
+                    title={items
+                      .map((x) => `${x.label}${x.amount ? ` ($${x.amount.toFixed(2)})` : ''}`)
+                      .join('\n')}
                   >
-                    <span className={`text-xs font-mono ${isToday ? 'font-bold text-natural-primary' : 'text-natural-muted'}`}>{day}</span>
+                    <span
+                      className={`text-xs font-mono ${isToday ? 'font-bold text-natural-primary' : 'text-natural-muted'}`}
+                    >
+                      {day}
+                    </span>
                     {items.slice(0, 2).map((x, idx) => (
-                      <span key={idx} className="block text-xs leading-tight font-semibold text-natural-text truncate">
+                      <span
+                        key={idx}
+                        className="block text-xs leading-tight font-semibold text-natural-text truncate"
+                      >
                         {x.label}
                       </span>
                     ))}
                     {items.length > 2 && (
-                      <span className="block text-xs text-natural-muted">+{items.length - 2} more</span>
+                      <span className="block text-xs text-natural-muted">
+                        +{items.length - 2} more
+                      </span>
                     )}
                   </div>
                 );
@@ -458,27 +576,53 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
           </div>
         ) : tab === 'bills' ? (
           <div className="space-y-4">
-            <form onSubmit={saveBill} className="bg-natural-bg/50 border border-natural-border rounded-2xl p-4 space-y-3">
+            <form
+              onSubmit={saveBill}
+              className="bg-natural-bg/50 border border-natural-border rounded-2xl p-4 space-y-3"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
-                  {editingBillId ? <><Pencil size={14} /> Edit Bill</> : <><Plus size={14} /> Catalog a Recurring Bill</>}
+                  {editingBillId ? (
+                    <>
+                      <Pencil size={14} /> Edit Bill
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} /> Catalog a Recurring Bill
+                    </>
+                  )}
                 </span>
                 {editingBillId && (
-                  <button type="button" onClick={resetBillForm} className="text-xs font-semibold text-natural-muted hover:text-natural-text">Cancel</button>
+                  <button
+                    type="button"
+                    onClick={resetBillForm}
+                    className="text-xs font-semibold text-natural-muted hover:text-natural-text"
+                  >
+                    Cancel
+                  </button>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   ref={billNameRef}
-                  type="text" value={billName} onChange={e => setBillName(e.target.value)}
-                  placeholder="Bill name" required
+                  type="text"
+                  value={billName}
+                  onChange={(e) => setBillName(e.target.value)}
+                  placeholder="Bill name"
+                  required
                   aria-label="Bill name"
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                 />
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                    $
+                  </span>
                   <input
-                    type="number" min="0" step="0.01" value={billAmount} onChange={e => setBillAmount(e.target.value)}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={billAmount}
+                    onChange={(e) => setBillAmount(e.target.value)}
                     placeholder="Amount"
                     aria-label="Amount (optional)"
                     className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
@@ -487,20 +631,34 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-natural-muted whitespace-nowrap">Due day</label>
                   <input
-                    type="number" min="1" max="31" value={billDueDay} onChange={e => setBillDueDay(e.target.value)} required
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={billDueDay}
+                    onChange={(e) => setBillDueDay(e.target.value)}
+                    required
                     className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary font-mono"
                   />
                 </div>
                 <select
-                  value={billCategory} onChange={e => setBillCategory(e.target.value)}
+                  value={billCategory}
+                  onChange={(e) => setBillCategory(e.target.value)}
                   aria-label="Category"
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
                 >
-                  {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                  {billCategory && !categoryOptions.includes(billCategory) && <option value={billCategory}>{billCategory}</option>}
+                  {categoryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  {billCategory && !categoryOptions.includes(billCategory) && (
+                    <option value={billCategory}>{billCategory}</option>
+                  )}
                 </select>
                 <input
-                  type="text" value={billNotes} onChange={e => setBillNotes(e.target.value)}
+                  type="text"
+                  value={billNotes}
+                  onChange={(e) => setBillNotes(e.target.value)}
                   placeholder="Notes"
                   aria-label="Notes (optional)"
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
@@ -511,7 +669,7 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
                 disabled={savingBill}
                 className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-60"
               >
-                {savingBill ? 'Saving...' : (editingBillId ? 'Save Changes' : 'Add to Vault')}
+                {savingBill ? 'Saving...' : editingBillId ? 'Save Changes' : 'Add to Vault'}
               </button>
             </form>
 
@@ -521,27 +679,44 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               </p>
             ) : (
               <div className="space-y-2">
-                {filteredBills.map(bill => (
-                    <div key={bill.id} className={`flex items-center justify-between bg-white border rounded-xl px-4 py-2.5 ${editingBillId === bill.id ? 'border-natural-primary' : 'border-natural-border'}`}>
-                      <div className="min-w-0">
-                        <span className="text-sm font-semibold text-natural-text">{bill.name}</span>
-                        <span className="block text-xs text-natural-muted">
-                          Due the {ordinal(bill.dueDay)}
-                          {bill.category ? ` · ${bill.category}` : ''}
-                          {bill.notes ? ` · ${bill.notes}` : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {bill.amount != null && <span className="text-sm font-mono font-bold text-natural-text">${bill.amount.toFixed(2)}</span>}
-                        <button onClick={() => startEditBill(bill)} className="text-natural-muted hover:text-natural-primary" title="Edit" aria-label={`Edit ${bill.name}`}>
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => removeBill(bill.id)} className="text-natural-muted hover:text-natural-primary" title="Remove" aria-label={`Remove ${bill.name}`}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                {filteredBills.map((bill) => (
+                  <div
+                    key={bill.id}
+                    className={`flex items-center justify-between bg-white border rounded-xl px-4 py-2.5 ${editingBillId === bill.id ? 'border-natural-primary' : 'border-natural-border'}`}
+                  >
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-natural-text">{bill.name}</span>
+                      <span className="block text-xs text-natural-muted">
+                        Due the {ordinal(bill.dueDay)}
+                        {bill.category ? ` · ${bill.category}` : ''}
+                        {bill.notes ? ` · ${bill.notes}` : ''}
+                      </span>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {bill.amount != null && (
+                        <span className="text-sm font-mono font-bold text-natural-text">
+                          ${bill.amount.toFixed(2)}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => startEditBill(bill)}
+                        className="text-natural-muted hover:text-natural-primary"
+                        title="Edit"
+                        aria-label={`Edit ${bill.name}`}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => removeBill(bill.id)}
+                        className="text-natural-muted hover:text-natural-primary"
+                        title="Remove"
+                        aria-label={`Remove ${bill.name}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -550,8 +725,9 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <Lock className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-text leading-relaxed">
-                Documents are encrypted with your group's key before they leave this
-                device - the lease, the wifi password, insurance cards. Security rules restrict them to group members.
+                Documents are encrypted with your group's key before they leave this device - the
+                lease, the wifi password, insurance cards. Security rules restrict them to group
+                members.
               </p>
             </div>
 
@@ -561,7 +737,10 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               disabled={busy}
               className="w-full py-2.5 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 rounded-xl flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
             >
-              <Upload size={14} /> {busy ? 'Working...' : `Upload a Document (up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB)`}
+              <Upload size={14} />{' '}
+              {busy
+                ? 'Working...'
+                : `Upload a Document (up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB)`}
             </button>
 
             {filteredDocs.length === 0 ? (
@@ -570,49 +749,98 @@ export default function HouseholdVault({ groupId, activeUser, expenses, memberNa
               </p>
             ) : (
               <div className="space-y-2">
-                {filteredDocs.map(d => (
+                {filteredDocs.map((d) =>
                   editingDocId === d.id ? (
-                    <form key={d.id} onSubmit={saveDoc} className="bg-white border border-natural-primary rounded-xl px-4 py-3 space-y-2">
+                    <form
+                      key={d.id}
+                      onSubmit={saveDoc}
+                      className="bg-white border border-natural-primary rounded-xl px-4 py-3 space-y-2"
+                    >
                       <input
-                        type="text" value={docName} onChange={e => setDocName(e.target.value)} autoFocus
+                        type="text"
+                        value={docName}
+                        onChange={(e) => setDocName(e.target.value)}
+                        autoFocus
                         className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                       />
                       <select
-                        value={docCategory} onChange={e => setDocCategory(e.target.value)}
+                        value={docCategory}
+                        onChange={(e) => setDocCategory(e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
                       >
                         <option value="">No category</option>
-                        {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                        {docCategory && !categoryOptions.includes(docCategory) && <option value={docCategory}>{docCategory}</option>}
+                        {categoryOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                        {docCategory && !categoryOptions.includes(docCategory) && (
+                          <option value={docCategory}>{docCategory}</option>
+                        )}
                       </select>
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setEditingDocId(null)} className="px-3 py-1.5 text-xs font-semibold text-natural-muted hover:text-natural-text">Cancel</button>
-                        <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl">Save</button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingDocId(null)}
+                          className="px-3 py-1.5 text-xs font-semibold text-natural-muted hover:text-natural-text"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl"
+                        >
+                          Save
+                        </button>
                       </div>
                     </form>
                   ) : (
-                  <div key={d.id} className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5 gap-3">
-                    <div className="min-w-0">
-                      <span className="text-sm font-semibold text-natural-text truncate block">{d.name}</span>
-                      <span className="block text-xs text-natural-muted">
-                        {(d.size / 1024).toFixed(0)}KB · {memberNames[d.uploadedBy] || 'Someone'} · {new Date(d.uploadedAt).toLocaleDateString()}
-                        {d.category ? ` · ${d.category}` : ''}
-                      </span>
+                    <div
+                      key={d.id}
+                      className="flex items-center justify-between bg-white border border-natural-border rounded-xl px-4 py-2.5 gap-3"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold text-natural-text truncate block">
+                          {d.name}
+                        </span>
+                        <span className="block text-xs text-natural-muted">
+                          {(d.size / 1024).toFixed(0)}KB · {memberNames[d.uploadedBy] || 'Someone'}{' '}
+                          · {new Date(d.uploadedAt).toLocaleDateString()}
+                          {d.category ? ` · ${d.category}` : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => startEditDoc(d)}
+                          disabled={busy}
+                          className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50"
+                          title="Rename or set a category"
+                          aria-label={`Rename ${d.name} or set its category`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDownload(d)}
+                          disabled={busy}
+                          className="p-1.5 text-natural-primary hover:bg-natural-sage/40 rounded-lg border border-natural-border disabled:opacity-50"
+                          title="Download"
+                          aria-label={`Download ${d.name}`}
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDoc(d)}
+                          disabled={busy}
+                          className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50"
+                          title="Delete"
+                          aria-label={`Delete ${d.name}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => startEditDoc(d)} disabled={busy} className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50" title="Rename or set a category" aria-label={`Rename ${d.name} or set its category`}>
-                        <Pencil size={14} />
-                      </button>
-                      <button onClick={() => handleDownload(d)} disabled={busy} className="p-1.5 text-natural-primary hover:bg-natural-sage/40 rounded-lg border border-natural-border disabled:opacity-50" title="Download" aria-label={`Download ${d.name}`}>
-                        <Download size={14} />
-                      </button>
-                      <button onClick={() => handleDeleteDoc(d)} disabled={busy} className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50" title="Delete" aria-label={`Delete ${d.name}`}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
                   )
-                ))}
+                )}
               </div>
             )}
           </div>

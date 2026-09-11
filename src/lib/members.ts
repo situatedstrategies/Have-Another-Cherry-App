@@ -30,7 +30,7 @@ export const getFullMembers = (group: any) => {
     members.push({
       uid: `ghost_${idx}`,
       name: typeof s === 'string' ? s : s.name,
-      email: ''
+      email: '',
     });
   });
   return members;
@@ -42,7 +42,7 @@ export const nameOf = (
   uid: string,
   members: { uid: string; name?: string }[],
   selfUid?: string
-): string => (uid === selfUid ? 'You' : members.find(m => m.uid === uid)?.name || 'Someone');
+): string => (uid === selfUid ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone');
 
 export const getFullDefaultSplit = (group: any) => {
   if (!group) return {};
@@ -71,8 +71,12 @@ export const pendingSeats = (group: Partial<Group> | null | undefined): PendingS
  *  so a half-joined member (in one list but not the other) still counts once. */
 export const joinedUids = (group: Partial<Group> | null | undefined): string[] => {
   const ids = new Set<string>();
-  (group?.memberIds || []).forEach(id => { if (id) ids.add(id); });
-  (group?.members || []).forEach(m => { if (m?.uid) ids.add(m.uid); });
+  (group?.memberIds || []).forEach((id) => {
+    if (id) ids.add(id);
+  });
+  (group?.members || []).forEach((m) => {
+    if (m?.uid) ids.add(m.uid);
+  });
   return Array.from(ids);
 };
 
@@ -123,13 +127,16 @@ export const scalePercents = (values: number[], target: number): number[] => {
   if (values.length === 0) return [];
   const safeTarget = Math.max(0, round1(target));
   const sum = values.reduce((a, b) => a + (Number(b) || 0), 0);
-  const scaled = sum > 0
-    ? values.map(v => round1(((Number(v) || 0) / sum) * safeTarget))
-    : values.map(() => round1(safeTarget / values.length));
+  const scaled =
+    sum > 0
+      ? values.map((v) => round1(((Number(v) || 0) / sum) * safeTarget))
+      : values.map(() => round1(safeTarget / values.length));
   const drift = round1(safeTarget - scaled.reduce((a, b) => a + b, 0));
   if (drift !== 0) {
     let big = 0;
-    scaled.forEach((v, i) => { if (v > scaled[big]) big = i; });
+    scaled.forEach((v, i) => {
+      if (v > scaled[big]) big = i;
+    });
     scaled[big] = round1(scaled[big] + drift);
   }
   return scaled;
@@ -151,13 +158,12 @@ const rebalance = (
 ): { defaultSplit: Record<string, number>; availableSplits: PendingSeat[] } => {
   const uids = joinedUids(group);
   const current = group.defaultSplit || {};
-  const values = [
-    ...uids.map(uid => Number(current[uid]) || 0),
-    ...pending.map(p => p.split),
-  ];
+  const values = [...uids.map((uid) => Number(current[uid]) || 0), ...pending.map((p) => p.split)];
   const scaled = scalePercents(values, 100 - reserve);
   const defaultSplit: Record<string, number> = {};
-  uids.forEach((uid, i) => { defaultSplit[uid] = scaled[i]; });
+  uids.forEach((uid, i) => {
+    defaultSplit[uid] = scaled[i];
+  });
   const availableSplits = pending.map((p, i) => ({ name: p.name, split: scaled[uids.length + i] }));
   return { defaultSplit, availableSplits };
 };

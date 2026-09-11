@@ -17,7 +17,15 @@ interface ModalProps {
  * screens. Handles the overlay, header/close, scrollable body, and footer so
  * individual modals don't repeat the boilerplate (or the responsive rules).
  */
-export default function Modal({ onClose, title, icon, size = 'md', footer, children, bodyClassName }: ModalProps) {
+export default function Modal({
+  onClose,
+  title,
+  icon,
+  size = 'md',
+  footer,
+  children,
+  bodyClassName,
+}: ModalProps) {
   const maxW = size === 'lg' ? 'sm:max-w-lg' : 'sm:max-w-md';
 
   // Escape to close, and freeze the page underneath while open. Without the
@@ -43,7 +51,9 @@ export default function Modal({ onClose, title, icon, size = 'md', footer, child
       role="dialog"
       aria-modal="true"
     >
-      <div className={`sheet-safe bg-white w-full h-full sm:h-auto sm:max-h-[90vh] ${maxW} rounded-none sm:rounded-3xl sm:border border-natural-border shadow-xl flex flex-col overflow-hidden sm:animate-in sm:zoom-in-95 sm:duration-200`}>
+      <div
+        className={`sheet-safe bg-white w-full h-full sm:h-auto sm:max-h-[90vh] ${maxW} rounded-none sm:rounded-3xl sm:border border-natural-border shadow-xl flex flex-col overflow-hidden sm:animate-in sm:zoom-in-95 sm:duration-200`}
+      >
         {title !== undefined && (
           <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-natural-border shrink-0">
             <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2 min-w-0">
@@ -59,8 +69,16 @@ export default function Modal({ onClose, title, icon, size = 'md', footer, child
             </button>
           </div>
         )}
-        <div className={`overflow-y-auto overscroll-contain flex-1 ${bodyClassName ?? 'p-4 sm:p-6'}`}>{children}</div>
-        {footer && <div className="p-4 border-t border-natural-border bg-natural-bg/30 shrink-0">{footer}</div>}
+        <div
+          className={`overflow-y-auto overscroll-contain flex-1 ${bodyClassName ?? 'p-4 sm:p-6'}`}
+        >
+          {children}
+        </div>
+        {footer && (
+          <div className="p-4 border-t border-natural-border bg-natural-bg/30 shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

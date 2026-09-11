@@ -80,13 +80,20 @@ export interface Group {
 // 'dark_cherry' is the blind split (a Plus feature): the creator sets the pot
 // target (the expense amount) plus a min/max per logged payment; everyone else
 // only ever sees the allowed payment range, never the total or what remains.
-export type SplitType = 'household_default' | 'equal' | 'custom_percentage' | 'custom_amount' | 'third_party' | 'dark_cherry';
+export type SplitType =
+  | 'household_default'
+  | 'equal'
+  | 'custom_percentage'
+  | 'custom_amount'
+  | 'third_party'
+  | 'dark_cherry';
 
 // 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
 // their own instruments so the settle flow can hand the payer into those apps.
-export type PaymentInstrument = 'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER';
+export type PaymentInstrument =
+  'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER';
 
-export type MismatchType = 
+export type MismatchType =
   | 'NO_MISMATCH'
   | 'FRONTED_ON_CREDIT_SETTLED_IN_CASH'
   | 'FRONTED_IN_CASH_SETTLED_ON_CREDIT'
@@ -114,15 +121,15 @@ export interface Settlement {
   amount: number;
   instrumentType: PaymentInstrument;
   label?: string; // e.g., "Chase Checking"
-  timestamp: string;        // when the settlement was logged in-app
-  paymentDate?: string;     // the actual date the payment was made (user-provided)
+  timestamp: string; // when the settlement was logged in-app
+  paymentDate?: string; // the actual date the payment was made (user-provided)
   // Status only ever moves forward: pending -> confirmed -> voided. A voided
   // settlement is a tombstone for an entry logged in error, it stays in the
   // audit trail (so merges can't resurrect it) but no longer counts toward
   // anyone's balance.
   status: 'pending' | 'confirmed' | 'voided';
   voidedAt?: string;
-  voidedBy?: string;        // uid of whoever removed the entry
+  voidedBy?: string; // uid of whoever removed the entry
   mismatchType?: MismatchType;
 }
 
@@ -137,11 +144,11 @@ export interface Credit {
 
 export interface SettleDetails {
   paymentMethod: string; // e.g. "Venmo", "Cash", "Bank Transfer", "Other"
-  paidAt: string;        // Date string
-  confirmedAt?: string;  // Date string when confirmed
-  paidBy: string;        // uid of who paid the settle amount
-  receivedBy: string;    // uid of who received the settle amount
-  amount: number;        // The exact settlement amount
+  paidAt: string; // Date string
+  confirmedAt?: string; // Date string when confirmed
+  paidBy: string; // uid of who paid the settle amount
+  receivedBy: string; // uid of who received the settle amount
+  amount: number; // The exact settlement amount
   notes?: string;
 }
 
@@ -152,7 +159,7 @@ export interface Expense {
   amount: number;
   date: string;
   category: string;
-  paidBy: string;         // legacy: uid of who paid the full original expense
+  paidBy: string; // legacy: uid of who paid the full original expense
   contributions?: Contribution[];
   splitType: SplitType;
   shares: Record<string, number>; // uid -> amount owed
@@ -176,7 +183,8 @@ export interface Expense {
   // only place that interprets any of them.
   recurringInterval?: string;
   nextRecurringDate?: string;
-  status: 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED' | 'unsettled' | 'pending_confirmation' | 'settled'; // legacy values retained for existing records
+  status:
+    'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED' | 'unsettled' | 'pending_confirmation' | 'settled'; // legacy values retained for existing records
   settleDetails?: SettleDetails; // legacy
   settlements?: Settlement[];
   comments?: Comment[];
@@ -228,5 +236,5 @@ export const DEFAULT_CATEGORIES = [
   'Dining Out',
   'Home Improvement',
   'Subscription',
-  'Other'
+  'Other',
 ];

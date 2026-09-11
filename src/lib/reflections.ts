@@ -49,7 +49,7 @@ const sharedCol = (groupId: string) => collection(db, 'group_reflections', group
 export async function loadReflectionsForExpense(
   uid: string,
   groupId: string,
-  expenseId: string,
+  expenseId: string
 ): Promise<Reflection[]> {
   const [mine, shared] = await Promise.all([
     getDocs(query(privateCol(uid), where('expenseId', '==', expenseId))),
@@ -107,11 +107,9 @@ export async function saveReflection(opts: {
   const createdAt = new Date().toISOString();
   const payload = await encryptData(
     { text: opts.text, mood: opts.mood },
-    opts.shared ? opts.groupId : opts.uid,
+    opts.shared ? opts.groupId : opts.uid
   );
-  const target = opts.shared
-    ? doc(sharedCol(opts.groupId), id)
-    : doc(privateCol(opts.uid), id);
+  const target = opts.shared ? doc(sharedCol(opts.groupId), id) : doc(privateCol(opts.uid), id);
   await setDoc(target, {
     authorUid: opts.uid,
     groupId: opts.groupId,
@@ -147,9 +145,5 @@ export async function shareReflection(r: Reflection): Promise<void> {
 }
 
 export async function deleteReflection(r: Reflection): Promise<void> {
-  await deleteDoc(
-    r.shared
-      ? doc(sharedCol(r.groupId), r.id)
-      : doc(privateCol(r.authorUid), r.id),
-  );
+  await deleteDoc(r.shared ? doc(sharedCol(r.groupId), r.id) : doc(privateCol(r.authorUid), r.id));
 }

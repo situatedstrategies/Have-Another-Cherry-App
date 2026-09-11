@@ -1,23 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: "Inter", Helvetica, Arial, sans-serif;
-  --font-display: "Lora", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: 'Inter', Helvetica, Arial, sans-serif;
+  --font-display: 'Lora', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
   /* Minimal High Contrast Cherry Palette based on haveanothercherry.com */
-  --color-natural-bg: #F4F4F5;
-  --color-natural-text: #18181B;
-  --color-natural-sidebar: #E4E4E7;
-  --color-natural-border: #D4D4D8;
-  --color-natural-primary: #C41200; /* bold cherry red */
-  --color-natural-primary-ink: #A00E00; /* deep cherry, hover state of solid red buttons */
-  --color-natural-primary-wash: #FBEAE7; /* pale cherry tint. See the note below. */
-  --color-natural-accent: #71717A;
-  --color-natural-muted: #52525B;
-  --color-natural-sage: #E4E4E7;
-  --color-natural-dark: #18181B;
+  --color-natural-bg: #f4f4f5;
+  --color-natural-text: #18181b;
+  --color-natural-sidebar: #e4e4e7;
+  --color-natural-border: #d4d4d8;
+  --color-natural-primary: #c41200; /* bold cherry red */
+  --color-natural-primary-ink: #a00e00; /* deep cherry, hover state of solid red buttons */
+  --color-natural-primary-wash: #fbeae7; /* pale cherry tint. See the note below. */
+  --color-natural-accent: #71717a;
+  --color-natural-muted: #52525b;
+  --color-natural-sage: #e4e4e7;
+  --color-natural-dark: #18181b;
 
   /* Pebble.
      Every neutral above sits at hue 240 and about 5% saturation, which is
@@ -32,15 +32,15 @@
      defaults (md 6px, lg 8px, xl 12px) read sharp next to the app's soft
      surfaces. Remapping the scale here softens every existing rounded-*
      class at once instead of rewriting them across two hundred call sites. */
-  --radius-sm: 0.5rem;    /* 8px  */
-  --radius-md: 0.75rem;   /* 12px */
-  --radius-lg: 1rem;      /* 16px */
-  --radius-xl: 1.25rem;   /* 20px */
-  --radius-2xl: 1.5rem;   /* 24px */
-  --radius-3xl: 1.75rem;  /* 28px */
+  --radius-sm: 0.5rem; /* 8px  */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1rem; /* 16px */
+  --radius-xl: 1.25rem; /* 20px */
+  --radius-2xl: 1.5rem; /* 24px */
+  --radius-3xl: 1.75rem; /* 28px */
 
-  --color-natural-pebble: #E8E8EB;      /* neutral ground under a cherry glyph */
-  --color-natural-pebble-deep: #DCDCE0; /* pressed/divider state of pebble */
+  --color-natural-pebble: #e8e8eb; /* neutral ground under a cherry glyph */
+  --color-natural-pebble-deep: #dcdce0; /* pressed/divider state of pebble */
 }
 
 /* ---------- mobile ----------
@@ -71,7 +71,9 @@
 /* Bottom inset only, added to whatever padding the element already has, for
    the end of a scrolling page rather than a sheet. Needs its own class because
    a padding utility replaces the value instead of adding to it. */
-.scroll-end-safe { margin-bottom: var(--safe-bottom); }
+.scroll-end-safe {
+  margin-bottom: var(--safe-bottom);
+}
 
 /* iOS Safari zooms the whole page in when a focused control's text is under
    16px, and it does not zoom back out on blur. The app's inputs are text-sm

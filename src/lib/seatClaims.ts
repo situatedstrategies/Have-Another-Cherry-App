@@ -14,12 +14,18 @@ const GHOST = /^ghost_(\d+)$/;
 /** Placeholder ids referenced anywhere on an expense, lowest index first. */
 function ghostIdsOn(expense: Expense): string[] {
   const ids = new Set<string>();
-  const add = (v: unknown) => { if (typeof v === 'string' && GHOST.test(v)) ids.add(v); };
+  const add = (v: unknown) => {
+    if (typeof v === 'string' && GHOST.test(v)) ids.add(v);
+  };
   Object.keys(expense.shares || {}).forEach(add);
   add(expense.paidBy);
-  (expense.contributions || []).forEach(c => add(c.userId));
-  (expense.settlements || []).forEach(s => { add(s.paidBy); add(s.receivedBy); add(s.voidedBy); });
-  (expense.comments || []).forEach(c => add(c.userId));
+  (expense.contributions || []).forEach((c) => add(c.userId));
+  (expense.settlements || []).forEach((s) => {
+    add(s.paidBy);
+    add(s.receivedBy);
+    add(s.voidedBy);
+  });
+  (expense.comments || []).forEach((c) => add(c.userId));
   return Array.from(ids).sort((a, b) => Number(a.match(GHOST)![1]) - Number(b.match(GHOST)![1]));
 }
 
@@ -28,9 +34,11 @@ export function seatClaimMap(expense: Expense, memberIds: string[]): Record<stri
   const ghosts = ghostIdsOn(expense);
   if (ghosts.length === 0) return {};
   const shares = expense.shares || {};
-  const unseated = memberIds.filter(uid => uid && !(uid in shares));
+  const unseated = memberIds.filter((uid) => uid && !(uid in shares));
   const map: Record<string, string> = {};
-  ghosts.forEach((g, i) => { if (unseated[i]) map[g] = unseated[i]; });
+  ghosts.forEach((g, i) => {
+    if (unseated[i]) map[g] = unseated[i];
+  });
   return map;
 }
 
@@ -50,24 +58,34 @@ export function claimSeatsOnExpense(expense: Expense, memberIds: string[]): Expe
     ...expense,
     shares,
     paidBy: re(expense.paidBy)!,
-    ...(expense.contributions ? { contributions: expense.contributions.map(c => ({ ...c, userId: re(c.userId)! })) } : {}),
-    ...(expense.settlements ? {
-      settlements: expense.settlements.map(s => ({
-        ...s,
-        paidBy: re(s.paidBy)!,
-        receivedBy: re(s.receivedBy)!,
-        ...(s.voidedBy ? { voidedBy: re(s.voidedBy) } : {}),
-      })),
-    } : {}),
-    ...(expense.comments ? { comments: expense.comments.map(c => ({ ...c, userId: re(c.userId)! })) } : {}),
+    ...(expense.contributions
+      ? { contributions: expense.contributions.map((c) => ({ ...c, userId: re(c.userId)! })) }
+      : {}),
+    ...(expense.settlements
+      ? {
+          settlements: expense.settlements.map((s) => ({
+            ...s,
+            paidBy: re(s.paidBy)!,
+            receivedBy: re(s.receivedBy)!,
+            ...(s.voidedBy ? { voidedBy: re(s.voidedBy) } : {}),
+          })),
+        }
+      : {}),
+    ...(expense.comments
+      ? { comments: expense.comments.map((c) => ({ ...c, userId: re(c.userId)! })) }
+      : {}),
   };
 }
 
 /** Whole-ledger pass. `changed` is false when every entry came back as-is. */
-export function claimSeats(expenses: Expense[], memberIds: string[] | undefined): { expenses: Expense[]; changed: boolean } {
-  if (!memberIds || memberIds.length === 0 || expenses.length === 0) return { expenses, changed: false };
+export function claimSeats(
+  expenses: Expense[],
+  memberIds: string[] | undefined
+): { expenses: Expense[]; changed: boolean } {
+  if (!memberIds || memberIds.length === 0 || expenses.length === 0)
+    return { expenses, changed: false };
   let changed = false;
-  const out = expenses.map(e => {
+  const out = expenses.map((e) => {
     const next = claimSeatsOnExpense(e, memberIds);
     if (next !== e) changed = true;
     return next;

@@ -6,8 +6,9 @@
  *  zones would mean the server learning where people live. */
 export function reminderTargetDate(now: Date, offsetHours = 0): string {
   const shifted = new Date(now.getTime() + offsetHours * 3600000);
-  const tomorrow = new Date(Date.UTC(
-    shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1));
+  const tomorrow = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1)
+  );
   return tomorrow.toISOString().slice(0, 10);
 }
 
@@ -17,7 +18,7 @@ export function reminderTargetDate(now: Date, offsetHours = 0): string {
 export function reminderPayload(
   groupId: string,
   dueDate: string,
-  entries: { id?: unknown; target?: unknown }[],
+  entries: { id?: unknown; target?: unknown }[]
 ): Record<string, string> {
   const only = entries.length === 1 ? entries[0] : null;
   return {
