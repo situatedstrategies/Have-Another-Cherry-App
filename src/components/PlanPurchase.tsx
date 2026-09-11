@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
-import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
+import { roundCurrency } from '../lib/money';
+import { computeNetBetween } from '../lib/balances';
 import { X, Sparkles, TrendingUp, MessageCircle, Cherry } from 'lucide-react';
 
 interface PlanPurchaseProps {
@@ -10,22 +11,6 @@ interface PlanPurchaseProps {
   groupUsers: Record<string, any>;
   expenses: Expense[];
   onClose: () => void;
-}
-
-// Net balance between the active user and one other member, from the ledger.
-export function computeNetBetween(expenses: Expense[], activeUser: string, otherUid: string) {
-  let theyOweYou = 0;
-  let youOweThem = 0;
-  expenses.forEach((e) => {
-    if (e.paidBy === activeUser) {
-      theyOweYou += getRemainingSettlementAmount(e, otherUid, false);
-    } else if (e.paidBy === otherUid) {
-      youOweThem += getRemainingSettlementAmount(e, activeUser, false);
-    }
-  });
-  theyOweYou = roundCurrency(theyOweYou);
-  youOweThem = roundCurrency(youOweThem);
-  return { theyOweYou, youOweThem, net: roundCurrency(theyOweYou - youOweThem) };
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
