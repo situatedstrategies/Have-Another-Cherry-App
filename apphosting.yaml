@@ -6,7 +6,7 @@
 # Hosting resolves every declared secret at build time and a missing one fails
 # the whole rollout rather than being skipped.
 #
-# The password wall in server.ts is off by default. To put it back:
+# The password wall in server/index.ts is off by default. To put it back:
 #   - variable: SITE_GATE_ENABLED
 #     value: "1"
 #     availability:
@@ -31,7 +31,7 @@ env:
   #
   # The database ID is a plain value: it is a pointer, not a credential, and it
   # is useless to anyone without the token. With NOTION_TOKEN unset the mirror
-  # is a no-op by design (src/lib/notion.ts), so signups still land by email.
+  # is a no-op by design (server/notion.ts), so signups still land by email.
   - variable: NOTION_TOKEN
     secret: NOTION_TOKEN
     availability:
@@ -74,7 +74,7 @@ env:
 
   # Cherry + promo allowlist: sign-in emails that get Cherry + without paying.
   # The owner, the App Store and Play review accounts, and anyone else the
-  # owner names. Read by /api/plus-promo-sync in server.ts, which every client
+  # owner names. Read by /api/plus-promo-sync in server/routes/billing.ts, which every client
   # calls after sign-in; removing an address here revokes on their next
   # sign-in. Everyone not on this list sees the paywall. A plain value: these
   # are addresses, not credentials.

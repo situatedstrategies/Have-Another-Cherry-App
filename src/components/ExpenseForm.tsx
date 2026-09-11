@@ -32,6 +32,7 @@ import {
   RECURRING_WEEKS,
   RECURRING_MONTHS,
 } from '../lib/recurring';
+import { labelClass } from '../lib/ui';
 
 interface ExpenseFormProps {
   group: Group;
@@ -1432,9 +1433,7 @@ export default function ExpenseForm({
             </div>
 
             <div className="pt-2 border-t border-natural-border">
-              <span className="block text-xs font-bold text-natural-muted uppercase tracking-wider mb-3">
-                Set 3-Way Split Percentages
-              </span>
+              <span className={`${labelClass} block mb-3`}>Set 3-Way Split Percentages</span>
               <div className="grid grid-cols-2 gap-4">
                 {members.map((m) => (
                   <div key={`third-pct-${m.uid}`}>

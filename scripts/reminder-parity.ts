@@ -1,11 +1,11 @@
-// The scheduled bill reminder is a contract between two codebases: server.ts
+// The scheduled bill reminder is a contract between two codebases: the server
 // writes the push payload, and the Flutter app's `routeForPush` reads it
 // (Have-Another-Cherry-iOS/test/push_route_test.dart). Nothing type-checks
 // across that gap, so these cases assert both halves agree.
 //
 // Run with: npm run test:parity
 
-import { reminderTargetDate, reminderPayload } from '../src/lib/reminders';
+import { reminderTargetDate, reminderPayload } from '../server/reminders';
 
 let failures = 0;
 const check = (name: string, actual: unknown, expected: unknown) => {

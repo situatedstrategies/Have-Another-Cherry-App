@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
-import { getRemainingSettlementAmount, roundCurrency } from '../lib/money';
+import { roundCurrency } from '../lib/money';
+import { computeNetBetween } from '../lib/balances';
 import { X, Sparkles, TrendingUp, MessageCircle, Cherry } from 'lucide-react';
+import { labelClass } from '../lib/ui';
 
 interface PlanPurchaseProps {
   group: Group;
@@ -10,22 +12,6 @@ interface PlanPurchaseProps {
   groupUsers: Record<string, any>;
   expenses: Expense[];
   onClose: () => void;
-}
-
-// Net balance between the active user and one other member, from the ledger.
-export function computeNetBetween(expenses: Expense[], activeUser: string, otherUid: string) {
-  let theyOweYou = 0;
-  let youOweThem = 0;
-  expenses.forEach((e) => {
-    if (e.paidBy === activeUser) {
-      theyOweYou += getRemainingSettlementAmount(e, otherUid, false);
-    } else if (e.paidBy === otherUid) {
-      youOweThem += getRemainingSettlementAmount(e, activeUser, false);
-    }
-  });
-  theyOweYou = roundCurrency(theyOweYou);
-  youOweThem = roundCurrency(youOweThem);
-  return { theyOweYou, youOweThem, net: roundCurrency(theyOweYou - youOweThem) };
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -283,7 +269,7 @@ export default function PlanPurchase({
           {result && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+                <span className={labelClass}>
                   {otherName}'s share ({theirPct}%)
                 </span>
                 <span className="text-lg font-display font-semibold text-natural-text">
@@ -325,9 +311,7 @@ export default function PlanPurchase({
           {solo && numericAmount > 0 && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-2 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
-                  Your share (100%)
-                </span>
+                <span className={labelClass}>Your share (100%)</span>
                 <span className="text-lg font-display font-semibold text-natural-text">
                   ${numericAmount.toFixed(2)}
                 </span>

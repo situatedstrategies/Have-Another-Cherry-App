@@ -94,3 +94,11 @@ export function supportMailto(error?: CherryError, screen?: string, detail?: str
   });
   return `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`;
 }
+
+// What the support dialog is shown: the error, where it happened, and
+// technical detail that travels only in the support email.
+export interface SupportError {
+  error: CherryError;
+  screen?: string;
+  detail?: string;
+}

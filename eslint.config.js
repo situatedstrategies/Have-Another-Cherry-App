@@ -24,8 +24,26 @@ export default tseslint.config(
     },
   },
   {
+    // The client bundle must never pull in server-only code (email, Notion,
+    // Admin SDK helpers). Anything under server/ is off limits to src/.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(\\.\\.?/)+server(/|$)',
+              message: 'src/ must not import from server/. Move shared code to src/lib.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Node-side code and one-off scripts print their results on purpose.
-    files: ['server.ts', 'scripts/**', 'test/**'],
+    files: ['server/**', 'scripts/**', 'test/**'],
     rules: { 'no-console': 'off' },
   }
 );

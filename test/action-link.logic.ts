@@ -1,4 +1,4 @@
-import { actionHandlerBase, retargetActionLink } from '../src/lib/actionLink';
+import { actionHandlerBase, retargetActionLink } from '../server/actionLink';
 
 let fails = 0;
 function eq(label: string, actual: unknown, expected: unknown) {

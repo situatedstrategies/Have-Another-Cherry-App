@@ -11,6 +11,7 @@ import {
 import { authHeader } from '../firebase';
 import Modal from './Modal';
 import { CreditCard, TrendingUp, ChevronRight, BellRing, Check, RefreshCcw } from 'lucide-react';
+import { labelClass } from '../lib/ui';
 
 interface OwedBreakdownModalProps {
   mode: 'you_owe' | 'owed_to_you';
@@ -131,7 +132,7 @@ export default function OwedBreakdownModal({
     >
       <div className="space-y-5">
         <div className="flex items-baseline justify-between bg-natural-sage/20 border border-natural-primary/20 rounded-xl px-4 py-3">
-          <span className="text-xs font-bold text-natural-muted uppercase tracking-wider">
+          <span className={labelClass}>
             {mode === 'you_owe' ? 'Total you owe' : 'Total owed to you'}
           </span>
           <span className="text-2xl font-display font-semibold text-natural-text">
