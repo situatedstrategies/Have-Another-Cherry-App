@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { playPatternById, stopHaptics, tick } from "../haptics/engine";
@@ -13,14 +20,20 @@ const TAP_THRESHOLD_MS = 250;
 /** How long a color stays before snapping back when returnToIdle is on. */
 const RETURN_DELAY_MS = 900;
 
+/** Lets the screen trigger a reward from outside: a deep link, a notification, a side button. */
+export interface RewardButtonHandle {
+  reward: (kind: "tap" | "hold") => void;
+}
+
 interface Props {
   settings: Settings;
   size: number;
   ringTrackColor: string;
   onReward: (kind: "tap" | "hold") => void;
+  ref?: React.Ref<RewardButtonHandle>;
 }
 
-export function RewardButton({ settings, size, ringTrackColor, onReward }: Props) {
+export function RewardButton({ settings, size, ringTrackColor, onReward, ref }: Props) {
   const { mode, shape, tapPattern, holdPattern, holdSeconds, idleColor, tapColors } = settings;
 
   const scale = useRef(new Animated.Value(1)).current;
@@ -129,6 +142,8 @@ export function RewardButton({ settings, size, ringTrackColor, onReward }: Props
       idleColor,
     ],
   );
+
+  useImperativeHandle(ref, () => ({ reward }), [reward]);
 
   const drainRing = useCallback(
     (duration: number) => {

@@ -5,19 +5,35 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "dopamine",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0B0B0F"
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#C41200",
+          "defaultChannel": "reminders"
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.situatedstrategies.dopamine"
+      "bundleIdentifier": "com.situatedstrategies.dopamine",
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
+      },
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Dopamine sends the reminders you schedule so you remember to tap."
+      }
     },
     "android": {
       "package": "com.situatedstrategies.dopamine",
-      "permissions": ["android.permission.VIBRATE"],
+      "permissions": ["android.permission.VIBRATE", "android.permission.POST_NOTIFICATIONS"],
       "adaptiveIcon": {
         "backgroundColor": "#0B0B0F",
         "foregroundImage": "./assets/android-icon-foreground.png",

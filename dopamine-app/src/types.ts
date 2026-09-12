@@ -26,7 +26,24 @@ export interface Settings {
   randomColors: boolean;
   /** Snap back to the idle color after a moment instead of staying. */
   returnToIdle: boolean;
+  reminders: ReminderSettings;
+  /** Pressing a volume button while the app is open counts as a tap. Needs a dev build. */
+  volumeButtons: boolean;
 }
+
+export interface ReminderSettings {
+  enabled: boolean;
+  /** Hours between reminders inside the window. */
+  everyHours: number;
+  /** First reminder hour (0 to 23), local time. */
+  startHour: number;
+  /** No reminders after this hour (0 to 23), local time. */
+  endHour: number;
+  /** iOS: deliver as a time-sensitive notification that breaks through Focus. */
+  timeSensitive: boolean;
+}
+
+export const REMINDER_INTERVALS = [1, 2, 3, 4, 6];
 
 export const SHAPES: { id: Shape; label: string }[] = [
   { id: "circle", label: "Circle" },
@@ -67,4 +84,12 @@ export const DEFAULT_SETTINGS: Settings = {
   tapColors: ["#F97316", "#FACC15", "#22C55E", "#0EA5E9", "#8B5CF6", "#EC4899"],
   randomColors: false,
   returnToIdle: false,
+  reminders: {
+    enabled: false,
+    everyHours: 2,
+    startHour: 9,
+    endHour: 21,
+    timeSensitive: true,
+  },
+  volumeButtons: false,
 };
