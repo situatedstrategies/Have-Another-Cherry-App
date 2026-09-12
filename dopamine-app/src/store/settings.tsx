@@ -52,6 +52,7 @@ function mergeSettings(raw: string | null): Settings {
     if (!Number.isFinite(merged.holdSeconds) || merged.holdSeconds < 1) {
       merged.holdSeconds = DEFAULT_SETTINGS.holdSeconds;
     }
+    merged.reminders = { ...DEFAULT_SETTINGS.reminders, ...(parsed.reminders ?? {}) };
     return merged;
   } catch {
     return DEFAULT_SETTINGS;

@@ -1,12 +1,38 @@
-import React from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import React, { useState } from "react";
+import {
+  Linking as RNLinking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chip } from "../components/Chip";
 import { Swatch } from "../components/Swatch";
 import { playPattern, PATTERNS_BY_ID } from "../haptics";
+import { isVolumeButtonSupportAvailable } from "../hardware/volumeButtons";
+import {
+  formatHour,
+  reminderTimes,
+  requestReminderPermission,
+} from "../notifications/reminders";
 import { useSettings } from "../store/settings";
 import type { Theme } from "../theme";
-import { HOLD_PRESETS, SHAPES, SWATCHES, type Mode, type PatternId } from "../types";
+import {
+  HOLD_PRESETS,
+  REMINDER_INTERVALS,
+  SHAPES,
+  SWATCHES,
+  type Mode,
+  type PatternId,
+  type ReminderSettings,
+} from "../types";
+
+export const REWARD_LINK = "dopamine://reward";
 
 interface Props {
   visible: boolean;
@@ -27,6 +53,28 @@ const MODES: { id: Mode; label: string; hint: string }[] = [
 export function SettingsScreen({ visible, onClose, theme }: Props) {
   const { settings, update, reset, stats, resetStats } = useSettings();
   const insets = useSafeAreaInsets();
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const volumeSupported = isVolumeButtonSupportAvailable();
+
+  const updateReminders = (patch: Partial<ReminderSettings>) =>
+    update({ reminders: { ...settings.reminders, ...patch } });
+
+  const toggleReminders = async (on: boolean) => {
+    if (!on) {
+      updateReminders({ enabled: false });
+      return;
+    }
+    const granted = await requestReminderPermission();
+    setPermissionDenied(!granted);
+    updateReminders({ enabled: granted });
+  };
+
+  const stepHour = (key: "startHour" | "endHour", delta: number) => {
+    const next = Math.min(23, Math.max(0, settings.reminders[key] + delta));
+    updateReminders({ [key]: next });
+  };
+
+  const reminderCount = reminderTimes(settings.reminders).length;
 
   const toggleTapColor = (color: string) => {
     const has = settings.tapColors.includes(color);
@@ -208,6 +256,110 @@ export function SettingsScreen({ visible, onClose, theme }: Props) {
             />
           </Section>
 
+          <Section title="Reminders" theme={theme}>
+            <ToggleRow
+              label="Remind me to tap"
+              value={settings.reminders.enabled}
+              onChange={(v) => void toggleReminders(v)}
+              theme={theme}
+            />
+            {permissionDenied && (
+              <Hint theme={theme}>
+                Notifications are turned off for Dopamine in your phone settings. Turn them on
+                there, then flip this switch again.
+              </Hint>
+            )}
+            {settings.reminders.enabled && (
+              <>
+                <Text style={[styles.subLabel, { color: theme.muted }]}>Every</Text>
+                <Row>
+                  {REMINDER_INTERVALS.map((h) => (
+                    <Chip
+                      key={h}
+                      label={h === 1 ? "hour" : `${h} hours`}
+                      selected={settings.reminders.everyHours === h}
+                      onPress={() => updateReminders({ everyHours: h })}
+                      theme={theme}
+                    />
+                  ))}
+                </Row>
+                <Text style={[styles.subLabel, { color: theme.muted }]}>From</Text>
+                <View style={styles.stepper}>
+                  <StepButton
+                    label="-"
+                    onPress={() => stepHour("startHour", -1)}
+                    theme={theme}
+                  />
+                  <Text style={[styles.stepValue, { color: theme.text }]}>
+                    {formatHour(settings.reminders.startHour)}
+                  </Text>
+                  <StepButton
+                    label="+"
+                    onPress={() => stepHour("startHour", 1)}
+                    theme={theme}
+                  />
+                </View>
+                <Text style={[styles.subLabel, { color: theme.muted }]}>Until</Text>
+                <View style={styles.stepper}>
+                  <StepButton label="-" onPress={() => stepHour("endHour", -1)} theme={theme} />
+                  <Text style={[styles.stepValue, { color: theme.text }]}>
+                    {formatHour(settings.reminders.endHour)}
+                  </Text>
+                  <StepButton label="+" onPress={() => stepHour("endHour", 1)} theme={theme} />
+                </View>
+                <Hint theme={theme}>
+                  {reminderCount} {reminderCount === 1 ? "reminder" : "reminders"} a day.
+                  Tapping a reminder, or its "I did it" button, counts as a tap.
+                </Hint>
+                <ToggleRow
+                  label="Time sensitive (breaks through Focus)"
+                  value={settings.reminders.timeSensitive}
+                  onChange={(v) => updateReminders({ timeSensitive: v })}
+                  theme={theme}
+                />
+              </>
+            )}
+          </Section>
+
+          <Section title="Side buttons" theme={theme}>
+            <ToggleRow
+              label="Volume buttons tap the button"
+              value={settings.volumeButtons && volumeSupported}
+              onChange={(v) => update({ volumeButtons: v })}
+              theme={theme}
+            />
+            <Hint theme={theme}>
+              {volumeSupported
+                ? "While Dopamine is open, either volume button counts as a tap. Your volume is parked at half and put back when you leave."
+                : "Not available in Expo Go. Install a development build or the store version to use the volume buttons."}
+            </Hint>
+            <Text style={[styles.subLabel, { color: theme.muted }]}>
+              Action Button, Back Tap, Quick Tap
+            </Text>
+            <Hint theme={theme}>
+              Make a shortcut that opens this link and Dopamine will tap for you the moment it
+              opens:
+            </Hint>
+            <Text
+              selectable
+              style={[styles.code, { color: theme.text, borderColor: theme.border }]}
+            >
+              {REWARD_LINK}
+            </Text>
+            <Hint theme={theme}>
+              iPhone: Shortcuts app, new shortcut, "Open URL", paste the link, then assign it in
+              Settings under Action Button or Accessibility, Touch, Back Tap. Android: assign
+              the shortcut to Quick Tap (Pixel) or a button remapper.
+            </Hint>
+            <View style={styles.actions}>
+              <TextButton
+                label="Test the link"
+                onPress={() => void RNLinking.openURL(REWARD_LINK)}
+                theme={theme}
+              />
+            </View>
+          </Section>
+
           <Section title="Counter" theme={theme}>
             <Text style={[styles.statLine, { color: theme.text }]}>
               Today: {stats.rewardsToday} All time: {stats.rewardsAllTime}
@@ -341,6 +493,18 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", flexWrap: "wrap" },
   hint: { fontSize: 14, lineHeight: 20, marginTop: 4 },
+  subLabel: { fontSize: 13, fontWeight: "600", marginTop: 14, marginBottom: 8 },
+  code: {
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 8,
+    marginBottom: 4,
+    alignSelf: "flex-start",
+  },
   stepper: {
     flexDirection: "row",
     alignItems: "center",
