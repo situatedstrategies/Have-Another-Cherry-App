@@ -11,6 +11,7 @@ import {
   Bell,
   UserPlus,
   Mail,
+  ChevronDown,
 } from 'lucide-react';
 import { Group } from '../types';
 import {
@@ -25,6 +26,7 @@ import {
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
+import { formatIncome } from '../lib/income';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -33,6 +35,9 @@ interface SettingsModalProps {
   group: Group;
   groupUsers: Record<string, any>;
   onSaveName: (name: string) => void;
+  /** Save the signed-in member's yearly income (validated; stored as the
+   *  plain number string both clients read). Resolves true when it saved. */
+  onSaveIncome: (raw: string) => Promise<boolean>;
   /** Newsletters and offers. Off by default; this switch is the only place it is asked. */
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
@@ -67,6 +72,7 @@ export default function SettingsModal({
   group,
   groupUsers,
   onSaveName,
+  onSaveIncome,
   onSaveMarketingOptIn,
   onRetakeQuiz,
   onRecalculateSplit,
@@ -82,6 +88,31 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+
+  // The roster: each joined member's row opens into a detail card with their
+  // income and financial style, matching the mobile Settings roster. One row
+  // at a time on purpose - the section stays a roster, not an accordion of
+  // five open dossiers. Your own income is editable (from the card or the
+  // User Profile row - one editor, two doorways); everyone else's is theirs
+  // to set, which is also all the security rules allow.
+  const [expandedUid, setExpandedUid] = useState<string | null>(null);
+  const [incomeEditorAt, setIncomeEditorAt] = useState<'profile' | 'roster' | null>(null);
+  const [incomeInput, setIncomeInput] = useState('');
+  const [incomeBusy, setIncomeBusy] = useState(false);
+  const openIncomeEditor = (at: 'profile' | 'roster') => {
+    setIncomeInput(userProfile?.income || '');
+    setIncomeEditorAt(at);
+  };
+  const submitIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (incomeBusy) return;
+    setIncomeBusy(true);
+    try {
+      if (await onSaveIncome(incomeInput)) setIncomeEditorAt(null);
+    } finally {
+      setIncomeBusy(false);
+    }
+  };
   const [marketingBusy, setMarketingBusy] = useState(false);
   const handleMarketingChange = async (optIn: boolean) => {
     if (marketingBusy) return;
@@ -406,17 +437,58 @@ export default function SettingsModal({
               </button>
             )}
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center gap-2">
             <span className="text-sm text-natural-muted">Annual Income</span>
-            <span className="text-sm font-semibold text-natural-text">
-              {userProfile?.income
-                ? new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    maximumFractionDigits: 0,
-                  }).format(Number(userProfile.income))
-                : 'N/A'}
-            </span>
+            {incomeEditorAt === 'profile' ? (
+              <form onSubmit={submitIncome} className="flex items-center gap-1.5">
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
+                    $
+                  </span>
+                  <input
+                    autoFocus
+                    inputMode="decimal"
+                    value={incomeInput}
+                    onChange={(e) => setIncomeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setIncomeEditorAt(null);
+                    }}
+                    placeholder="Yearly income"
+                    aria-label="Your yearly income"
+                    className="w-32 pl-5 pr-2 py-1 text-sm text-right font-mono border border-natural-border focus:border-natural-primary rounded-md outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={incomeBusy}
+                  className="text-natural-primary hover:text-natural-dark p-1"
+                  title="Save"
+                  aria-label="Save income"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomeEditorAt(null)}
+                  className="text-natural-muted hover:text-natural-text p-1"
+                  title="Cancel"
+                  aria-label="Cancel editing income"
+                >
+                  <X size={16} />
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => openIncomeEditor('profile')}
+                className="flex items-center gap-1.5 group"
+                title="Edit your income"
+              >
+                <span className="text-sm font-semibold text-natural-text">
+                  {formatIncome(userProfile?.income) || 'Not set yet'}
+                </span>
+                <Edit2 size={13} className="text-natural-muted group-hover:text-natural-primary" />
+              </button>
+            )}
           </div>
           {fp && (
             <div className="pt-2 mt-2 border-t border-natural-border">
@@ -493,9 +565,26 @@ export default function SettingsModal({
                       key={uid}
                       className="text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0"
                     >
-                      <div className="flex justify-between items-center">
+                      <div
+                        className={`flex justify-between items-center${
+                          !isGhost && !editingSplit ? ' cursor-pointer select-none' : ''
+                        }`}
+                        onClick={
+                          !isGhost && !editingSplit
+                            ? () => {
+                                setExpandedUid(expandedUid === uid ? null : uid);
+                                if (incomeEditorAt === 'roster') setIncomeEditorAt(null);
+                              }
+                            : undefined
+                        }
+                      >
                         <div className="flex items-center gap-2">
-                          <span className="text-natural-text font-semibold">{memberName}</span>
+                          <span className="text-natural-text font-semibold">
+                            {memberName}
+                            {!isGhost && uid === currentUser?.uid && (
+                              <span className="text-natural-muted font-normal"> (you)</span>
+                            )}
+                          </span>
                           {editingSplit ? (
                             <span className="inline-flex items-center gap-1">
                               <input
@@ -520,8 +609,19 @@ export default function SettingsModal({
                         </div>
                         <div>
                           {!isGhost ? (
-                            <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">
-                              Joined
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">
+                                Joined
+                              </span>
+                              {!editingSplit && (
+                                <ChevronDown
+                                  size={14}
+                                  aria-hidden
+                                  className={`text-natural-muted transition-transform${
+                                    expandedUid === uid ? ' rotate-180' : ''
+                                  }`}
+                                />
+                              )}
                             </span>
                           ) : (
                             <div className="flex items-center gap-2">
@@ -575,6 +675,163 @@ export default function SettingsModal({
                           </button>
                         </form>
                       )}
+                      {/* The opened card under a member's row: income on top,
+                          style below - the same card the mobile roster shows.
+                          groupUsers holds each member's live profile (the
+                          rules give group members read access for exactly
+                          this); your own row uses userProfile, which is
+                          fresher. */}
+                      {!isGhost &&
+                        !editingSplit &&
+                        expandedUid === uid &&
+                        (() => {
+                          const isSelf = uid === currentUser?.uid;
+                          const member = isSelf ? userProfile : groupUsers[uid];
+                          const mfp = member?.financialProfile;
+                          const income = formatIncome(member?.income);
+                          return (
+                            <div className="mt-2 mb-1 bg-white/70 border border-natural-border rounded-xl p-3 space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-0.5">
+                                    Annual income
+                                  </span>
+                                  {isSelf && incomeEditorAt === 'roster' ? null : income ? (
+                                    <span className="text-base font-bold text-natural-text">
+                                      {income}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-natural-muted">
+                                      {isSelf ? 'Not set yet' : 'Not shared yet'}
+                                    </span>
+                                  )}
+                                </div>
+                                {isSelf && incomeEditorAt !== 'roster' && (
+                                  <button
+                                    onClick={() => openIncomeEditor('roster')}
+                                    className="flex items-center gap-1 text-xs font-bold text-natural-primary hover:underline shrink-0"
+                                  >
+                                    <Edit2 size={12} /> {income ? 'Edit' : 'Add'}
+                                  </button>
+                                )}
+                              </div>
+                              {isSelf && incomeEditorAt === 'roster' && (
+                                <div className="space-y-1.5">
+                                  <form onSubmit={submitIncome} className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
+                                        $
+                                      </span>
+                                      <input
+                                        autoFocus
+                                        inputMode="decimal"
+                                        value={incomeInput}
+                                        onChange={(e) => setIncomeInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setIncomeEditorAt(null);
+                                        }}
+                                        placeholder="Yearly income"
+                                        aria-label="Your yearly income"
+                                        className="w-full pl-6 pr-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
+                                      />
+                                    </div>
+                                    <button
+                                      type="submit"
+                                      disabled={incomeBusy}
+                                      className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
+                                    >
+                                      {incomeBusy ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIncomeEditorAt(null)}
+                                      className="text-xs font-semibold text-natural-muted hover:text-natural-text"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </form>
+                                  <p className="text-[11px] text-natural-muted">
+                                    Approximate is fine. Your household can see it, and it powers the
+                                    income-based split suggestion.
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
+                                  Financial style
+                                </span>
+                                {mfp ? (
+                                  <div>
+                                    <span className="text-sm font-semibold text-natural-primary block">
+                                      {mfp.type}
+                                    </span>
+                                    {mfp.description && (
+                                      <p className="text-xs text-natural-text mt-1 leading-relaxed">
+                                        {mfp.description}
+                                      </p>
+                                    )}
+                                    {Array.isArray(mfp.traits) && mfp.traits.length > 0 && (
+                                      <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {mfp.traits.map((t: string, i: number) => (
+                                          <span
+                                            key={i}
+                                            className="text-xs font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full"
+                                          >
+                                            {t}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {mfp.strengths && (
+                                      <p className="text-xs text-natural-text mt-2">
+                                        <strong className="text-natural-muted">Strengths:</strong>{' '}
+                                        {mfp.strengths}
+                                      </p>
+                                    )}
+                                    {mfp.watchouts && (
+                                      <p className="text-xs text-natural-text mt-1">
+                                        <strong className="text-natural-muted">Watch out for:</strong>{' '}
+                                        {mfp.watchouts}
+                                      </p>
+                                    )}
+                                    {mfp.communicationStyle && (
+                                      <p className="text-xs text-natural-text mt-1">
+                                        <strong className="text-natural-muted">
+                                          Talking money with {isSelf ? 'you' : memberName}:
+                                        </strong>{' '}
+                                        {mfp.communicationStyle}
+                                      </p>
+                                    )}
+                                    {mfp.quote && (
+                                      <blockquote className="mt-2 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
+                                        {mfp.quote}
+                                      </blockquote>
+                                    )}
+                                    {isSelf && (
+                                      <button
+                                        onClick={onRetakeQuiz}
+                                        className="mt-3 text-xs font-semibold text-natural-primary hover:underline"
+                                      >
+                                        Retake Profile Quiz
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : isSelf ? (
+                                  <button
+                                    onClick={onRetakeQuiz}
+                                    className="text-xs font-bold text-natural-primary hover:underline"
+                                  >
+                                    Find your style
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-natural-muted">
+                                    {memberName} hasn&apos;t taken the style quiz yet.
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                     </div>
                   );
                 })}

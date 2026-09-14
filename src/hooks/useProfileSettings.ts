@@ -11,6 +11,7 @@ import {
 } from '../lib/money';
 import { encryptData, decryptData } from '../lib/crypto';
 import { getGreetingKey } from '../lib/greeting';
+import { incomeInputError, parseIncome, normalizeIncome } from '../lib/income';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
@@ -371,6 +372,30 @@ export function useProfileSettings({
     }
   };
 
+  // Yearly income, editable from the Settings roster. Same writer either
+  // client uses (users/{uid}.income as a plain number string); the group can
+  // read it - that is its point: the roster shows it, and the income-based
+  // split recommendation divides by the group total. Validation mirrors the
+  // Flutter app's domain/profile/income.dart.
+  const handleSaveIncome = async (raw: string): Promise<boolean> => {
+    const err = incomeInputError(raw);
+    if (err) {
+      addToast('Check the income', err, 'error');
+      return false;
+    }
+    const income = normalizeIncome(parseIncome(raw)!);
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { income });
+      setUserProfile((prev: any) => ({ ...(prev || {}), income }));
+      addToast('Income Updated', 'The new figure now shows on your household roster.', 'success');
+      return true;
+    } catch (e) {
+      console.error('Failed to save income', e);
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - income' });
+      return false;
+    }
+  };
+
   // Synced to the profile so other members' forms can warn early.
   const handleSaveThreshold = async () => {
     if (savingThreshold) return;
@@ -450,6 +475,7 @@ export function useProfileSettings({
     paymentHandlesByUid,
     handleExportData,
     handleSaveName,
+    handleSaveIncome,
     handleSaveMarketingOptIn,
     handleSaveThreshold,
     handleSavePaymentHandles,
