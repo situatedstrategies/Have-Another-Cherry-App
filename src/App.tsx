@@ -190,6 +190,7 @@ export default function App() {
     paymentHandlesByUid,
     handleExportData,
     handleSaveName,
+    handleSaveIncome,
     handleSaveMarketingOptIn,
     handleSaveThreshold,
     handleSavePaymentHandles,
@@ -747,6 +748,7 @@ export default function App() {
           group={group}
           groupUsers={groupUsers}
           onSaveName={handleSaveName}
+          onSaveIncome={handleSaveIncome}
           onSaveMarketingOptIn={handleSaveMarketingOptIn}
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
