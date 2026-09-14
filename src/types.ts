@@ -75,6 +75,15 @@ export interface Group {
   categories: string[];
   memberIncomes?: Record<string, string>;
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)
+  // Set whenever someone changes the standing split. The group doc streams to
+  // every member, so this is what drives the "split changed" banner on the
+  // other members' dashboards (dismissals are local, keyed on `at`).
+  splitChange?: {
+    by: string; // uid of who changed it
+    byName: string;
+    at: string; // ISO datetime
+    summary: string; // e.g. "Olivia 65% / Sam 35%"
+  };
 }
 
 // 'dark_cherry' is the blind split (a Plus feature): the creator sets the pot

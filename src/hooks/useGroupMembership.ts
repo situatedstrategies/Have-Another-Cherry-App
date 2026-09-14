@@ -402,6 +402,7 @@ export function useGroupMembership({
       await updateDoc(doc(db, 'groups', group.id), {
         [`defaultSplit.${uids[0]}`]: pct1,
         [`defaultSplit.${uids[1]}`]: pct2,
+        splitChange: splitChangeStamp({ [uids[0]]: pct1, [uids[1]]: pct2 }, group.availableSplits),
       });
       addToast(
         'Split Updated',
@@ -411,6 +412,70 @@ export function useGroupMembership({
     } catch (e) {
       console.error('Failed to recalculate split', e);
       addToast('Error', 'Could not update the split. Please try again.', 'error');
+    }
+  };
+
+  // The banner payload other members see when the standing split changes:
+  // who, when, and the new ratio in one line.
+  const splitChangeStamp = (
+    joined: Record<string, number>,
+    availableSplits?: Group['availableSplits']
+  ) => {
+    const nameOfUid = (uid: string) =>
+      groupUsers[uid]?.name || group?.members?.find((m: any) => m.uid === uid)?.name || 'Someone';
+    const parts = [
+      ...Object.entries(joined).map(([uid, pct]) => `${nameOfUid(uid)} ${Math.round(pct)}%`),
+      ...((availableSplits || []) as any[])
+        .filter((s) => typeof s === 'object')
+        .map((s: any) => `${s.name} ${Math.round(s.split)}%`),
+    ];
+    return {
+      by: activeUser,
+      byName: nameOfUid(activeUser),
+      at: new Date().toISOString(),
+      summary: parts.join(' / '),
+    };
+  };
+
+  // Direct edit of the standing household ratio from Settings. The ratio must
+  // still cover exactly 100% — it is the default applied to every expense, so
+  // anything else would orphan or invent money on every log. Ghost (pending)
+  // seats are edited alongside joined members.
+  const handleSaveDefaultSplit = async (
+    joined: Record<string, number>,
+    ghostSplits: number[]
+  ): Promise<boolean> => {
+    if (!group || !activeGroupId) return false;
+    const values = [...Object.values(joined), ...ghostSplits];
+    if (values.some((v) => !Number.isFinite(v) || v < 0)) {
+      addToast('Check the split', 'Every share needs to be a number of at least 0%.', 'error');
+      return false;
+    }
+    const total = values.reduce((t, v) => t + v, 0);
+    if (Math.abs(total - 100) > 0.05) {
+      addToast(
+        'Check the split',
+        `The shares add up to ${total.toFixed(1)}% — the household ratio has to cover exactly 100%.`,
+        'error'
+      );
+      return false;
+    }
+    // Pending seats keep their names; only their share changes.
+    const nextAvailable = ((group.availableSplits || []) as any[])
+      .filter((s) => typeof s === 'object')
+      .map((s: any, i: number) => ({ ...s, split: ghostSplits[i] ?? s.split }));
+    try {
+      await updateDoc(doc(db, 'groups', activeGroupId), {
+        defaultSplit: joined,
+        ...(nextAvailable.length ? { availableSplits: nextAvailable } : {}),
+        splitChange: splitChangeStamp(joined, nextAvailable),
+      });
+      addToast('Split Updated', 'The new ratio now applies to everything you log.', 'success');
+      return true;
+    } catch (e) {
+      console.error('Failed to save default split', e);
+      addToast('Error', 'Could not update the split. Please try again.', 'error');
+      return false;
     }
   };
 
@@ -426,6 +491,7 @@ export function useGroupMembership({
     handleAddSeat,
     handleRemoveSeat,
     handleRecalculateSplit,
+    handleSaveDefaultSplit,
     handleResendInvite,
   };
 }
