@@ -37,6 +37,12 @@ interface SettingsModalProps {
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => Promise<void> | void;
+  /** Save an edited standing split (joined uid -> %, plus pending-seat %s in
+   *  availableSplits order). Resolves true when it saved. */
+  onSaveDefaultSplit: (
+    joined: Record<string, number>,
+    ghostSplits: number[]
+  ) => Promise<boolean>;
   /** Email the invite code to the person holding a pending seat. */
   onResendInvite: (memberName: string, email: string) => Promise<void> | void;
   /** Add a pending seat (name + percentage); everyone else is rescaled. With
@@ -64,6 +70,7 @@ export default function SettingsModal({
   onSaveMarketingOptIn,
   onRetakeQuiz,
   onRecalculateSplit,
+  onSaveDefaultSplit,
   onResendInvite,
   onAddSeat,
   onRemoveSeat,
@@ -125,6 +132,49 @@ export default function SettingsModal({
       await onRecalculateSplit();
     } finally {
       setRecalcBusy(false);
+    }
+  };
+
+  // Direct split editing: percentage inputs per roster row, saved as the new
+  // standing ratio. Other members learn about it from the dashboard banner.
+  const [editingSplit, setEditingSplit] = useState(false);
+  const [splitDraft, setSplitDraft] = useState<Record<string, string>>({});
+  const [splitBusy, setSplitBusy] = useState(false);
+
+  const openSplitEditor = () => {
+    const draft: Record<string, string> = {};
+    if (group) {
+      for (const [uid, pct] of Object.entries(getFullDefaultSplit(group))) {
+        draft[uid] = String(pct);
+      }
+    }
+    setSplitDraft(draft);
+    setEditingSplit(true);
+  };
+
+  const splitDraftTotal = Object.values(splitDraft).reduce(
+    (t, v) => t + (parseFloat(v) || 0),
+    0
+  );
+
+  const saveSplit = async () => {
+    if (splitBusy || !group) return;
+    const joined: Record<string, number> = {};
+    const ghostSplits: number[] = [];
+    for (const uid of Object.keys(getFullDefaultSplit(group))) {
+      const value = parseFloat(splitDraft[uid]) || 0;
+      if (uid.startsWith('ghost_')) {
+        ghostSplits[Number(uid.slice('ghost_'.length))] = value;
+      } else {
+        joined[uid] = value;
+      }
+    }
+    setSplitBusy(true);
+    try {
+      const saved = await onSaveDefaultSplit(joined, ghostSplits);
+      if (saved) setEditingSplit(false);
+    } finally {
+      setSplitBusy(false);
     }
   };
 
@@ -444,11 +494,29 @@ export default function SettingsModal({
                       className="text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0"
                     >
                       <div className="flex justify-between items-center">
-                        <div>
+                        <div className="flex items-center gap-2">
                           <span className="text-natural-text font-semibold">{memberName}</span>
-                          <span className="ml-2 text-xs font-mono text-natural-muted">
-                            {Number(pct)}% split
-                          </span>
+                          {editingSplit ? (
+                            <span className="inline-flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={splitDraft[uid] ?? ''}
+                                onChange={(e) =>
+                                  setSplitDraft((prev) => ({ ...prev, [uid]: e.target.value }))
+                                }
+                                aria-label={`${memberName}'s share of the split`}
+                                className="w-16 px-2 py-1 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs font-mono text-right outline-none"
+                              />
+                              <span className="text-xs font-mono text-natural-muted">%</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-mono text-natural-muted">
+                              {Number(pct)}% split
+                            </span>
+                          )}
                         </div>
                         <div>
                           {!isGhost ? (
@@ -511,7 +579,48 @@ export default function SettingsModal({
                   );
                 })}
             </div>
-            {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && (
+            {/* Adjust the standing split directly. In edit mode the roster rows
+                above become inputs; the total must land on exactly 100%. */}
+            {!editingSplit ? (
+              <button
+                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
+                onClick={openSplitEditor}
+              >
+                Adjust Split
+              </button>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <p
+                  className={`text-xs font-mono text-center ${
+                    Math.abs(splitDraftTotal - 100) <= 0.05
+                      ? 'text-natural-muted'
+                      : 'text-natural-primary font-bold'
+                  }`}
+                >
+                  Total: {splitDraftTotal.toFixed(0)}% {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : '— needs to be 100%'}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    className="flex-1 text-sm font-bold bg-white text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text transition-colors"
+                    onClick={() => setEditingSplit(false)}
+                    disabled={splitBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg transition-colors disabled:opacity-60"
+                    onClick={saveSplit}
+                    disabled={splitBusy || Math.abs(splitDraftTotal - 100) > 0.05}
+                  >
+                    {splitBusy ? 'Saving...' : 'Save New Split'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-natural-muted text-center">
+                  Everyone in the group will see a note that the split changed.
+                </p>
+              </div>
+            )}
+            {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && !editingSplit && (
               <button
                 className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
                 onClick={recalculate}

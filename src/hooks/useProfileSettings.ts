@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { updateDoc, doc, getDoc, deleteField } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { updateDoc, doc, deleteField, onSnapshot } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { auth, db, authHeader } from '../firebase';
 import { getFullMembers } from '../lib/members';
@@ -52,54 +52,67 @@ export function useProfileSettings({
 
   const [savingHandles, setSavingHandles] = useState(false);
 
+  // The profile is a LIVE listener, not a one-shot read, so entitlement
+  // writes that land after sign-in — the RevenueCat webhook, plus-promo-sync,
+  // a purchase made on another device or platform — reach this session
+  // immediately. Cherry+ follows the account, whichever group is active.
+  const profileBackfilledRef = useRef<string | null>(null);
   useEffect(() => {
     if (!currentUser) return;
     setIsLoading(true);
 
-    const fetchProfile = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', currentUser.uid),
+      (userDoc) => {
         if (userDoc.exists()) {
           const profile = userDoc.data() as any;
-          // Backfill a missing name from the sign-in display name.
-          if (
-            (!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') &&
-            currentUser.displayName
-          ) {
-            profile.name = currentUser.displayName;
-            updateDoc(doc(db, 'users', currentUser.uid), { name: currentUser.displayName }).catch(
-              () => {}
-            );
-          }
-          // Migrate legacy single-group accounts to the multi-group shape.
-          if (
-            profile.groupId &&
-            (!Array.isArray(profile.groupIds) ||
-              profile.groupIds.length === 0 ||
-              !profile.activeGroupId)
-          ) {
-            profile.groupIds =
-              Array.isArray(profile.groupIds) && profile.groupIds.length
-                ? profile.groupIds
-                : [profile.groupId];
-            profile.activeGroupId = profile.activeGroupId || profile.groupId;
-            updateDoc(doc(db, 'users', currentUser.uid), {
-              groupIds: profile.groupIds,
-              activeGroupId: profile.activeGroupId,
-            }).catch(() => {});
+          // One-time backfills per sign-in; the writes echo back through this
+          // same listener, so guard against re-running them on every snapshot.
+          if (profileBackfilledRef.current !== currentUser.uid) {
+            profileBackfilledRef.current = currentUser.uid;
+            // Backfill a missing name from the sign-in display name.
+            if (
+              (!profile.name || profile.name === 'Anonymous' || profile.name === 'Unknown') &&
+              currentUser.displayName
+            ) {
+              profile.name = currentUser.displayName;
+              updateDoc(doc(db, 'users', currentUser.uid), {
+                name: currentUser.displayName,
+              }).catch(() => {});
+            }
+            // Migrate legacy single-group accounts to the multi-group shape.
+            if (
+              profile.groupId &&
+              (!Array.isArray(profile.groupIds) ||
+                profile.groupIds.length === 0 ||
+                !profile.activeGroupId)
+            ) {
+              profile.groupIds =
+                Array.isArray(profile.groupIds) && profile.groupIds.length
+                  ? profile.groupIds
+                  : [profile.groupId];
+              profile.activeGroupId = profile.activeGroupId || profile.groupId;
+              updateDoc(doc(db, 'users', currentUser.uid), {
+                groupIds: profile.groupIds,
+                activeGroupId: profile.activeGroupId,
+              }).catch(() => {});
+            }
           }
           setUserProfile(profile);
         } else {
           setUserProfile({}); // Setup required
         }
-      } catch (error) {
-        console.error('Error fetching profile', error);
-      } finally {
+        setIsLoading(false);
+      },
+      (error) => {
+        // Sign-out cancels listeners with permission-denied; teardown noise.
+        if ((error as any).code === 'permission-denied' && !auth.currentUser) return;
+        console.error('Error watching profile', error);
         setIsLoading(false);
       }
-    };
+    );
 
-    fetchProfile();
+    return () => unsubscribe();
   }, [currentUser]);
 
   // Settings inputs mirror the profile. Handles are stored encrypted with the
