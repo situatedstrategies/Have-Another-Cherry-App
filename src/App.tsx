@@ -37,6 +37,7 @@ import PlanPurchase, { PlanPrefill } from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
 import InsightsSection from './components/InsightsSection';
+import OrchardMode from './components/OrchardMode';
 import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -50,6 +51,7 @@ import {
   ChevronDown,
   TrendingUp,
   Vault as VaultIcon,
+  Cherry as CherryIcon,
 } from 'lucide-react';
 
 export default function App() {
@@ -76,6 +78,7 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
+  const [showOrchard, setShowOrchard] = useState(false);
   const [planPrefill, setPlanPrefill] = useState<PlanPrefill | null>(null);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
@@ -396,7 +399,7 @@ export default function App() {
 
           {/* Three equal columns on phones; natural size in a row from sm up. */}
           <div
-            className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
+            className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
             id="header-controls"
           >
             <button
@@ -419,6 +422,13 @@ export default function App() {
               <TrendingUp className="h-4 w-4 shrink-0" />
               <span className="sm:hidden">Plan</span>
               <span className="hidden sm:inline">Plan a Purchase</span>
+            </button>
+            <button
+              onClick={() => setShowOrchard(true)}
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
+              title="Settle the ledger by swiping"
+            >
+              <CherryIcon className="h-4 w-4 shrink-0" /> Cherry Pick
             </button>
             <button
               onClick={() => {
@@ -857,6 +867,21 @@ export default function App() {
           screen={supportError.screen}
           detail={supportError.detail}
           onClose={() => setSupportError(null)}
+        />
+      )}
+
+      {showOrchard && (
+        <OrchardMode
+          expenses={expenses}
+          group={group}
+          activeUser={activeUser}
+          onSettle={(e) => {
+            setSelectedExpense(e);
+            setShowSettleModal(true);
+          }}
+          onOpen={(e) => setSelectedExpense(e)}
+          onAddComment={handleAddComment}
+          onClose={() => setShowOrchard(false)}
         />
       )}
 
