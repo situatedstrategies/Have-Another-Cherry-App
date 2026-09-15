@@ -11,6 +11,8 @@ import {
   suggestedSeatPercent,
   MAX_ADDED_SEATS,
   MIN_GROUP_CAPACITY,
+  incomeRecalcBlocker,
+  incomeRecalculatedShares,
 } from '../src/lib/members';
 
 let bad = 0;
@@ -163,6 +165,53 @@ try {
   threw = e.message;
 }
 check('share over 100 refused', threw.length > 0, true);
+
+// Recalculate by income: only the standing ratio moves, pending seats keep
+// theirs, and the math matches the Flutter app's split_edit.dart.
+check(
+  'income recalc: runs when everyone shared',
+  incomeRecalcBlocker({ A: 65000, B: 35000 }),
+  null
+);
+check('income recalc: zero counts as shared', incomeRecalcBlocker({ A: 65000, B: 0 }), null);
+check(
+  'income recalc: names who is missing',
+  incomeRecalcBlocker({ A: 65000, B: null }),
+  "B hasn't shared an income yet."
+);
+check(
+  'income recalc: names everyone missing',
+  incomeRecalcBlocker({ A: 65000, B: null, C: null }),
+  "B and C haven't shared an income yet."
+);
+check(
+  'income recalc: nobody shared',
+  (incomeRecalcBlocker({ A: null, B: null }) || '').startsWith('Nobody has shared'),
+  true
+);
+check('income recalc: all zero', (incomeRecalcBlocker({ A: 0, B: 0 }) || '').includes('$0'), true);
+check('income recalc: empty roster', incomeRecalcBlocker({}), 'Nobody has joined yet.');
+
+check('income shares: 65/35 with no pending', incomeRecalculatedShares({ a: 65000, b: 35000 }, 0), {
+  a: 65,
+  b: 35,
+});
+check('income shares: equal incomes', incomeRecalculatedShares({ a: 80000, b: 80000 }, 0), {
+  a: 50,
+  b: 50,
+});
+check(
+  'income shares: pending seat keeps its 20',
+  incomeRecalculatedShares({ a: 65000, b: 35000 }, 20),
+  { a: 52, b: 28 }
+);
+const incomeThree = incomeRecalculatedShares({ a: 50000, b: 30000, c: 20000 }, 15);
+check('income shares: three members land on 85', sum(incomeThree), 85);
+check('income shares: pending fills 100', incomeRecalculatedShares({ a: 65000, b: 35000 }, 100), {
+  a: 0,
+  b: 0,
+});
+check('income shares: empty roster', incomeRecalculatedShares({}, 0), {});
 
 console.log(bad ? `\n${bad} FAILURES` : '\nall seat rules hold');
 if (bad) process.exit(1);

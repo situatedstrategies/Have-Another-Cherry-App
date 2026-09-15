@@ -16,7 +16,6 @@ import { Group } from '../types';
 import {
   getFullDefaultSplit,
   joinedUids,
-  pendingSeats,
   seatAddBlocker,
   suggestedSeatPercent,
   withAddedSeat,
@@ -37,6 +36,9 @@ interface SettingsModalProps {
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => Promise<void> | void;
+  /** Every member's decrypted Venmo/Zelle handles, keyed by uid, so the
+   *  roster shows how to pay each person. */
+  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
   /** Email the invite code to the person holding a pending seat. */
   onResendInvite: (memberName: string, email: string) => Promise<void> | void;
   /** Add a pending seat (name + percentage); everyone else is rescaled. With
@@ -64,6 +66,7 @@ export default function SettingsModal({
   onSaveMarketingOptIn,
   onRetakeQuiz,
   onRecalculateSplit,
+  paymentHandlesByUid,
   onResendInvite,
   onAddSeat,
   onRemoveSeat,
@@ -113,6 +116,17 @@ export default function SettingsModal({
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  };
+
+  const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
+  const copyHandle = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedHandle(text);
+        setTimeout(() => setCopiedHandle(null), 2000);
       })
       .catch(() => {});
   };
@@ -483,6 +497,40 @@ export default function SettingsModal({
                           )}
                         </div>
                       </div>
+                      {!isGhost &&
+                        (() => {
+                          const h = paymentHandlesByUid?.[uid];
+                          const rows = [
+                            h?.venmo
+                              ? { label: 'Venmo', text: `@${h.venmo.replace(/^@/, '')}` }
+                              : null,
+                            h?.zelle ? { label: 'Zelle', text: h.zelle } : null,
+                          ].filter(Boolean) as { label: string; text: string }[];
+                          if (rows.length === 0) return null;
+                          return (
+                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                              {rows.map((r) => (
+                                <button
+                                  key={r.label}
+                                  type="button"
+                                  onClick={() => copyHandle(r.text)}
+                                  title={`Copy ${memberName}'s ${r.label} handle`}
+                                  className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
+                                >
+                                  <span className="font-semibold">{r.label}</span>
+                                  <span className="font-mono text-natural-text break-all">
+                                    {r.text}
+                                  </span>
+                                  {copiedHandle === r.text ? (
+                                    <Check size={11} />
+                                  ) : (
+                                    <Copy size={11} />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       {isGhost && resendFor === uid && (
                         <form
                           onSubmit={(e) => submitResend(e, memberName)}
@@ -511,14 +559,23 @@ export default function SettingsModal({
                   );
                 })}
             </div>
-            {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && (
-              <button
-                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
-                onClick={recalculate}
-                disabled={recalcBusy}
-              >
-                {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
-              </button>
+            {/* Any roster of two or more. Pending seats keep their share; the
+                incomes divide the rest. Old expenses are untouched: each one
+                stores its own dollar shares. */}
+            {joinedUids(group).length >= 2 && (
+              <>
+                <button
+                  className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
+                  onClick={recalculate}
+                  disabled={recalcBusy}
+                >
+                  {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
+                </button>
+                <p className="mt-1.5 text-xs text-natural-muted">
+                  Applies to what you log from now on. Past expenses keep the shares they were
+                  logged with.
+                </p>
+              </>
             )}
 
             {/* Grow the group. Every member may add a seat; the split is rescaled

@@ -214,3 +214,46 @@ export const withRemovedSeat = (group: Partial<Group>, index: number): SeatUpdat
     addedSeats: Math.max(0, addedSeats(group) - 1),
   };
 };
+
+/** Why "Recalculate by income" cannot run, or null when it can. Keyed by
+ *  display name so the message can say who is missing. A null income is one
+ *  that was never shared; zero counts as shared, the arithmetic handles it. */
+export const incomeRecalcBlocker = (
+  incomesByName: Record<string, number | null>
+): string | null => {
+  const names = Object.keys(incomesByName);
+  if (names.length === 0) return 'Nobody has joined yet.';
+  const missing = names.filter((n) => incomesByName[n] == null);
+  if (missing.length === names.length) {
+    return 'Nobody has shared an income yet. Each person adds theirs from their own profile.';
+  }
+  if (missing.length > 0) {
+    return `${missing.join(' and ')} ${missing.length === 1 ? "hasn't" : "haven't"} shared an income yet.`;
+  }
+  const total = names.reduce((t, n) => t + (incomesByName[n] || 0), 0);
+  if (total <= 0) return 'The incomes add up to $0, so there is no ratio.';
+  return null;
+};
+
+/** The joined members' shares recomputed from income. `incomes` is uid ->
+ *  yearly income for every joined member; `reserved` is the total already
+ *  promised to pending seats, which keep their shares, so the incomes divide
+ *  what is left. Result sums with `reserved` to exactly 100, one decimal.
+ *
+ *  This only ever feeds `defaultSplit`, the ratio future expenses default to.
+ *  Every logged expense stores its own dollar shares, so nothing already in
+ *  the ledger moves. Mirrored in the Flutter app's `split_edit.dart`. */
+export const incomeRecalculatedShares = (
+  incomes: Record<string, number>,
+  reserved: number
+): Record<string, number> => {
+  const uids = Object.keys(incomes);
+  if (uids.length === 0) return {};
+  const room = 100 - reserved;
+  if (room <= 0) return Object.fromEntries(uids.map((u) => [u, 0]));
+  const scaled = scalePercents(
+    uids.map((u) => incomes[u]),
+    room
+  );
+  return Object.fromEntries(uids.map((u, i) => [u, scaled[i]]));
+};

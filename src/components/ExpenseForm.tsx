@@ -14,6 +14,8 @@ import {
   Camera,
   Sparkles,
   EyeOff,
+  Copy,
+  Check,
 } from 'lucide-react';
 import Modal from './Modal';
 import DarkCherryInfoModal, {
@@ -44,6 +46,10 @@ interface ExpenseFormProps {
   memberThresholds?: Record<string, number>;
   /** Cherry + entitlement; gates creating Dark Cherry splits. */
   isPlus?: boolean;
+  /** Every member's decrypted Venmo/Zelle handles, keyed by uid. Shown the
+   *  moment Venmo or Zelle is picked, so the handle is in hand while the
+   *  payment is being made. */
+  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
 }
 
 export default function ExpenseForm({
@@ -54,6 +60,7 @@ export default function ExpenseForm({
   editingExpense,
   memberThresholds,
   isPlus,
+  paymentHandlesByUid,
 }: ExpenseFormProps) {
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
@@ -75,6 +82,35 @@ export default function ExpenseForm({
   const [instrumentLabel, setInstrumentLabel] = useState<string>(
     editingExpense?.contributions?.[0]?.label || ''
   );
+  const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
+  const copyHandle = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedHandle(text);
+        setTimeout(() => setCopiedHandle(null), 2000);
+      })
+      .catch(() => {});
+  };
+  // The other joined members' handles for the picked network. Ghost seats
+  // have no profile to read, and your own handle is not who you are paying.
+  const peerHandles = useMemo(() => {
+    if (instrumentType !== 'VENMO' && instrumentType !== 'ZELLE') return [];
+    return members
+      .filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'))
+      .map((m) => {
+        const h = paymentHandlesByUid?.[m.uid];
+        const raw = instrumentType === 'VENMO' ? h?.venmo : h?.zelle;
+        const text = raw?.trim();
+        if (!text) return null;
+        return {
+          uid: m.uid,
+          name: m.name,
+          text: instrumentType === 'VENMO' ? `@${text.replace(/^@/, '')}` : text,
+        };
+      })
+      .filter(Boolean) as { uid: string; name: string; text: string }[];
+  }, [instrumentType, members, activeUser, paymentHandlesByUid]);
   const [splitType, setSplitType] = useState<SplitType>(
     editingExpense?.splitType || 'household_default'
   );
@@ -917,6 +953,37 @@ export default function ExpenseForm({
               </button>
             ))}
           </div>
+          {(instrumentType === 'VENMO' || instrumentType === 'ZELLE') && (
+            <div className="mt-2 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-natural-muted mb-1.5">
+                {instrumentType === 'VENMO' ? 'Venmo' : 'Zelle'} handles
+              </p>
+              {peerHandles.length === 0 ? (
+                <p className="text-xs text-natural-muted">
+                  {members.filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'))
+                    .length === 0
+                    ? 'No one else in the group yet.'
+                    : `No one else has added a ${instrumentType === 'VENMO' ? 'Venmo' : 'Zelle'} handle yet.`}
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {peerHandles.map((h) => (
+                    <button
+                      key={h.uid}
+                      type="button"
+                      onClick={() => copyHandle(h.text)}
+                      title={`Copy ${h.name}'s handle`}
+                      className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
+                    >
+                      <span className="font-semibold">{h.name}</span>
+                      <span className="font-mono text-natural-text break-all">{h.text}</span>
+                      {copiedHandle === h.text ? <Check size={11} /> : <Copy size={11} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {['CREDIT', 'DEBIT', 'OTHER'].includes(instrumentType as string) && (
             <div className="mt-2 relative">
               <input
