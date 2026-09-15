@@ -2,7 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from '../lib/crypto';
-import { Expense, VaultBill, VaultDocMeta, VaultData, DEFAULT_CATEGORIES } from '../types';
+import {
+  Expense,
+  VaultBill,
+  VaultDocMeta,
+  VaultData,
+  VaultNote,
+  DEFAULT_CATEGORIES,
+} from '../types';
+import VaultCaptureSheet from './VaultCaptureSheet';
 import Modal from './Modal';
 import {
   Vault,
@@ -21,6 +29,8 @@ import {
   Search,
   Pencil,
   X,
+  NotebookPen,
+  Camera,
 } from 'lucide-react';
 import { recurringDaysInMonth } from '../lib/recurring';
 
@@ -39,7 +49,7 @@ interface HouseholdVaultProps {
 // so cap uploads well below that. Bigger files need Firebase Storage (later).
 const MAX_FILE_BYTES = 400 * 1024;
 
-const EMPTY_VAULT: VaultData = { bills: [], docs: [] };
+const EMPTY_VAULT: VaultData = { bills: [], docs: [], notes: [] };
 
 const MONTH_NAMES = [
   'January',
@@ -71,7 +81,8 @@ export default function HouseholdVault({
   categories,
   onClose,
 }: HouseholdVaultProps) {
-  const [tab, setTab] = useState<'calendar' | 'bills' | 'docs'>('calendar');
+  const [tab, setTab] = useState<'notebook' | 'calendar' | 'bills' | 'docs'>('notebook');
+  const [capturing, setCapturing] = useState(false);
   const [vault, setVault] = useState<VaultData>(EMPTY_VAULT);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -117,6 +128,21 @@ export default function HouseholdVault({
       (b) => !q || [b.name, b.category || '', b.notes || ''].join(' ').toLowerCase().includes(q)
     )
     .sort((a, b) => a.dueDay - b.dueDay);
+  const notes = vault.notes || [];
+  const filteredNotes = notes
+    .filter((n) => inCategory(n.category))
+    .filter(
+      (n) =>
+        !q ||
+        [n.title, n.body, n.vendor || '', n.category || '', n.accountHint || '', ...(n.tags || [])]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const saveNote = (note: VaultNote) => persistVault({ ...vault, notes: [note, ...notes] });
+  const deleteNote = (id: string) =>
+    persistVault({ ...vault, notes: notes.filter((n) => n.id !== id) });
   const filteredDocs = vault.docs
     .filter((d) => inCategory(d.category))
     .filter((d) => !q || [d.name, d.category || ''].join(' ').toLowerCase().includes(q));
@@ -126,7 +152,9 @@ export default function HouseholdVault({
     new Set(
       (tab === 'bills'
         ? vault.bills.map((b) => b.category)
-        : vault.docs.map((d) => d.category)
+        : tab === 'notebook'
+          ? notes.map((n) => n.category)
+          : vault.docs.map((d) => d.category)
       ).filter((c): c is string => !!c)
     )
   ).sort();
@@ -141,9 +169,12 @@ export default function HouseholdVault({
         if (snap.exists() && snap.data()?.payload) {
           const decrypted = await decryptData(snap.data().payload, groupId);
           if (!cancelled && decrypted && typeof decrypted === 'object') {
+            // Notes are the iOS app's notebook, saved into this same payload.
+            // Dropping them here would erase them on the next save from web.
             setVault({
               bills: Array.isArray(decrypted.bills) ? decrypted.bills : [],
               docs: Array.isArray(decrypted.docs) ? decrypted.docs : [],
+              notes: Array.isArray(decrypted.notes) ? decrypted.notes : [],
             });
           }
         }
@@ -358,8 +389,22 @@ export default function HouseholdVault({
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
 
   const dueByDay = useMemo(() => {
-    const map: Record<number, { label: string; amount?: number; source: 'bill' | 'expense' }[]> =
-      {};
+    const map: Record<
+      number,
+      { label: string; amount?: number; source: 'bill' | 'expense' | 'note' }[]
+    > = {};
+
+    for (const note of vault.notes || []) {
+      if (!note.dueDate) continue;
+      const [y, m, d] = note.dueDate.split('-').map(Number);
+      if (y === viewYear && m - 1 === viewMonth && d >= 1) {
+        (map[Math.min(d, daysInMonth)] ||= []).push({
+          label: note.title,
+          amount: note.amount,
+          source: 'note',
+        });
+      }
+    }
 
     for (const bill of vault.bills) {
       const day = Math.min(bill.dueDay, daysInMonth);
@@ -380,7 +425,7 @@ export default function HouseholdVault({
       }
     }
     return map;
-  }, [vault.bills, expenses, viewYear, viewMonth, daysInMonth]);
+  }, [vault.bills, vault.notes, expenses, viewYear, viewMonth, daysInMonth]);
 
   const monthTotal = useMemo(
     () =>
@@ -410,6 +455,7 @@ export default function HouseholdVault({
       <div className="flex items-center gap-1.5 px-6 pt-4">
         {(
           [
+            { key: 'notebook', label: 'Notebook', icon: <NotebookPen size={14} /> },
             { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} /> },
             { key: 'bills', label: 'Recurring Bills', icon: <ReceiptText size={14} /> },
             { key: 'docs', label: 'Documents', icon: <FileText size={14} /> },
@@ -446,7 +492,13 @@ export default function HouseholdVault({
               <input
                 type="text"
                 placeholder="Search"
-                aria-label={tab === 'bills' ? 'Search bills' : 'Search documents'}
+                aria-label={
+                  tab === 'bills'
+                    ? 'Search bills'
+                    : tab === 'notebook'
+                      ? 'Search notes'
+                      : 'Search documents'
+                }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-9 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
@@ -489,6 +541,91 @@ export default function HouseholdVault({
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-natural-muted text-xs font-mono">
             <RefreshCcw className="h-4 w-4 animate-spin" /> Opening the vault...
+          </div>
+        ) : tab === 'notebook' ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setCapturing(true)}
+              className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5"
+            >
+              <Plus size={15} /> Add to the vault
+            </button>
+            {filteredNotes.length === 0 ? (
+              <p className="text-xs text-natural-muted text-center py-6">
+                {filtering
+                  ? 'Nothing in the notebook matches.'
+                  : 'Write down or photograph the things the household runs on. They are encrypted before they leave this device.'}
+              </p>
+            ) : (
+              filteredNotes.map((note) => {
+                const meta = [
+                  note.vendor,
+                  note.amount != null ? `$${note.amount.toFixed(2)}` : null,
+                  note.dueDate ? `due ${note.dueDate}` : null,
+                  note.recurrence && note.recurrence !== 'none' ? note.recurrence : null,
+                ].filter(Boolean);
+                return (
+                  <div
+                    key={note.id}
+                    className="bg-white border border-natural-border rounded-2xl p-4 shadow-sm space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 p-1.5 rounded-full bg-natural-pebble text-natural-primary">
+                          {note.sourceType === 'photo' ? (
+                            <Camera size={13} />
+                          ) : (
+                            <NotebookPen size={13} />
+                          )}
+                        </span>
+                        <h4 className="text-sm font-semibold text-natural-text truncate">
+                          {note.title}
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteNote(note.id)}
+                        aria-label={`Delete ${note.title}`}
+                        className="text-natural-muted hover:text-natural-primary shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-natural-text whitespace-pre-line leading-relaxed line-clamp-4">
+                      {note.body}
+                    </p>
+                    {meta.length > 0 && (
+                      <p className="font-mono text-[9px] tracking-wider uppercase text-natural-muted">
+                        {meta.join(' · ')}
+                      </p>
+                    )}
+                    {(note.category || note.tags?.length) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {note.category && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-natural-primary-wash text-natural-primary">
+                            {note.category}
+                          </span>
+                        )}
+                        {(note.tags || []).map((t) => (
+                          <span
+                            key={t}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-natural-sidebar text-natural-muted"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {!!note.lowConfidenceFields?.length && (
+                      <p className="text-[11px] text-natural-primary">
+                        Unverified: {note.lowConfidenceFields.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         ) : tab === 'calendar' ? (
           <div className="space-y-3">
@@ -846,6 +983,14 @@ export default function HouseholdVault({
           </div>
         )}
       </div>
+      {capturing && (
+        <VaultCaptureSheet
+          activeUser={activeUser}
+          categories={categories && categories.length ? categories : [...DEFAULT_CATEGORIES]}
+          onSave={saveNote}
+          onClose={() => setCapturing(false)}
+        />
+      )}
     </Modal>
   );
 }

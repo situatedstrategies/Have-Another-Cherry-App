@@ -232,9 +232,43 @@ export interface VaultDocMeta {
   category?: string;
 }
 
+// A note in the vault's notebook: typed or photographed, optionally organised
+// by the model into the fields below. Same shape as the iOS VaultNote; both
+// clients read and write the same encrypted payload, so neither may drop it.
+export interface VaultNote {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  createdBy: string;
+  vendor?: string;
+  amount?: number;
+  dueDate?: string; // YYYY-MM-DD
+  recurrence?: string; // none | weekly | biweekly | monthly | quarterly | yearly
+  accountHint?: string;
+  category?: string;
+  tags?: string[];
+  sourceType?: 'typed' | 'photo';
+  lowConfidenceFields?: string[];
+}
+
+export interface VaultExtraction {
+  title: string;
+  body: string;
+  vendor?: string;
+  amount?: number;
+  dueDate?: string;
+  recurrence?: string;
+  accountHint?: string;
+  category?: string;
+  tags?: string[];
+  confidence?: Record<string, 'high' | 'medium' | 'low'>;
+}
+
 export interface VaultData {
   bills: VaultBill[];
   docs: VaultDocMeta[];
+  notes?: VaultNote[];
 }
 
 export const DEFAULT_CATEGORIES = [
