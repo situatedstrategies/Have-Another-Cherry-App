@@ -4,6 +4,7 @@ import { db, authHeader } from './firebase';
 import { getFullMembers } from './lib/members';
 import { isDarkCherry } from './lib/money';
 import { hasPlus } from './lib/entitlements';
+import { useReminderPublisher } from './hooks/useReminderPublisher';
 import { computeIncomeDiscrepancy } from './lib/incomeDiscrepancy';
 import { SupportError } from './lib/errors';
 import { Expense, Group } from './types';
@@ -33,9 +34,11 @@ import LegalModal, { LegalDoc } from './components/LegalModal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import FinancialAlignmentModal from './components/FinancialAlignmentModal';
-import PlanPurchase from './components/PlanPurchase';
+import PlanPurchase, { PlanPrefill } from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
+import InsightsSection from './components/InsightsSection';
+import OrchardMode from './components/OrchardMode';
 import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -49,6 +52,7 @@ import {
   ChevronDown,
   TrendingUp,
   Vault as VaultIcon,
+  Cherry as CherryIcon,
 } from 'lucide-react';
 
 export default function App() {
@@ -75,6 +79,8 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
+  const [showOrchard, setShowOrchard] = useState(false);
+  const [planPrefill, setPlanPrefill] = useState<PlanPrefill | null>(null);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
   // The one error dialog, set from any failure point.
@@ -161,6 +167,14 @@ export default function App() {
   // and set after a purchase. ORed with the profile flag below so a paid
   // customer is unlocked even before users/{uid}.isPlus catches up.
   const [rcPlus, setRcPlus] = useState(false);
+  // Bill reminders: publish the minimal due-date index the daily push job
+  // reads, so a web-only household gets "due tomorrow" too.
+  useReminderPublisher({
+    uid: activeUser || null,
+    groupId: group?.id || null,
+    expenses,
+    isPlus: hasPlus(userProfile) || rcPlus,
+  });
 
   const { handleSignOut, handleDeleteAccount } = useAuthSession({
     activeUser,
@@ -394,7 +408,7 @@ export default function App() {
 
           {/* Three equal columns on phones; natural size in a row from sm up. */}
           <div
-            className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
+            className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
             id="header-controls"
           >
             <button
@@ -417,6 +431,13 @@ export default function App() {
               <TrendingUp className="h-4 w-4 shrink-0" />
               <span className="sm:hidden">Plan</span>
               <span className="hidden sm:inline">Plan a Purchase</span>
+            </button>
+            <button
+              onClick={() => setShowOrchard(true)}
+              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
+              title="Settle the ledger by swiping"
+            >
+              <CherryIcon className="h-4 w-4 shrink-0" /> Cherry Pick
             </button>
             <button
               onClick={() => {
@@ -677,6 +698,15 @@ export default function App() {
                   onCardClick={(card) => setOwedModal(card)}
                 />
               </ModuleBoundary>
+              {isPlus && (
+                <ModuleBoundary label="Insights">
+                  <InsightsSection
+                    expenses={statsVisibleExpenses}
+                    members={getFullMembers(group)}
+                    activeUser={activeUser}
+                  />
+                </ModuleBoundary>
+              )}
               {!isPlus && (
                 <button
                   type="button"
@@ -695,8 +725,8 @@ export default function App() {
                     See where the money actually goes
                   </p>
                   <p className="mt-1 text-sm text-natural-muted">
-                    How it was paid, who is carrying the card, and how long things take to come
-                    back. Arriving with the iOS and Android apps.
+                    How it was paid, who is carrying the card, how long things take to come back,
+                    and what Venmo instant transfers are quietly costing.
                   </p>
                   <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
                     Join the waitlist
@@ -849,12 +879,34 @@ export default function App() {
         />
       )}
 
+      {showOrchard && (
+        <OrchardMode
+          expenses={expenses}
+          group={group}
+          activeUser={activeUser}
+          onSettle={(e) => {
+            setSelectedExpense(e);
+            setShowSettleModal(true);
+          }}
+          onOpen={(e) => setSelectedExpense(e)}
+          onAddComment={handleAddComment}
+          onClose={() => setShowOrchard(false)}
+        />
+      )}
+
       {showPlanPurchase && (
         <PlanPurchase
           group={group}
           activeUser={activeUser}
           groupUsers={groupUsers}
           expenses={expenses}
+          myThreshold={Number(userProfile?.recurringThreshold) || 0}
+          onLogIt={(prefill) => {
+            setShowPlanPurchase(false);
+            setEditingExpense(null);
+            setPlanPrefill(prefill);
+            setShowForm(true);
+          }}
           onClose={() => setShowPlanPurchase(false)}
         />
       )}
@@ -892,12 +944,14 @@ export default function App() {
           onClose={() => {
             setShowForm(false);
             setEditingExpense(null);
+            setPlanPrefill(null);
           }}
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}
+          prefill={planPrefill}
         />
       )}
 

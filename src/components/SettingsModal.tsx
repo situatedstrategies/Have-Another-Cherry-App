@@ -24,6 +24,12 @@ import {
 } from '../lib/members';
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import { quizRetakeBlocker } from '../lib/quizRetake';
+import {
+  APPEARANCE_MODES,
+  AppearanceMode,
+  loadSavedAppearance,
+  saveAppearance,
+} from '../lib/appearance';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { formatIncome } from '../lib/income';
@@ -170,6 +176,8 @@ export default function SettingsModal({
   // A style is a reading of a season: the quiz reopens three months after
   // the last result. Null means it is open now.
   const retakeBlocker = quizRetakeBlocker(userProfile?.financialProfileAt);
+
+  const [appearance, setAppearance] = useState<AppearanceMode>(loadSavedAppearance);
 
   const [recalcBusy, setRecalcBusy] = useState(false);
   const recalculate = async () => {
@@ -338,6 +346,37 @@ export default function SettingsModal({
       }
     >
       {extraSection}
+
+      {/* Appearance: light, dark, or follow the device. Per device. */}
+      <div>
+        <h3 className={`${labelClass} mb-2`}>Appearance</h3>
+        <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border">
+          <p className="text-xs text-natural-muted leading-relaxed mb-3">
+            System follows whatever the device is set to. Light and dark hold, whichever way the
+            device goes.
+          </p>
+          <div className="flex gap-1.5">
+            {APPEARANCE_MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => {
+                  saveAppearance(m.value);
+                  setAppearance(m.value);
+                }}
+                title={m.help}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-full border transition-all ${
+                  appearance === m.value
+                    ? 'bg-natural-primary border-natural-primary text-white shadow-sm'
+                    : 'bg-white border-natural-border text-natural-text hover:border-natural-primary/40'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Notifications (web push) */}
       {pushState !== 'unavailable' && (
