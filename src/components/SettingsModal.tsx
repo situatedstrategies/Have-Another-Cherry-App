@@ -17,7 +17,6 @@ import { Group } from '../types';
 import {
   getFullDefaultSplit,
   joinedUids,
-  pendingSeats,
   seatAddBlocker,
   suggestedSeatPercent,
   withAddedSeat,
@@ -42,12 +41,12 @@ interface SettingsModalProps {
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => Promise<void> | void;
+  /** Every member's decrypted Venmo/Zelle handles, keyed by uid, so the
+   *  roster shows how to pay each person. */
+  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
   /** Save an edited standing split (joined uid -> %, plus pending-seat %s in
    *  availableSplits order). Resolves true when it saved. */
-  onSaveDefaultSplit: (
-    joined: Record<string, number>,
-    ghostSplits: number[]
-  ) => Promise<boolean>;
+  onSaveDefaultSplit: (joined: Record<string, number>, ghostSplits: number[]) => Promise<boolean>;
   /** Email the invite code to the person holding a pending seat. */
   onResendInvite: (memberName: string, email: string) => Promise<void> | void;
   /** Add a pending seat (name + percentage); everyone else is rescaled. With
@@ -76,6 +75,7 @@ export default function SettingsModal({
   onSaveMarketingOptIn,
   onRetakeQuiz,
   onRecalculateSplit,
+  paymentHandlesByUid,
   onSaveDefaultSplit,
   onResendInvite,
   onAddSeat,
@@ -155,6 +155,17 @@ export default function SettingsModal({
       .catch(() => {});
   };
 
+  const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
+  const copyHandle = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedHandle(text);
+        setTimeout(() => setCopiedHandle(null), 2000);
+      })
+      .catch(() => {});
+  };
+
   const [recalcBusy, setRecalcBusy] = useState(false);
   const recalculate = async () => {
     if (recalcBusy) return;
@@ -183,10 +194,7 @@ export default function SettingsModal({
     setEditingSplit(true);
   };
 
-  const splitDraftTotal = Object.values(splitDraft).reduce(
-    (t, v) => t + (parseFloat(v) || 0),
-    0
-  );
+  const splitDraftTotal = Object.values(splitDraft).reduce((t, v) => t + (parseFloat(v) || 0), 0);
 
   const saveSplit = async () => {
     if (splitBusy || !group) return;
@@ -751,11 +759,60 @@ export default function SettingsModal({
                                     </button>
                                   </form>
                                   <p className="text-[11px] text-natural-muted">
-                                    Approximate is fine. Your household can see it, and it powers the
-                                    income-based split suggestion.
+                                    Approximate is fine. Your household can see it, and it powers
+                                    the income-based split suggestion.
                                   </p>
                                 </div>
                               )}
+                              {/* How to pay this person. Stored encrypted on
+                                  their own profile; readable here because the
+                                  rules let group members read each other. */}
+                              <div>
+                                <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
+                                  Payment handles
+                                </span>
+                                {(() => {
+                                  const h = paymentHandlesByUid?.[uid];
+                                  const rows = [
+                                    h?.venmo
+                                      ? { label: 'Venmo', text: `@${h.venmo.replace(/^@/, '')}` }
+                                      : null,
+                                    h?.zelle ? { label: 'Zelle', text: h.zelle } : null,
+                                  ].filter(Boolean) as { label: string; text: string }[];
+                                  if (rows.length === 0) {
+                                    return (
+                                      <span className="text-xs text-natural-muted">
+                                        {isSelf
+                                          ? 'Add yours under How people pay you.'
+                                          : `${memberName} hasn't added any yet.`}
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                      {rows.map((r) => (
+                                        <button
+                                          key={r.label}
+                                          type="button"
+                                          onClick={() => copyHandle(r.text)}
+                                          title={`Copy ${memberName}'s ${r.label} handle`}
+                                          className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
+                                        >
+                                          <span className="font-semibold">{r.label}</span>
+                                          <span className="font-mono text-natural-text break-all">
+                                            {r.text}
+                                          </span>
+                                          {copiedHandle === r.text ? (
+                                            <Check size={11} />
+                                          ) : (
+                                            <Copy size={11} />
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                               <div>
                                 <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
                                   Financial style
@@ -790,7 +847,9 @@ export default function SettingsModal({
                                     )}
                                     {mfp.watchouts && (
                                       <p className="text-xs text-natural-text mt-1">
-                                        <strong className="text-natural-muted">Watch out for:</strong>{' '}
+                                        <strong className="text-natural-muted">
+                                          Watch out for:
+                                        </strong>{' '}
                                         {mfp.watchouts}
                                       </p>
                                     )}
@@ -854,7 +913,8 @@ export default function SettingsModal({
                       : 'text-natural-primary font-bold'
                   }`}
                 >
-                  Total: {splitDraftTotal.toFixed(0)}% {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : '— needs to be 100%'}
+                  Total: {splitDraftTotal.toFixed(0)}%{' '}
+                  {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : '— needs to be 100%'}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -877,14 +937,23 @@ export default function SettingsModal({
                 </p>
               </div>
             )}
-            {Object.keys(groupUsers).length === 2 && pendingSeats(group).length === 0 && !editingSplit && (
-              <button
-                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
-                onClick={recalculate}
-                disabled={recalcBusy}
-              >
-                {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
-              </button>
+            {/* Any roster of two or more. Pending seats keep their share; the
+                incomes divide the rest. Old expenses are untouched: each one
+                stores its own dollar shares. */}
+            {joinedUids(group).length >= 2 && !editingSplit && (
+              <>
+                <button
+                  className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
+                  onClick={recalculate}
+                  disabled={recalcBusy}
+                >
+                  {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
+                </button>
+                <p className="mt-1.5 text-xs text-natural-muted">
+                  Applies to what you log from now on. Past expenses keep the shares they were
+                  logged with.
+                </p>
+              </>
             )}
 
             {/* Grow the group. Every member may add a seat; the split is rescaled

@@ -752,6 +752,7 @@ export default function App() {
           onSaveMarketingOptIn={handleSaveMarketingOptIn}
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
+          paymentHandlesByUid={paymentHandlesByUid}
           onSaveDefaultSplit={handleSaveDefaultSplit}
           onResendInvite={handleResendInvite}
           onAddSeat={handleAddSeat}
@@ -896,6 +897,7 @@ export default function App() {
           editingExpense={editingExpense}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
+          paymentHandlesByUid={paymentHandlesByUid}
         />
       )}
 

@@ -9,7 +9,14 @@ import {
   arrayRemove,
 } from 'firebase/firestore';
 import { auth, db, authHeader } from '../firebase';
-import { joinedUids, pendingSeats, withAddedSeat, withRemovedSeat } from '../lib/members';
+import {
+  incomeRecalcBlocker,
+  incomeRecalculatedShares,
+  joinedUids,
+  pendingSeats,
+  withAddedSeat,
+  withRemovedSeat,
+} from '../lib/members';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
@@ -382,31 +389,40 @@ export function useGroupMembership({
     }
   };
 
+  // Recalculate the standing ratio from everyone's reported income. Pending
+  // seats keep the share they were promised; the incomes divide the rest.
+  // Only `defaultSplit` changes: every logged expense stores its own dollar
+  // shares, so this shapes what gets logged from now on and nothing before.
   const handleRecalculateSplit = async () => {
     if (!group) return;
-    const uids = Object.keys(groupUsers);
-    const inc1 = Number(groupUsers[uids[0]]?.income) || 0;
-    const inc2 = Number(groupUsers[uids[1]]?.income) || 0;
-    if (inc1 <= 0 || inc2 <= 0) {
-      addToast(
-        'Cannot Recalculate',
-        'Everyone needs an income on their profile before the split can be recalculated.',
-        'error'
-      );
+    const uids = joinedUids(group);
+    const incomesByName: Record<string, number | null> = {};
+    const incomes: Record<string, number> = {};
+    for (const uid of uids) {
+      const raw = String(groupUsers[uid]?.income ?? '').replace(/[$,\s]/g, '');
+      const n = raw === '' ? NaN : Number(raw);
+      const income = Number.isFinite(n) ? n : null;
+      incomesByName[groupUsers[uid]?.name || 'Someone'] = income;
+      if (income != null) incomes[uid] = income;
+    }
+    const blocker = incomeRecalcBlocker(incomesByName);
+    if (blocker) {
+      addToast('Cannot Recalculate', blocker, 'error');
       return;
     }
-    const total = inc1 + inc2;
-    const pct1 = Math.round((inc1 / total) * 100);
-    const pct2 = 100 - pct1;
+    const reserved = pendingSeats(group).reduce((t, s) => t + s.split, 0);
+    const defaultSplit = incomeRecalculatedShares(incomes, reserved);
+    const summary = uids
+      .map((uid) => `${groupUsers[uid]?.name || 'Someone'} ${Math.round(defaultSplit[uid])}%`)
+      .join(' / ');
     try {
       await updateDoc(doc(db, 'groups', group.id), {
-        [`defaultSplit.${uids[0]}`]: pct1,
-        [`defaultSplit.${uids[1]}`]: pct2,
-        splitChange: splitChangeStamp({ [uids[0]]: pct1, [uids[1]]: pct2 }, group.availableSplits),
+        defaultSplit,
+        splitChange: splitChangeStamp(defaultSplit, group.availableSplits),
       });
       addToast(
         'Split Updated',
-        `New split is ${pct1}% / ${pct2}% based on verified incomes.`,
+        `${summary}, from reported incomes. Applies to what you log from now on; past expenses keep their shares.`,
         'success'
       );
     } catch (e) {
