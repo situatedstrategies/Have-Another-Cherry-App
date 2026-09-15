@@ -33,7 +33,7 @@ import LegalModal, { LegalDoc } from './components/LegalModal';
 import SettingsModal from './components/SettingsModal';
 import PrivacyModal from './components/PrivacyModal';
 import FinancialAlignmentModal from './components/FinancialAlignmentModal';
-import PlanPurchase from './components/PlanPurchase';
+import PlanPurchase, { PlanPrefill } from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
 import CherryPlusModal from './components/CherryPlusModal';
@@ -75,6 +75,7 @@ export default function App() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [showPlanPurchase, setShowPlanPurchase] = useState(false);
+  const [planPrefill, setPlanPrefill] = useState<PlanPrefill | null>(null);
   const [showVault, setShowVault] = useState(false);
   const [showCherryPlus, setShowCherryPlus] = useState(false);
   // The one error dialog, set from any failure point.
@@ -855,6 +856,13 @@ export default function App() {
           activeUser={activeUser}
           groupUsers={groupUsers}
           expenses={expenses}
+          myThreshold={Number(userProfile?.recurringThreshold) || 0}
+          onLogIt={(prefill) => {
+            setShowPlanPurchase(false);
+            setEditingExpense(null);
+            setPlanPrefill(prefill);
+            setShowForm(true);
+          }}
           onClose={() => setShowPlanPurchase(false)}
         />
       )}
@@ -892,12 +900,14 @@ export default function App() {
           onClose={() => {
             setShowForm(false);
             setEditingExpense(null);
+            setPlanPrefill(null);
           }}
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}
+          prefill={planPrefill}
         />
       )}
 

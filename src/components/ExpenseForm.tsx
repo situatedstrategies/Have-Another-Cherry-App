@@ -50,6 +50,8 @@ interface ExpenseFormProps {
    *  moment Venmo or Zelle is picked, so the handle is in hand while the
    *  payment is being made. */
   paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
+  /** Seed a new expense from the purchase planner. Ignored when editing. */
+  prefill?: { title: string; amount: number; paidBy: string; splitType: SplitType } | null;
 }
 
 export default function ExpenseForm({
@@ -61,12 +63,16 @@ export default function ExpenseForm({
   memberThresholds,
   isPlus,
   paymentHandlesByUid,
+  prefill,
 }: ExpenseFormProps) {
+  const seed = editingExpense ? null : prefill;
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
 
-  const [title, setTitle] = useState(editingExpense?.title || '');
-  const [amount, setAmount] = useState(editingExpense?.amount?.toString() || '');
+  const [title, setTitle] = useState(editingExpense?.title || seed?.title || '');
+  const [amount, setAmount] = useState(
+    editingExpense?.amount?.toString() || (seed && seed.amount > 0 ? String(seed.amount) : '')
+  );
   // Start empty so the placeholder shows and nothing "sticks" in the field.
   const [category, setCategory] = useState<string>(editingExpense?.category || '');
   const categoryInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +81,9 @@ export default function ExpenseForm({
     setCategory(e.target.value);
   };
   const [date, setDate] = useState(editingExpense?.date || todayLocal());
-  const [paidBy, setPaidBy] = useState<string>(editingExpense?.paidBy || activeUser);
+  const [paidBy, setPaidBy] = useState<string>(
+    editingExpense?.paidBy || seed?.paidBy || activeUser
+  );
   const [instrumentType, setInstrumentType] = useState<PaymentInstrument | undefined>(
     editingExpense?.contributions?.[0]?.instrumentType
   );
@@ -112,7 +120,7 @@ export default function ExpenseForm({
       .filter(Boolean) as { uid: string; name: string; text: string }[];
   }, [instrumentType, members, activeUser, paymentHandlesByUid]);
   const [splitType, setSplitType] = useState<SplitType>(
-    editingExpense?.splitType || 'household_default'
+    editingExpense?.splitType || seed?.splitType || 'household_default'
   );
 
   // Dark Cherry (blind split): per-payment bounds + the first-use explainer.

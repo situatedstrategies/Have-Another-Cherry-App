@@ -3,15 +3,56 @@ import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { roundCurrency } from '../lib/money';
 import { computeNetBetween } from '../lib/balances';
-import { X, Sparkles, TrendingUp, MessageCircle, Cherry } from 'lucide-react';
+import { netNow, projectPurchase, purchaseDelta, SplitMode } from '../lib/planPurchase';
+import { X, Sparkles, TrendingUp, MessageCircle, Cherry, Plus, ArrowRight } from 'lucide-react';
 import { labelClass } from '../lib/ui';
+
+export interface PlanPrefill {
+  title: string;
+  amount: number;
+  paidBy: string;
+  splitType: 'household_default' | 'equal';
+}
 
 interface PlanPurchaseProps {
   group: Group;
   activeUser: string;
   groupUsers: Record<string, any>;
   expenses: Expense[];
+  /** Your own spending threshold, for the monthly-share warning. */
+  myThreshold?: number;
+  /** Open the expense form prefilled with this projection. */
+  onLogIt?: (prefill: PlanPrefill) => void;
   onClose: () => void;
+}
+
+const money = (v: number) => `$${v.toFixed(2)}`;
+/** Owing reads as a plain figure, being owed in parentheses, as on iOS. */
+const signed = (v: number) => (v < 0 ? `(${money(Math.abs(v))})` : money(v));
+
+// A capsule choice, the same control for every either/or question below.
+function Choice({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`py-1.5 px-3 text-xs font-semibold rounded-full border transition-all ${
+        selected
+          ? 'bg-natural-primary border-natural-primary text-white shadow-sm'
+          : 'bg-natural-sidebar border-natural-border text-natural-text hover:bg-natural-bg'
+      }`}
+    >
+      {label}
+    </button>
+  );
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -80,6 +121,8 @@ export default function PlanPurchase({
   activeUser,
   groupUsers,
   expenses,
+  myThreshold = 0,
+  onLogIt,
   onClose,
 }: PlanPurchaseProps) {
   const members = useMemo(() => getFullMembers(group), [group]);
@@ -88,6 +131,12 @@ export default function PlanPurchase({
   const [otherUid, setOtherUid] = useState(others[0]?.uid || '');
   const [item, setItem] = useState('');
   const [amount, setAmount] = useState('');
+  // Who fronts it, how it splits, and whether it is carried across months:
+  // the three things the arguments actually happen over (ported from iOS).
+  const [payer, setPayer] = useState(activeUser);
+  const [mode, setMode] = useState<SplitMode>('household');
+  const [months, setMonths] = useState(1);
+  const householdSize = Object.keys(getFullDefaultSplit(group)).length;
 
   // The roster can arrive after the modal opens (a join landing, or the
   // group snapshot catching up), in which case the initial pick was empty and
@@ -120,6 +169,29 @@ export default function PlanPurchase({
   // is simply what it costs; the modal still works rather than sitting on an
   // empty prompt however much is typed.
   const solo = others.length === 0;
+
+  // The projection: every seat's share, its monthly slice, and net before
+  // and after. Null until there is a price.
+  const projection = useMemo(() => {
+    if (numericAmount <= 0) return null;
+    const { shares, perMonth } = projectPurchase(numericAmount, defaultSplit, mode, payer, months);
+    const rows = Object.keys(defaultSplit).map((uid) => {
+      const before = netNow(expenses, uid);
+      return {
+        uid,
+        name: uid === activeUser ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone',
+        share: shares[uid] ?? 0,
+        monthly: perMonth[uid] ?? 0,
+        before,
+        after: roundCurrency(before + purchaseDelta(shares, uid, payer)),
+        isPayer: uid === payer,
+      };
+    });
+    const myMonthly = perMonth[activeUser] ?? 0;
+    return { rows, myMonthly, overThreshold: myThreshold > 0 && myMonthly > myThreshold };
+    // defaultSplit is rebuilt each render from group; group is the stable input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericAmount, group, mode, payer, months, expenses, activeUser, members, myThreshold]);
 
   const result = useMemo(() => {
     if (!otherUid || numericAmount <= 0) return null;
@@ -236,6 +308,65 @@ export default function PlanPurchase({
             </div>
           </div>
 
+          {/* Who fronts it / how it splits / spread over (ported from iOS) */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1">
+                Who fronts it
+              </label>
+              <p className="text-[11px] text-natural-muted mb-1.5">
+                {householdSize <= 1
+                  ? 'You cover the whole thing.'
+                  : "Whoever pays is owed the others' shares."}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.keys(getFullDefaultSplit(group)).map((uid) => (
+                  <Choice
+                    key={uid}
+                    label={
+                      uid === activeUser
+                        ? 'You'
+                        : members.find((m) => m.uid === uid)?.name || 'Someone'
+                    }
+                    selected={payer === uid}
+                    onClick={() => setPayer(uid)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
+                How it splits
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                <Choice
+                  label="Household ratio"
+                  selected={mode === 'household'}
+                  onClick={() => setMode('household')}
+                />
+                <Choice label="Even" selected={mode === 'even'} onClick={() => setMode('even')} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1">
+                Spread over
+              </label>
+              <p className="text-[11px] text-natural-muted mb-1.5">
+                Carrying a large purchase changes what it costs each month, not what it costs.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[1, 3, 6, 12].map((n) => (
+                  <Choice
+                    key={n}
+                    label={n === 1 ? 'One go' : `${n} months`}
+                    selected={months === n}
+                    onClick={() => setMonths(n)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Balance snapshot */}
           {!solo && (
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -320,6 +451,82 @@ export default function PlanPurchase({
                 Nobody has joined yet, so this is all yours for now. Invite someone from Settings
                 and this turns into a split and a conversation starter.
               </p>
+            </div>
+          )}
+
+          {projection && (
+            <div className="space-y-2">
+              <span className={labelClass}>
+                {householdSize <= 1 ? 'What it does to you' : 'What it does to each of you'}
+              </span>
+              <p className="text-xs text-natural-muted">
+                Net position today, what this adds, and where it leaves you. A negative number means
+                you are owed.
+              </p>
+              <div className="bg-white rounded-2xl border border-natural-border shadow-sm divide-y divide-natural-border">
+                {projection.rows.map((r) => (
+                  <div key={r.uid} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold text-natural-text truncate">
+                          {r.name}
+                        </span>
+                        {r.isPayer && (
+                          <span className="text-[8.5px] font-mono tracking-[0.1em] text-natural-primary bg-natural-primary-wash px-2 py-0.5 rounded-full">
+                            PAYS
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[15px] font-display font-semibold text-natural-text">
+                        {money(r.share)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
+                      <span className="text-natural-muted truncate">
+                        {months > 1
+                          ? `${money(r.monthly)} a month for ${months} months`
+                          : 'Share of this purchase'}
+                      </span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span
+                          className={r.before > 0 ? 'text-natural-primary' : 'text-natural-text'}
+                        >
+                          {signed(r.before)}
+                        </span>
+                        <ArrowRight className="h-3 w-3 text-natural-accent" />
+                        <span
+                          className={`font-medium ${r.after > 0 ? 'text-natural-primary' : 'text-natural-text'}`}
+                        >
+                          {signed(r.after)}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {projection.overThreshold && (
+                <div className="bg-natural-primary-wash border border-natural-primary/35 rounded-xl p-3 text-xs text-natural-text">
+                  Your share works out at {money(projection.myMonthly)}
+                  {months > 1 ? ' a month' : ''}, past the ${myThreshold.toFixed(0)} you set as
+                  comfortable. Worth talking about before it is logged.
+                </div>
+              )}
+              {onLogIt && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onLogIt({
+                      title: item.trim(),
+                      amount: numericAmount,
+                      paidBy: payer.startsWith('ghost_') ? activeUser : payer,
+                      splitType: mode === 'household' ? 'household_default' : 'equal',
+                    })
+                  }
+                  className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="h-4 w-4" /> Log it
+                </button>
+              )}
             </div>
           )}
 
