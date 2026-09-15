@@ -4,6 +4,7 @@ import { db, authHeader } from './firebase';
 import { getFullMembers } from './lib/members';
 import { isDarkCherry } from './lib/money';
 import { hasPlus } from './lib/entitlements';
+import { useReminderPublisher } from './hooks/useReminderPublisher';
 import { computeIncomeDiscrepancy } from './lib/incomeDiscrepancy';
 import { SupportError } from './lib/errors';
 import { Expense, Group } from './types';
@@ -166,6 +167,14 @@ export default function App() {
   // and set after a purchase. ORed with the profile flag below so a paid
   // customer is unlocked even before users/{uid}.isPlus catches up.
   const [rcPlus, setRcPlus] = useState(false);
+  // Bill reminders: publish the minimal due-date index the daily push job
+  // reads, so a web-only household gets "due tomorrow" too.
+  useReminderPublisher({
+    uid: activeUser || null,
+    groupId: group?.id || null,
+    expenses,
+    isPlus: hasPlus(userProfile) || rcPlus,
+  });
 
   const { handleSignOut, handleDeleteAccount } = useAuthSession({
     activeUser,

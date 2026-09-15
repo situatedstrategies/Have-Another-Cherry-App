@@ -57,8 +57,11 @@ export const creditFrontedBy = (expenses: Expense[]): Record<string, number> => 
   return out;
 };
 
+// A date-only string is a calendar day, not an instant: read it as local so
+// "2026-08-01" is the 1st everywhere rather than UTC midnight the day before.
 const dayOf = (iso: string): number | null => {
-  const d = new Date(iso);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 };
