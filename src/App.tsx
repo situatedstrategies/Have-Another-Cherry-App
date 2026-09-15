@@ -36,6 +36,7 @@ import FinancialAlignmentModal from './components/FinancialAlignmentModal';
 import PlanPurchase, { PlanPrefill } from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
+import InsightsSection from './components/InsightsSection';
 import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
@@ -678,6 +679,15 @@ export default function App() {
                   onCardClick={(card) => setOwedModal(card)}
                 />
               </ModuleBoundary>
+              {isPlus && (
+                <ModuleBoundary label="Insights">
+                  <InsightsSection
+                    expenses={statsVisibleExpenses}
+                    members={getFullMembers(group)}
+                    activeUser={activeUser}
+                  />
+                </ModuleBoundary>
+              )}
               {!isPlus && (
                 <button
                   type="button"
@@ -696,8 +706,8 @@ export default function App() {
                     See where the money actually goes
                   </p>
                   <p className="mt-1 text-sm text-natural-muted">
-                    How it was paid, who is carrying the card, and how long things take to come
-                    back. Arriving with the iOS and Android apps.
+                    How it was paid, who is carrying the card, how long things take to come back,
+                    and what Venmo instant transfers are quietly costing.
                   </p>
                   <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
                     Join the waitlist
