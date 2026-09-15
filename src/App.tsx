@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, authHeader } from './firebase';
 import { getFullMembers } from './lib/members';
 import { isDarkCherry } from './lib/money';
 import { hasPlus } from './lib/entitlements';
@@ -81,6 +81,26 @@ export default function App() {
   const [supportError, setSupportError] = useState<SupportError | null>(null);
   const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
+  // Which split change (by its timestamp) this device has acknowledged. In
+  // localStorage so the banner doesn't come back on every reload, but a NEW
+  // change (different `at`) shows again.
+  const [dismissedSplitChangeAt, setDismissedSplitChangeAt] = useState<string | null>(null);
+  const dismissSplitChange = (at: string) => {
+    setDismissedSplitChangeAt(at);
+    try {
+      if (group) localStorage.setItem(`split_change_seen_${group.id}`, at);
+    } catch {
+      /* per-device convenience only */
+    }
+  };
+  useEffect(() => {
+    if (!group?.id) return;
+    try {
+      setDismissedSplitChangeAt(localStorage.getItem(`split_change_seen_${group.id}`));
+    } catch {
+      setDismissedSplitChangeAt(null);
+    }
+  }, [group?.id]);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -114,6 +134,7 @@ export default function App() {
     handleAddSeat,
     handleRemoveSeat,
     handleRecalculateSplit,
+    handleSaveDefaultSplit,
     handleResendInvite,
   } = useGroupMembership({
     currentUser,
@@ -136,6 +157,11 @@ export default function App() {
     setSupportError,
   });
 
+  // RevenueCat's live answer for this user, read at sign-in (useAuthSession)
+  // and set after a purchase. ORed with the profile flag below so a paid
+  // customer is unlocked even before users/{uid}.isPlus catches up.
+  const [rcPlus, setRcPlus] = useState(false);
+
   const { handleSignOut, handleDeleteAccount } = useAuthSession({
     activeUser,
     setCurrentUser,
@@ -149,6 +175,7 @@ export default function App() {
     setExpenses,
     setShowSettings,
     setShowPrivacyModal,
+    setRcPlus,
   });
 
   const {
@@ -163,6 +190,7 @@ export default function App() {
     paymentHandlesByUid,
     handleExportData,
     handleSaveName,
+    handleSaveIncome,
     handleSaveMarketingOptIn,
     handleSaveThreshold,
     handleSavePaymentHandles,
@@ -281,7 +309,7 @@ export default function App() {
   const statsVisibleExpenses = expenses.filter((e) => !isDarkCherry(e) || e.paidBy === activeUser);
 
   // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
-  const isPlus = hasPlus(userProfile);
+  const isPlus = hasPlus(userProfile) || rcPlus;
 
   // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
@@ -547,6 +575,37 @@ export default function App() {
             </div>
           )}
 
+          {/* Someone changed the standing split: a banner at the top of every
+              other member's dashboard, dismissed per change (keyed on `at`). */}
+          {group.splitChange &&
+            group.splitChange.by !== activeUser &&
+            dismissedSplitChangeAt !== group.splitChange.at && (
+              <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                <AlertCircle className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-natural-text">
+                    {group.splitChange.byName} updated the household split
+                  </h3>
+                  <p className="text-xs text-natural-muted mt-1">
+                    The default ratio is now{' '}
+                    <span className="font-mono font-semibold text-natural-text">
+                      {group.splitChange.summary}
+                    </span>
+                    . It applies to every new expense; anything already logged keeps the split it
+                    had.
+                  </p>
+                </div>
+                <button
+                  onClick={() => dismissSplitChange(group.splitChange!.at)}
+                  className="text-natural-primary hover:text-natural-dark bg-white/60 p-1 rounded-full border border-natural-primary/25 shrink-0"
+                  title="Got it"
+                  aria-label="Dismiss split change notice"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
           {missingProfiles.length > 0 && !dismissedWaiting && (
             <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
@@ -689,10 +748,12 @@ export default function App() {
           group={group}
           groupUsers={groupUsers}
           onSaveName={handleSaveName}
+          onSaveIncome={handleSaveIncome}
           onSaveMarketingOptIn={handleSaveMarketingOptIn}
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           paymentHandlesByUid={paymentHandlesByUid}
+          onSaveDefaultSplit={handleSaveDefaultSplit}
           onResendInvite={handleResendInvite}
           onAddSeat={handleAddSeat}
           onRemoveSeat={handleRemoveSeat}
@@ -758,8 +819,12 @@ export default function App() {
         <CherryPlusModal
           onClose={() => setShowCherryPlus(false)}
           customerEmail={currentUser?.email || userProfile?.email}
-          onPurchased={() =>
-            // Unlock now; the webhook writes the durable copy to users/{uid}.
+          onPurchased={() => {
+            // Unlock now. The durable copy on users/{uid} is written by the
+            // webhook and, independently, by the entitlement sync asked for
+            // here, so the purchase survives sign-out even if the webhook
+            // never lands.
+            setRcPlus(true);
             setUserProfile((prev: any) => ({
               ...(prev || {}),
               isPlus: true,
@@ -767,8 +832,11 @@ export default function App() {
                 source: 'revenuecat_web',
                 updatedAt: new Date().toISOString(),
               },
-            }))
-          }
+            }));
+            authHeader()
+              .then((h) => fetch('/api/plus-promo-sync', { method: 'POST', headers: h }))
+              .catch(() => {});
+          }}
         />
       )}
 

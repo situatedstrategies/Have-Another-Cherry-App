@@ -11,6 +11,7 @@ import {
   Bell,
   UserPlus,
   Mail,
+  ChevronDown,
 } from 'lucide-react';
 import { Group } from '../types';
 import {
@@ -24,6 +25,7 @@ import {
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
+import { formatIncome } from '../lib/income';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -32,6 +34,9 @@ interface SettingsModalProps {
   group: Group;
   groupUsers: Record<string, any>;
   onSaveName: (name: string) => void;
+  /** Save the signed-in member's yearly income (validated; stored as the
+   *  plain number string both clients read). Resolves true when it saved. */
+  onSaveIncome: (raw: string) => Promise<boolean>;
   /** Newsletters and offers. Off by default; this switch is the only place it is asked. */
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
   onRetakeQuiz: () => void;
@@ -39,6 +44,9 @@ interface SettingsModalProps {
   /** Every member's decrypted Venmo/Zelle handles, keyed by uid, so the
    *  roster shows how to pay each person. */
   paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
+  /** Save an edited standing split (joined uid -> %, plus pending-seat %s in
+   *  availableSplits order). Resolves true when it saved. */
+  onSaveDefaultSplit: (joined: Record<string, number>, ghostSplits: number[]) => Promise<boolean>;
   /** Email the invite code to the person holding a pending seat. */
   onResendInvite: (memberName: string, email: string) => Promise<void> | void;
   /** Add a pending seat (name + percentage); everyone else is rescaled. With
@@ -63,10 +71,12 @@ export default function SettingsModal({
   group,
   groupUsers,
   onSaveName,
+  onSaveIncome,
   onSaveMarketingOptIn,
   onRetakeQuiz,
   onRecalculateSplit,
   paymentHandlesByUid,
+  onSaveDefaultSplit,
   onResendInvite,
   onAddSeat,
   onRemoveSeat,
@@ -78,6 +88,31 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+
+  // The roster: each joined member's row opens into a detail card with their
+  // income and financial style, matching the mobile Settings roster. One row
+  // at a time on purpose - the section stays a roster, not an accordion of
+  // five open dossiers. Your own income is editable (from the card or the
+  // User Profile row - one editor, two doorways); everyone else's is theirs
+  // to set, which is also all the security rules allow.
+  const [expandedUid, setExpandedUid] = useState<string | null>(null);
+  const [incomeEditorAt, setIncomeEditorAt] = useState<'profile' | 'roster' | null>(null);
+  const [incomeInput, setIncomeInput] = useState('');
+  const [incomeBusy, setIncomeBusy] = useState(false);
+  const openIncomeEditor = (at: 'profile' | 'roster') => {
+    setIncomeInput(userProfile?.income || '');
+    setIncomeEditorAt(at);
+  };
+  const submitIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (incomeBusy) return;
+    setIncomeBusy(true);
+    try {
+      if (await onSaveIncome(incomeInput)) setIncomeEditorAt(null);
+    } finally {
+      setIncomeBusy(false);
+    }
+  };
   const [marketingBusy, setMarketingBusy] = useState(false);
   const handleMarketingChange = async (optIn: boolean) => {
     if (marketingBusy) return;
@@ -139,6 +174,46 @@ export default function SettingsModal({
       await onRecalculateSplit();
     } finally {
       setRecalcBusy(false);
+    }
+  };
+
+  // Direct split editing: percentage inputs per roster row, saved as the new
+  // standing ratio. Other members learn about it from the dashboard banner.
+  const [editingSplit, setEditingSplit] = useState(false);
+  const [splitDraft, setSplitDraft] = useState<Record<string, string>>({});
+  const [splitBusy, setSplitBusy] = useState(false);
+
+  const openSplitEditor = () => {
+    const draft: Record<string, string> = {};
+    if (group) {
+      for (const [uid, pct] of Object.entries(getFullDefaultSplit(group))) {
+        draft[uid] = String(pct);
+      }
+    }
+    setSplitDraft(draft);
+    setEditingSplit(true);
+  };
+
+  const splitDraftTotal = Object.values(splitDraft).reduce((t, v) => t + (parseFloat(v) || 0), 0);
+
+  const saveSplit = async () => {
+    if (splitBusy || !group) return;
+    const joined: Record<string, number> = {};
+    const ghostSplits: number[] = [];
+    for (const uid of Object.keys(getFullDefaultSplit(group))) {
+      const value = parseFloat(splitDraft[uid]) || 0;
+      if (uid.startsWith('ghost_')) {
+        ghostSplits[Number(uid.slice('ghost_'.length))] = value;
+      } else {
+        joined[uid] = value;
+      }
+    }
+    setSplitBusy(true);
+    try {
+      const saved = await onSaveDefaultSplit(joined, ghostSplits);
+      if (saved) setEditingSplit(false);
+    } finally {
+      setSplitBusy(false);
     }
   };
 
@@ -370,17 +445,58 @@ export default function SettingsModal({
               </button>
             )}
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center gap-2">
             <span className="text-sm text-natural-muted">Annual Income</span>
-            <span className="text-sm font-semibold text-natural-text">
-              {userProfile?.income
-                ? new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    maximumFractionDigits: 0,
-                  }).format(Number(userProfile.income))
-                : 'N/A'}
-            </span>
+            {incomeEditorAt === 'profile' ? (
+              <form onSubmit={submitIncome} className="flex items-center gap-1.5">
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
+                    $
+                  </span>
+                  <input
+                    autoFocus
+                    inputMode="decimal"
+                    value={incomeInput}
+                    onChange={(e) => setIncomeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setIncomeEditorAt(null);
+                    }}
+                    placeholder="Yearly income"
+                    aria-label="Your yearly income"
+                    className="w-32 pl-5 pr-2 py-1 text-sm text-right font-mono border border-natural-border focus:border-natural-primary rounded-md outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={incomeBusy}
+                  className="text-natural-primary hover:text-natural-dark p-1"
+                  title="Save"
+                  aria-label="Save income"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomeEditorAt(null)}
+                  className="text-natural-muted hover:text-natural-text p-1"
+                  title="Cancel"
+                  aria-label="Cancel editing income"
+                >
+                  <X size={16} />
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => openIncomeEditor('profile')}
+                className="flex items-center gap-1.5 group"
+                title="Edit your income"
+              >
+                <span className="text-sm font-semibold text-natural-text">
+                  {formatIncome(userProfile?.income) || 'Not set yet'}
+                </span>
+                <Edit2 size={13} className="text-natural-muted group-hover:text-natural-primary" />
+              </button>
+            )}
           </div>
           {fp && (
             <div className="pt-2 mt-2 border-t border-natural-border">
@@ -457,17 +573,63 @@ export default function SettingsModal({
                       key={uid}
                       className="text-sm border-b border-natural-border/30 pb-2 last:border-0 last:pb-0"
                     >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-natural-text font-semibold">{memberName}</span>
-                          <span className="ml-2 text-xs font-mono text-natural-muted">
-                            {Number(pct)}% split
+                      <div
+                        className={`flex justify-between items-center${
+                          !isGhost && !editingSplit ? ' cursor-pointer select-none' : ''
+                        }`}
+                        onClick={
+                          !isGhost && !editingSplit
+                            ? () => {
+                                setExpandedUid(expandedUid === uid ? null : uid);
+                                if (incomeEditorAt === 'roster') setIncomeEditorAt(null);
+                              }
+                            : undefined
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-natural-text font-semibold">
+                            {memberName}
+                            {!isGhost && uid === currentUser?.uid && (
+                              <span className="text-natural-muted font-normal"> (you)</span>
+                            )}
                           </span>
+                          {editingSplit ? (
+                            <span className="inline-flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={splitDraft[uid] ?? ''}
+                                onChange={(e) =>
+                                  setSplitDraft((prev) => ({ ...prev, [uid]: e.target.value }))
+                                }
+                                aria-label={`${memberName}'s share of the split`}
+                                className="w-16 px-2 py-1 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs font-mono text-right outline-none"
+                              />
+                              <span className="text-xs font-mono text-natural-muted">%</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-mono text-natural-muted">
+                              {Number(pct)}% split
+                            </span>
+                          )}
                         </div>
                         <div>
                           {!isGhost ? (
-                            <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">
-                              Joined
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">
+                                Joined
+                              </span>
+                              {!editingSplit && (
+                                <ChevronDown
+                                  size={14}
+                                  aria-hidden
+                                  className={`text-natural-muted transition-transform${
+                                    expandedUid === uid ? ' rotate-180' : ''
+                                  }`}
+                                />
+                              )}
                             </span>
                           ) : (
                             <div className="flex items-center gap-2">
@@ -497,40 +659,6 @@ export default function SettingsModal({
                           )}
                         </div>
                       </div>
-                      {!isGhost &&
-                        (() => {
-                          const h = paymentHandlesByUid?.[uid];
-                          const rows = [
-                            h?.venmo
-                              ? { label: 'Venmo', text: `@${h.venmo.replace(/^@/, '')}` }
-                              : null,
-                            h?.zelle ? { label: 'Zelle', text: h.zelle } : null,
-                          ].filter(Boolean) as { label: string; text: string }[];
-                          if (rows.length === 0) return null;
-                          return (
-                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-                              {rows.map((r) => (
-                                <button
-                                  key={r.label}
-                                  type="button"
-                                  onClick={() => copyHandle(r.text)}
-                                  title={`Copy ${memberName}'s ${r.label} handle`}
-                                  className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
-                                >
-                                  <span className="font-semibold">{r.label}</span>
-                                  <span className="font-mono text-natural-text break-all">
-                                    {r.text}
-                                  </span>
-                                  {copiedHandle === r.text ? (
-                                    <Check size={11} />
-                                  ) : (
-                                    <Copy size={11} />
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        })()}
                       {isGhost && resendFor === uid && (
                         <form
                           onSubmit={(e) => submitResend(e, memberName)}
@@ -555,14 +683,264 @@ export default function SettingsModal({
                           </button>
                         </form>
                       )}
+                      {/* The opened card under a member's row: income on top,
+                          style below - the same card the mobile roster shows.
+                          groupUsers holds each member's live profile (the
+                          rules give group members read access for exactly
+                          this); your own row uses userProfile, which is
+                          fresher. */}
+                      {!isGhost &&
+                        !editingSplit &&
+                        expandedUid === uid &&
+                        (() => {
+                          const isSelf = uid === currentUser?.uid;
+                          const member = isSelf ? userProfile : groupUsers[uid];
+                          const mfp = member?.financialProfile;
+                          const income = formatIncome(member?.income);
+                          return (
+                            <div className="mt-2 mb-1 bg-white/70 border border-natural-border rounded-xl p-3 space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-0.5">
+                                    Annual income
+                                  </span>
+                                  {isSelf && incomeEditorAt === 'roster' ? null : income ? (
+                                    <span className="text-base font-bold text-natural-text">
+                                      {income}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-natural-muted">
+                                      {isSelf ? 'Not set yet' : 'Not shared yet'}
+                                    </span>
+                                  )}
+                                </div>
+                                {isSelf && incomeEditorAt !== 'roster' && (
+                                  <button
+                                    onClick={() => openIncomeEditor('roster')}
+                                    className="flex items-center gap-1 text-xs font-bold text-natural-primary hover:underline shrink-0"
+                                  >
+                                    <Edit2 size={12} /> {income ? 'Edit' : 'Add'}
+                                  </button>
+                                )}
+                              </div>
+                              {isSelf && incomeEditorAt === 'roster' && (
+                                <div className="space-y-1.5">
+                                  <form onSubmit={submitIncome} className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
+                                        $
+                                      </span>
+                                      <input
+                                        autoFocus
+                                        inputMode="decimal"
+                                        value={incomeInput}
+                                        onChange={(e) => setIncomeInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setIncomeEditorAt(null);
+                                        }}
+                                        placeholder="Yearly income"
+                                        aria-label="Your yearly income"
+                                        className="w-full pl-6 pr-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
+                                      />
+                                    </div>
+                                    <button
+                                      type="submit"
+                                      disabled={incomeBusy}
+                                      className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
+                                    >
+                                      {incomeBusy ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIncomeEditorAt(null)}
+                                      className="text-xs font-semibold text-natural-muted hover:text-natural-text"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </form>
+                                  <p className="text-[11px] text-natural-muted">
+                                    Approximate is fine. Your household can see it, and it powers
+                                    the income-based split suggestion.
+                                  </p>
+                                </div>
+                              )}
+                              {/* How to pay this person. Stored encrypted on
+                                  their own profile; readable here because the
+                                  rules let group members read each other. */}
+                              <div>
+                                <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
+                                  Payment handles
+                                </span>
+                                {(() => {
+                                  const h = paymentHandlesByUid?.[uid];
+                                  const rows = [
+                                    h?.venmo
+                                      ? { label: 'Venmo', text: `@${h.venmo.replace(/^@/, '')}` }
+                                      : null,
+                                    h?.zelle ? { label: 'Zelle', text: h.zelle } : null,
+                                  ].filter(Boolean) as { label: string; text: string }[];
+                                  if (rows.length === 0) {
+                                    return (
+                                      <span className="text-xs text-natural-muted">
+                                        {isSelf
+                                          ? 'Add yours under How people pay you.'
+                                          : `${memberName} hasn't added any yet.`}
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                      {rows.map((r) => (
+                                        <button
+                                          key={r.label}
+                                          type="button"
+                                          onClick={() => copyHandle(r.text)}
+                                          title={`Copy ${memberName}'s ${r.label} handle`}
+                                          className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
+                                        >
+                                          <span className="font-semibold">{r.label}</span>
+                                          <span className="font-mono text-natural-text break-all">
+                                            {r.text}
+                                          </span>
+                                          {copiedHandle === r.text ? (
+                                            <Check size={11} />
+                                          ) : (
+                                            <Copy size={11} />
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                              <div>
+                                <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
+                                  Financial style
+                                </span>
+                                {mfp ? (
+                                  <div>
+                                    <span className="text-sm font-semibold text-natural-primary block">
+                                      {mfp.type}
+                                    </span>
+                                    {mfp.description && (
+                                      <p className="text-xs text-natural-text mt-1 leading-relaxed">
+                                        {mfp.description}
+                                      </p>
+                                    )}
+                                    {Array.isArray(mfp.traits) && mfp.traits.length > 0 && (
+                                      <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {mfp.traits.map((t: string, i: number) => (
+                                          <span
+                                            key={i}
+                                            className="text-xs font-semibold text-natural-primary bg-natural-sage/40 border border-natural-primary/20 px-2 py-0.5 rounded-full"
+                                          >
+                                            {t}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {mfp.strengths && (
+                                      <p className="text-xs text-natural-text mt-2">
+                                        <strong className="text-natural-muted">Strengths:</strong>{' '}
+                                        {mfp.strengths}
+                                      </p>
+                                    )}
+                                    {mfp.watchouts && (
+                                      <p className="text-xs text-natural-text mt-1">
+                                        <strong className="text-natural-muted">
+                                          Watch out for:
+                                        </strong>{' '}
+                                        {mfp.watchouts}
+                                      </p>
+                                    )}
+                                    {mfp.communicationStyle && (
+                                      <p className="text-xs text-natural-text mt-1">
+                                        <strong className="text-natural-muted">
+                                          Talking money with {isSelf ? 'you' : memberName}:
+                                        </strong>{' '}
+                                        {mfp.communicationStyle}
+                                      </p>
+                                    )}
+                                    {mfp.quote && (
+                                      <blockquote className="mt-2 text-xs italic text-natural-muted border-l-2 border-natural-primary/30 pl-2">
+                                        {mfp.quote}
+                                      </blockquote>
+                                    )}
+                                    {isSelf && (
+                                      <button
+                                        onClick={onRetakeQuiz}
+                                        className="mt-3 text-xs font-semibold text-natural-primary hover:underline"
+                                      >
+                                        Retake Profile Quiz
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : isSelf ? (
+                                  <button
+                                    onClick={onRetakeQuiz}
+                                    className="text-xs font-bold text-natural-primary hover:underline"
+                                  >
+                                    Find your style
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-natural-muted">
+                                    {memberName} hasn&apos;t taken the style quiz yet.
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                     </div>
                   );
                 })}
             </div>
+            {/* Adjust the standing split directly. In edit mode the roster rows
+                above become inputs; the total must land on exactly 100%. */}
+            {!editingSplit ? (
+              <button
+                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
+                onClick={openSplitEditor}
+              >
+                Adjust Split
+              </button>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <p
+                  className={`text-xs font-mono text-center ${
+                    Math.abs(splitDraftTotal - 100) <= 0.05
+                      ? 'text-natural-muted'
+                      : 'text-natural-primary font-bold'
+                  }`}
+                >
+                  Total: {splitDraftTotal.toFixed(0)}%{' '}
+                  {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : '— needs to be 100%'}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    className="flex-1 text-sm font-bold bg-white text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text transition-colors"
+                    onClick={() => setEditingSplit(false)}
+                    disabled={splitBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg transition-colors disabled:opacity-60"
+                    onClick={saveSplit}
+                    disabled={splitBusy || Math.abs(splitDraftTotal - 100) > 0.05}
+                  >
+                    {splitBusy ? 'Saving...' : 'Save New Split'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-natural-muted text-center">
+                  Everyone in the group will see a note that the split changed.
+                </p>
+              </div>
+            )}
             {/* Any roster of two or more. Pending seats keep their share; the
                 incomes divide the rest. Old expenses are untouched: each one
                 stores its own dollar shares. */}
-            {joinedUids(group).length >= 2 && (
+            {joinedUids(group).length >= 2 && !editingSplit && (
               <>
                 <button
                   className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
