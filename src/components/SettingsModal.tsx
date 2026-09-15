@@ -23,6 +23,7 @@ import {
   MAX_ADDED_SEATS,
 } from '../lib/members';
 import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../lib/push';
+import { quizRetakeBlocker } from '../lib/quizRetake';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { formatIncome } from '../lib/income';
@@ -165,6 +166,10 @@ export default function SettingsModal({
       })
       .catch(() => {});
   };
+
+  // A style is a reading of a season: the quiz reopens three months after
+  // the last result. Null means it is open now.
+  const retakeBlocker = quizRetakeBlocker(userProfile?.financialProfileAt);
 
   const [recalcBusy, setRecalcBusy] = useState(false);
   const recalculate = async () => {
@@ -536,12 +541,16 @@ export default function SettingsModal({
                   {fp.quote}
                 </blockquote>
               )}
-              <button
-                onClick={onRetakeQuiz}
-                className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
-              >
-                Retake Profile Quiz
-              </button>
+              {retakeBlocker ? (
+                <p className="mt-4 text-xs text-natural-muted">{retakeBlocker}</p>
+              ) : (
+                <button
+                  onClick={onRetakeQuiz}
+                  className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
+                >
+                  Retake Profile Quiz
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -866,14 +875,19 @@ export default function SettingsModal({
                                         {mfp.quote}
                                       </blockquote>
                                     )}
-                                    {isSelf && (
-                                      <button
-                                        onClick={onRetakeQuiz}
-                                        className="mt-3 text-xs font-semibold text-natural-primary hover:underline"
-                                      >
-                                        Retake Profile Quiz
-                                      </button>
-                                    )}
+                                    {isSelf &&
+                                      (retakeBlocker ? (
+                                        <p className="mt-3 text-xs text-natural-muted">
+                                          {retakeBlocker}
+                                        </p>
+                                      ) : (
+                                        <button
+                                          onClick={onRetakeQuiz}
+                                          className="mt-3 text-xs font-semibold text-natural-primary hover:underline"
+                                        >
+                                          Retake Profile Quiz
+                                        </button>
+                                      ))}
                                   </div>
                                 ) : isSelf ? (
                                   <button
