@@ -12,6 +12,7 @@ import {
 import { encryptData, decryptData } from '../lib/crypto';
 import { getGreetingKey } from '../lib/greeting';
 import { incomeInputError, parseIncome, normalizeIncome } from '../lib/income';
+import { quizRetakeBlocker } from '../lib/quizRetake';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
@@ -455,6 +456,11 @@ export function useProfileSettings({
   };
 
   const handleRetakeQuiz = async () => {
+    const blocker = quizRetakeBlocker(userProfile?.financialProfileAt);
+    if (blocker) {
+      addToast('Not yet', blocker, 'info');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'users', activeUser), { financialProfile: null });
       setUserProfile((prev: any) => ({ ...prev, financialProfile: null }));

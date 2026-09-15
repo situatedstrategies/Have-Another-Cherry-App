@@ -281,6 +281,10 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
           partnerIncome: answers.partnerIncome,
           quizAnswers: answers,
           financialProfile,
+          // The retake cooldown counts from here. Not stamped on the
+          // fallback below: a placeholder profile should not lock the
+          // person out of a real reading for three months.
+          financialProfileAt: new Date().toISOString(),
         },
         { merge: true }
       );
