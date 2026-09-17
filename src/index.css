@@ -43,48 +43,6 @@
   --color-natural-pebble-deep: #dcdce0; /* pressed/divider state of pebble */
 }
 
-/* ---------- dark mode ----------
-
-   The same cherry red and the same neutral ramp, inverted, rather than a
-   second palette; values mirror CherryPalette.dark in the Flutter client's
-   lib/core/theme.dart. Dark is OPT-IN: only an explicit choice in Settings
-   stamps data-theme="dark" on <html> (lib/appearance.ts). It used to follow
-   the device's dark-mode setting as well, which switched every phone set to
-   dark onto a palette nobody had chosen and, where it collided with the
-   hand-coloured cards, left text unreadable. The device preference is
-   ignored until the dark palette has been audited surface by surface.
-   Tailwind v4 utilities
-   read these variables, so redefining them re-skins every natural-* class
-   at once. The handful of plain `bg-white` cards and `bg-natural-dark`
-   badges are remapped below rather than rewritten across the components. */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
-
-:root {
-  color-scheme: light;
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --color-natural-bg: #18181b;
-  --color-natural-text: #ffffff;
-  --color-natural-sidebar: #232327;
-  --color-natural-border: #3f3f46;
-  --color-natural-primary-wash: #2e1512;
-  --color-natural-accent: #9c9ca6;
-  --color-natural-muted: #d7d7de;
-  --color-natural-sage: #232327;
-  --color-natural-dark: #f4f4f5;
-  --color-natural-pebble: #2e2e34;
-  --color-natural-pebble-deep: #3a3a42;
-  --color-white: #232327;
-}
-:root[data-theme='dark'] .text-white {
-  color: #ffffff;
-}
-:root[data-theme='dark'] .bg-natural-dark {
-  color: #18181b;
-}
-
 /* ---------- mobile ----------
 
    index.html sets viewport-fit=cover, which is what lets the app paint under
