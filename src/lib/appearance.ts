@@ -1,34 +1,38 @@
-// Appearance: light, dark, or follow the device. Stored per device, not per
+// Appearance: light, or dark by explicit choice. Stored per device, not per
 // account, like the iOS `appearance.dart`: it describes this screen, and
 // carrying it to another device someone signs in on would be presumptuous.
+//
+// There is deliberately no "follow the device" option for now. Following the
+// device put everyone whose phone was set to dark onto the dark palette
+// without asking, and that palette is not yet readable on every surface.
+// Light is the default until it is; dark stays available to anyone who
+// picks it. A previously saved "system" choice reads as light.
 
-export type AppearanceMode = 'system' | 'light' | 'dark';
+export type AppearanceMode = 'light' | 'dark';
 
 const KEY = 'appearance_mode';
 
 export const APPEARANCE_MODES: { value: AppearanceMode; label: string; help: string }[] = [
-  { value: 'system', label: 'System', help: 'Follows whatever the device is set to.' },
-  { value: 'light', label: 'Light', help: 'Holds, whichever way the device goes.' },
-  { value: 'dark', label: 'Dark', help: 'Holds, whichever way the device goes.' },
+  { value: 'light', label: 'Light', help: 'The default. Cream, grey and cherry red.' },
+  { value: 'dark', label: 'Dark', help: 'Early: some screens are still being tuned.' },
 ];
 
 export const appearanceFromName = (name: string | null | undefined): AppearanceMode =>
-  name === 'light' || name === 'dark' ? name : 'system';
+  name === 'dark' ? 'dark' : 'light';
 
 export const loadSavedAppearance = (): AppearanceMode => {
   try {
     return appearanceFromName(localStorage.getItem(KEY));
   } catch {
-    return 'system';
+    return 'light';
   }
 };
 
-/** Stamp the choice on <html>. "system" removes the attribute so the
- *  prefers-color-scheme rules in index.css take over. */
+/** Stamp the choice on <html>. Only data-theme="dark" changes anything in
+ *  index.css; light is stamped too so the attribute always states the
+ *  choice rather than leaving it to inference. */
 export const applyAppearance = (mode: AppearanceMode) => {
-  const root = document.documentElement;
-  if (mode === 'system') root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', mode);
+  document.documentElement.setAttribute('data-theme', mode);
 };
 
 export const saveAppearance = (mode: AppearanceMode) => {
