@@ -3,10 +3,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import AuthActionHandler from './components/AuthActionHandler.tsx';
 import './index.css';
-import { applyAppearance, loadSavedAppearance } from './lib/appearance';
-
-// Before the first paint, so a dark-mode choice never flashes light.
-applyAppearance(loadSavedAppearance());
 
 // There is no router in this app - App.tsx switches views with local state. The
 // Firebase Auth action handler needs a real URL though, because Firebase puts it
