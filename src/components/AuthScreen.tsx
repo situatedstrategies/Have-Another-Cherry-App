@@ -750,10 +750,35 @@ export default function AuthScreen() {
             ) : (
               !isLogin && (
                 /* The same promise the marketing site makes at the moment of the
-               click, repeated where the hesitation actually lands. */
-                <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
-                  Everything you need is free. No credit card required.
-                </p>
+               click, repeated where the hesitation actually lands. Under it, the
+               two store links, for anyone who opened the web app on a phone and
+               would rather have the native one. Same account either way. */
+                <>
+                  <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
+                    Everything you need is free. No credit card required.
+                  </p>
+                  <p className="text-center font-mono text-xs leading-relaxed text-natural-muted mt-3">
+                    Also on the{' '}
+                    <a
+                      href="https://apps.apple.com/us/app/have-another-cherry/id6807625462"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-natural-text underline underline-offset-2 hover:text-natural-accent"
+                    >
+                      App Store
+                    </a>{' '}
+                    and{' '}
+                    <a
+                      href="https://play.google.com/store/apps/details?id=com.situatedstrategies.have_another_cherry"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-natural-text underline underline-offset-2 hover:text-natural-accent"
+                    >
+                      Google Play
+                    </a>
+                    .
+                  </p>
+                </>
               )
             )}
           </div>
