@@ -24,7 +24,7 @@ A household expense-splitter web app ("Have Another Cherry"). Users create a gro
 - `src/types.ts` - data model (Group, User, Expense, Settlement, etc.).
 - `src/firebase.ts` - Firebase init from `firebase-applet-config.json`.
 - `server/index.ts` - app setup, middleware, static serving; `server/routes/*.ts` - API routes by concern (auth, invites, ai, billing, notifications, support); `server/middleware.ts` - requireAuth, rateLimit, requireSecret, requireGroupMember.
-- `public/` - static assets served at site root (e.g. `/cherry2transparent.png`).
+- `public/` - static assets served at site root (e.g. `/cherry2transparent.png`). `app-store-badge.svg` and `google-play-badge.svg` are the official store badges from Apple's and Google's brand kits, the same files the marketing site serves; `AuthScreen.tsx` shows them under the sign up form. Never recolor, crop or restyle them, and keep the two black plates the same height (Google's file carries its own clear space, so it is set 1.5x taller).
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).
 
 ## Commands

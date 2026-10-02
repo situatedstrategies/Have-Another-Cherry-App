@@ -356,7 +356,9 @@ export default function AuthScreen() {
         // people hit is the 15-character ceiling: a password manager pastes
         // 20 characters, the checklist quietly shows one unmet item, and the
         // policy sentence reads like the password is fine.
-        const missing = PASSWORD_REQUIREMENTS.filter((req) => !passwordChecks[req.key]).map((req) => req.label.toLowerCase());
+        const missing = PASSWORD_REQUIREMENTS.filter((req) => !passwordChecks[req.key]).map((req) =>
+          req.label.toLowerCase()
+        );
         setError(
           missing.length === 1
             ? `Your password needs ${missing[0]}.`
@@ -751,33 +753,45 @@ export default function AuthScreen() {
               !isLogin && (
                 /* The same promise the marketing site makes at the moment of the
                click, repeated where the hesitation actually lands. Under it, the
-               two store links, for anyone who opened the web app on a phone and
-               would rather have the native one. Same account either way. */
+               two official store badges (the same files the marketing site
+               uses), for anyone who opened the web app on a phone and would
+               rather have the native one. Same account either way. Google's
+               artwork carries its own clear space inside the file, so it is set
+               taller than Apple's for the two black plates to match. */
                 <>
                   <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
                     Everything you need is free. No credit card required.
                   </p>
-                  <p className="text-center font-mono text-xs leading-relaxed text-natural-muted mt-3">
-                    Also on the{' '}
+                  <div className="mt-4 flex items-center justify-center gap-2.5">
                     <a
                       href="https://apps.apple.com/us/app/have-another-cherry/id6807625462"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-natural-text underline underline-offset-2 hover:text-natural-accent"
+                      className="inline-flex rounded-lg transition-opacity hover:opacity-90"
                     >
-                      App Store
-                    </a>{' '}
-                    and{' '}
+                      <img
+                        src="/app-store-badge.svg"
+                        alt="Download on the App Store"
+                        width={120}
+                        height={40}
+                        className="h-10 w-auto"
+                      />
+                    </a>
                     <a
                       href="https://play.google.com/store/apps/details?id=com.situatedstrategies.have_another_cherry"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-natural-text underline underline-offset-2 hover:text-natural-accent"
+                      className="inline-flex rounded-lg transition-opacity hover:opacity-90"
                     >
-                      Google Play
+                      <img
+                        src="/google-play-badge.svg"
+                        alt="Get it on Google Play"
+                        width={155}
+                        height={60}
+                        className="-mx-1.5 -my-2.5 h-[60px] w-auto"
+                      />
                     </a>
-                    .
-                  </p>
+                  </div>
                 </>
               )
             )}
