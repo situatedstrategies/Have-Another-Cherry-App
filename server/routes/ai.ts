@@ -48,6 +48,24 @@ const getCuratedProfile = async () => {
   return { ...f, greetingTone: 'harmonious' };
 };
 
+// profile_log is a trusted fallback/catalog, so only the backend may append
+// entries. Client writes are denied in Firestore rules to prevent a signed-in
+// account from poisoning the catalog with arbitrary documents.
+const appendGeneratedProfile = async (profile: Record<string, unknown>) => {
+  try {
+    await ensureAdminApp();
+    const { getFirestore } = await import('firebase-admin/firestore');
+    await getFirestore().collection('profile_log').add({
+      ...profile,
+      createdAt: new Date().toISOString(),
+      source: 'ai',
+    });
+  } catch (e: any) {
+    // Profile generation should still succeed if catalog logging is unavailable.
+    console.error('profile_log append failed:', e?.message || e);
+  }
+};
+
 // ---- AI: receipt scan and vault extract ----
 router.post('/api/scan-receipt', requireAuth, rateLimit('scan', 60), async (req, res) => {
   try {
@@ -337,6 +355,7 @@ router.post('/api/generate-profile', requireAuth, rateLimit('profile', 30), asyn
 
     if (response.text) {
       const parsed = JSON.parse(stripEmDashes(response.text.trim()));
+      await appendGeneratedProfile(parsed);
       return res.status(200).json({ success: true, source: 'ai', data: parsed });
     }
 

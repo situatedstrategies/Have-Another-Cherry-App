@@ -48,11 +48,21 @@ service cloud.firestore {
         && request.auth.uid in currentMemberIds();
     }
 
-    // The set of groups the requesting user belongs to (multi-group support).
-    // Defaults to an empty list for accounts not yet migrated to `groupIds`.
-    function myGroupIds() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid))
-        .data.get('groupIds', []);
+    // A profile document is client-writable, so it is never sufficient proof
+    // that the caller belongs to a group. Resolve the caller's active group from
+    // their profile, then verify BOTH people against the authoritative group's
+    // memberIds before exposing another user's profile.
+    function myActiveGroupId() {
+      let me = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return me.get('activeGroupId', me.get('groupId', null));
+    }
+
+    function sharesVerifiedActiveGroup(userId) {
+      let groupId = myActiveGroupId();
+      return groupId != null
+        && groupExists(groupId)
+        && request.auth.uid in get(groupPath(groupId)).data.get('memberIds', [])
+        && userId in get(groupPath(groupId)).data.get('memberIds', []);
     }
 
     // Allows a signed-in user to add only themselves through the invite-code
@@ -121,19 +131,14 @@ service cloud.firestore {
       allow delete:
         if signedIn() && request.auth.uid == userId;
 
-      // A user can read their own doc, or the doc of someone with whom they share
-      // at least one group (the app loads member names, incomes, and profile
-      // state for the roster). Supports users who belong to several groups; the
-      // legacy single-`groupId` branch keeps un-migrated members readable.
+      // A user can read their own doc, or another member's profile only when
+      // both accounts are verified members of the caller's active group. Do not
+      // trust the caller's writable groupIds list as an authorization source.
       allow read:
         if signedIn()
         && (
           request.auth.uid == userId
-          || resource.data.get('groupIds', []).hasAny(myGroupIds())
-          || (
-            resource.data.get('groupId', null) != null
-            && isGroupMember(resource.data.get('groupId', null))
-          )
+          || sharesVerifiedActiveGroup(userId)
         );
     }
 
@@ -260,13 +265,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Append-only log of AI-generated financial profiles. Standalone (not tied
-    // to a user/group doc); used as a growing record and future fixed fallback
-    // catalog. Signed-in users may append; the log is curated via the console,
-    // so it is not client-readable/editable.
+    // Server-owned log of AI-generated financial profiles. The backend writes
+    // validated AI results through the Admin SDK; clients cannot seed or poison
+    // the fallback/catalog that later users may receive.
     match /profile_log/{docId} {
-      allow create: if signedIn();
-      allow read, update, delete: if false;
+      allow read, write: if false;
     }
 
     match /{document=**} {

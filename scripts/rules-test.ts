@@ -30,9 +30,13 @@ import {
 import { readFileSync } from 'fs';
 
 const CODE = 'ABC123'; // a group id, which is also its invite code
+const SHARED = 'SHARED1';
 const OWNER = 'owner-uid';
 const INVITEE = 'invitee-uid';
 const STRANGER = 'stranger-uid';
+const MEMBER = 'member-uid';
+const PEER = 'peer-uid';
+const ATTACKER = 'attacker-uid';
 
 let env: RulesTestEnvironment;
 let failures = 0;
@@ -58,6 +62,19 @@ async function seed() {
       defaultSplit: { [OWNER]: 50 },
       targetNumPeople: 2,
       availableSplits: [{ name: 'Two', split: 50 }],
+      categories: ['Rent'],
+    });
+    await setDoc(doc(db, 'groups', SHARED), {
+      name: 'Shared household',
+      inviteCode: SHARED,
+      members: [
+        { uid: MEMBER, name: 'Member', email: 'member@x.com' },
+        { uid: PEER, name: 'Peer', email: 'peer@x.com' },
+      ],
+      memberIds: [MEMBER, PEER],
+      defaultSplit: { [MEMBER]: 50, [PEER]: 50 },
+      targetNumPeople: 2,
+      availableSplits: [],
       categories: ['Rent'],
     });
     await setDoc(doc(db, 'group_ledgers', CODE), { groupId: CODE, payload: 'x' });
@@ -225,6 +242,52 @@ async function main() {
     )
   );
 
+  // --- profile reads must be backed by authoritative group membership ----
+  const member = env.authenticatedContext(MEMBER).firestore();
+  const peer = env.authenticatedContext(PEER).firestore();
+  const attacker = env.authenticatedContext(ATTACKER).firestore();
+
+  await check('a user CAN create a profile that names their active group', () =>
+    assertSucceeds(
+      setDoc(doc(member, 'users', MEMBER), {
+        name: 'Member',
+        groupIds: [SHARED],
+        activeGroupId: SHARED,
+        groupId: SHARED,
+      })
+    )
+  );
+  await check('a peer CAN create their profile in the same group', () =>
+    assertSucceeds(
+      setDoc(doc(peer, 'users', PEER), {
+        name: 'Peer',
+        income: '75000',
+        groupIds: [SHARED],
+        activeGroupId: SHARED,
+        groupId: SHARED,
+      })
+    )
+  );
+  await check('a verified group member CAN read another member profile', () =>
+    assertSucceeds(getDoc(doc(member, 'users', PEER)))
+  );
+
+  // This is the regression: user profiles are client-writable. Merely claiming
+  // a group id must never grant access to another member's income/profile data.
+  await check('an attacker CAN forge groupIds only on their own profile', () =>
+    assertSucceeds(
+      setDoc(doc(attacker, 'users', ATTACKER), {
+        name: 'Attacker',
+        groupIds: [SHARED],
+        activeGroupId: SHARED,
+        groupId: SHARED,
+      })
+    )
+  );
+  await check('forged groupIds DO NOT grant another member profile access', () =>
+    assertFails(getDoc(doc(attacker, 'users', PEER)))
+  );
+
   // --- the Cherry + entitlement is server-owned --------------------------
   const self = env.authenticatedContext(OWNER).firestore();
   await check('a user CAN create their own profile', () =>
@@ -252,6 +315,16 @@ async function main() {
     assertFails(
       updateDoc(doc(self, 'users', OWNER), {
         plusEntitlement: { source: 'promo', updatedAt: 'now' },
+      })
+    )
+  );
+
+  await check('a signed-in client CANNOT seed the AI profile catalog', () =>
+    assertFails(
+      setDoc(doc(self, 'profile_log', 'poison-attempt'), {
+        type: 'Injected',
+        description: 'This must never enter the trusted catalog.',
+        createdAt: 'now',
       })
     )
   );
