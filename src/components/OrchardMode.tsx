@@ -276,7 +276,7 @@ function Card({
   const pill =
     status === 'CLOSED'
       ? 'bg-natural-sidebar text-natural-muted'
-      : status === 'PARTIALLY_SETTLED'
+      : status === 'PENDING' || status === 'PARTIALLY_SETTLED'
         ? 'bg-natural-primary-wash text-natural-primary'
         : 'bg-natural-primary text-white';
 

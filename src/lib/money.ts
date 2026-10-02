@@ -101,11 +101,46 @@ export const getTotalRemainingOwedToPayer = (expense: Expense, includePending = 
           )
       );
 
-export type NormalizedExpenseStatus = 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED';
+export type NormalizedExpenseStatus = 'OPEN' | 'PENDING' | 'PARTIALLY_SETTLED' | 'CLOSED';
 
+/**
+ * Everything still owed has been paid and is waiting on the other side to
+ * confirm it.
+ *
+ * Nothing is owed any more unless that confirmation is refused, so the row
+ * should say "pending", not "partially settled": a payment for the whole
+ * balance is not a partial one. The test is the remaining amount with pending
+ * payments counted, which is what the debtor sees as their balance. A pending
+ * payment that covers only part of the share stays partially settled, since
+ * money is still owed either way.
+ *
+ * Legacy rows that stored `pending_confirmation` from before settlements were
+ * itemised, and carry no settlement records at all, are the same state; so is
+ * this status when a client wrote it back onto such a row. The flag is only
+ * trusted when there is no record to compute from, as with the other stored
+ * statuses. Mirror of isAwaitingConfirmation in the Flutter client's
+ * domain/ledger/money.dart.
+ */
+export const isAwaitingConfirmation = (expense: Expense): boolean => {
+  if (isUnclaimed(expense)) return false;
+  const settlements = expense.settlements || [];
+  if (settlements.length === 0) {
+    return expense.status === 'pending_confirmation' || expense.status === 'PENDING';
+  }
+  if (!settlements.some((s) => s.status === 'pending')) return false;
+  if (isDarkCherry(expense)) return getDarkCherryRemaining(expense, true) <= 0.01;
+  return getTotalRemainingOwedToPayer(expense, true) <= 0.01;
+};
+
+// PENDING sits between the other two open states: paid in full, awaiting
+// confirmation, after which it closes.
 export const getNormalizedExpenseStatus = (expense: Expense): NormalizedExpenseStatus => {
   if (isExpenseFullySettled(expense)) {
     return 'CLOSED';
+  }
+
+  if (isAwaitingConfirmation(expense)) {
+    return 'PENDING';
   }
 
   const hasConfirmedSettlement = (expense.settlements || []).some(
@@ -136,6 +171,7 @@ export const getExpenseStatusLabel = (expense: Expense): string => {
   const status = getNormalizedExpenseStatus(expense);
 
   if (status === 'CLOSED') return 'Fully Settled';
+  if (status === 'PENDING') return 'Pending Confirmation';
   if (status === 'PARTIALLY_SETTLED') return 'Partially Settled';
 
   return 'Open';

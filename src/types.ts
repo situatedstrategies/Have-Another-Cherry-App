@@ -193,7 +193,13 @@ export interface Expense {
   recurringInterval?: string;
   nextRecurringDate?: string;
   status:
-    'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED' | 'unsettled' | 'pending_confirmation' | 'settled'; // legacy values retained for existing records
+    | 'OPEN'
+    | 'PENDING'
+    | 'PARTIALLY_SETTLED'
+    | 'CLOSED'
+    | 'unsettled'
+    | 'pending_confirmation'
+    | 'settled'; // legacy values retained for existing records
   settleDetails?: SettleDetails; // legacy
   settlements?: Settlement[];
   comments?: Comment[];
