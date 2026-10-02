@@ -42,9 +42,9 @@ export default function ExpenseList({
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'OPEN' | 'PARTIALLY_SETTLED' | 'CLOSED'>(
-    'all'
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'OPEN' | 'PENDING' | 'PARTIALLY_SETTLED' | 'CLOSED'
+  >('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -115,7 +115,7 @@ export default function ExpenseList({
             className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
             id="status-filters"
           >
-            {(['all', 'OPEN', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
+            {(['all', 'OPEN', 'PENDING', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -130,9 +130,11 @@ export default function ExpenseList({
                   ? 'All Items'
                   : status === 'OPEN'
                     ? 'Open'
-                    : status === 'PARTIALLY_SETTLED'
-                      ? 'Partially Settled'
-                      : 'Fully Settled'}
+                    : status === 'PENDING'
+                      ? 'Pending'
+                      : status === 'PARTIALLY_SETTLED'
+                        ? 'Partially Settled'
+                        : 'Fully Settled'}
               </button>
             ))}
           </div>
@@ -292,14 +294,17 @@ export default function ExpenseList({
                   {/* Status indicator ring */}
                   <div className="mt-0.5 shrink-0" id={`status-ring-${exp.id}`}>
                     {/* Cherry means money is outstanding, so open is the
-                        loudest and closed is the quietest. This used to run
-                        the other way, pointing the eye at the rows that
-                        needed nothing. */}
+                        loudest and closed is the quietest. Pending and
+                        partially settled share the clock: both wait on
+                        somebody. This used to run the other way, pointing
+                        the eye at the rows that needed nothing. */}
                     {getNormalizedExpenseStatus(exp) === 'CLOSED' ? (
                       <div className="p-2 bg-natural-pebble text-natural-muted rounded-full border border-natural-border">
                         <CheckCircle2 className="h-4 w-4" />
                       </div>
-                    ) : getNormalizedExpenseStatus(exp) === 'PARTIALLY_SETTLED' ? (
+                    ) : ['PENDING', 'PARTIALLY_SETTLED'].includes(
+                        getNormalizedExpenseStatus(exp)
+                      ) ? (
                       <div className="p-2 bg-natural-pebble text-natural-primary rounded-full border border-natural-primary/25 animate-pulse">
                         <Clock className="h-4 w-4" />
                       </div>

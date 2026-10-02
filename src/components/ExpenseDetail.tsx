@@ -133,7 +133,7 @@ export default function ExpenseDetail({
               className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
                 getNormalizedExpenseStatus(expense) === 'CLOSED'
                   ? 'bg-natural-pebble text-natural-muted border-natural-border'
-                  : getNormalizedExpenseStatus(expense) === 'PARTIALLY_SETTLED'
+                  : ['PENDING', 'PARTIALLY_SETTLED'].includes(getNormalizedExpenseStatus(expense))
                     ? 'bg-natural-pebble text-natural-primary border-natural-primary/25'
                     : 'bg-natural-primary-wash text-natural-primary border-natural-primary/30'
               }`}
