@@ -1,6 +1,10 @@
 import { PaymentInstrument, MismatchType, Expense } from '../types';
 
-const getInstrumentClass = (instrument?: PaymentInstrument): 'IMMEDIATE' | 'DEFERRED' | null => {
+// Immediate money has left the payer's account; deferred money (a credit card)
+// is being carried until the statement. Shared with lib/carrying.
+export const getInstrumentClass = (
+  instrument?: PaymentInstrument
+): 'IMMEDIATE' | 'DEFERRED' | null => {
   if (!instrument) return null;
   if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(instrument)) return 'IMMEDIATE';
   if (instrument === 'CREDIT') return 'DEFERRED';

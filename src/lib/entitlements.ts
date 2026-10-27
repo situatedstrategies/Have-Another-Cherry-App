@@ -12,6 +12,8 @@ export const PLUS_FEATURES = [
   'insights', // Insights & monthly trends
   'backup', // Backups & export (BackupModal)
   'mismatch', // Payment-mismatch detection surfaces
+  'forecast', // My month ahead (MonthAheadCard, lib/forecast)
+  'carrying', // Who's carrying what (CarryingCard, lib/carrying)
 ] as const;
 export type PlusFeature = (typeof PLUS_FEATURES)[number];
 

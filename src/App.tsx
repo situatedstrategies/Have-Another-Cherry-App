@@ -38,6 +38,8 @@ import PlanPurchase, { PlanPrefill } from './components/PlanPurchase';
 import HouseholdVault from './components/HouseholdVault';
 import RhythmCard from './components/RhythmCard';
 import InsightsSection from './components/InsightsSection';
+import MonthAheadCard from './components/MonthAheadCard';
+import CarryingCard from './components/CarryingCard';
 import OrchardMode from './components/OrchardMode';
 import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
@@ -698,14 +700,33 @@ export default function App() {
                   onCardClick={(card) => setOwedModal(card)}
                 />
               </ModuleBoundary>
+              {/* Cherry +: the member's share of the month, dated, before it comes due. */}
+              <ModuleBoundary label="My month ahead">
+                <MonthAheadCard
+                  expenses={statsVisibleExpenses}
+                  activeUser={activeUser}
+                  locked={!isPlus}
+                  onUnlock={() => setShowCherryPlus(true)}
+                />
+              </ModuleBoundary>
               {isPlus && (
-                <ModuleBoundary label="Insights">
-                  <InsightsSection
-                    expenses={statsVisibleExpenses}
-                    members={getFullMembers(group)}
-                    activeUser={activeUser}
-                  />
-                </ModuleBoundary>
+                <>
+                  <ModuleBoundary label="Insights">
+                    <InsightsSection
+                      expenses={statsVisibleExpenses}
+                      members={getFullMembers(group)}
+                      activeUser={activeUser}
+                    />
+                  </ModuleBoundary>
+                  {/* The free Insights teaser below already names this one. */}
+                  <ModuleBoundary label="Who's carrying what">
+                    <CarryingCard
+                      expenses={statsVisibleExpenses}
+                      members={getFullMembers(group)}
+                      activeUser={activeUser}
+                    />
+                  </ModuleBoundary>
+                </>
               )}
               {!isPlus && (
                 <button
