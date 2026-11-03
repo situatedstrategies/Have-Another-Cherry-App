@@ -106,6 +106,12 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
 - Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
 
+## Monetisation (owner decision, November 2nd 2026)
+
+- Every feature is free for everyone. Nothing in `src/` may gate a feature on `isPlus`.
+- Ads pay for it: Google AdSense for signed-in members without ad-free (`src/components/AdBanner.tsx`, bottom of the dashboard; the script never loads for ad-free members). Publisher `ca-pub-2443535982979230`, shared with every Situated Strategies site and app.
+- The one purchase is ad-free: the `have_another_cherry` entitlement, read through `lib/entitlements.hasPlus`. It is the Lifetime package of the RevenueCat offering ($3.99 one-time), bought on the web through `CherryPlusModal`, or in the apps. Old Cherry + subscriptions keep it until they lapse.
+
 ## Design system (match this for UI work)
 
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).
