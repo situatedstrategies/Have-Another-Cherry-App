@@ -40,12 +40,12 @@ export default function CherryPlusModal({
     (async () => {
       const [offerings, portal] = await Promise.all([plusOfferings(), manageSubscriptionUrl()]);
       if (!cancelled) {
-        // The one-time plan is the offer. The monthly and yearly packages
-        // stay in the shared offering for subscribers who already have
-        // them, so they are not shown here; if the one-time plan is ever
-        // missing, every plan is better than an empty page.
-        const lifetime = offerings.filter((p) => p.key === 'lifetime');
-        setPlans(lifetime.length > 0 ? lifetime : offerings);
+        // The one-time plan is the only thing for sale. The monthly and
+        // yearly packages stay in the shared offering for subscribers who
+        // already have them and are never offered to a new buyer; if the
+        // one-time plan is missing, the page says it is not open yet rather
+        // than selling a subscription the site no longer describes.
+        setPlans(offerings.filter((p) => p.key === 'lifetime'));
         setManageUrl(portal);
       }
     })();
@@ -87,13 +87,9 @@ export default function CherryPlusModal({
   };
 
   const PLAN_BLURB: Record<string, string> = {
-    monthly: 'Billed monthly. Cancel anytime.',
-    yearly: 'Billed yearly. Cancel anytime.',
     lifetime: 'One payment. No ads, forever.',
   };
   const PLAN_LABEL: Record<string, string> = {
-    monthly: 'Monthly',
-    yearly: 'Yearly',
     lifetime: 'Remove ads',
   };
 
