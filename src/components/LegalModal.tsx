@@ -247,9 +247,12 @@ function TermsOfService() {
 
       <Section title="Plans & Billing">
         <p>
-          The free plan is genuinely free: unlimited expenses, no ads, no daily limits. Cherry + is
-          our optional premium tier; it will be billed per user through the App Store and Google
-          Play when our mobile apps launch, under those stores' terms.
+          Every feature is free: unlimited expenses, receipt scanning, the Household Vault, blind
+          splits, insights, no daily limits. Ads pay for it: one ad at the bottom of the dashboard
+          on the web and on the Android home screen, never inside your ledger and never fed by it.
+          The one purchase is ad-free, $3.99 once per account, bought on the web or through the App
+          Store and Google Play under those stores' terms, and it applies to every device you sign
+          in on. Earlier Cherry + subscriptions keep ad-free until they lapse.
         </p>
       </Section>
 

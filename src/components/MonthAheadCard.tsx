@@ -24,8 +24,8 @@ const SHOWN = 6;
 
 /**
  * My month ahead: this member's share of the shared costs for a month, dated,
- * before they come due. Arithmetic in `lib/forecast.ts`. Cherry + only,
- * mounted by App in the right rail under Balances.
+ * before they come due. Arithmetic in `lib/forecast.ts`. Free for everyone since
+ * November 2026, mounted by App in the right rail under Balances.
  */
 export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock }: Props) {
   // 0 is the current month, 1 the next: people budget by calendar month.

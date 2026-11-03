@@ -59,6 +59,13 @@ export default function PrivacyModal({
               delivery services and lands on your lock screen.
             </li>
             <li>
+              <strong>Ads never read your ledger:</strong> the app is free and one Google ad at the
+              bottom of the dashboard pays for it, unless you have bought ad-free. The ad request
+              carries the page, your IP address and basic browser details, never an amount, a
+              balance, an expense name or a member name, and the ad sits outside your expense list.
+              Ad-free stops the ad code from loading at all.
+            </li>
+            <li>
               <strong>You can delete all of it:</strong> deleting your account removes you from your
               households, hands your share of each split to whoever is left, and deletes your
               profile and your sign-in. A household you share with other people keeps its ledger,
