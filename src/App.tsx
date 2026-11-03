@@ -42,6 +42,7 @@ import MonthAheadCard from './components/MonthAheadCard';
 import CarryingCard from './components/CarryingCard';
 import OrchardMode from './components/OrchardMode';
 import CherryPlusModal from './components/CherryPlusModal';
+import AdBanner from './components/AdBanner';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import {
@@ -175,7 +176,6 @@ export default function App() {
     uid: activeUser || null,
     groupId: group?.id || null,
     expenses,
-    isPlus: hasPlus(userProfile) || rcPlus,
   });
 
   const { handleSignOut, handleDeleteAccount } = useAuthSession({
@@ -324,7 +324,8 @@ export default function App() {
   // group total that included one would let members back the number out.
   const statsVisibleExpenses = expenses.filter((e) => !isDarkCherry(e) || e.paidBy === activeUser);
 
-  // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
+  // Ad-free. Every feature is open to everyone; Cherry + (bought anywhere)
+  // only removes the ads.
   const isPlus = hasPlus(userProfile) || rcPlus;
 
   // Each member's spending limit, and this user's shares that exceed their own.
@@ -414,16 +415,11 @@ export default function App() {
             id="header-controls"
           >
             <button
-              onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
+              onClick={() => setShowVault(true)}
               className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
               title="Household Vault"
             >
               <VaultIcon className="h-4 w-4 shrink-0" /> Vault
-              {!isPlus && (
-                <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                  Cherry +
-                </span>
-              )}
             </button>
             <button
               onClick={() => setShowPlanPurchase(true)}
@@ -678,15 +674,12 @@ export default function App() {
                   />
                 </ModuleBoundary>
               </div>
-              {/* Gated: month-over-month is on the paywall as "Insights and monthly trends". */}
-              {isPlus && (
-                <ModuleBoundary label="Monthly trends">
-                  <MonthlyComparisonChart
-                    expenses={statsVisibleExpenses}
-                    members={getFullMembers(group)}
-                  />
-                </ModuleBoundary>
-              )}
+              <ModuleBoundary label="Monthly trends">
+                <MonthlyComparisonChart
+                  expenses={statsVisibleExpenses}
+                  members={getFullMembers(group)}
+                />
+              </ModuleBoundary>
             </div>
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
@@ -705,65 +698,37 @@ export default function App() {
                 <MonthAheadCard
                   expenses={statsVisibleExpenses}
                   activeUser={activeUser}
-                  locked={!isPlus}
+                  locked={false}
                   onUnlock={() => setShowCherryPlus(true)}
                 />
               </ModuleBoundary>
-              {isPlus && (
-                <>
-                  <ModuleBoundary label="Insights">
-                    <InsightsSection
-                      expenses={statsVisibleExpenses}
-                      members={getFullMembers(group)}
-                      activeUser={activeUser}
-                    />
-                  </ModuleBoundary>
-                  {/* The free Insights teaser below already names this one. */}
-                  <ModuleBoundary label="Who's carrying what">
-                    <CarryingCard
-                      expenses={statsVisibleExpenses}
-                      members={getFullMembers(group)}
-                      activeUser={activeUser}
-                    />
-                  </ModuleBoundary>
-                </>
-              )}
-              {!isPlus && (
-                <button
-                  type="button"
-                  onClick={() => setShowCherryPlus(true)}
-                  className="w-full text-left bg-white border border-natural-border rounded-2xl p-5 shadow-sm hover:border-natural-primary/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
-                      Insights
-                    </span>
-                    <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                      Cherry +
-                    </span>
-                  </div>
-                  <p className="mt-2 font-display text-lg font-semibold text-natural-text">
-                    See where the money actually goes
-                  </p>
-                  <p className="mt-1 text-sm text-natural-muted">
-                    How it was paid, who is carrying the card, how long things take to come back,
-                    and what Venmo instant transfers are quietly costing.
-                  </p>
-                  <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
-                    Join the waitlist
-                  </span>
-                </button>
-              )}
+              <ModuleBoundary label="Insights">
+                <InsightsSection
+                  expenses={statsVisibleExpenses}
+                  members={getFullMembers(group)}
+                  activeUser={activeUser}
+                />
+              </ModuleBoundary>
+              {/* The free Insights teaser below already names this one. */}
+              <ModuleBoundary label="Who's carrying what">
+                <CarryingCard
+                  expenses={statsVisibleExpenses}
+                  members={getFullMembers(group)}
+                  activeUser={activeUser}
+                />
+              </ModuleBoundary>
               <ModuleBoundary label="Rhythm">
                 <RhythmCard
                   expenses={expenses}
-                  locked={!isPlus}
+                  locked={false}
                   onUnlock={() => setShowCherryPlus(true)}
                 />
               </ModuleBoundary>
             </div>
           </div>
         </div>
+
+        <AdBanner adFree={isPlus} onRemoveAds={() => setShowCherryPlus(true)} />
 
         <footer
           className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1"
@@ -779,7 +744,7 @@ export default function App() {
           <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
         </div>
       )}
-      {showBackup && isPlus && (
+      {showBackup && (
         <BackupModal
           onClose={() => setShowBackup(false)}
           activeUser={activeUser}
@@ -810,13 +775,8 @@ export default function App() {
           onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}
           onOpenBackup={() => {
-            // Backups and export are Cherry +; free users get the upgrade page.
             setShowSettings(false);
-            if (isPlus) {
-              setShowBackup(true);
-            } else {
-              setShowCherryPlus(true);
-            }
+            setShowBackup(true);
           }}
           onOpenPrivacy={() => setShowPrivacyModal(true)}
           onSignOut={() => {
@@ -825,9 +785,6 @@ export default function App() {
           }}
           extraSection={
             <BudgetPaymentsSettings
-              isPlus={isPlus}
-              setShowSettings={setShowSettings}
-              setShowCherryPlus={setShowCherryPlus}
               thresholdInput={thresholdInput}
               setThresholdInput={setThresholdInput}
               savingThreshold={savingThreshold}
@@ -858,9 +815,7 @@ export default function App() {
           expenses={statsVisibleExpenses}
           group={group}
           activeUser={activeUser}
-          isPlus={isPlus}
           onSelectExpense={(exp) => setSelectedExpense(exp)}
-          onCherryPlus={() => setShowCherryPlus(true)}
           onToast={addToast}
           onClose={() => setOwedModal(null)}
         />
@@ -932,7 +887,7 @@ export default function App() {
         />
       )}
 
-      {showVault && isPlus && (
+      {showVault && (
         <HouseholdVault
           groupId={group.id}
           activeUser={activeUser}
@@ -970,7 +925,6 @@ export default function App() {
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
           memberThresholds={memberThresholds}
-          isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}
           prefill={planPrefill}
         />

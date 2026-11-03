@@ -142,3 +142,11 @@ env:
   #   value: https://api.revenuecat.com/...
   #   availability:
   #     - RUNTIME
+
+  # AdSense display unit for the dashboard banner (src/components/AdBanner.tsx).
+  # "off" means no manual unit: only the AdSense script loads and Auto ads place
+  # themselves. Replace with the numeric ad unit id once one exists in AdSense.
+  - variable: VITE_ADSENSE_SLOT
+    value: "off"
+    availability:
+      - BUILD

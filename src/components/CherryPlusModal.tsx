@@ -12,13 +12,11 @@ import {
 } from '../lib/billing';
 import { labelClass } from '../lib/ui';
 
-// The Cherry + page. Today Cherry + is bought in the iOS/Android apps and the
-// web only reads the entitlement (see the note rendered below) - that keeps
-// the app clear of Apple's and Google's rules on outside payment, and nothing
-// is sold here. Web selling exists behind lib/billing.ts and switches on only
-// when VITE_RC_WEB_KEY is set: then this page offers the plans directly
-// through RevenueCat's hosted checkout. With no key, behavior is unchanged:
-// the waitlist card plus the where-to-buy note.
+// The ad-free page. Every feature is free; ads pay for the app, and this is
+// the one thing for sale: a single payment that turns them off on every
+// device you sign in to. Web selling runs through lib/billing.ts and
+// RevenueCat's hosted checkout when VITE_RC_WEB_KEY is set; with no key the
+// page explains where else to buy and offers the launch-news list instead.
 export default function CherryPlusModal({
   onClose,
   customerEmail,
@@ -42,7 +40,12 @@ export default function CherryPlusModal({
     (async () => {
       const [offerings, portal] = await Promise.all([plusOfferings(), manageSubscriptionUrl()]);
       if (!cancelled) {
-        setPlans(offerings);
+        // The one-time plan is the offer. The monthly and yearly packages
+        // stay in the shared offering for subscribers who already have
+        // them, so they are not shown here; if the one-time plan is ever
+        // missing, every plan is better than an empty page.
+        const lifetime = offerings.filter((p) => p.key === 'lifetime');
+        setPlans(lifetime.length > 0 ? lifetime : offerings);
         setManageUrl(portal);
       }
     })();
@@ -85,8 +88,13 @@ export default function CherryPlusModal({
 
   const PLAN_BLURB: Record<string, string> = {
     monthly: 'Billed monthly. Cancel anytime.',
-    yearly: 'Billed yearly - save ~37%.',
-    lifetime: 'One payment. Cherries forever.',
+    yearly: 'Billed yearly. Cancel anytime.',
+    lifetime: 'One payment. No ads, forever.',
+  };
+  const PLAN_LABEL: Record<string, string> = {
+    monthly: 'Monthly',
+    yearly: 'Yearly',
+    lifetime: 'Remove ads',
   };
 
   const storeReady = (plans?.length ?? 0) > 0;
@@ -94,7 +102,7 @@ export default function CherryPlusModal({
   return (
     <Modal
       onClose={onClose}
-      title="Cherry +"
+      title="Remove ads"
       icon={<Cherry className="h-5 w-5 text-natural-primary" />}
     >
       <div className="space-y-5 text-center">
@@ -105,28 +113,28 @@ export default function CherryPlusModal({
         {purchaseState === 'purchased' ? (
           <div className="space-y-3">
             <h3 className="text-xl font-display font-semibold text-natural-text">
-              Welcome to Cherry +
+              Ads are off. Thank you.
             </h3>
             <div className="bg-natural-sage/40 border border-natural-primary/20 rounded-xl p-4 flex items-center justify-center gap-2 text-sm font-bold text-natural-primary">
-              <Check className="h-4 w-4" /> Everything is unlocked - the vault, blind splits,
-              insights, and more.
+              <Check className="h-4 w-4" /> Ad-free follows your account to every device, apps
+              included.
             </div>
             <button
               onClick={onClose}
               className="bg-natural-primary hover:bg-natural-primary-ink text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-colors"
             >
-              Enjoy your cherries
+              Back to the ledger
             </button>
           </div>
         ) : storeReady ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-xl font-display font-semibold text-natural-text">
-                The vault, blind splits and deeper insight.
+                Everything is free. The ads pay for it.
               </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                Everything in Free, plus the Household Vault, Dark Cherry blind splits, spending
-                thresholds, rhythm streaks, insights, and backups.
+                One payment turns them off for good, on every device you sign in to. Nothing else
+                changes: every feature is already yours.
               </p>
             </div>
             <div className="space-y-2 max-w-sm mx-auto">
@@ -138,8 +146,8 @@ export default function CherryPlusModal({
                   className="w-full flex items-center justify-between bg-white border border-natural-border hover:border-natural-primary rounded-xl px-4 py-3 transition-colors disabled:opacity-50 text-left"
                 >
                   <span>
-                    <span className="block text-sm font-bold text-natural-text capitalize">
-                      {plan.key}
+                    <span className="block text-sm font-bold text-natural-text">
+                      {PLAN_LABEL[plan.key] || plan.title}
                     </span>
                     <span className="block text-xs text-natural-muted">
                       {PLAN_BLURB[plan.key] || plan.title}
@@ -163,7 +171,7 @@ export default function CherryPlusModal({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-natural-muted hover:text-natural-text"
               >
-                Manage existing subscription <ExternalLink className="h-3 w-3" />
+                Manage an existing purchase <ExternalLink className="h-3 w-3" />
               </a>
             )}
             {isSandboxBilling && (
@@ -173,21 +181,21 @@ export default function CherryPlusModal({
             )}
             <p className="text-[10px] text-natural-muted max-w-sm mx-auto">
               Prices subject to change with notice. Taxes may apply. Payments are processed by
-              RevenueCat; we never see your card. Cherry + follows your account everywhere, apps
-              included.
+              RevenueCat; we never see your card. Bought ad-free in the iPhone or Android app? It
+              applies here too, on the same account.
             </p>
           </div>
         ) : plans === null ? (
-          <p className="text-sm text-natural-muted">Loading plans...</p>
+          <p className="text-sm text-natural-muted">Loading...</p>
         ) : (
           <>
             <div>
               <h3 className="text-xl font-display font-semibold text-natural-text">
-                This tree is still growing.
+                Not open for purchase on the web just yet.
               </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                Cherry + will bring deeper budgeting tools and more ways to keep money conversations
-                kind. Keep in touch - and always stay sweet.
+                Every feature is free. Removing the ads will be a single small payment; leave your
+                email and we will write when it opens here.
               </p>
             </div>
 
@@ -197,7 +205,7 @@ export default function CherryPlusModal({
               </div>
             ) : (
               <form onSubmit={handleWaitlist} className="max-w-sm mx-auto space-y-2">
-                <label className={`${labelClass} block`}>Get updates when Cherry + launches</label>
+                <label className={`${labelClass} block`}>Get a note when it opens</label>
                 <div className="flex gap-2">
                   <input
                     type="email"
@@ -231,16 +239,11 @@ export default function CherryPlusModal({
               </form>
             )}
 
-            {/* Where Cherry + is actually bought, stated once and in both states.
-                Purchases happen in the iOS and Android apps through the store's own
-                billing; the web reads the same entitlement, so premium bought there
-                works here. Nothing is ever sold on this page, which is what keeps
-                the app clear of Apple's and Google's rules on outside payment. */}
             <div className="flex items-start gap-3 text-left bg-natural-pebble/60 border border-natural-border rounded-xl p-3.5 max-w-sm mx-auto">
               <Smartphone className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-muted leading-relaxed">
-                Cherry + lives in the iPhone and Android apps. Subscribe there once and it unlocks
-                here too, on the same account. There is nothing to buy on the web.
+                Ad-free can be bought in the iPhone and Android apps. Buy it there once and it
+                applies here too, on the same account.
               </p>
             </div>
           </>

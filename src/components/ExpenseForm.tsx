@@ -22,7 +22,6 @@ import DarkCherryInfoModal, {
   hasSeenDarkCherryIntro,
   markDarkCherryIntroSeen,
 } from './DarkCherryInfoModal';
-import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
 import { roundCurrency } from '../lib/money';
@@ -45,7 +44,6 @@ interface ExpenseFormProps {
   /** Each member's spending threshold, for over-threshold heads-ups. */
   memberThresholds?: Record<string, number>;
   /** Cherry + entitlement; gates creating Dark Cherry splits. */
-  isPlus?: boolean;
   /** Every member's decrypted Venmo/Zelle handles, keyed by uid. Shown the
    *  moment Venmo or Zelle is picked, so the handle is in hand while the
    *  payment is being made. */
@@ -61,7 +59,6 @@ export default function ExpenseForm({
   onSubmit,
   editingExpense,
   memberThresholds,
-  isPlus,
   paymentHandlesByUid,
   prefill,
 }: ExpenseFormProps) {
@@ -127,7 +124,6 @@ export default function ExpenseForm({
   const [blindMin, setBlindMin] = useState(editingExpense?.blindMin?.toString() || '');
   const [blindMax, setBlindMax] = useState(editingExpense?.blindMax?.toString() || '');
   const [showDarkIntro, setShowDarkIntro] = useState(false);
-  const [showCherryPlus, setShowCherryPlus] = useState(false);
 
   // Line items from the receipt scan, assignable to members ('shared' = split
   // by the household default) to build an itemized custom-amount split.
@@ -168,13 +164,6 @@ export default function ExpenseForm({
   };
 
   const selectDarkCherry = () => {
-    // Dark Cherry is a Cherry + feature. Editing an existing one is
-    // grandfathered (the edit effect sets the split type directly), but
-    // creating a new one without the entitlement opens the coming-soon page.
-    if (!isPlus) {
-      setShowCherryPlus(true);
-      return;
-    }
     setSplitType('dark_cherry');
     if (!hasSeenDarkCherryIntro(activeUser)) {
       setShowDarkIntro(true);
@@ -1237,18 +1226,6 @@ export default function ExpenseForm({
                 <div>
                   <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
                     Dark Cherry
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowCherryPlus(true);
-                      }}
-                      className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
-                      title="About Cherry +"
-                    >
-                      Cherry +
-                    </button>
                   </span>
                   <span className="block text-xs text-natural-muted">
                     Blind split - others contribute what they can, no numbers shown.{' '}
@@ -1650,8 +1627,6 @@ export default function ExpenseForm({
           }}
         />
       )}
-
-      {showCherryPlus && <CherryPlusModal onClose={() => setShowCherryPlus(false)} />}
     </Modal>
   );
 }

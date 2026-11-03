@@ -18,23 +18,19 @@ interface OwedBreakdownModalProps {
   expenses: Expense[];
   group: Group;
   activeUser: string;
-  isPlus: boolean;
   onSelectExpense: (expense: Expense) => void;
-  onCherryPlus: () => void;
   onToast: (title: string, message: string, type: 'info' | 'success' | 'error') => void;
   onClose: () => void;
 }
 
 // Opened from the balance cards in the rail: the transactions still owed,
-// grouped per person, with a Cherry + option to email them a gentle reminder.
+// grouped per person, with an option to email them a gentle reminder.
 export default function OwedBreakdownModal({
   mode,
   expenses,
   group,
   activeUser,
-  isPlus,
   onSelectExpense,
-  onCherryPlus,
   onToast,
   onClose,
 }: OwedBreakdownModalProps) {
@@ -85,10 +81,6 @@ export default function OwedBreakdownModal({
   const grandTotal = byPerson.reduce((s, p) => s + p.total, 0);
 
   const sendReminder = async (debtorUid: string) => {
-    if (!isPlus) {
-      onCherryPlus();
-      return;
-    }
     setSendingTo(debtorUid);
     try {
       const res = await fetch('/api/send-reminder', {
@@ -178,11 +170,6 @@ export default function OwedBreakdownModal({
                         <BellRing size={12} />
                       )}
                       Send reminder
-                      {!isPlus && (
-                        <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                          Cherry +
-                        </span>
-                      )}
                     </button>
                   ))}
               </div>
