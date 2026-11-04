@@ -2,6 +2,7 @@ import express from 'express';
 import { rateLimit, requireAuth, requireSecret } from '../middleware';
 import { ensureAdminApp } from '../shared';
 import { fetchRevenueCatEntitlement } from '../revenuecat';
+import { analytics } from '../heycatch';
 
 const router = express.Router();
 
@@ -160,6 +161,27 @@ router.post(
           },
           { merge: true }
         );
+      }
+
+      // HeyCatch business events, sent from here because this is the side
+      // that actually knows a purchase happened (an adblocker cannot eat a
+      // server event, and the value comes from RevenueCat, not the browser).
+      // A webhook has no request to pass, so the event ties to the person,
+      // not to a live session. Awaited so the handler never returns mid-send;
+      // the calls never throw. After the entitlement write, which is the
+      // thing this webhook exists for.
+      const store = String(event?.store || '');
+      if (DEACTIVATING.includes(type)) {
+        await analytics.setIdentity(uid, { plan: 'free' });
+      } else {
+        await analytics.setIdentity(uid, { plan: 'ad-free' });
+        if (type === 'INITIAL_PURCHASE' || type === 'NON_RENEWING_PURCHASE') {
+          await analytics.trackEvent(
+            'ad_free_purchased',
+            { product_id: String(event?.product_id || ''), store, event_type: type },
+            { userId: uid }
+          );
+        }
       }
 
       return res.status(200).json({ received: true });

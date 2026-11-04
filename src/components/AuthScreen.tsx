@@ -12,6 +12,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { analytics } from '@heycatch/sdk';
 import { auth, db, applyKeepSignedIn } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
@@ -122,6 +123,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// The one business outcome autocapture cannot see: a brand-new account.
+// Sign-up goes straight from the browser to Firebase Auth with no server
+// route of ours in the path, so the client is the only side that knows.
+// Identify first so the event attaches to the person, not an anonymous one.
+function reportSignupCompleted(user: { uid: string; email: string | null; displayName: string | null }) {
+  analytics.setIdentity(user.uid, {
+    ...(user.email ? { email: user.email } : {}),
+    ...(user.displayName ? { name: user.displayName } : {}),
+  });
+  analytics.trackEvent('signup_completed');
+}
+
 // Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
 async function recordTermsAcceptance(uid: string) {
   try {
@@ -192,6 +205,7 @@ export default function AuthScreen() {
     getRedirectResult(auth)
       .then((result) => {
         if (result && getAdditionalUserInfo(result)?.isNewUser) {
+          reportSignupCompleted(result.user);
           return recordTermsAcceptance(result.user.uid);
         }
       })
@@ -256,6 +270,7 @@ export default function AuthScreen() {
       // Record consent for brand-new accounts (the provider already verified
       // the email address).
       if (getAdditionalUserInfo(result)?.isNewUser) {
+        reportSignupCompleted(result.user);
         await recordTermsAcceptance(result.user.uid);
       }
     } catch (err: any) {
@@ -392,6 +407,9 @@ export default function AuthScreen() {
           await updateProfile(userCred.user, { displayName: name.trim() });
         }
         await recordTermsAcceptance(userCred.user.uid);
+        // The account is usable from here (verification is not a gate), so
+        // this is the moment the sign-up completed.
+        reportSignupCompleted(userCred.user);
 
         // Confirm the address for password signups. Google accounts skip this:
         // Google has already verified the address, and Firebase marks them
