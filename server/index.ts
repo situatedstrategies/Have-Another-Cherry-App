@@ -275,6 +275,14 @@ async function startServer() {
   // Unknown API routes get a JSON 404 rather than the SPA HTML.
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
+  // HeyCatch short links (https://heycatch.ai/agents.md, step 4): every
+  // single-character path, /a to /z and /0 to /9, is reserved for channel
+  // attribution. The query IS the attribution; the SDK strips it from the URL
+  // bar after landing. The app has no real single-character route.
+  app.get(/^\/[a-z0-9]$/, (req, res) => {
+    res.redirect(302, `/?utm_source=heycatch&utm_campaign=${req.path.slice(1)}`);
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });

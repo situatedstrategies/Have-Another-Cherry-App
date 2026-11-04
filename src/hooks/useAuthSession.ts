@@ -9,6 +9,7 @@ import {
   OAuthProvider,
   EmailAuthProvider,
 } from 'firebase/auth';
+import { analytics } from '@heycatch/sdk';
 import { auth, db, authHeader, forgetKeepSignedIn } from '../firebase';
 import { disableWebPush } from '../lib/push';
 import { configureBilling, plusEntitlementActive } from '../lib/billing';
@@ -58,9 +59,26 @@ export function useAuthSession({
         // session immediately: a paid customer must never see the paywall
         // on sign-in because a profile write lagged or a webhook was lost.
         setRcPlus(false);
+        // HeyCatch identity: the Firebase uid is the stable id the server's
+        // webhook events use too, which is what joins the two. Email and name
+        // are person properties, never the id. signup_date is set once.
+        analytics.setIdentity(
+          user.uid,
+          {
+            ...(user.email ? { email: user.email } : {}),
+            ...(user.displayName ? { name: user.displayName } : {}),
+          },
+          user.metadata?.creationTime
+            ? { signup_date: new Date(user.metadata.creationTime).toISOString() }
+            : undefined
+        );
         configureBilling(user.uid)
           .then(() => plusEntitlementActive())
-          .then((active) => setRcPlus(active))
+          .then((active) => {
+            setRcPlus(active);
+            // A property change, reported when it is known, not on render.
+            analytics.setPersonProperties({ plan: active ? 'ad-free' : 'free' });
+          })
           .catch(console.error);
         // Entitlement sync: promo allowlist plus RevenueCat, written by the
         // server; the profile listener picks it up. Silent on failure.
@@ -78,6 +96,8 @@ export function useAuthSession({
     if (uid) await disableWebPush(uid).catch(() => {});
     // The next visit asks for login again instead of restoring a session.
     forgetKeepSignedIn();
+    // The next visitor on this browser starts anonymous in analytics.
+    analytics.resetIdentity();
     // Let the auth listener reset state: clearing userProfile here would
     // flash ProfileSetup for a frame before currentUser clears.
     auth.signOut();
@@ -156,6 +176,7 @@ export function useAuthSession({
 
       // Last: this revokes the auth the steps above needed.
       await deleteUser(auth.currentUser!);
+      analytics.resetIdentity();
       setShowSettings(false);
       setShowPrivacyModal(false);
       setUserProfile(null);

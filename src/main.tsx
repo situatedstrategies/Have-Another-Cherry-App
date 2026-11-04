@@ -1,8 +1,23 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { analytics } from '@heycatch/sdk';
 import App from './App.tsx';
 import AuthActionHandler from './components/AuthActionHandler.tsx';
 import './index.css';
+
+// HeyCatch product analytics (https://heycatch.ai/agents.md). Module scope, in
+// the entry file, before anything renders: pageviews, clicks and view changes
+// are captured from here on; identity lives in useAuthSession and the business
+// events (signup_completed, ad_free_purchased) in AuthScreen and the server's
+// RevenueCat webhook. The key is publishable, so it is inlined on purpose.
+analytics.init({
+  projectKey: 'hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK',
+  install: {
+    framework: 'vite-react',
+    frameworkVersion: '6',
+    agent: 'claude-code',
+  },
+});
 
 // There is no router in this app - App.tsx switches views with local state. The
 // Firebase Auth action handler needs a real URL though, because Firebase puts it

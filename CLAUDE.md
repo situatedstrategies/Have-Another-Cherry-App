@@ -155,6 +155,22 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   responses with `stripEmDashes` in `server/shared.ts` before returning them. Keep both
   in place when adding new AI endpoints.
 
+## Product analytics (HeyCatch)
+
+- `@heycatch/sdk` (latest stable, never a `-dev.N` prerelease), installed per
+  https://heycatch.ai/agents.md. Project key `hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK`
+  is publishable and inlined. Browser init lives in `src/main.tsx` (static
+  import, module scope); server init in `server/heycatch.ts`.
+- Autocapture covers pageviews, clicks and view changes: never hand-instrument
+  UI events. Identity: `setIdentity(uid, {email, name}, {signup_date})` in
+  `useAuthSession`, `resetIdentity` on sign-out and account deletion, `plan`
+  (`free` / `ad-free`) as a person property. Business events:
+  `signup_completed` from `AuthScreen` (client-only Firebase Auth), and
+  `ad_free_purchased` from the RevenueCat webhook in `server/routes/billing.ts`.
+- Single-character paths (`/a`-`/z`, `/0`-`/9`) are HeyCatch short links;
+  `server/index.ts` 302s them to `/?utm_source=heycatch&utm_campaign=<char>`.
+  Do not add a real single-character route.
+
 ## Conventions / gotchas
 
 - Source of truth is GitHub `main` - that is what deploys. Prefer: edit locally, `npm run dev` to verify, then commit/push.

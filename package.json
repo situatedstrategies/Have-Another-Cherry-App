@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@heycatch/sdk": "^0.8.3",
     "@revenuecat/purchases-js": "^1.55.0",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
