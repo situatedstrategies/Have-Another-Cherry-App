@@ -813,6 +813,20 @@ export default function AuthScreen() {
                 </>
               )
             )}
+            {/* The floating reCAPTCHA badge sat on top of the form on phones, so
+                it is hidden (index.css) and Google's required notice takes its
+                place, in the words Google asks for. */}
+            <p className="mt-6 text-center text-[11px] leading-relaxed text-natural-accent">
+              This site is protected by reCAPTCHA and the Google{' '}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                Privacy Policy
+              </a>{' '}
+              and{' '}
+              <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                Terms of Service
+              </a>{' '}
+              apply.
+            </p>
           </div>
         </div>
       </div>

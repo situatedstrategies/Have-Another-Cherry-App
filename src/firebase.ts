@@ -10,6 +10,7 @@ import {
   browserPopupRedirectResolver,
 } from 'firebase/auth';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
+import { onAuthStateChanged } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // One Firebase project, one backend. Do not reintroduce a beta config or a VITE_APP_ENV switch.
@@ -38,11 +39,53 @@ const appCheckDebugToken = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
 if (import.meta.env.DEV || appCheckDebugToken) {
   (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken || true;
 }
-if (firebaseConfig.recaptchaSiteKey) {
+// Started on demand rather than at module load. Initializing App Check runs a
+// reCAPTCHA Enterprise assessment immediately, and when the key's challenge
+// setting is on, a low-scoring visitor got an image puzzle over the sign-in
+// screen the moment the page opened, before touching anything. So App Check
+// starts at the first moment it can matter: right away when a session is
+// about to be restored or a sign-in redirect is coming back, on the first
+// tap, click or keypress on the signed-out screen (always before any sign-in
+// request, since pointerdown and keydown fire ahead of the click or submit
+// they lead to), and the moment Auth reports a signed-in user (the listener
+// below is registered before any of the app's own, so it runs first).
+let appCheckStarted = false;
+export function ensureAppCheck(): void {
+  if (appCheckStarted || !firebaseConfig.recaptchaSiteKey) return;
+  appCheckStarted = true;
   initializeAppCheck(app, {
     provider: new ReCaptchaEnterpriseProvider(firebaseConfig.recaptchaSiteKey),
     isTokenAutoRefreshEnabled: true,
   });
+}
+
+function sessionLikelyRestoring(): boolean {
+  try {
+    if (localStorage.getItem('hac:keepSignedIn') === '1') return true;
+    for (const store of [sessionStorage, localStorage]) {
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i) || '';
+        if (key.startsWith('firebase:authUser:') || key.startsWith('firebase:pendingRedirect')) return true;
+      }
+    }
+  } catch {
+    // Blocked storage: no restored session to protect, wait for the visitor.
+  }
+  return false;
+}
+
+if (import.meta.env.DEV || appCheckDebugToken || sessionLikelyRestoring()) {
+  ensureAppCheck();
+} else if (typeof window !== 'undefined') {
+  const start = () => {
+    ensureAppCheck();
+    for (const type of ['pointerdown', 'keydown', 'focusin'] as const) {
+      window.removeEventListener(type, start, true);
+    }
+  };
+  for (const type of ['pointerdown', 'keydown', 'focusin'] as const) {
+    window.addEventListener(type, start, { capture: true, passive: true });
+  }
 }
 
 // Initialize Firestore with the custom database ID as the third argument
@@ -101,6 +144,11 @@ export const auth = initializeAuth(app, {
     ? [indexedDBLocalPersistence, browserLocalPersistence]
     : [browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver,
+});
+
+// A signed-in user means Firestore traffic is next: App Check must be running.
+onAuthStateChanged(auth, (user) => {
+  if (user) ensureAppCheck();
 });
 
 // Build the Authorization header for calls to our authenticated API endpoints.
