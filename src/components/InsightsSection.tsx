@@ -10,6 +10,7 @@ import {
   venmoFees,
   UNKNOWN_INSTRUMENT,
 } from '../lib/insights';
+import { formatAmount } from '../lib/format';
 
 interface Props {
   expenses: Expense[];
@@ -28,7 +29,6 @@ const INSTRUMENT_LABELS: Record<string, string> = {
   [UNKNOWN_INSTRUMENT]: 'Not recorded',
 };
 
-const money = (v: number) => `$${v.toFixed(2)}`;
 const label = 'text-xs font-bold text-natural-muted uppercase tracking-widest';
 const panel = 'bg-white border border-natural-border rounded-3xl shadow-sm';
 
@@ -86,7 +86,7 @@ export default function InsightsSection({ expenses, members, activeUser }: Props
             <div key={k}>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-natural-text font-medium">{INSTRUMENT_LABELS[k] || k}</span>
-                <span className="font-mono text-xs text-natural-text">{money(v)}</span>
+                <span className="font-mono text-xs text-natural-text">{formatAmount(v)}</span>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-natural-sidebar overflow-hidden">
                 <div
@@ -112,7 +112,7 @@ export default function InsightsSection({ expenses, members, activeUser }: Props
             {data.credit.map(([uid, v]) => (
               <div key={uid} className="flex items-center justify-between text-sm">
                 <span className="text-natural-text font-medium">{nameOf(uid)}</span>
-                <span className="font-mono text-xs text-natural-text">{money(v)}</span>
+                <span className="font-mono text-xs text-natural-text">{formatAmount(v)}</span>
               </div>
             ))}
           </div>
@@ -149,10 +149,10 @@ export default function InsightsSection({ expenses, members, activeUser }: Props
           </p>
           <div className="mt-3 space-y-1.5 text-sm">
             {[
-              ['Moved through Venmo', money(data.venmo.transferred), ''],
+              ['Moved through Venmo', formatAmount(data.venmo.transferred), ''],
               [
                 'Estimated fees if instant',
-                money(data.venmo.estimatedFees),
+                formatAmount(data.venmo.estimatedFees),
                 'text-natural-primary',
               ],
               ['Payments', String(data.venmo.settlementCount), ''],
@@ -187,7 +187,9 @@ export default function InsightsSection({ expenses, members, activeUser }: Props
               t.medianDays !== null
                 ? `${t.medianDays} day${t.medianDays === 1 ? '' : 's'} to settle`
                 : null,
-              carrier ? `${nameOf(carrier[0])} carries ${money(carrier[1])}` : null,
+              carrier
+                ? `${nameOf(carrier[0])} ${carrier[0] === activeUser ? 'carry' : 'carries'} ${formatAmount(carrier[1])}`
+                : null,
             ].filter(Boolean);
             return (
               <div key={t.category} className="px-5 py-3.5">
@@ -196,7 +198,7 @@ export default function InsightsSection({ expenses, members, activeUser }: Props
                     {t.category}
                   </span>
                   <span className="font-display text-[15px] font-semibold text-natural-text">
-                    {money(t.total)}
+                    {formatAmount(t.total)}
                   </span>
                 </div>
                 {bits.length > 0 && (
