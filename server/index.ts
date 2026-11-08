@@ -11,6 +11,7 @@ import aiRoutes from './routes/ai';
 import billingRoutes from './routes/billing';
 import notificationsRoutes from './routes/notifications';
 import supportRoutes from './routes/support';
+import assessmentRoutes from './routes/assessment';
 
 async function startServer() {
   const app = express();
@@ -219,6 +220,7 @@ async function startServer() {
   app.use(billingRoutes);
   app.use(notificationsRoutes);
   app.use(supportRoutes);
+  app.use(assessmentRoutes);
 
   // ---- Well-known files, service worker, favicon ----
   // Apple fetches this to verify the domain and app belong together, which
