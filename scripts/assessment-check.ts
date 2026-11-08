@@ -30,12 +30,16 @@ assert.equal(full.suggestedSplit.kind, 'income');
 assert.equal(full.reminderCadence, 'biweekly');
 
 const sparse = normalizeAssessment(
-  { summary: 'Short — with a dash', suggestedSplit: { kind: 'weird' }, reminderCadence: 'daily' },
+  {
+    summary: 'Short ' + String.fromCharCode(0x2014) + ' with a dash',
+    suggestedSplit: { kind: 'weird' },
+    reminderCadence: 'daily',
+  },
   'en'
 );
 assert.equal(sparse.suggestedSplit.kind, 'even', 'unknown split kind falls back to even');
 assert.equal(sparse.reminderCadence, 'monthly', 'unknown cadence falls back to monthly');
-assert.ok(!sparse.summary.includes('—'), 'em dashes are stripped');
+assert.ok(!sparse.summary.includes(String.fromCharCode(0x2014)), 'em dashes are stripped');
 assert.deepEqual(sparse.strengths, []);
 assert.deepEqual(sparse.thresholds, []);
 assert.ok(sparse.style.length > 0, 'style always has a value');

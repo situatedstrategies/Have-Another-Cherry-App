@@ -406,6 +406,10 @@
       "4": {
         "title": "Talking it through",
         "subtitle": "How you like to handle the conversations."
+      },
+      "5": {
+        "title": "Almost there",
+        "subtitle": "Two optional questions for your written assessment."
       }
     },
     "q": {
@@ -537,9 +541,23 @@
           "detailed": "Detailed spending tracking",
           "accountable": "Keeping everyone accountable"
         }
+      },
+      "groupsExpected": {
+        "label": "How many groups do you expect to share money with?",
+        "opt": {
+          "1": "Just one",
+          "2": "Two",
+          "3": "Three",
+          "4": "Four or more"
+        }
+      },
+      "troubles": {
+        "label": "What usually goes wrong when you share money?",
+        "placeholder": "In your own words. Optional."
       }
     },
-    "retakeBlocker": "You can retake the quiz on {{date}}. A style is a reading of a season, so it opens every {{months}} months."
+    "retakeBlocker": "You can retake the quiz on {{date}}. A style is a reading of a season, so it opens every {{months}} months.",
+    "skipAssessment": "Skip the written assessment. You can get it later from Settings."
   },
   "app": {
     "alignmentTitle": "Conversation Starter: Financial Alignment",
@@ -1652,5 +1670,47 @@
       "currency": "Currency code"
     },
     "notePlaceholder": "Optional. In your own words."
+  },
+  "assessment": {
+    "yourStyle": "Your money style",
+    "strengths": "Lean on",
+    "watchFor": "Watch for",
+    "suggestedSplit": "A split to start from",
+    "split": {
+      "even": "Evenly",
+      "income": "By income",
+      "custom": "Your own ratio"
+    },
+    "openers": "Ways to open the conversation",
+    "disclaimer": "Written from your answers to help with shared money. It is not financial, credit, tax or legal advice.",
+    "continue": "Continue",
+    "settingsTitle": "Your written assessment",
+    "retake": "Retake the quiz and write it again"
+  },
+  "next": {
+    "label": "Next up",
+    "invite": {
+      "title": "Invite the others",
+      "body": "{{group}} is just you so far. Send the link and the ledger fills in from both sides.",
+      "cta": "Invite"
+    },
+    "setup": {
+      "title": "Set up this household",
+      "body": "A few questions set the split, the payment apps and the reminders.",
+      "cta": "Set up"
+    },
+    "settle": {
+      "title": "Settle what you owe",
+      "body_one": "{{count}} expense is waiting on you. Open it and hand off the payment in one tap.",
+      "body_few": "{{count}} expenses are waiting on you. Open them and hand off the payments in one tap.",
+      "body_many": "{{count}} expenses are waiting on you. Open them and hand off the payments in one tap.",
+      "body_other": "{{count}} expenses are waiting on you. Open them and hand off the payments in one tap.",
+      "cta": "Settle"
+    },
+    "first": {
+      "title": "Log the first expense",
+      "body": "Snap the receipt and the amount, date and items fill themselves in.",
+      "cta": "Add expense"
+    }
   }
 }

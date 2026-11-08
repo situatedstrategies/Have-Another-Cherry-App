@@ -120,8 +120,12 @@ export default function ExpenseForm({
       })
       .filter(Boolean) as { uid: string; name: string; text: string }[];
   }, [instrumentType, members, activeUser, paymentHandlesByUid]);
+  // The household setup's answer seeds the split: "evenly" starts equal,
+  // everything else starts from the standing ratio.
   const [splitType, setSplitType] = useState<SplitType>(
-    editingExpense?.splitType || seed?.splitType || 'household_default'
+    editingExpense?.splitType ||
+      seed?.splitType ||
+      (group.setup?.split === 'even' ? 'equal' : 'household_default')
   );
 
   // Dark Cherry (blind split): per-payment bounds + the first-use explainer.
@@ -1105,7 +1109,9 @@ export default function ExpenseForm({
                   <span className="block text-sm font-semibold text-natural-text">
                     {t('form.evenSplit')}
                   </span>
-                  <span className="block text-xs text-natural-muted">{t('form.evenSplitBody')}</span>
+                  <span className="block text-xs text-natural-muted">
+                    {t('form.evenSplitBody')}
+                  </span>
                 </div>
               </div>
               <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1134,7 +1140,9 @@ export default function ExpenseForm({
                   <span className="block text-sm font-semibold text-natural-text">
                     {t('form.customPct')}
                   </span>
-                  <span className="block text-xs text-natural-muted">{t('form.customPctBody')}</span>
+                  <span className="block text-xs text-natural-muted">
+                    {t('form.customPctBody')}
+                  </span>
                 </div>
               </div>
               <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1163,7 +1171,9 @@ export default function ExpenseForm({
                   <span className="block text-sm font-semibold text-natural-text">
                     {t('form.customAmt')}
                   </span>
-                  <span className="block text-xs text-natural-muted">{t('form.customAmtBody')}</span>
+                  <span className="block text-xs text-natural-muted">
+                    {t('form.customAmtBody')}
+                  </span>
                 </div>
               </div>
               <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1388,7 +1398,9 @@ export default function ExpenseForm({
                           onClick={() => removeGuest(g.id)}
                           className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0"
                           title={t('settings.remove')}
-                          aria-label={t('form.removeGuest', { name: g.name.trim() || t('form.thisGuest') })}
+                          aria-label={t('form.removeGuest', {
+                            name: g.name.trim() || t('form.thisGuest'),
+                          })}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1408,7 +1420,8 @@ export default function ExpenseForm({
                   <span
                     className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}
                   >
-                    {t('form.total', { total: pctTotal.toFixed(1) })}{balanced ? ' ✓' : ' / 100%'}
+                    {t('form.total', { total: pctTotal.toFixed(1) })}
+                    {balanced ? ' ✓' : ' / 100%'}
                   </span>
                 </div>
               </div>

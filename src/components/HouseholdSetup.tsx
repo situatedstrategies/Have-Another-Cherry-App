@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { track } from '../lib/analytics';
-import { HANDOFFS, KNOWN_REGIONS, handoffsForRegion, normalizeRegion, type HandoffId } from '../lib/handoffs';
+import {
+  HANDOFFS,
+  KNOWN_REGIONS,
+  handoffsForRegion,
+  normalizeRegion,
+  type HandoffId,
+} from '../lib/handoffs';
 import {
   GROUP_KINDS,
   GROUP_PAYING,
@@ -22,7 +28,10 @@ import { seedRecurringStubs } from '../lib/householdSeed';
 import type { Group, GroupSetup } from '../types';
 
 interface Props {
-  group: Pick<Group, 'id' | 'setup' | 'region' | 'targetNumPeople' | 'availableSplits' | 'defaultSplit'>;
+  group: Pick<
+    Group,
+    'id' | 'setup' | 'region' | 'targetNumPeople' | 'availableSplits' | 'defaultSplit'
+  >;
   uid: string;
   isPlus: boolean;
   /** The region to start from when the group has none yet. */
@@ -33,8 +42,7 @@ interface Props {
   onSkip?: () => void;
 }
 
-const card =
-  'w-full text-left p-3 rounded-xl border transition-colors text-sm font-semibold';
+const card = 'w-full text-left p-3 rounded-xl border transition-colors text-sm font-semibold';
 const on = 'border-natural-primary bg-natural-sage/40 text-natural-text';
 const off = 'border-natural-border bg-white text-natural-muted hover:border-natural-muted';
 
@@ -44,11 +52,22 @@ const off = 'border-natural-border bg-white text-natural-muted hover:border-natu
 // dates and currency. Answers go to groups/{id}.setup and seed the defaults
 // the plan names; anything behind Cherry + is stored as intent when the gate
 // is closed.
-export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode, onDone, onSkip }: Props) {
+export default function HouseholdSetup({
+  group,
+  uid,
+  isPlus,
+  initialRegion,
+  mode,
+  onDone,
+  onSkip,
+}: Props) {
   const { t } = useTranslation();
   const [region, setRegion] = useState(normalizeRegion(group.region, initialRegion));
   const [draft, setDraft] = useState<SetupDraft>(() =>
-    draftFrom(group.setup, handoffsForRegion(normalizeRegion(group.region, initialRegion)).slice(0, 3))
+    draftFrom(
+      group.setup,
+      handoffsForRegion(normalizeRegion(group.region, initialRegion)).slice(0, 3)
+    )
   );
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -62,7 +81,10 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
   const toggle = (k: 'handoffs' | 'recurring', v: string) =>
     setDraft((d) => {
       const list = d[k] as string[];
-      return { ...d, [k]: list.includes(v) ? list.filter((x) => x !== v) : [...list, v] } as SetupDraft;
+      return {
+        ...d,
+        [k]: list.includes(v) ? list.filter((x) => x !== v) : [...list, v],
+      } as SetupDraft;
     });
 
   const regionHandoffs = handoffsForRegion(region);
@@ -85,16 +107,22 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
       // An even answer rewrites the standing split across every seat, joined
       // or pending; the other answers leave the split the form set.
       if (mode === 'create' && draft.split === 'even') {
-        const seats = Math.max(group.targetNumPeople || 1, Object.keys(group.defaultSplit || {}).length);
+        const seats = Math.max(
+          group.targetNumPeople || 1,
+          Object.keys(group.defaultSplit || {}).length
+        );
         const shares = evenSplit(seats);
         const joined = Object.keys(group.defaultSplit || {});
         const defaultSplit: Record<string, number> = {};
         joined.forEach((u, i) => {
           defaultSplit[u] = shares[i] ?? 0;
         });
-        const pending = (group.availableSplits || []) as { name: string; split: number }[] | number[];
+        const pending = (group.availableSplits || []) as
+          { name: string; split: number }[] | number[];
         const availableSplits = pending.map((p, i) =>
-          typeof p === 'number' ? shares[joined.length + i] ?? 0 : { ...p, split: shares[joined.length + i] ?? 0 }
+          typeof p === 'number'
+            ? (shares[joined.length + i] ?? 0)
+            : { ...p, split: shares[joined.length + i] ?? 0 }
         );
         patch.defaultSplit = defaultSplit;
         patch.availableSplits = availableSplits;
@@ -156,7 +184,11 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
                 {t('household.region')}
               </label>
               <select
-                value={KNOWN_REGIONS.includes(region as (typeof KNOWN_REGIONS)[number]) ? region : 'other'}
+                value={
+                  KNOWN_REGIONS.includes(region as (typeof KNOWN_REGIONS)[number])
+                    ? region
+                    : 'other'
+                }
                 onChange={(e) => changeRegion(e.target.value === 'other' ? 'XX' : e.target.value)}
                 className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
               >
@@ -214,10 +246,18 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
         return (
           <div className="space-y-3">
             <div className="grid gap-2">
-              <button type="button" onClick={() => set('thresholdsWanted', true)} className={`${card} ${draft.thresholdsWanted ? on : off}`}>
+              <button
+                type="button"
+                onClick={() => set('thresholdsWanted', true)}
+                className={`${card} ${draft.thresholdsWanted ? on : off}`}
+              >
                 {t('household.thresholds.yes')}
               </button>
-              <button type="button" onClick={() => set('thresholdsWanted', false)} className={`${card} ${!draft.thresholdsWanted ? on : off}`}>
+              <button
+                type="button"
+                onClick={() => set('thresholdsWanted', false)}
+                className={`${card} ${!draft.thresholdsWanted ? on : off}`}
+              >
                 {t('household.thresholds.no')}
               </button>
             </div>
@@ -234,7 +274,13 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
               <input
                 type="date"
                 value={draft.trip?.start || ''}
-                onChange={(e) => set('trip', { start: e.target.value, end: draft.trip?.end || '', currency: draft.trip?.currency || 'USD' })}
+                onChange={(e) =>
+                  set('trip', {
+                    start: e.target.value,
+                    end: draft.trip?.end || '',
+                    currency: draft.trip?.currency || 'USD',
+                  })
+                }
                 className="mt-1 w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
               />
             </label>
@@ -243,7 +289,13 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
               <input
                 type="date"
                 value={draft.trip?.end || ''}
-                onChange={(e) => set('trip', { start: draft.trip?.start || '', end: e.target.value, currency: draft.trip?.currency || 'USD' })}
+                onChange={(e) =>
+                  set('trip', {
+                    start: draft.trip?.start || '',
+                    end: e.target.value,
+                    currency: draft.trip?.currency || 'USD',
+                  })
+                }
                 className="mt-1 w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
               />
             </label>
@@ -253,7 +305,13 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
                 type="text"
                 maxLength={3}
                 value={draft.trip?.currency || ''}
-                onChange={(e) => set('trip', { start: draft.trip?.start || '', end: draft.trip?.end || '', currency: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  set('trip', {
+                    start: draft.trip?.start || '',
+                    end: draft.trip?.end || '',
+                    currency: e.target.value.toUpperCase(),
+                  })
+                }
                 placeholder="USD"
                 className="mt-1 w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm font-mono outline-none focus:border-natural-primary"
               />
@@ -282,7 +340,10 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
         <p className="text-sm text-natural-muted">{t('household.subtitle')}</p>
         <div className="flex gap-1.5 mt-4">
           {steps.map((s, i) => (
-            <div key={s} className={`h-1.5 flex-1 rounded-full ${i <= index ? 'bg-natural-primary' : 'bg-natural-border'}`} />
+            <div
+              key={s}
+              className={`h-1.5 flex-1 rounded-full ${i <= index ? 'bg-natural-primary' : 'bg-natural-border'}`}
+            />
           ))}
         </div>
         <p className="text-[11px] font-bold text-natural-muted uppercase tracking-wider mt-3">
@@ -297,11 +358,19 @@ export default function HouseholdSetup({ group, uid, isPlus, initialRegion, mode
 
       <div className="flex gap-3 pt-5">
         {index > 0 ? (
-          <button type="button" onClick={() => setIndex((i) => i - 1)} className="w-1/3 bg-natural-border text-natural-text font-medium py-3 px-4 rounded-md hover:bg-natural-border/80">
+          <button
+            type="button"
+            onClick={() => setIndex((i) => i - 1)}
+            className="w-1/3 bg-natural-border text-natural-text font-medium py-3 px-4 rounded-md hover:bg-natural-border/80"
+          >
             {t('common.back')}
           </button>
         ) : onSkip ? (
-          <button type="button" onClick={onSkip} className="w-1/3 text-natural-muted font-medium py-3 px-4 rounded-md hover:text-natural-text">
+          <button
+            type="button"
+            onClick={onSkip}
+            className="w-1/3 text-natural-muted font-medium py-3 px-4 rounded-md hover:text-natural-text"
+          >
             {t('household.skip')}
           </button>
         ) : null}

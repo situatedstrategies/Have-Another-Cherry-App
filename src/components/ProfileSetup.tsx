@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { db, authHeader } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
+import { currentLocale } from '../i18n';
+import { track } from '../lib/analytics';
+import AssessmentResult from './AssessmentResult';
+import type { Assessment } from '../types';
 
 interface ProfileSetupProps {
   userId: string;
@@ -10,7 +14,7 @@ interface ProfileSetupProps {
 
 type Question = {
   key: string;
-  type: 'number' | 'select';
+  type: 'number' | 'select' | 'text';
   /** Option values, in display order. Labels come from quiz.q.<key>.opt.<value>. */
   options?: string[];
   /** The question has a quiz.q.<key>.help text. */
@@ -32,7 +36,11 @@ const STEPS: Step[] = [
     questions: [
       { key: 'income', type: 'number', hasPlaceholder: true },
       { key: 'partnerIncome', type: 'number', hasPlaceholder: true, optional: true, hasHelp: true },
-      { key: 'spendingStyle', type: 'select', options: ['saver', 'spender', 'balanced', 'depends'] },
+      {
+        key: 'spendingStyle',
+        type: 'select',
+        options: ['saver', 'spender', 'balanced', 'depends'],
+      },
     ],
   },
   {
@@ -49,20 +57,36 @@ const STEPS: Step[] = [
         type: 'select',
         options: ['pay_in_full', 'carry_sometimes', 'carry_often', 'avoid_credit'],
       },
-      { key: 'cashVsCredit', type: 'select', options: ['credit_points', 'debit', 'cash', 'whatever'] },
+      {
+        key: 'cashVsCredit',
+        type: 'select',
+        options: ['credit_points', 'debit', 'cash', 'whatever'],
+      },
     ],
   },
   {
     questions: [
       { key: 'lowOnCash', type: 'select', options: ['me', 'partner', 'fluctuates'] },
       { key: 'groceries', type: 'select', options: ['me', 'partner', 'split', 'together'] },
-      { key: 'paybackPreference', type: 'select', options: ['cash', 'goods', 'services', 'doesnt_matter'] },
+      {
+        key: 'paybackPreference',
+        type: 'select',
+        options: ['cash', 'goods', 'services', 'doesnt_matter'],
+      },
     ],
   },
   {
     questions: [
-      { key: 'moneyFeeling', type: 'select', options: ['security', 'freedom', 'stress', 'status', 'tool'] },
-      { key: 'moneyTalkComfort', type: 'select', options: ['love', 'comfortable', 'awkward', 'avoid'] },
+      {
+        key: 'moneyFeeling',
+        type: 'select',
+        options: ['security', 'freedom', 'stress', 'status', 'tool'],
+      },
+      {
+        key: 'moneyTalkComfort',
+        type: 'select',
+        options: ['love', 'comfortable', 'awkward', 'avoid'],
+      },
     ],
   },
   {
@@ -72,12 +96,24 @@ const STEPS: Step[] = [
         type: 'select',
         options: ['direct', 'scheduled', 'casual', 'written', 'avoid'],
       },
-      { key: 'conflictStyle', type: 'select', options: ['compromise', 'data', 'defer', 'pause', 'avoid'] },
+      {
+        key: 'conflictStyle',
+        type: 'select',
+        options: ['compromise', 'data', 'defer', 'pause', 'avoid'],
+      },
       {
         key: 'appGoal',
         type: 'select',
         options: ['conversations', 'fairness', 'transparency', 'detailed', 'accountable'],
       },
+    ],
+  },
+  // The last step feeds the written assessment only (POST /api/assessment)
+  // and may be left blank.
+  {
+    questions: [
+      { key: 'groupsExpected', type: 'select', optional: true, options: ['1', '2', '3', '4'] },
+      { key: 'troubles', type: 'text', optional: true, hasPlaceholder: true },
     ],
   },
 ];
@@ -93,6 +129,8 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>(INITIAL_ANSWERS);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [skipAssessment, setSkipAssessment] = useState(false);
 
   const setAnswer = (key: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -109,6 +147,27 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     return true;
   });
   const isLastStep = step === STEPS.length - 1;
+
+  const requestAssessment = async (): Promise<Assessment | null> => {
+    try {
+      const { groupsExpected, troubles, ...quizAnswers } = answers;
+      const res = await fetch('/api/assessment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({
+          answers: quizAnswers,
+          groupsExpected: groupsExpected ? Number(groupsExpected) : undefined,
+          troubles: troubles?.trim() || undefined,
+          language: currentLocale(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return res.ok && data?.data ? (data.data as Assessment) : null;
+    } catch (e) {
+      console.error('Assessment request failed', e);
+      return null;
+    }
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -142,6 +201,19 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         },
         { merge: true }
       );
+      // The written assessment, the account level step of 2.0 setup. Its
+      // failure never blocks the account; the profile above already landed.
+      if (skipAssessment) {
+        track({ name: 'assessment_skipped' });
+        onComplete();
+        return;
+      }
+      const written = await requestAssessment();
+      if (written) {
+        setAssessment(written);
+        setLoading(false);
+        return;
+      }
       onComplete();
     } catch (err) {
       console.error(err);
@@ -167,6 +239,16 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       }
     }
   };
+
+  if (assessment) {
+    return (
+      <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
+        <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md p-8">
+          <AssessmentResult assessment={assessment} onContinue={onComplete} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -202,7 +284,11 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
             ))}
           </div>
           <p className="text-[11px] font-bold text-natural-muted uppercase tracking-wider mt-3">
-            {t('quiz.stepOf', { step: step + 1, total: STEPS.length, title: t(`quiz.steps.${step}.title`) })}
+            {t('quiz.stepOf', {
+              step: step + 1,
+              total: STEPS.length,
+              title: t(`quiz.steps.${step}.title`),
+            })}
           </p>
         </div>
 
@@ -219,7 +305,15 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               <label className="block text-sm font-semibold text-natural-text mb-2">
                 {t(`quiz.q.${q.key}.label`)}
               </label>
-              {q.type === 'number' ? (
+              {q.type === 'text' ? (
+                <textarea
+                  rows={3}
+                  value={answers[q.key] || ''}
+                  onChange={(e) => setAnswer(q.key, e.target.value.slice(0, 600))}
+                  placeholder={q.hasPlaceholder ? t(`quiz.q.${q.key}.placeholder`) : undefined}
+                  className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
+                />
+              ) : q.type === 'number' ? (
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted">
                     $
@@ -282,6 +376,17 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               </button>
             )}
           </div>
+          {isLastStep && (
+            <label className="flex items-start gap-2 text-xs text-natural-muted pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={skipAssessment}
+                onChange={(e) => setSkipAssessment(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>{t('quiz.skipAssessment')}</span>
+            </label>
+          )}
         </div>
       </div>
     </div>

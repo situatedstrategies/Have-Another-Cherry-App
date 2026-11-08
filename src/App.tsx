@@ -24,6 +24,8 @@ import LoadingScreen from './components/LoadingScreen';
 import BudgetPaymentsSettings from './components/BudgetPaymentsSettings';
 import { deviceRegion, normalizeRegion } from './lib/handoffs';
 import { captureInviteFromUrl } from './lib/invites';
+import { nextAction } from './lib/nextAction';
+import NextActionCard from './components/NextActionCard';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -341,6 +343,9 @@ export default function App() {
   // has one, else this device's.
   const groupRegion = normalizeRegion(group.region, deviceRegion());
 
+  // The one thing to do next in this group (lib/nextAction).
+  const homeAction = nextAction(group, expenses, activeUser);
+
   // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
   Object.entries(groupUsers).forEach(([uid, u]: any) => {
@@ -464,6 +469,19 @@ export default function App() {
         </header>
 
         <div className="space-y-6" id="dashboard-content">
+          {homeAction && (
+            <NextActionCard
+              action={homeAction}
+              groupName={group.name || t('app.unnamedGroup')}
+              onInvite={() => setShowSettings(true)}
+              onSetup={() => setShowSettings(true)}
+              onSettle={() => setOwedModal('you_owe')}
+              onFirstExpense={() => {
+                setEditingExpense(null);
+                setShowForm(true);
+              }}
+            />
+          )}
           <div
             className="bg-white border border-natural-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
             id="welcome-banner"
@@ -622,7 +640,9 @@ export default function App() {
                     <Trans
                       i18nKey="app.splitUpdatedBody"
                       values={{ summary: group.splitChange.summary }}
-                      components={{ 1: <span className="font-mono font-semibold text-natural-text" /> }}
+                      components={{
+                        1: <span className="font-mono font-semibold text-natural-text" />,
+                      }}
                     />
                   </p>
                 </div>

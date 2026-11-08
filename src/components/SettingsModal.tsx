@@ -30,6 +30,7 @@ import { labelClass } from '../lib/ui';
 import { displayHandle, isHandoffId, type HandoffId } from '../lib/handoffs';
 import InvitePanel from './InvitePanel';
 import HouseholdSetup from './HouseholdSetup';
+import AssessmentResult from './AssessmentResult';
 import { setupOwner, setupSummary } from '../lib/householdSetup';
 import { deviceRegion } from '../lib/handoffs';
 import { instrumentForHandoff, instrumentLabel } from '../lib/instruments';
@@ -253,7 +254,11 @@ export default function SettingsModal({
   let seatPreview: { name: string; pct: number }[] | null = null;
   if (addingSeat && group) {
     try {
-      const next = withAddedSeat(group, seatName || t('settings.newPerson'), parseFloat(seatPercent));
+      const next = withAddedSeat(
+        group,
+        seatName || t('settings.newPerson'),
+        parseFloat(seatPercent)
+      );
       seatPreview = [
         ...joinedUids(group).map((uid) => ({
           name:
@@ -539,7 +544,9 @@ export default function SettingsModal({
           </div>
           {fp && (
             <div className="pt-2 mt-2 border-t border-natural-border">
-              <span className="text-xs text-natural-muted block mb-1">{t('settings.financialStyle')}</span>
+              <span className="text-xs text-natural-muted block mb-1">
+                {t('settings.financialStyle')}
+              </span>
               <span className="text-sm font-semibold text-natural-primary block">{fp.type}</span>
               <p className="text-xs text-natural-text mt-1 leading-relaxed">{fp.description}</p>
               {Array.isArray(fp.traits) && fp.traits.length > 0 && (
@@ -556,12 +563,14 @@ export default function SettingsModal({
               )}
               {fp.strengths && (
                 <p className="text-xs text-natural-text mt-2">
-                  <strong className="text-natural-muted">{t('settings.strength')}</strong> {fp.strengths}
+                  <strong className="text-natural-muted">{t('settings.strength')}</strong>{' '}
+                  {fp.strengths}
                 </p>
               )}
               {fp.watchouts && (
                 <p className="text-xs text-natural-text mt-1">
-                  <strong className="text-natural-muted">{t('settings.watchOut')}</strong> {fp.watchouts}
+                  <strong className="text-natural-muted">{t('settings.watchOut')}</strong>{' '}
+                  {fp.watchouts}
                 </p>
               )}
               {fp.communicationStyle && (
@@ -575,6 +584,14 @@ export default function SettingsModal({
                   {fp.quote}
                 </blockquote>
               )}
+              {userProfile?.assessment?.summary && (
+                <div className="mt-4 border-t border-natural-border/50 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-natural-muted mb-2">
+                    {t('assessment.settingsTitle')}
+                  </p>
+                  <AssessmentResult assessment={userProfile.assessment} compact />
+                </div>
+              )}
               {retakeBlocker ? (
                 <p className="mt-4 text-xs text-natural-muted">{retakeBlocker}</p>
               ) : (
@@ -582,7 +599,7 @@ export default function SettingsModal({
                   onClick={onRetakeQuiz}
                   className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
                 >
-                  {t('settings.retakeQuiz')}
+                  {userProfile?.assessment ? t('assessment.retake') : t('settings.retakeQuiz')}
                 </button>
               )}
             </div>
@@ -604,7 +621,9 @@ export default function SettingsModal({
           <div className="border-t border-natural-border/50 pt-3">
             <div className="flex justify-between items-start gap-3">
               <div className="min-w-0">
-                <span className="text-sm text-natural-muted block">{t('household.settingsRow')}</span>
+                <span className="text-sm text-natural-muted block">
+                  {t('household.settingsRow')}
+                </span>
                 <span className="text-xs text-natural-text font-semibold block mt-0.5">
                   {group?.setup ? setupSummary(group.setup) : t('household.notYet')}
                 </span>
@@ -622,7 +641,9 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <span className="text-sm text-natural-muted block mb-2">{t('settings.groupMembers')}</span>
+            <span className="text-sm text-natural-muted block mb-2">
+              {t('settings.groupMembers')}
+            </span>
             <div className="space-y-3">
               {group &&
                 Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
@@ -653,7 +674,9 @@ export default function SettingsModal({
                           <span className="text-natural-text font-semibold">
                             {memberName}
                             {!isGhost && uid === currentUser?.uid && (
-                              <span className="text-natural-muted font-normal">{t('settings.youSuffix')}</span>
+                              <span className="text-natural-muted font-normal">
+                                {t('settings.youSuffix')}
+                              </span>
                             )}
                           </span>
                           {editingSplit ? (
@@ -706,7 +729,9 @@ export default function SettingsModal({
                                 }}
                                 className="text-xs uppercase font-bold text-natural-primary hover:underline"
                               >
-                                {resendFor === uid ? t('common.cancel') : t('settings.resendInvite')}
+                                {resendFor === uid
+                                  ? t('common.cancel')
+                                  : t('settings.resendInvite')}
                               </button>
                               <button
                                 onClick={() => removeSeat(Number(uid.slice('ghost_'.length)))}
@@ -773,7 +798,9 @@ export default function SettingsModal({
                                     </span>
                                   ) : (
                                     <span className="text-xs text-natural-muted">
-                                      {isSelf ? t('settings.notSetYet') : t('settings.notSharedYet')}
+                                      {isSelf
+                                        ? t('settings.notSetYet')
+                                        : t('settings.notSharedYet')}
                                     </span>
                                   )}
                                 </div>
@@ -782,7 +809,8 @@ export default function SettingsModal({
                                     onClick={() => openIncomeEditor('roster')}
                                     className="flex items-center gap-1 text-xs font-bold text-natural-primary hover:underline shrink-0"
                                   >
-                                    <Edit2 size={12} /> {income ? t('common.edit') : t('settings.add')}
+                                    <Edit2 size={12} />{' '}
+                                    {income ? t('common.edit') : t('settings.add')}
                                   </button>
                                 )}
                               </div>
@@ -858,7 +886,10 @@ export default function SettingsModal({
                                           key={r.label}
                                           type="button"
                                           onClick={() => copyHandle(r.text)}
-                                          title={t('settings.copyHandle', { name: memberName, label: r.label })}
+                                          title={t('settings.copyHandle', {
+                                            name: memberName,
+                                            label: r.label,
+                                          })}
                                           className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
                                         >
                                           <span className="font-semibold">{r.label}</span>
@@ -904,7 +935,9 @@ export default function SettingsModal({
                                     )}
                                     {mfp.strengths && (
                                       <p className="text-xs text-natural-text mt-2">
-                                        <strong className="text-natural-muted">{t('settings.strengths')}</strong>{' '}
+                                        <strong className="text-natural-muted">
+                                          {t('settings.strengths')}
+                                        </strong>{' '}
                                         {mfp.strengths}
                                       </p>
                                     )}
@@ -1019,9 +1052,7 @@ export default function SettingsModal({
                 >
                   {recalcBusy ? t('settings.recalculating') : t('settings.recalculate')}
                 </button>
-                <p className="mt-1.5 text-xs text-natural-muted">
-                  {t('settings.recalculateNote')}
-                </p>
+                <p className="mt-1.5 text-xs text-natural-muted">{t('settings.recalculateNote')}</p>
               </>
             )}
 
@@ -1090,7 +1121,9 @@ export default function SettingsModal({
                 </div>
                 {seatPreview && (
                   <div className="text-xs text-natural-muted space-y-1">
-                    <p className="font-bold uppercase tracking-wider text-[10px]">{t('settings.newSplit')}</p>
+                    <p className="font-bold uppercase tracking-wider text-[10px]">
+                      {t('settings.newSplit')}
+                    </p>
                     {seatPreview.map((row, i) => (
                       <div key={i} className="flex justify-between font-mono">
                         <span className="font-sans">{row.name}</span>
@@ -1178,7 +1211,8 @@ export default function SettingsModal({
             className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Shield size={16} className="text-natural-primary" /> {t('settings.dataPrivacySecurity')}
+              <Shield size={16} className="text-natural-primary" />{' '}
+              {t('settings.dataPrivacySecurity')}
             </span>
           </button>
         </div>

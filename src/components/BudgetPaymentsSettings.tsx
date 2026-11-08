@@ -35,7 +35,10 @@ interface Props {
 }
 
 /** The handoffs a person can store a handle for: the group's picks, else the region's. */
-export function handleHandoffsFor(groupHandoffs: string[] | undefined, region: string): HandoffId[] {
+export function handleHandoffsFor(
+  groupHandoffs: string[] | undefined,
+  region: string
+): HandoffId[] {
   const chosen = (groupHandoffs || []).filter((id): id is HandoffId =>
     HANDLE_HANDOFFS.includes(id as HandoffId)
   );
@@ -153,9 +156,7 @@ export default function BudgetPaymentsSettings({
                   <input
                     type="text"
                     value={handlesInput[id] || ''}
-                    onChange={(e) =>
-                      setHandlesInput((prev) => ({ ...prev, [id]: e.target.value }))
-                    }
+                    onChange={(e) => setHandlesInput((prev) => ({ ...prev, [id]: e.target.value }))}
                     placeholder={`${appName(id)}: ${t(`handoff.placeholder.${def.handle}`)}`}
                     aria-label={appName(id)}
                     className={`w-full ${prefix ? 'pl-7' : 'pl-3'} pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary`}
@@ -170,9 +171,7 @@ export default function BudgetPaymentsSettings({
                 </label>
                 <select
                   value={bankAppInput[id] || ''}
-                  onChange={(e) =>
-                    setBankAppInput((prev) => ({ ...prev, [id]: e.target.value }))
-                  }
+                  onChange={(e) => setBankAppInput((prev) => ({ ...prev, [id]: e.target.value }))}
                   className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                 >
                   <option value="">{t('handoff.chooseBank')}</option>

@@ -105,7 +105,9 @@ export default function InvitePanel({
       setTimeout(() => setStatus('idle'), 3000);
     } catch (err: any) {
       setErrorText(
-        err instanceof TypeError ? t('group.inviteFallbackError') : err?.message || t('group.inviteFallbackError')
+        err instanceof TypeError
+          ? t('group.inviteFallbackError')
+          : err?.message || t('group.inviteFallbackError')
       );
       setStatus('error');
       setTimeout(() => setStatus('idle'), 5000);
@@ -213,7 +215,11 @@ export default function InvitePanel({
             aria-label={t('group.sendInvite')}
             className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
           >
-            {status === 'sending' ? <span className="animate-spin inline-block">◌</span> : <Send size={18} />}
+            {status === 'sending' ? (
+              <span className="animate-spin inline-block">◌</span>
+            ) : (
+              <Send size={18} />
+            )}
           </button>
         </div>
         {status === 'success' && (
@@ -262,7 +268,10 @@ export default function InvitePanel({
                         disabled={resending === inv.to}
                         className="shrink-0 text-natural-primary font-bold inline-flex items-center gap-1 hover:underline disabled:opacity-50"
                       >
-                        <RefreshCw size={11} className={resending === inv.to ? 'animate-spin' : ''} />
+                        <RefreshCw
+                          size={11}
+                          className={resending === inv.to ? 'animate-spin' : ''}
+                        />
                         {t('invite.resend')}
                       </button>
                     )}

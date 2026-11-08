@@ -154,7 +154,14 @@ router.post('/api/assessment', requireAuth, rateLimit('assessment', 10), async (
             reminderCadence: { type: Type.STRING },
             conversationOpeners: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ['style', 'summary', 'strengths', 'watchFor', 'suggestedSplit', 'reminderCadence'],
+          required: [
+            'style',
+            'summary',
+            'strengths',
+            'watchFor',
+            'suggestedSplit',
+            'reminderCadence',
+          ],
         },
       },
     });

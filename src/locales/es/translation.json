@@ -406,6 +406,10 @@
       "4": {
         "title": "Hablarlo",
         "subtitle": "Cómo prefieres llevar las conversaciones."
+      },
+      "5": {
+        "title": "Casi listo",
+        "subtitle": "Dos preguntas opcionales para tu evaluación escrita."
       }
     },
     "q": {
@@ -537,9 +541,23 @@
           "detailed": "Un seguimiento detallado de los gastos",
           "accountable": "Que todos rindan cuentas"
         }
+      },
+      "groupsExpected": {
+        "label": "¿Con cuántos grupos esperas compartir gastos?",
+        "opt": {
+          "1": "Solo uno",
+          "2": "Dos",
+          "3": "Tres",
+          "4": "Cuatro o más"
+        }
+      },
+      "troubles": {
+        "label": "¿Qué suele salir mal cuando compartes dinero?",
+        "placeholder": "Con tus palabras. Opcional."
       }
     },
-    "retakeBlocker": "Puedes repetir el cuestionario el {{date}}. Un estilo es una lectura de una temporada, así que se abre cada {{months}} meses."
+    "retakeBlocker": "Puedes repetir el cuestionario el {{date}}. Un estilo es una lectura de una temporada, así que se abre cada {{months}} meses.",
+    "skipAssessment": "Omitir la evaluación escrita. Puedes pedirla después en Ajustes."
   },
   "app": {
     "alignmentTitle": "Tema de conversación: alineación financiera",
@@ -1652,5 +1670,47 @@
       "currency": "Código de moneda"
     },
     "notePlaceholder": "Opcional. Con tus palabras."
+  },
+  "assessment": {
+    "yourStyle": "Tu estilo con el dinero",
+    "strengths": "Apóyate en",
+    "watchFor": "Ten en cuenta",
+    "suggestedSplit": "Un reparto para empezar",
+    "split": {
+      "even": "A partes iguales",
+      "income": "Según ingresos",
+      "custom": "Tu propia proporción"
+    },
+    "openers": "Formas de empezar la conversación",
+    "disclaimer": "Escrito a partir de tus respuestas para ayudar con el dinero compartido. No es asesoramiento financiero, crediticio, fiscal ni legal.",
+    "continue": "Continuar",
+    "settingsTitle": "Tu evaluación escrita",
+    "retake": "Repetir el cuestionario y escribirla de nuevo"
+  },
+  "next": {
+    "label": "Siguiente paso",
+    "invite": {
+      "title": "Invita a los demás",
+      "body": "En {{group}} solo estás tú por ahora. Envía el enlace y el libro se llena desde ambos lados.",
+      "cta": "Invitar"
+    },
+    "setup": {
+      "title": "Configura este hogar",
+      "body": "Unas preguntas fijan el reparto, las apps de pago y los recordatorios.",
+      "cta": "Configurar"
+    },
+    "settle": {
+      "title": "Salda lo que debes",
+      "body_one": "{{count}} gasto te está esperando. Ábrelo y haz el pago en un toque.",
+      "body_few": "{{count}} gastos te están esperando. Ábrelos y haz los pagos en un toque.",
+      "body_many": "{{count}} gastos te están esperando. Ábrelos y haz los pagos en un toque.",
+      "body_other": "{{count}} gastos te están esperando. Ábrelos y haz los pagos en un toque.",
+      "cta": "Saldar"
+    },
+    "first": {
+      "title": "Registra el primer gasto",
+      "body": "Haz una foto del recibo y el importe, la fecha y los artículos se rellenan solos.",
+      "cta": "Añadir gasto"
+    }
   }
 }

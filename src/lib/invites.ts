@@ -62,7 +62,11 @@ export async function recordInvite(
   groupId: string,
   invite: Omit<GroupInvite, 'at'>
 ): Promise<void> {
-  const entry: GroupInvite = { ...invite, to: invite.to.slice(0, 120), at: new Date().toISOString() };
+  const entry: GroupInvite = {
+    ...invite,
+    to: invite.to.slice(0, 120),
+    at: new Date().toISOString(),
+  };
   try {
     await updateDoc(doc(db, 'groups', groupId), { invites: arrayUnion(entry) });
   } catch (e) {

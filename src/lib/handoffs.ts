@@ -59,8 +59,7 @@ export interface HandoffDef {
 
 const EVERYWHERE = ['*'] as const;
 
-const money = (amount: number): string =>
-  (Math.round(Math.max(0, amount) * 100) / 100).toFixed(2);
+const money = (amount: number): string => (Math.round(Math.max(0, amount) * 100) / 100).toFixed(2);
 
 export const HANDOFFS: Record<HandoffId, HandoffDef> = {
   venmo: {
@@ -257,29 +256,167 @@ export interface BankDef {
 }
 
 export const BANKS: Record<BankId, BankDef> = {
-  chase: { id: 'chase', name: 'Chase', handoff: 'zelle', schemes: ['chase://'], web: 'https://www.chase.com/' },
-  bofa: { id: 'bofa', name: 'Bank of America', handoff: 'zelle', schemes: ['bofa://'], web: 'https://www.bankofamerica.com/' },
-  wellsfargo: { id: 'wellsfargo', name: 'Wells Fargo', handoff: 'zelle', schemes: ['wellsfargo://'], web: 'https://www.wellsfargo.com/' },
-  capitalone: { id: 'capitalone', name: 'Capital One', handoff: 'zelle', schemes: ['capitalone://'], web: 'https://www.capitalone.com/' },
-  citi: { id: 'citi', name: 'Citi', handoff: 'zelle', schemes: ['citimobile://'], web: 'https://www.citi.com/' },
-  usbank: { id: 'usbank', name: 'U.S. Bank', handoff: 'zelle', schemes: ['usbank://'], web: 'https://www.usbank.com/' },
-  pnc: { id: 'pnc', name: 'PNC', handoff: 'zelle', schemes: ['pnc://'], web: 'https://www.pnc.com/' },
-  truist: { id: 'truist', name: 'Truist', handoff: 'zelle', schemes: ['truist://'], web: 'https://www.truist.com/' },
-  sber: { id: 'sber', name: 'Sber', handoff: 'sbp', schemes: ['sberbankonline://', 'sbolonline://'], web: 'https://online.sberbank.ru/' },
-  tbank: { id: 'tbank', name: 'T-Bank', handoff: 'sbp', schemes: ['tinkoffbank://', 'tbank://'], web: 'https://www.tbank.ru/' },
-  alfa: { id: 'alfa', name: 'Alfa-Bank', handoff: 'sbp', schemes: ['alfabank://'], web: 'https://alfabank.ru/' },
-  vtb: { id: 'vtb', name: 'VTB', handoff: 'sbp', schemes: ['vtbonline://', 'vtb://'], web: 'https://online.vtb.ru/' },
-  raiffeisen: { id: 'raiffeisen', name: 'Raiffeisen', handoff: 'sbp', schemes: ['raiffeisen://'], web: 'https://online.raiffeisen.ru/' },
-  caixabank: { id: 'caixabank', name: 'CaixaBank', handoff: 'bizum', schemes: ['caixabank://'], web: 'https://www.caixabank.es/' },
-  bbva: { id: 'bbva', name: 'BBVA', handoff: 'bizum', schemes: ['bbva://'], web: 'https://www.bbva.es/' },
-  santander: { id: 'santander', name: 'Santander', handoff: 'bizum', schemes: ['santander://'], web: 'https://www.bancosantander.es/' },
-  sabadell: { id: 'sabadell', name: 'Sabadell', handoff: 'bizum', schemes: ['bsabadell://'], web: 'https://www.bancsabadell.com/' },
-  ing: { id: 'ing', name: 'ING', handoff: 'bizum', schemes: ['ing://'], web: 'https://www.ing.es/' },
-  openbank: { id: 'openbank', name: 'Openbank', handoff: 'bizum', schemes: ['openbank://'], web: 'https://www.openbank.es/' },
-  bbva_mx: { id: 'bbva_mx', name: 'BBVA México', handoff: 'spei', schemes: ['bbvamexico://'], web: 'https://www.bbva.mx/' },
-  banorte: { id: 'banorte', name: 'Banorte', handoff: 'spei', schemes: ['banorte://'], web: 'https://www.banorte.com/' },
-  santander_mx: { id: 'santander_mx', name: 'Santander México', handoff: 'spei', schemes: ['santandermx://'], web: 'https://www.santander.com.mx/' },
-  banamex: { id: 'banamex', name: 'Banamex', handoff: 'spei', schemes: ['banamex://'], web: 'https://www.banamex.com/' },
+  chase: {
+    id: 'chase',
+    name: 'Chase',
+    handoff: 'zelle',
+    schemes: ['chase://'],
+    web: 'https://www.chase.com/',
+  },
+  bofa: {
+    id: 'bofa',
+    name: 'Bank of America',
+    handoff: 'zelle',
+    schemes: ['bofa://'],
+    web: 'https://www.bankofamerica.com/',
+  },
+  wellsfargo: {
+    id: 'wellsfargo',
+    name: 'Wells Fargo',
+    handoff: 'zelle',
+    schemes: ['wellsfargo://'],
+    web: 'https://www.wellsfargo.com/',
+  },
+  capitalone: {
+    id: 'capitalone',
+    name: 'Capital One',
+    handoff: 'zelle',
+    schemes: ['capitalone://'],
+    web: 'https://www.capitalone.com/',
+  },
+  citi: {
+    id: 'citi',
+    name: 'Citi',
+    handoff: 'zelle',
+    schemes: ['citimobile://'],
+    web: 'https://www.citi.com/',
+  },
+  usbank: {
+    id: 'usbank',
+    name: 'U.S. Bank',
+    handoff: 'zelle',
+    schemes: ['usbank://'],
+    web: 'https://www.usbank.com/',
+  },
+  pnc: {
+    id: 'pnc',
+    name: 'PNC',
+    handoff: 'zelle',
+    schemes: ['pnc://'],
+    web: 'https://www.pnc.com/',
+  },
+  truist: {
+    id: 'truist',
+    name: 'Truist',
+    handoff: 'zelle',
+    schemes: ['truist://'],
+    web: 'https://www.truist.com/',
+  },
+  sber: {
+    id: 'sber',
+    name: 'Sber',
+    handoff: 'sbp',
+    schemes: ['sberbankonline://', 'sbolonline://'],
+    web: 'https://online.sberbank.ru/',
+  },
+  tbank: {
+    id: 'tbank',
+    name: 'T-Bank',
+    handoff: 'sbp',
+    schemes: ['tinkoffbank://', 'tbank://'],
+    web: 'https://www.tbank.ru/',
+  },
+  alfa: {
+    id: 'alfa',
+    name: 'Alfa-Bank',
+    handoff: 'sbp',
+    schemes: ['alfabank://'],
+    web: 'https://alfabank.ru/',
+  },
+  vtb: {
+    id: 'vtb',
+    name: 'VTB',
+    handoff: 'sbp',
+    schemes: ['vtbonline://', 'vtb://'],
+    web: 'https://online.vtb.ru/',
+  },
+  raiffeisen: {
+    id: 'raiffeisen',
+    name: 'Raiffeisen',
+    handoff: 'sbp',
+    schemes: ['raiffeisen://'],
+    web: 'https://online.raiffeisen.ru/',
+  },
+  caixabank: {
+    id: 'caixabank',
+    name: 'CaixaBank',
+    handoff: 'bizum',
+    schemes: ['caixabank://'],
+    web: 'https://www.caixabank.es/',
+  },
+  bbva: {
+    id: 'bbva',
+    name: 'BBVA',
+    handoff: 'bizum',
+    schemes: ['bbva://'],
+    web: 'https://www.bbva.es/',
+  },
+  santander: {
+    id: 'santander',
+    name: 'Santander',
+    handoff: 'bizum',
+    schemes: ['santander://'],
+    web: 'https://www.bancosantander.es/',
+  },
+  sabadell: {
+    id: 'sabadell',
+    name: 'Sabadell',
+    handoff: 'bizum',
+    schemes: ['bsabadell://'],
+    web: 'https://www.bancsabadell.com/',
+  },
+  ing: {
+    id: 'ing',
+    name: 'ING',
+    handoff: 'bizum',
+    schemes: ['ing://'],
+    web: 'https://www.ing.es/',
+  },
+  openbank: {
+    id: 'openbank',
+    name: 'Openbank',
+    handoff: 'bizum',
+    schemes: ['openbank://'],
+    web: 'https://www.openbank.es/',
+  },
+  bbva_mx: {
+    id: 'bbva_mx',
+    name: 'BBVA México',
+    handoff: 'spei',
+    schemes: ['bbvamexico://'],
+    web: 'https://www.bbva.mx/',
+  },
+  banorte: {
+    id: 'banorte',
+    name: 'Banorte',
+    handoff: 'spei',
+    schemes: ['banorte://'],
+    web: 'https://www.banorte.com/',
+  },
+  santander_mx: {
+    id: 'santander_mx',
+    name: 'Santander México',
+    handoff: 'spei',
+    schemes: ['santandermx://'],
+    web: 'https://www.santander.com.mx/',
+  },
+  banamex: {
+    id: 'banamex',
+    name: 'Banamex',
+    handoff: 'spei',
+    schemes: ['banamex://'],
+    web: 'https://www.banamex.com/',
+  },
   other_bank: { id: 'other_bank', name: '', handoff: '*', schemes: [], web: '' },
 };
 
@@ -296,8 +433,7 @@ export const KNOWN_REGIONS = ['US', 'RU', 'ES', 'MX', 'AR', 'CO', 'PE', 'CL'] as
 
 /** The device's region from the browser locale, 'US' when it has none. */
 export function deviceRegion(): string {
-  const tags =
-    typeof navigator !== 'undefined' ? navigator.languages || [navigator.language] : [];
+  const tags = typeof navigator !== 'undefined' ? navigator.languages || [navigator.language] : [];
   for (const tag of tags) {
     const m = /-([A-Za-z]{2})(?:-|$)/.exec(tag || '');
     if (m) return m[1].toUpperCase();

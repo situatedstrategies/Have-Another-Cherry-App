@@ -120,9 +120,7 @@ export default function SettleUpModal({
       const min = expense.blindMin || 0.01;
       const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
       if (amount < min || amount > max) {
-        setError(
-          t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) })
-        );
+        setError(t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) }));
         return;
       }
     } else {
@@ -395,7 +393,9 @@ export default function SettleUpModal({
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-natural-muted">{t('handoff.noHandle', { app: appName })}</p>
+                <p className="text-xs text-natural-muted">
+                  {t('handoff.noHandle', { app: appName })}
+                </p>
               )}
 
               {handoffDef.bankPicker && selectedHandoff && (
@@ -416,7 +416,9 @@ export default function SettleUpModal({
                     ))}
                   </select>
                   {chosenBank && (
-                    <p className="text-[11px] text-natural-muted mt-1">{t('handoff.rememberBank')}</p>
+                    <p className="text-[11px] text-natural-muted mt-1">
+                      {t('handoff.rememberBank')}
+                    </p>
                   )}
                 </div>
               )}

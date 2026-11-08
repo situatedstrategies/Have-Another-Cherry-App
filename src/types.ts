@@ -134,14 +134,7 @@ export type HandoffInstrument =
   | 'mach'
   | 'tenpo';
 export type PaymentInstrument =
-  | 'CASH'
-  | 'CREDIT'
-  | 'DEBIT'
-  | 'TRANSFER'
-  | 'VENMO'
-  | 'ZELLE'
-  | 'OTHER'
-  | HandoffInstrument;
+  'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER' | HandoffInstrument;
 
 // ---- 2.0 setup path (docs/REBUILD_PLAN.md section 11 in the mobile repo) ----
 
@@ -162,7 +155,8 @@ export interface Assessment {
   conversationOpeners: string[];
 }
 
-export type GroupKind = 'partners' | 'housemates' | 'family' | 'friends' | 'trip' | 'team' | 'other';
+export type GroupKind =
+  'partners' | 'housemates' | 'family' | 'friends' | 'trip' | 'team' | 'other';
 export type GroupPaying = 'one_fronts' | 'whoever' | 'shared_account' | 'varies';
 export type GroupSettle = 'as_you_go' | 'weekly' | 'monthly' | 'when_big';
 export type GroupSplitAnswer = 'even' | 'income' | 'shares' | 'each_time';

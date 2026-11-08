@@ -17,11 +17,25 @@ import type {
 
 export const SETUP_VERSION = 1;
 
-export const GROUP_KINDS: GroupKind[] = ['partners', 'housemates', 'family', 'friends', 'trip', 'team', 'other'];
+export const GROUP_KINDS: GroupKind[] = [
+  'partners',
+  'housemates',
+  'family',
+  'friends',
+  'trip',
+  'team',
+  'other',
+];
 export const GROUP_PAYING: GroupPaying[] = ['one_fronts', 'whoever', 'shared_account', 'varies'];
 export const GROUP_SETTLE: GroupSettle[] = ['as_you_go', 'weekly', 'monthly', 'when_big'];
 export const GROUP_SPLITS: GroupSplitAnswer[] = ['even', 'income', 'shares', 'each_time'];
-export const GROUP_RECURRING: GroupRecurring[] = ['rent', 'utilities', 'subscriptions', 'groceries', 'childcare'];
+export const GROUP_RECURRING: GroupRecurring[] = [
+  'rent',
+  'utilities',
+  'subscriptions',
+  'groceries',
+  'childcare',
+];
 
 export type SetupDraft = Omit<GroupSetup, 'version' | 'completedBy' | 'completedAt'>;
 
@@ -142,6 +156,9 @@ export function setupSummary(setup: GroupSetup): string {
 }
 
 /** Who may change the setup: the creator, or the first member on groups made before 2.0. */
-export function setupOwner(group: { createdBy?: string; members?: { uid: string }[] }): string | null {
+export function setupOwner(group: {
+  createdBy?: string;
+  members?: { uid: string }[];
+}): string | null {
   return group.createdBy || group.members?.[0]?.uid || null;
 }

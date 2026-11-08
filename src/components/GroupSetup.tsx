@@ -134,7 +134,8 @@ export default function GroupSetup({
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
+        name:
+          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
@@ -153,8 +154,7 @@ export default function GroupSetup({
         if (!existing.exists()) break;
         newInviteCode = generateInviteCode();
         groupId = newInviteCode;
-        if (attempt === 5)
-          throw new Error(t('group.couldNotGenerateCode'));
+        if (attempt === 5) throw new Error(t('group.couldNotGenerateCode'));
       }
 
       const totalSplit = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
@@ -235,7 +235,8 @@ export default function GroupSetup({
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
+        name:
+          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
@@ -462,9 +463,7 @@ export default function GroupSetup({
             </div>
 
             <div className="text-center mb-6">
-              <p className="text-natural-muted font-medium">
-                {t('group.getStarted')}
-              </p>
+              <p className="text-natural-muted font-medium">{t('group.getStarted')}</p>
             </div>
 
             <div className="space-y-4">
@@ -496,7 +495,9 @@ export default function GroupSetup({
                     <Key size={24} />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-bold text-natural-text text-sm">{t('group.joinExisting')}</h3>
+                    <h3 className="font-bold text-natural-text text-sm">
+                      {t('group.joinExisting')}
+                    </h3>
                     <p className="text-xs text-natural-muted">{t('group.joinExistingSub')}</p>
                   </div>
                 </div>
@@ -551,10 +552,10 @@ export default function GroupSetup({
               </div>
 
               <div>
-                <label className={`${labelClass} block mb-1.5`}>
-                  {t('group.howMany')}
-                </label>
-                <p className="text-xs text-natural-muted mb-4 font-medium">{t('group.howManyHelp')}</p>
+                <label className={`${labelClass} block mb-1.5`}>{t('group.howMany')}</label>
+                <p className="text-xs text-natural-muted mb-4 font-medium">
+                  {t('group.howManyHelp')}
+                </p>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   {[1, 2, 3, 4, 5].map((num) => (
@@ -581,7 +582,9 @@ export default function GroupSetup({
               </div>
 
               <div>
-                <label className={`${labelClass} block mb-1.5`}>{t('group.splitPercentages')}</label>
+                <label className={`${labelClass} block mb-1.5`}>
+                  {t('group.splitPercentages')}
+                </label>
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">

@@ -18,16 +18,50 @@ import {
   stepsFor,
 } from '../src/lib/householdSetup';
 
-assert.deepEqual(GROUP_KINDS, ['partners', 'housemates', 'family', 'friends', 'trip', 'team', 'other']);
+assert.deepEqual(GROUP_KINDS, [
+  'partners',
+  'housemates',
+  'family',
+  'friends',
+  'trip',
+  'team',
+  'other',
+]);
 assert.deepEqual(GROUP_PAYING, ['one_fronts', 'whoever', 'shared_account', 'varies']);
 assert.deepEqual(GROUP_SETTLE, ['as_you_go', 'weekly', 'monthly', 'when_big']);
 assert.deepEqual(GROUP_SPLITS, ['even', 'income', 'shares', 'each_time']);
 assert.deepEqual(GROUP_RECURRING, ['rent', 'utilities', 'subscriptions', 'groceries', 'childcare']);
 
-assert.deepEqual(stepsFor({ kind: 'housemates' }), ['kind', 'paying', 'settle', 'split', 'handoffs', 'recurring', 'note']);
-assert.deepEqual(stepsFor({ kind: 'partners' }), ['kind', 'paying', 'settle', 'split', 'handoffs', 'recurring', 'thresholds', 'note']);
+assert.deepEqual(stepsFor({ kind: 'housemates' }), [
+  'kind',
+  'paying',
+  'settle',
+  'split',
+  'handoffs',
+  'recurring',
+  'note',
+]);
+assert.deepEqual(stepsFor({ kind: 'partners' }), [
+  'kind',
+  'paying',
+  'settle',
+  'split',
+  'handoffs',
+  'recurring',
+  'thresholds',
+  'note',
+]);
 assert.deepEqual(stepsFor({ kind: 'family' }).includes('thresholds'), true);
-assert.deepEqual(stepsFor({ kind: 'trip' }), ['kind', 'paying', 'settle', 'split', 'handoffs', 'recurring', 'trip', 'note']);
+assert.deepEqual(stepsFor({ kind: 'trip' }), [
+  'kind',
+  'paying',
+  'settle',
+  'split',
+  'handoffs',
+  'recurring',
+  'trip',
+  'note',
+]);
 
 assert.deepEqual(evenSplit(2), [50, 50]);
 assert.deepEqual(evenSplit(3), [33.4, 33.3, 33.3]);
@@ -56,13 +90,20 @@ const back = draftFrom(done, ['zelle']);
 assert.deepEqual(back.handoffs, ['venmo'], 'a stored setup keeps its own handoffs');
 assert.deepEqual(draftFrom(undefined, ['zelle']).handoffs, ['zelle']);
 
-const stubs = recurringStubs(['rent', 'groceries'], [{ id: 'x', name: 'Rent or mortgage', dueDay: 5 }]);
+const stubs = recurringStubs(
+  ['rent', 'groceries'],
+  [{ id: 'x', name: 'Rent or mortgage', dueDay: 5 }]
+);
 assert.equal(stubs.length, 1, 'a bill already in the vault is not duplicated');
 assert.equal(stubs[0].id, 'setup_groceries');
 assert.equal(stubs[0].dueDay, 1);
 
 assert.equal(setupOwner({ createdBy: 'a', members: [{ uid: 'b' }] }), 'a');
-assert.equal(setupOwner({ members: [{ uid: 'b' }] }), 'b', 'pre-2.0 groups fall back to the first member');
+assert.equal(
+  setupOwner({ members: [{ uid: 'b' }] }),
+  'b',
+  'pre-2.0 groups fall back to the first member'
+);
 assert.equal(setupOwner({}), null);
 
 console.log('household-setup-check: ok');
