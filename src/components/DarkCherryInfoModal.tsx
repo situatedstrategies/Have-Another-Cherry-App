@@ -1,4 +1,5 @@
 import { EyeOff, HandCoins, ShieldCheck, Cherry } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import Modal from './Modal';
 
 // First-use explainer for the Dark Cherry blind split. The "seen" flag is
@@ -22,57 +23,49 @@ export const markDarkCherryIntroSeen = (uid?: string) => {
 };
 
 export default function DarkCherryInfoModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <Modal
       onClose={onClose}
-      title="What's a Dark Cherry?"
+      title={t('darkCherry.whatIs')}
       icon={<Cherry className="h-5 w-5 text-natural-primary" />}
       footer={
         <button
           onClick={onClose}
           className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md transition-all cursor-pointer"
         >
-          Got it
+          {t('common.gotIt')}
         </button>
       }
     >
       <div className="space-y-5">
         <p className="text-sm text-natural-text leading-relaxed">
-          A <strong>Dark Cherry</strong> is a blind split - for the expenses where talking about
-          exact numbers feels weird. Think of it as money going into a shared pot, without anyone
-          staring at a balance.
+          <Trans i18nKey="darkCherry.intro" components={{ 1: <strong /> }} />
         </p>
 
         <div className="space-y-3">
           <div className="flex gap-3 items-start bg-natural-bg/50 border border-natural-border rounded-xl p-3.5">
             <EyeOff className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             <p className="text-xs text-natural-text leading-relaxed">
-              <strong>No totals, no balances.</strong> Whoever creates it sets the amount that
-              settles it - but the people chipping in never see the total, what's left, or what
-              anyone else has put in.
+              <Trans i18nKey="darkCherry.noTotals" components={{ 1: <strong /> }} />
             </p>
           </div>
           <div className="flex gap-3 items-start bg-natural-bg/50 border border-natural-border rounded-xl p-3.5">
             <HandCoins className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             <p className="text-xs text-natural-text leading-relaxed">
-              <strong>Give what you can, when you can.</strong> The creator sets a comfortable range
-              for each payment. You just log something in that range toward the pot - once, or as
-              many times as you like.
+              <Trans i18nKey="darkCherry.giveWhatYouCan" components={{ 1: <strong /> }} />
             </p>
           </div>
           <div className="flex gap-3 items-start bg-natural-bg/50 border border-natural-border rounded-xl p-3.5">
             <ShieldCheck className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             <p className="text-xs text-natural-text leading-relaxed">
-              <strong>It closes itself.</strong> When the pot quietly reaches the target, the cherry
-              is settled and everyone sees it's done. Nobody ever had to ask anyone for a specific
-              amount.
+              <Trans i18nKey="darkCherry.closesItself" components={{ 1: <strong /> }} />
             </p>
           </div>
         </div>
 
         <p className="text-xs text-natural-muted leading-relaxed italic border-t border-natural-border/60 pt-3">
-          It's for the households where "you owe me $43.50" lands wrong - a little less precise, a
-          lot more kind.
+          {t('darkCherry.footer')}
         </p>
       </div>
     </Modal>

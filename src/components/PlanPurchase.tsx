@@ -1,4 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { t as tr } from '../i18n';
+import { formatCurrency } from '../lib/format';
 import { Expense, Group } from '../types';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { roundCurrency } from '../lib/money';
@@ -26,7 +29,7 @@ interface PlanPurchaseProps {
   onClose: () => void;
 }
 
-const money = (v: number) => `$${v.toFixed(2)}`;
+const money = (v: number) => formatCurrency(v);
 /** Owing reads as a plain figure, being owed in parentheses, as on iOS. */
 const signed = (v: number) => (v < 0 ? `(${money(Math.abs(v))})` : money(v));
 
@@ -69,52 +72,39 @@ type Juice = {
 function juiceFor(score: number): Juice {
   if (score >= 75)
     return {
-      level: 'Extra juicy',
+      level: tr('plan.extraJuicy'),
       cherries: 2,
       recommended: true,
       color: 'text-natural-primary',
-      blurb: 'Great time to bring this up - the balance is in your favor.',
+      blurb: tr('plan.extraJuicyBlurb'),
     };
   if (score >= 55)
     return {
-      level: 'Juicy',
+      level: tr('plan.juicy'),
       cherries: 1,
       recommended: true,
       color: 'text-natural-primary',
-      blurb: 'This looks reasonable to propose right now.',
+      blurb: tr('plan.juicyBlurb'),
     };
   if (score >= 35)
     return {
-      level: 'A little juice',
+      level: tr('plan.littleJuice'),
       cherries: 1,
       recommended: false,
       color: 'text-natural-text',
-      blurb: 'Doable, but worth a gentle, considerate conversation first.',
+      blurb: tr('plan.littleJuiceBlurb'),
     };
   return {
-    level: 'No juice',
+    level: tr('plan.noJuice'),
     cherries: 0,
     recommended: false,
     color: 'text-natural-muted',
-    blurb: 'Maybe hold off, or plan to cover more of it yourself for now.',
+    blurb: tr('plan.noJuiceBlurb'),
   };
 }
 
-const STARTERS: Record<string, string[]> = {
-  good: [
-    "Hey, I've been eyeing {item} for us - want to split it {theirPct}%/{yourPct}%? Your part would be about ${theirShare}.",
-    'I think {item} would be a great add for the place. Fair split puts you around ${theirShare} - how does that sit with you?',
-    "Been thinking about {item}. Given how things have balanced out, splitting it feels fair - you'd be at ~${theirShare}. Thoughts?",
-  ],
-  careful: [
-    "No pressure at all, but I've been considering {item} (~${theirShare} for your share). Is now an okay time, or should we plan for later?",
-    "I'd love to get {item} eventually. Your share would be about ${theirShare} - want to talk through timing so it's comfortable for everyone?",
-  ],
-  hold: [
-    "I've been wanting {item}, but I know things are a bit tight - no rush. Maybe we revisit it next month?",
-    'Thinking ahead to {item} (~${theirShare} for your part). Totally fine to wait. Want to set a target date instead?',
-  ],
-};
+// Conversation starters live in the locale files as plan.starter.<bucket>.<n>.
+const STARTER_COUNTS: Record<string, number> = { good: 3, careful: 2, hold: 2 };
 
 export default function PlanPurchase({
   group,
@@ -125,6 +115,7 @@ export default function PlanPurchase({
   onLogIt,
   onClose,
 }: PlanPurchaseProps) {
+  const { t } = useTranslation();
   const members = useMemo(() => getFullMembers(group), [group]);
   const others = members.filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'));
 
@@ -156,7 +147,7 @@ export default function PlanPurchase({
   const theirShare = roundCurrency((numericAmount * theirPct) / 100);
 
   const other = groupUsers[otherUid] || {};
-  const otherName = members.find((m) => m.uid === otherUid)?.name || 'The other person';
+  const otherName = members.find((m) => m.uid === otherUid)?.name || t('plan.otherPerson');
   const otherIncome = Number(other.income) || 0;
   const otherThreshold = Number(other.recurringThreshold) || 0;
 
@@ -179,7 +170,10 @@ export default function PlanPurchase({
       const before = netNow(expenses, uid);
       return {
         uid,
-        name: uid === activeUser ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone',
+        name:
+          uid === activeUser
+            ? t('common.you')
+            : members.find((m) => m.uid === uid)?.name || t('common.someone'),
         share: shares[uid] ?? 0,
         monthly: perMonth[uid] ?? 0,
         before,
@@ -212,13 +206,15 @@ export default function PlanPurchase({
 
     const juice = juiceFor(score);
     const bucket = score >= 55 ? 'good' : score >= 35 ? 'careful' : 'hold';
-    const pool = STARTERS[bucket];
+    const poolSize = STARTER_COUNTS[bucket];
     // Deterministic pick so it doesn't flicker while typing.
-    const starter = pool[Math.min(pool.length - 1, Math.floor(theirShare) % pool.length)]
-      .replace('{item}', item.trim() || 'this')
-      .replace('{theirPct}', String(theirPct))
-      .replace('{yourPct}', String(yourPct))
-      .replace(/\{theirShare\}/g, theirShare.toFixed(2));
+    const pick = Math.min(poolSize - 1, Math.floor(theirShare) % poolSize);
+    const starter = t(`plan.starter.${bucket}.${pick}`, {
+      item: item.trim() || t('plan.this'),
+      theirPct,
+      yourPct,
+      theirShare: formatCurrency(theirShare),
+    });
 
     return { score, juice, starter };
   }, [
@@ -231,6 +227,7 @@ export default function PlanPurchase({
     item,
     theirPct,
     yourPct,
+    t,
   ]);
 
   return (
@@ -238,11 +235,11 @@ export default function PlanPurchase({
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border">
           <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-natural-primary" /> Plan a Purchase
+            <TrendingUp className="h-5 w-5 text-natural-primary" /> {t('plan.title')}
           </h2>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors"
           >
             <X className="h-5 w-5" />
@@ -251,20 +248,18 @@ export default function PlanPurchase({
 
         <div className="p-6 space-y-4 overflow-y-auto">
           <p className="text-xs text-natural-muted">
-            {solo
-              ? 'Thinking about a big purchase? See what it would cost you. Once someone joins, this weighs the balance between you too.'
-              : "Thinking about a big shared purchase? See if it's a good moment to bring it up - based on your real balances."}
+            {solo ? t('plan.introSolo') : t('plan.intro')}
           </p>
 
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
-              What is it?
+              {t('plan.whatIsIt')}
             </label>
             <input
               type="text"
               value={item}
               onChange={(e) => setItem(e.target.value)}
-              placeholder="Item"
+              placeholder={t('plan.itemPlaceholder')}
               className="w-full px-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-xl text-sm outline-none"
             />
           </div>
@@ -272,7 +267,7 @@ export default function PlanPurchase({
           {others.length > 1 && (
             <div>
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
-                With whom?
+                {t('plan.withWhom')}
               </label>
               <select
                 value={otherUid}
@@ -290,7 +285,7 @@ export default function PlanPurchase({
 
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
-              Total price
+              {t('plan.totalPrice')}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted">
@@ -312,12 +307,10 @@ export default function PlanPurchase({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1">
-                Who fronts it
+                {t('plan.whoFronts')}
               </label>
               <p className="text-[11px] text-natural-muted mb-1.5">
-                {householdSize <= 1
-                  ? 'You cover the whole thing.'
-                  : "Whoever pays is owed the others' shares."}
+                {householdSize <= 1 ? t('plan.youCoverAll') : t('plan.whoeverPays')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {Object.keys(getFullDefaultSplit(group)).map((uid) => (
@@ -325,8 +318,8 @@ export default function PlanPurchase({
                     key={uid}
                     label={
                       uid === activeUser
-                        ? 'You'
-                        : members.find((m) => m.uid === uid)?.name || 'Someone'
+                        ? t('common.you')
+                        : members.find((m) => m.uid === uid)?.name || t('common.someone')
                     }
                     selected={payer === uid}
                     onClick={() => setPayer(uid)}
@@ -336,29 +329,31 @@ export default function PlanPurchase({
             </div>
             <div>
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1.5">
-                How it splits
+                {t('plan.howSplits')}
               </label>
               <div className="flex flex-wrap gap-1.5">
                 <Choice
-                  label="Household ratio"
+                  label={t('plan.householdRatio')}
                   selected={mode === 'household'}
                   onClick={() => setMode('household')}
                 />
-                <Choice label="Even" selected={mode === 'even'} onClick={() => setMode('even')} />
+                <Choice
+                  label={t('plan.even')}
+                  selected={mode === 'even'}
+                  onClick={() => setMode('even')}
+                />
               </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-1">
-                Spread over
+                {t('plan.spreadOver')}
               </label>
-              <p className="text-[11px] text-natural-muted mb-1.5">
-                Carrying a large purchase changes what it costs each month, not what it costs.
-              </p>
+              <p className="text-[11px] text-natural-muted mb-1.5">{t('plan.spreadBody')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {[1, 3, 6, 12].map((n) => (
                   <Choice
                     key={n}
-                    label={n === 1 ? 'One go' : `${n} months`}
+                    label={n === 1 ? t('plan.oneGo') : t('plan.nMonths', { count: n })}
                     selected={months === n}
                     onClick={() => setMonths(n)}
                   />
@@ -372,26 +367,29 @@ export default function PlanPurchase({
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
                 <span className="block text-xs font-bold text-natural-muted uppercase">
-                  They owe you
+                  {t('plan.theyOweYou')}
                 </span>
                 <span className="block text-sm font-bold text-natural-text mt-0.5">
-                  ${theyOweYou.toFixed(2)}
+                  {formatCurrency(theyOweYou)}
                 </span>
               </div>
               <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
                 <span className="block text-xs font-bold text-natural-muted uppercase">
-                  You owe them
+                  {t('plan.youOweThem')}
                 </span>
                 <span className="block text-sm font-bold text-natural-text mt-0.5">
-                  ${youOweThem.toFixed(2)}
+                  {formatCurrency(youOweThem)}
                 </span>
               </div>
               <div className="bg-natural-sidebar/40 rounded-xl p-2.5 border border-natural-border/50">
-                <span className="block text-xs font-bold text-natural-muted uppercase">Net</span>
+                <span className="block text-xs font-bold text-natural-muted uppercase">
+                  {t('plan.net')}
+                </span>
                 <span
                   className={`block text-sm font-bold mt-0.5 ${net >= 0 ? 'text-natural-primary' : 'text-natural-text'}`}
                 >
-                  {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                  {net >= 0 ? '+' : ''}
+                  {formatCurrency(net)}
                 </span>
               </div>
             </div>
@@ -401,10 +399,10 @@ export default function PlanPurchase({
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className={labelClass}>
-                  {otherName}'s share ({theirPct}%)
+                  {t('plan.share', { name: otherName, pct: theirPct })}
                 </span>
                 <span className="text-lg font-display font-semibold text-natural-text">
-                  ${theirShare.toFixed(2)}
+                  {formatCurrency(theirShare)}
                 </span>
               </div>
               <div className="text-center py-1">
@@ -423,14 +421,16 @@ export default function PlanPurchase({
                 <p className="text-xs text-natural-muted mt-1">{result.juice.blurb}</p>
                 {otherThreshold > 0 && theirShare > otherThreshold && (
                   <p className="text-xs text-natural-primary mt-1 font-semibold">
-                    Note: this exceeds {otherName}'s spending threshold ($
-                    {otherThreshold.toFixed(0)}).
+                    {t('plan.exceedsThreshold', {
+                      name: otherName,
+                      amount: formatCurrency(otherThreshold, 0),
+                    })}
                   </p>
                 )}
               </div>
               <div className="bg-white rounded-xl p-3 border border-natural-border/60">
                 <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider flex items-center gap-1.5">
-                  <MessageCircle className="h-3 w-3" /> Conversation starter
+                  <MessageCircle className="h-3 w-3" /> {t('plan.starterLabel')}
                 </span>
                 <p className="text-sm text-natural-text mt-1.5 italic leading-relaxed">
                   "{result.starter}"
@@ -442,27 +442,21 @@ export default function PlanPurchase({
           {solo && numericAmount > 0 && (
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 space-y-2 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className={labelClass}>Your share (100%)</span>
+                <span className={labelClass}>{t('plan.yourShare100')}</span>
                 <span className="text-lg font-display font-semibold text-natural-text">
-                  ${numericAmount.toFixed(2)}
+                  {formatCurrency(numericAmount)}
                 </span>
               </div>
-              <p className="text-xs text-natural-muted">
-                Nobody has joined yet, so this is all yours for now. Invite someone from Settings
-                and this turns into a split and a conversation starter.
-              </p>
+              <p className="text-xs text-natural-muted">{t('plan.soloBody')}</p>
             </div>
           )}
 
           {projection && (
             <div className="space-y-2">
               <span className={labelClass}>
-                {householdSize <= 1 ? 'What it does to you' : 'What it does to each of you'}
+                {householdSize <= 1 ? t('plan.whatItDoesYou') : t('plan.whatItDoesEach')}
               </span>
-              <p className="text-xs text-natural-muted">
-                Net position today, what this adds, and where it leaves you. A negative number means
-                you are owed.
-              </p>
+              <p className="text-xs text-natural-muted">{t('plan.netBody')}</p>
               <div className="bg-white rounded-2xl border border-natural-border shadow-sm divide-y divide-natural-border">
                 {projection.rows.map((r) => (
                   <div key={r.uid} className="px-4 py-3">
@@ -473,7 +467,7 @@ export default function PlanPurchase({
                         </span>
                         {r.isPayer && (
                           <span className="text-[8.5px] font-mono tracking-[0.1em] text-natural-primary bg-natural-primary-wash px-2 py-0.5 rounded-full">
-                            PAYS
+                            {t('plan.pays')}
                           </span>
                         )}
                       </span>
@@ -484,8 +478,11 @@ export default function PlanPurchase({
                     <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
                       <span className="text-natural-muted truncate">
                         {months > 1
-                          ? `${money(r.monthly)} a month for ${months} months`
-                          : 'Share of this purchase'}
+                          ? t('plan.perMonth', {
+                              amount: money(r.monthly),
+                              months: t('plan.nMonths', { count: months }),
+                            })
+                          : t('plan.shareOfPurchase')}
                       </span>
                       <span className="flex items-center gap-1.5 shrink-0">
                         <span
@@ -506,9 +503,11 @@ export default function PlanPurchase({
               </div>
               {projection.overThreshold && (
                 <div className="bg-natural-primary-wash border border-natural-primary/35 rounded-xl p-3 text-xs text-natural-text">
-                  Your share works out at {money(projection.myMonthly)}
-                  {months > 1 ? ' a month' : ''}, past the ${myThreshold.toFixed(0)} you set as
-                  comfortable. Worth talking about before it is logged.
+                  {t('plan.overThreshold', {
+                    amount: money(projection.myMonthly),
+                    perMonth: months > 1 ? t('plan.aMonth') : '',
+                    threshold: formatCurrency(myThreshold, 0),
+                  })}
                 </div>
               )}
               {onLogIt && (
@@ -524,7 +523,7 @@ export default function PlanPurchase({
                   }
                   className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5 transition-colors"
                 >
-                  <Plus className="h-4 w-4" /> Log it
+                  <Plus className="h-4 w-4" /> {t('plan.logIt')}
                 </button>
               )}
             </div>
@@ -533,9 +532,7 @@ export default function PlanPurchase({
           {!result && !(solo && numericAmount > 0) && (
             <div className="text-center text-xs text-natural-muted py-4 flex flex-col items-center gap-2">
               <Sparkles className="h-5 w-5 text-natural-primary/40" />
-              {solo
-                ? 'Enter a price to see what it would cost you.'
-                : "Enter a price to see whether it's a juicy time to ask."}
+              {solo ? t('plan.enterPriceSolo') : t('plan.enterPrice')}
             </div>
           )}
         </div>

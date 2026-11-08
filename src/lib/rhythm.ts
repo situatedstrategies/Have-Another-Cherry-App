@@ -2,6 +2,7 @@
 // Everything is derived locally from the ledger, no extra syncing.
 
 import { Expense } from '../types';
+import { t } from '../i18n';
 import { isExpenseFullySettled } from './money';
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -73,13 +74,13 @@ export function computeRhythm(expenses: Expense[]): Rhythm | null {
   let celebration: string | null = null;
   if (monthsTogether > 0 && monthsTogether % 12 === 0) {
     const years = monthsTogether / 12;
-    celebration = `Ledger anniversary - ${years} ${years === 1 ? 'year' : 'years'} of sharing. Have another cherry on us.`;
+    celebration = t('rhythm.anniversary', { count: years });
   } else if (monthsTogether > 0 && monthsTogether % 6 === 0) {
-    celebration = `${monthsTogether} months of keeping this ledger.`;
+    celebration = t('rhythm.monthsKeeping', { count: monthsTogether });
   } else if (streakMonths >= 3) {
-    celebration = `${streakMonths} straight months with everything settled. You're in rhythm.`;
+    celebration = t('rhythm.streak', { count: streakMonths });
   } else if ([25, 50, 100, 250, 500].includes(settled.length)) {
-    celebration = `${settled.length} expenses settled. Sweet milestone.`;
+    celebration = t('rhythm.milestone', { count: settled.length });
   }
 
   return {

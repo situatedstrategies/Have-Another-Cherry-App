@@ -13,6 +13,8 @@ import { todayLocal } from '../lib/recurring';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
+import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
@@ -67,8 +69,11 @@ export function useSettlements({
         const potRemaining = getDarkCherryRemaining(expense, true);
         if (!baseValid || normalizedAmount > potRemaining) {
           addToast(
-            'Invalid Payment',
-            `Payment must be between $0.01 and $${potRemaining.toFixed(2)}.`,
+            t('settleHook.invalidPayment'),
+            t('settleHook.between', {
+              min: formatCurrency(0.01),
+              max: formatCurrency(potRemaining),
+            }),
             'info'
           );
           return;
@@ -78,8 +83,8 @@ export function useSettlements({
         const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
         if (!baseValid || normalizedAmount < min || normalizedAmount > max) {
           addToast(
-            'Invalid Payment',
-            `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`,
+            t('settleHook.invalidPayment'),
+            t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) }),
             'info'
           );
           return;
@@ -89,8 +94,11 @@ export function useSettlements({
       const remainingAmount = getRemainingSettlementAmount(expense, debtorId, true);
       if (!baseValid || normalizedAmount > remainingAmount) {
         addToast(
-          'Invalid Payment',
-          `Payment must be between $0.01 and $${remainingAmount.toFixed(2)}.`,
+          t('settleHook.invalidPayment'),
+          t('settleHook.between', {
+            min: formatCurrency(0.01),
+            max: formatCurrency(remainingAmount),
+          }),
           'info'
         );
         return;
@@ -139,8 +147,8 @@ export function useSettlements({
       await syncExpenseUpdate(updatedExp);
       // Toast only after the write: "logged" over a failed save gets a payment sent twice.
       addToast(
-        isCreditor ? 'Payment Logged' : 'Settlement Logged',
-        isCreditor ? 'The received payment was recorded.' : 'Your payment is pending confirmation.',
+        isCreditor ? t('settleHook.paymentLogged') : t('settleHook.settlementLogged'),
+        isCreditor ? t('settleHook.received') : t('settleHook.pending'),
         'success'
       );
       notifyLedgerEvent('payment_logged');
@@ -181,7 +189,7 @@ export function useSettlements({
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       await syncExpenseUpdate(updatedExp);
-      addToast('Receipt Confirmed', 'The payment has been confirmed.', 'success');
+      addToast(t('settleHook.receiptConfirmed'), t('settleHook.receiptConfirmedBody'), 'success');
     } catch (e: any) {
       console.error('Confirm receipt failed', e);
       setSupportError({
@@ -217,11 +225,7 @@ export function useSettlements({
     updatedExp.status = getNormalizedExpenseStatus(updatedExp);
     try {
       await syncExpenseUpdate(updatedExp);
-      addToast(
-        'Payment Removed',
-        'The payment entry was removed and the balance updated.',
-        'success'
-      );
+      addToast(t('settleHook.paymentRemoved'), t('settleHook.paymentRemovedBody'), 'success');
     } catch (e: any) {
       console.error('Void settlement failed', e);
       setSupportError({

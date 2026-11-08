@@ -5,6 +5,7 @@ import { pushPermission, enableWebPush, listenForegroundPush } from '../lib/push
 import { getRemainingSettlementAmount } from '../lib/money';
 import { encryptData } from '../lib/crypto';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
 
@@ -98,16 +99,14 @@ export function useNotifications({
         body: JSON.stringify({ groupId: group.id, toUids: debtors }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not send the reminder.');
+      if (!res.ok) throw new Error(data.error || t('notifHook.couldNotSend'));
       addToast(
-        'Nudge Sent',
-        data.sent > 0
-          ? 'A gentle reminder is on its way.'
-          : "Sent - though nobody's devices are set up for notifications yet.",
+        t('notifHook.nudgeSent'),
+        data.sent > 0 ? t('notifHook.onItsWay') : t('notifHook.noDevices'),
         'success'
       );
     } catch (e: any) {
-      addToast('Could Not Nudge', e?.message || 'Please try again in a moment.', 'info');
+      addToast(t('notifHook.couldNotNudge'), e?.message || t('notifHook.tryAgain'), 'info');
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ModalProps {
   onClose: () => void;
@@ -26,6 +27,7 @@ export default function Modal({
   children,
   bodyClassName,
 }: ModalProps) {
+  const { t } = useTranslation();
   const maxW = size === 'lg' ? 'sm:max-w-lg' : 'sm:max-w-md';
 
   // Escape to close, and freeze the page underneath while open. Without the
@@ -63,7 +65,7 @@ export default function Modal({
             <button
               onClick={onClose}
               className="tap-target shrink-0 flex items-center justify-center text-natural-muted hover:text-natural-text bg-white rounded-full border border-natural-border shadow-sm"
-              aria-label="Close"
+              aria-label={t('common.close')}
             >
               <X size={18} />
             </button>

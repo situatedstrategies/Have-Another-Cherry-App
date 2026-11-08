@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Expense, Group } from '../types';
 import { getFullMembers, nameOf } from '../lib/members';
 import { formatAmount, formatShortDate } from '../lib/format';
@@ -18,22 +19,27 @@ interface OwedBreakdownModalProps {
   expenses: Expense[];
   group: Group;
   activeUser: string;
+  isPlus: boolean;
   onSelectExpense: (expense: Expense) => void;
+  onCherryPlus: () => void;
   onToast: (title: string, message: string, type: 'info' | 'success' | 'error') => void;
   onClose: () => void;
 }
 
 // Opened from the balance cards in the rail: the transactions still owed,
-// grouped per person, with an option to email them a gentle reminder.
+// grouped per person, with a Cherry + option to email them a gentle reminder.
 export default function OwedBreakdownModal({
   mode,
   expenses,
   group,
   activeUser,
+  isPlus,
   onSelectExpense,
+  onCherryPlus,
   onToast,
   onClose,
 }: OwedBreakdownModalProps) {
+  const { t } = useTranslation();
   const members = useMemo(() => getFullMembers(group), [group]);
   // A reminder is an email to a real account. A pending seat (ghost_N) has
   // no address on file, so the button is only offered for people who joined.
@@ -81,6 +87,10 @@ export default function OwedBreakdownModal({
   const grandTotal = byPerson.reduce((s, p) => s + p.total, 0);
 
   const sendReminder = async (debtorUid: string) => {
+    if (!isPlus) {
+      onCherryPlus();
+      return;
+    }
     setSendingTo(debtorUid);
     try {
       const res = await fetch('/api/send-reminder', {
@@ -94,16 +104,16 @@ export default function OwedBreakdownModal({
       if (res.ok && data?.success) {
         setRemindedUids((prev) => [...prev, debtorUid]);
         onToast(
-          'Reminder Sent',
-          `A gentle nudge is on its way to ${nameOf(debtorUid, members)}.`,
+          t('owed.reminderSent'),
+          t('owed.nudgeOnWay', { name: nameOf(debtorUid, members) }),
           'success'
         );
       } else {
-        onToast('Error', data?.error || 'Could not send the reminder. Please try again.', 'error');
+        onToast(t('owed.error'), data?.error || t('owed.couldNotSend'), 'error');
       }
     } catch (e) {
       console.error('Reminder failed', e);
-      onToast('Error', 'Could not send the reminder. Please try again.', 'error');
+      onToast(t('owed.error'), t('owed.couldNotSend'), 'error');
     } finally {
       setSendingTo(null);
     }
@@ -112,7 +122,7 @@ export default function OwedBreakdownModal({
   return (
     <Modal
       onClose={onClose}
-      title={mode === 'you_owe' ? 'What You Still Owe' : 'Still Owed to You'}
+      title={mode === 'you_owe' ? t('owed.titleYouOwe') : t('owed.titleOwedToYou')}
       icon={
         mode === 'you_owe' ? (
           <CreditCard className="h-5 w-5 text-natural-primary" />
@@ -125,7 +135,7 @@ export default function OwedBreakdownModal({
       <div className="space-y-5">
         <div className="flex items-baseline justify-between bg-natural-sage/20 border border-natural-primary/20 rounded-xl px-4 py-3">
           <span className={labelClass}>
-            {mode === 'you_owe' ? 'Total you owe' : 'Total owed to you'}
+            {mode === 'you_owe' ? t('owed.totalYouOwe') : t('owed.totalOwedToYou')}
           </span>
           <span className="text-2xl font-display font-semibold text-natural-text">
             {formatAmount(grandTotal)}
@@ -133,7 +143,7 @@ export default function OwedBreakdownModal({
         </div>
 
         {byPerson.length === 0 ? (
-          <p className="text-center text-sm text-natural-muted py-6">Nothing outstanding. Sweet.</p>
+          <p className="text-center text-sm text-natural-muted py-6">{t('owed.nothing')}</p>
         ) : (
           byPerson.map((person) => (
             <div
@@ -144,11 +154,11 @@ export default function OwedBreakdownModal({
                 <div>
                   <span className="text-sm font-bold text-natural-text capitalize">
                     {mode === 'you_owe'
-                      ? `You owe ${nameOf(person.uid, members)}`
+                      ? t('owed.youOweName', { name: nameOf(person.uid, members) })
                       : nameOf(person.uid, members)}
                   </span>
                   <span className="block text-xs text-natural-muted">
-                    {person.items.length} open {person.items.length === 1 ? 'item' : 'items'} ·{' '}
+                    {t('owed.openItems', { count: person.items.length })} ·{' '}
                     {formatAmount(person.total)}
                   </span>
                 </div>
@@ -156,7 +166,7 @@ export default function OwedBreakdownModal({
                   hasJoined(person.uid) &&
                   (remindedUids.includes(person.uid) ? (
                     <span className="text-xs font-bold text-natural-primary flex items-center gap-1">
-                      <Check size={12} /> Reminder sent
+                      <Check size={12} /> {t('owed.reminderSentShort')}
                     </span>
                   ) : (
                     <button
@@ -169,7 +179,12 @@ export default function OwedBreakdownModal({
                       ) : (
                         <BellRing size={12} />
                       )}
-                      Send reminder
+                      {t('owed.sendReminder')}
+                      {!isPlus && (
+                        <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
+                          Cherry +
+                        </span>
+                      )}
                     </button>
                   ))}
               </div>
@@ -208,11 +223,7 @@ export default function OwedBreakdownModal({
         )}
 
         {mode === 'owed_to_you' && byPerson.length > 0 && (
-          <p className="text-xs text-natural-muted">
-            Reminders arrive as a kind, no-pressure email from tartcherry@haveanothercherry.com. For
-            privacy, the email never includes amounts or expense names: it just says an open balance
-            is waiting in the app.
-          </p>
+          <p className="text-xs text-natural-muted">{t('owed.privacyNote')}</p>
         )}
       </div>
     </Modal>

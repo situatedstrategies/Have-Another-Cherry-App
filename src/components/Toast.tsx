@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export type ToastMessage = {
   id: string;
@@ -37,6 +38,7 @@ function ToastItem({
   toast: ToastMessage;
   removeToast: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const timer = setTimeout(() => {
       removeToast(toast.id);
@@ -63,7 +65,7 @@ function ToastItem({
       </div>
       <button
         onClick={() => removeToast(toast.id)}
-        aria-label="Dismiss notification"
+        aria-label={t('common.dismissNotification')}
         className="absolute top-3 right-3 text-natural-muted hover:text-natural-text transition-colors"
       >
         <X size={16} />

@@ -8,21 +8,16 @@ import { groupCapacity, scalePercents } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
 import CherryLogo from './CherryLogo';
 import { labelClass } from '../lib/ui';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
-const NUMBER_WORDS = [
-  'One',
-  'Two',
-  'Three',
-  'Four',
-  'Five',
-  'Six',
-  'Seven',
-  'Eight',
-  'Nine',
-  'Ten',
-];
-
-const INVITE_FALLBACK_ERROR = 'Could not send the email. Share the code directly instead.';
+// "Cherry One" .. "Cherry Five": the placeholder names for seats not yet
+// filled. The words are translated (group.numberWord.N); past five the digit
+// is used.
+function cherryLabel(t: TFunction, index: number) {
+  const n = index <= 5 ? t(`group.numberWord.${index}`) : String(index);
+  return t('group.cherryN', { n });
+}
 
 export default function GroupSetup({
   onComplete,
@@ -31,6 +26,8 @@ export default function GroupSetup({
   onComplete: (groupId: string) => void;
   onCancel?: () => void;
 }) {
+  const { t } = useTranslation();
+  const inviteFallbackError = t('group.inviteFallbackError');
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
@@ -86,15 +83,18 @@ export default function GroupSetup({
   const recommendSplit = () => {
     const myVal = parseFloat(myIncome);
     const partnerVal = parseFloat(partnerIncome);
-    const otherName = memberNames[1]?.trim() || 'the other person';
+    const namedOther = memberNames[1]?.trim();
+    const otherName = namedOther || t('group.otherPerson');
 
     if (!myVal || myVal <= 0) {
-      setRecMessage('Enter your income first to calculate a split.');
+      setRecMessage(t('group.enterYourIncome'));
       return;
     }
     if (!partnerVal || partnerVal <= 0) {
       setRecMessage(
-        `Enter ${otherName === 'the other person' ? "the other person's" : `${otherName}'s`} income first to calculate a split.`
+        namedOther
+          ? t('group.enterOtherIncome', { name: namedOther })
+          : t('group.enterOtherPersonIncome')
       );
       return;
     }
@@ -104,9 +104,7 @@ export default function GroupSetup({
     const partnerPct = 100 - myPct;
 
     setSplits([String(myPct), String(partnerPct)]);
-    setRecMessage(
-      `Recommended: you ${myPct}% / ${otherName} ${partnerPct}%, proportional to income. Adjust below if you'd like.`
-    );
+    setRecMessage(t('group.recommended', { mine: myPct, name: otherName, theirs: partnerPct }));
   };
 
   const handleSendInvite = async (e: React.FormEvent) => {
@@ -123,7 +121,7 @@ export default function GroupSetup({
           inviteCode: createdGroupInfo.inviteCode,
           recipientName: inviteName,
           fromName:
-            auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'A friend',
+            auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || t('group.aFriend'),
           // A solo group has no split to show yet: the creator holds 100%
           // until someone joins, so the email uses its "set up together" row.
           split:
@@ -133,15 +131,15 @@ export default function GroupSetup({
                     i === 0
                       ? auth.currentUser?.displayName ||
                         auth.currentUser?.email?.split('@')[0] ||
-                        'You'
-                      : memberNames[i]?.trim() || 'Person ' + (i + 1),
+                        t('common.you')
+                      : memberNames[i]?.trim() || t('group.personN', { n: i + 1 }),
                   split: parseFloat(s) || 0,
                 }))
               : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || INVITE_FALLBACK_ERROR);
+      if (!res.ok) throw new Error(data.error || inviteFallbackError);
       setInviteStatus('success');
       setInviteEmail('');
       setInviteName('');
@@ -151,7 +149,7 @@ export default function GroupSetup({
       // A fetch that never reached the server rejects with a TypeError and a
       // message meant for developers, not the person reading the screen.
       setInviteError(
-        err instanceof TypeError ? INVITE_FALLBACK_ERROR : err?.message || INVITE_FALLBACK_ERROR
+        err instanceof TypeError ? inviteFallbackError : err?.message || inviteFallbackError
       );
       setInviteStatus('error');
       setTimeout(() => setInviteStatus('idle'), 5000);
@@ -177,17 +175,17 @@ export default function GroupSetup({
     setError('');
 
     try {
-      if (!auth.currentUser) throw new Error('Not logged in');
+      if (!auth.currentUser) throw new Error(t('group.notLoggedIn'));
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'User',
+        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
       for (let i = 1; i < numPeople; i++) {
         if (!memberNames[i] || !memberNames[i].trim()) {
-          throw new Error(`Please enter a name for Cherry ${NUMBER_WORDS[i] || i + 1}`);
+          throw new Error(t('group.enterNameFor', { name: cherryLabel(t, i + 1) }));
         }
       }
 
@@ -201,12 +199,12 @@ export default function GroupSetup({
         newInviteCode = generateInviteCode();
         groupId = newInviteCode;
         if (attempt === 5)
-          throw new Error('Could not generate a unique invite code. Please try again.');
+          throw new Error(t('group.couldNotGenerateCode'));
       }
 
       const totalSplit = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
       if (Math.abs(totalSplit - 100) > 0.01) {
-        throw new Error('Total splits must equal exactly 100%');
+        throw new Error(t('group.splitsMustBe100'));
       }
 
       const defaultSplit: Record<string, number> = {
@@ -214,7 +212,7 @@ export default function GroupSetup({
       };
 
       const availableSplits = splits.slice(1).map((s, idx) => ({
-        name: memberNames[idx + 1]?.trim() || `Cherry ${NUMBER_WORDS[idx + 1] || idx + 2}`,
+        name: memberNames[idx + 1]?.trim() || cherryLabel(t, idx + 2),
         split: parseFloat(s) || 0,
       }));
 
@@ -248,7 +246,7 @@ export default function GroupSetup({
           groupId: groupId,
           activeGroupId: groupId,
           groupIds: arrayUnion(groupId),
-          name: currentUser.name || 'Friend',
+          name: currentUser.name || t('group.friend'),
           email: hashedEmail,
         },
         { merge: true }
@@ -273,11 +271,11 @@ export default function GroupSetup({
     setError('');
 
     try {
-      if (!auth.currentUser) throw new Error('Not logged in');
+      if (!auth.currentUser) throw new Error(t('group.notLoggedIn'));
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'User',
+        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
@@ -288,7 +286,7 @@ export default function GroupSetup({
       // and retried on conflict).
       const joinedGroupId = await runTransaction(db, async (tx) => {
         const snap = await tx.get(groupRef);
-        if (!snap.exists()) throw new Error('Invalid invite code');
+        if (!snap.exists()) throw new Error(t('group.invalidCode'));
         const groupData = snap.data() as Group;
 
         const existingMembers = Array.isArray(groupData.members) ? groupData.members : [];
@@ -326,9 +324,7 @@ export default function GroupSetup({
         );
         const joinedCount = joinedUidList.length;
         if (joinedCount >= capacity) {
-          throw new Error(
-            `This group is already full (${capacity} people). A member can add a seat for you from Settings.`
-          );
+          throw new Error(t('group.full', { capacity }));
         }
 
         // Take the next available split slot, or fall back to the even remainder.
@@ -394,7 +390,7 @@ export default function GroupSetup({
           groupId: joinedGroupId,
           activeGroupId: joinedGroupId,
           groupIds: arrayUnion(joinedGroupId),
-          name: currentUser.name || 'Friend',
+          name: currentUser.name || t('group.friend'),
           email: hashedEmail,
         },
         { merge: true }
@@ -428,17 +424,17 @@ export default function GroupSetup({
                 <Users className="h-12 w-12 text-natural-primary" />
               </div>
               <h1 className="text-3xl font-semibold font-display text-natural-text mb-2 tracking-tight">
-                Group Created!
+                {t('group.created')}
               </h1>
               <p className="text-natural-muted font-medium">
                 {createdGroupInfo.numCodes > 0
-                  ? `You can invite up to ${createdGroupInfo.numCodes} ${createdGroupInfo.numCodes === 1 ? 'person' : 'people'} to join.`
-                  : 'Share this code whenever you want someone to join.'}
+                  ? t('group.canInvite', { count: createdGroupInfo.numCodes })
+                  : t('group.shareCodeWhenever')}
               </p>
             </div>
 
             <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
-              <p className={`${labelClass} mb-3`}>Invite Code</p>
+              <p className={`${labelClass} mb-3`}>{t('group.inviteCode')}</p>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">
                   {createdGroupInfo.inviteCode}
@@ -449,7 +445,7 @@ export default function GroupSetup({
                 className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark transition-colors"
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied' : 'Copy to Clipboard'}
+                {copied ? t('group.copied') : t('group.copyToClipboard')}
               </button>
             </div>
 
@@ -457,11 +453,11 @@ export default function GroupSetup({
               onSubmit={handleSendInvite}
               className="mb-8 p-6 bg-natural-sage/20 border border-natural-sage/30 rounded-xl"
             >
-              <p className="text-sm font-bold text-natural-text mb-3">Send Invite via Email</p>
+              <p className="text-sm font-bold text-natural-text mb-3">{t('group.sendInviteEmail')}</p>
               <input
                 type="text"
                 required
-                placeholder="Their name"
+                placeholder={t('group.theirName')}
                 value={inviteName}
                 onChange={(e) => setInviteName(e.target.value)}
                 className="w-full mb-2 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
@@ -470,7 +466,7 @@ export default function GroupSetup({
                 <input
                   type="email"
                   required
-                  placeholder="Email"
+                  placeholder={t('auth.email')}
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
@@ -478,7 +474,7 @@ export default function GroupSetup({
                 <button
                   type="submit"
                   disabled={inviteStatus === 'sending'}
-                  aria-label="Send invite"
+                  aria-label={t('group.sendInvite')}
                   className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
                 >
                   {inviteStatus === 'sending' ? (
@@ -489,11 +485,11 @@ export default function GroupSetup({
                 </button>
               </div>
               {inviteStatus === 'success' && (
-                <p className="text-xs text-natural-primary font-medium mt-2">Invite sent.</p>
+                <p className="text-xs text-natural-primary font-medium mt-2">{t('group.inviteSent')}</p>
               )}
               {inviteStatus === 'error' && (
                 <p className="text-xs text-natural-primary font-medium mt-2">
-                  {inviteError || INVITE_FALLBACK_ERROR}
+                  {inviteError || inviteFallbackError}
                 </p>
               )}
             </form>
@@ -502,7 +498,7 @@ export default function GroupSetup({
               onClick={() => onComplete(createdGroupInfo.groupId)}
               className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm"
             >
-              Done, go to Dashboard
+              {t('group.doneDashboard')}
             </button>
           </div>
         </div>
@@ -519,23 +515,23 @@ export default function GroupSetup({
               onClick={() => (onCancel ? onCancel() : (forgetKeepSignedIn(), signOut(auth)))}
               className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
             >
-              <ArrowLeft size={16} /> {onCancel ? 'Cancel' : 'Back'}
+              <ArrowLeft size={16} /> {onCancel ? t('common.cancel') : t('common.back')}
             </button>
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
                 <CherryLogo className="h-12 w-12" />
               </div>
               <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
-                Welcome!
+                {t('group.welcome')}
               </h1>
               <p className="text-natural-accent font-medium text-sm uppercase tracking-widest">
-                MAKE SHARING EXPENSES SWEETER
+                {t('group.tagline')}
               </p>
             </div>
 
             <div className="text-center mb-6">
               <p className="text-natural-muted font-medium">
-                To get started, create a new household or join an existing one.
+                {t('group.getStarted')}
               </p>
             </div>
 
@@ -549,8 +545,8 @@ export default function GroupSetup({
                     <Plus size={24} />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-bold text-natural-text text-sm">Create New Group</h3>
-                    <p className="text-xs text-natural-muted">Start a new shared expense tracker</p>
+                    <h3 className="font-bold text-natural-text text-sm">{t('group.createNew')}</h3>
+                    <p className="text-xs text-natural-muted">{t('group.createNewSub')}</p>
                   </div>
                 </div>
                 <ArrowRight
@@ -568,8 +564,8 @@ export default function GroupSetup({
                     <Key size={24} />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-bold text-natural-text text-sm">Join Existing Group</h3>
-                    <p className="text-xs text-natural-muted">Use an invite code</p>
+                    <h3 className="font-bold text-natural-text text-sm">{t('group.joinExisting')}</h3>
+                    <p className="text-xs text-natural-muted">{t('group.joinExistingSub')}</p>
                   </div>
                 </div>
                 <ArrowRight
@@ -592,12 +588,12 @@ export default function GroupSetup({
             onClick={() => setMode('choose')}
             className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
           >
-            <ArrowLeft size={16} /> Back
+            <ArrowLeft size={16} /> {t('common.back')}
           </button>
 
           <div className="text-center mb-6">
             <h2 className="text-2xl font-semibold font-display text-natural-text">
-              {mode === 'create' ? 'Create a Group' : 'Join a Group'}
+              {mode === 'create' ? t('group.createTitle') : t('group.joinTitle')}
             </h2>
           </div>
 
@@ -611,12 +607,12 @@ export default function GroupSetup({
           {mode === 'create' ? (
             <form onSubmit={handleCreateGroup} className="space-y-6">
               <div>
-                <label className={`${labelClass} block mb-1.5`}>Group Name</label>
+                <label className={`${labelClass} block mb-1.5`}>{t('group.groupName')}</label>
                 <input
                   type="text"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Group name"
+                  placeholder={t('group.groupNamePlaceholder')}
                   className="w-full px-4 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all mb-4"
                   required
                 />
@@ -624,12 +620,9 @@ export default function GroupSetup({
 
               <div>
                 <label className={`${labelClass} block mb-1.5`}>
-                  How many people are in this group?
+                  {t('group.howMany')}
                 </label>
-                <p className="text-xs text-natural-muted mb-4 font-medium">
-                  You can add up to 5 people total. Starting alone is fine: invite someone whenever
-                  you like and they take a share when they join.
-                </p>
+                <p className="text-xs text-natural-muted mb-4 font-medium">{t('group.howManyHelp')}</p>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   {[1, 2, 3, 4, 5].map((num) => (
@@ -649,29 +642,24 @@ export default function GroupSetup({
                           : 'border-natural-border text-natural-muted hover:border-natural-primary/50 hover:bg-natural-bg'
                       }`}
                     >
-                      {num === 1
-                        ? 'Just me for now'
-                        : `You + ${num - 1} ${num - 1 === 1 ? 'other' : 'others'}`}
+                      {num === 1 ? t('group.justMe') : t('group.youPlusOthers', { count: num - 1 })}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className={`${labelClass} block mb-1.5`}>Split Percentages</label>
+                <label className={`${labelClass} block mb-1.5`}>{t('group.splitPercentages')}</label>
                 {numPeople === 2 && (
                   <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">
-                      Want an income-based split recommendation?
+                      {t('group.wantRecommendation')}
                     </p>
-                    <p className="text-xs text-natural-muted">
-                      Enter both incomes and we'll suggest a split proportional to income. You can
-                      still adjust the percentages below.
-                    </p>
+                    <p className="text-xs text-natural-muted">{t('group.recommendationHelp')}</p>
                     <div className="space-y-2">
                       <div>
                         <label className="block text-xs font-semibold text-natural-muted mb-1">
-                          Your annual income
+                          {t('group.yourAnnualIncome')}
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -685,7 +673,7 @@ export default function GroupSetup({
                               setMyIncome(e.target.value);
                               setRecMessage('');
                             }}
-                            placeholder="Amount"
+                            placeholder={t('group.amount')}
                             className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                           />
                         </div>
@@ -693,8 +681,8 @@ export default function GroupSetup({
                       <div>
                         <label className="block text-xs font-semibold text-natural-muted mb-1">
                           {memberNames[1]?.trim()
-                            ? `${memberNames[1].trim()}'s annual income`
-                            : "The other person's annual income"}
+                            ? t('group.namesAnnualIncome', { name: memberNames[1].trim() })
+                            : t('group.otherPersonsAnnualIncome')}
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -708,7 +696,7 @@ export default function GroupSetup({
                               setPartnerIncome(e.target.value);
                               setRecMessage('');
                             }}
-                            placeholder="Amount"
+                            placeholder={t('group.amount')}
                             className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                           />
                         </div>
@@ -719,7 +707,7 @@ export default function GroupSetup({
                       onClick={recommendSplit}
                       className="w-full bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90"
                     >
-                      Calculate Recommended Split
+                      {t('group.calculateSplit')}
                     </button>
                     {recMessage && (
                       <p className="text-xs font-medium text-natural-primary">{recMessage}</p>
@@ -731,7 +719,7 @@ export default function GroupSetup({
                     <div key={idx} className="flex items-center gap-3">
                       {idx === 0 ? (
                         <span className="text-sm font-medium text-natural-text w-24 shrink-0">
-                          You
+                          {t('common.you')}
                         </span>
                       ) : (
                         <input
@@ -742,7 +730,7 @@ export default function GroupSetup({
                             newNames[idx] = e.target.value;
                             setMemberNames(newNames);
                           }}
-                          placeholder={`Cherry ${NUMBER_WORDS[idx] || idx + 1}`}
+                          placeholder={cherryLabel(t, idx + 1)}
                           className="w-24 shrink-0 text-sm font-medium text-natural-text bg-transparent border-b border-dashed border-natural-border focus:border-natural-primary outline-none"
                         />
                       )}
@@ -768,7 +756,7 @@ export default function GroupSetup({
                   ))}
                 </div>
                 <div className="flex justify-between items-center mt-3 px-1">
-                  <span className="text-xs font-medium text-natural-muted">Total:</span>
+                  <span className="text-xs font-medium text-natural-muted">{t('group.total')}</span>
                   <span
                     className={`text-sm font-bold font-mono ${splitBalanced ? 'text-natural-text' : 'text-natural-primary'}`}
                   >
@@ -777,10 +765,10 @@ export default function GroupSetup({
                 </div>
                 {!splitBalanced && (
                   <p className="mt-2 px-1 text-xs font-medium text-natural-primary">
-                    Percentages need to add up to 100% before you can create the group
+                    {t('group.needs100')}
                     {splitTotal > 100
-                      ? ` - that's ${(splitTotal - 100).toFixed(1)}% too much.`
-                      : ` - ${(100 - splitTotal).toFixed(1)}% still to assign.`}
+                      ? t('group.tooMuch', { amount: (splitTotal - 100).toFixed(1) })
+                      : t('group.stillToAssign', { amount: (100 - splitTotal).toFixed(1) })}
                   </p>
                 )}
               </div>
@@ -790,13 +778,13 @@ export default function GroupSetup({
                 disabled={loading || !splitBalanced}
                 className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
-                {loading ? 'Creating...' : 'Create & Get Invite Code'}
+                {loading ? t('group.creating') : t('group.createAndGetCode')}
               </button>
             </form>
           ) : (
             <form onSubmit={handleJoinGroup} className="space-y-6">
               <div>
-                <label className={`${labelClass} block mb-1.5`}>Enter Invite Code</label>
+                <label className={`${labelClass} block mb-1.5`}>{t('group.enterInviteCode')}</label>
                 <input
                   type="text"
                   required
@@ -818,7 +806,7 @@ export default function GroupSetup({
                 disabled={loading}
                 className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
-                {loading ? 'Joining...' : 'Join Group'}
+                {loading ? t('group.joining') : t('group.joinGroup')}
               </button>
             </form>
           )}

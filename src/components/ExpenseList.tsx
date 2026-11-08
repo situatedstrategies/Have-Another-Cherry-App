@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import {
@@ -39,6 +40,7 @@ export default function ExpenseList({
   activeUser,
   onExpenseClick,
 }: ExpenseListProps) {
+  const { t } = useTranslation();
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
   const [search, setSearch] = useState('');
@@ -107,7 +109,7 @@ export default function ExpenseList({
       <div className="p-5 border-b border-natural-border space-y-4" id="list-controls-header">
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <h2 className="text-xl font-display font-semibold text-natural-text">
-            Itemized Transactions
+            {t('list.title')}
           </h2>
 
           {/* Quick Filters */}
@@ -127,14 +129,14 @@ export default function ExpenseList({
                 id={`filter-status-${status}`}
               >
                 {status === 'all'
-                  ? 'All Items'
+                  ? t('list.allItems')
                   : status === 'OPEN'
-                    ? 'Open'
+                    ? t('list.open')
                     : status === 'PENDING'
-                      ? 'Pending'
+                      ? t('list.pending')
                       : status === 'PARTIALLY_SETTLED'
-                        ? 'Partially Settled'
-                        : 'Fully Settled'}
+                        ? t('list.partiallySettled')
+                        : t('list.fullySettled')}
               </button>
             ))}
           </div>
@@ -147,8 +149,8 @@ export default function ExpenseList({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
             <input
               type="text"
-              placeholder="Search"
-              aria-label="Search expenses"
+              placeholder={t('list.search')}
+              aria-label={t('list.searchAria')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
@@ -164,7 +166,7 @@ export default function ExpenseList({
               className="w-full px-3 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-xs outline-none transition-all appearance-none cursor-pointer"
               id="category-filter-select"
             >
-              <option value="all">All Categories</option>
+              <option value="all">{t('list.allCategories')}</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -184,7 +186,7 @@ export default function ExpenseList({
               }`}
               id="sort-date-btn"
             >
-              <ArrowUpDown className="h-3 w-3" /> Date{' '}
+              <ArrowUpDown className="h-3 w-3" /> {t('list.date')}{' '}
               {sortField === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button
@@ -196,7 +198,7 @@ export default function ExpenseList({
               }`}
               id="sort-amount-btn"
             >
-              <ArrowUpDown className="h-3 w-3" /> Amount{' '}
+              <ArrowUpDown className="h-3 w-3" /> {t('list.amount')}{' '}
               {sortField === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
           </div>
@@ -208,10 +210,8 @@ export default function ExpenseList({
         {filteredExpenses.length === 0 ? (
           <div className="p-12 text-center" id="empty-list-state">
             <AlertCircle className="h-10 w-10 text-natural-muted mx-auto mb-3" />
-            <p className="text-natural-text font-semibold text-sm">No expenses found</p>
-            <p className="text-natural-muted text-xs mt-1">
-              Try relaxing your search terms or filters.
-            </p>
+            <p className="text-natural-text font-semibold text-sm">{t('list.noExpenses')}</p>
+            <p className="text-natural-muted text-xs mt-1">{t('list.relaxFilters')}</p>
             {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
               <button
                 onClick={() => {
@@ -221,14 +221,14 @@ export default function ExpenseList({
                 }}
                 className="mt-3 text-natural-primary hover:underline text-xs font-bold inline-flex items-center gap-1"
               >
-                <RefreshCw className="h-3 w-3" /> Clear filters
+                <RefreshCw className="h-3 w-3" /> {t('list.clearFilters')}
               </button>
             )}
           </div>
         ) : (
           filteredExpenses.slice(0, visibleCount).map((exp) => {
             const payerMember = members.find((m) => m.uid === exp.paidBy);
-            const payerName = payerMember?.name || 'Someone';
+            const payerName = payerMember?.name || t('common.someone');
             const isPayerActive = exp.paidBy === activeUser;
             const isFullySettled = isExpenseFullySettled(exp);
             const myRemainingBalance = getRemainingSettlementAmount(exp, activeUser, false);
@@ -241,35 +241,40 @@ export default function ExpenseList({
             let balanceStyle = '';
 
             if (isFullySettled) {
-              balanceText = 'Fully Settled';
+              balanceText = t('list.fullySettled');
               balanceStyle =
                 'text-natural-primary bg-natural-sage border-natural-primary/20 font-semibold';
             } else if (isDark) {
               if (isPayerActive) {
-                balanceText = `Pot: $${getDarkCherryRemaining(exp, false).toFixed(2)} to go`;
+                balanceText = t('list.potToGo', {
+                  amount: formatCurrency(getDarkCherryRemaining(exp, false)),
+                });
                 balanceStyle =
                   'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
-                balanceText = 'Chip in when you can';
+                balanceText = t('list.chipIn');
                 balanceStyle =
                   'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
               }
             } else if (isPayerActive) {
               if (totalRemainingToPayer > 0.01) {
-                balanceText = `Others owe you $${totalRemainingToPayer.toFixed(2)}`;
+                balanceText = t('list.othersOweYou', { amount: formatCurrency(totalRemainingToPayer) });
                 balanceStyle =
                   'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
-                balanceText = 'No balance for you';
+                balanceText = t('list.noBalance');
                 balanceStyle =
                   'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
               }
             } else if (myRemainingBalance > 0.01) {
-              balanceText = `You owe ${payerName} $${myRemainingBalance.toFixed(2)}`;
+              balanceText = t('list.youOwe', {
+                name: payerName,
+                amount: formatCurrency(myRemainingBalance),
+              });
               balanceStyle =
                 'text-natural-text bg-natural-sidebar border-natural-border/20 font-semibold';
             } else {
-              balanceText = 'No balance for you';
+              balanceText = t('list.noBalance');
               balanceStyle =
                 'text-natural-muted bg-natural-sidebar border-natural-border font-semibold';
             }
@@ -279,7 +284,7 @@ export default function ExpenseList({
                 key={exp.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`Open ${exp.title}`}
+                aria-label={t('list.openAria', { title: exp.title })}
                 onClick={() => onExpenseClick(exp)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -328,9 +333,13 @@ export default function ExpenseList({
                       {exp.isRecurring && (
                         <span
                           role="img"
-                          aria-label={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}
+                          aria-label={t('list.recurringLabel', {
+                            label: intervalLabel(exp.recurringInterval || ''),
+                          })}
                           className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                          title={`Recurring: ${intervalLabel(exp.recurringInterval || '')}`}
+                          title={t('list.recurringLabel', {
+                            label: intervalLabel(exp.recurringInterval || ''),
+                          })}
                         >
                           <Repeat size={10} />
                         </span>
@@ -341,7 +350,7 @@ export default function ExpenseList({
                       <span className="font-mono">{formatDate(exp.date)}</span>
                       <span className="text-natural-border">•</span>
                       <span>
-                        Paid by{' '}
+                        {t('list.paidBy')}{' '}
                         <strong className="capitalize text-natural-text font-medium">
                           {payerName}
                         </strong>
@@ -349,10 +358,10 @@ export default function ExpenseList({
                       <span className="text-natural-border">•</span>
                       <span className="font-mono text-xs">
                         {isDark ? (
-                          'Dark Cherry · blind split'
+                          t('list.darkBlind')
                         ) : (
                           <>
-                            Split:{' '}
+                            {t('list.split')}{' '}
                             {members
                               .map(
                                 (m) =>
@@ -405,7 +414,7 @@ export default function ExpenseList({
             className="text-xs font-bold text-natural-primary hover:text-natural-dark bg-natural-sage/30 hover:bg-natural-sage/50 border border-natural-primary/20 px-5 py-2 rounded-full transition-all cursor-pointer"
             id="show-more-expenses-btn"
           >
-            Show more ({filteredExpenses.length - visibleCount} more)
+            {t('list.showMore', { count: filteredExpenses.length - visibleCount })}
           </button>
         </div>
       )}
@@ -417,8 +426,10 @@ export default function ExpenseList({
           id="list-footer-stats"
         >
           <span className="font-medium font-mono">
-            Showing {Math.min(visibleCount, filteredExpenses.length)} of {expenses.length} expense
-            items
+            {t('list.showing', {
+              shown: Math.min(visibleCount, filteredExpenses.length),
+              total: expenses.length,
+            })}
           </span>
           {(statusFilter !== 'all' || categoryFilter !== 'all' || search.trim() !== '') && (
             <button
@@ -430,7 +441,7 @@ export default function ExpenseList({
               className="text-natural-text hover:text-natural-primary font-bold flex items-center gap-1 cursor-pointer"
               id="clear-filters-footer-btn"
             >
-              <RefreshCw className="h-3 w-3" /> Clear filters
+              <RefreshCw className="h-3 w-3" /> {t('list.clearFilters')}
             </button>
           )}
         </div>

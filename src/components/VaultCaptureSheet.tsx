@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '../lib/format';
 import { Camera, Sparkles, HelpCircle, X } from 'lucide-react';
 import Modal from './Modal';
 import { authHeader } from '../firebase';
@@ -29,6 +31,7 @@ const uncertainFields = (x: VaultExtraction) =>
  * loses trust.
  */
 export default function VaultCaptureSheet({ activeUser, categories, onSave, onClose }: Props) {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [intent, setIntent] = useState('');
   const [image, setImage] = useState<{ dataUrl: string; name: string; mime: string } | null>(null);
@@ -69,7 +72,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
       if (!res.ok || !json?.data) throw new Error(json?.error || 'extract failed');
       setResult(json.data as VaultExtraction);
     } catch {
-      setError('Could not organise that right now. You can still save it as a plain note.');
+      setError(t('capture.failed'));
     } finally {
       setBusy(false);
     }
@@ -89,7 +92,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
     const first = body.split('\n')[0].trim();
     persist({
       id: newId(),
-      title: first || 'Note',
+      title: first || t('capture.note'),
       body,
       createdAt: new Date().toISOString(),
       createdBy: activeUser,
@@ -129,7 +132,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
         <div className="min-w-0">
           <p className="text-[13.5px] font-semibold text-natural-text truncate">{value}</p>
           <p className="text-xs text-natural-muted">
-            {unsure ? `${label} · needs checking` : label}
+            {unsure ? t('capture.needsChecking', { label }) : label}
           </p>
         </div>
         {unsure && <HelpCircle size={16} className="text-natural-primary shrink-0" />}
@@ -142,22 +145,20 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
   return (
     <Modal
       onClose={onClose}
-      title={result ? 'Check this over' : 'Add to the vault'}
+      title={result ? t('capture.checkOver') : t('capture.addToVault')}
       icon={<Sparkles className="h-5 w-5 text-natural-primary" />}
       size="lg"
     >
       {!result ? (
         <div className="space-y-4">
-          <p className="text-xs text-natural-muted">
-            Photograph it, pick a photo, or write it down.
-          </p>
+          <p className="text-xs text-natural-muted">{t('capture.intro')}</p>
           {image ? (
             <div className="flex items-center justify-between gap-2 bg-natural-bg/50 border border-natural-border rounded-xl px-3 py-2">
               <span className="text-xs text-natural-text truncate">{image.name}</span>
               <button
                 type="button"
                 onClick={() => setImage(null)}
-                aria-label="Remove image"
+                aria-label={t('capture.removeImage')}
                 className="text-natural-muted hover:text-natural-text"
               >
                 <X size={14} />
@@ -169,7 +170,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
               onClick={() => fileRef.current?.click()}
               className="w-full py-2 text-xs font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary flex items-center justify-center gap-1.5"
             >
-              <Camera size={14} /> Photos
+              <Camera size={14} /> {t('capture.photos')}
             </button>
           )}
           <input
@@ -183,18 +184,18 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Write a note"
+            placeholder={t('capture.writeNote')}
             rows={5}
             className="w-full px-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-text rounded-xl text-sm outline-none"
           />
           <div>
             <label className="block text-[11px] font-mono font-bold uppercase tracking-[0.1em] text-natural-muted mb-1.5">
-              Anything to pull out?
+              {t('capture.pullOut')}
             </label>
             <input
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder="Due date, account"
+              placeholder={t('capture.pullOutPlaceholder')}
               className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-text rounded-xl text-sm outline-none"
             />
           </div>
@@ -209,7 +210,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
             disabled={busy || (!text.trim() && !image)}
             className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5 disabled:opacity-60"
           >
-            <Sparkles size={15} /> {busy ? 'Organising...' : 'Organise it'}
+            <Sparkles size={15} /> {busy ? t('capture.organising') : t('capture.organise')}
           </button>
           <button
             type="button"
@@ -217,20 +218,17 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
             disabled={busy || saving || !text.trim()}
             className="w-full py-2.5 text-sm font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary disabled:opacity-60"
           >
-            {saving ? 'Saving...' : 'Save as a plain note'}
+            {saving ? t('common.saving') : t('capture.savePlain')}
           </button>
-          <p className="text-[11px] text-natural-muted text-center">
-            Organising sends the note to be read once. A plain note is encrypted and saved without
-            anyone reading it.
-          </p>
+          <p className="text-[11px] text-natural-muted text-center">{t('capture.privacyNote')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           {uncertain.length > 0 && (
             <p className="p-3 bg-natural-primary-wash border border-natural-primary/15 rounded-xl text-xs font-medium text-natural-primary">
               {uncertain.length === 1
-                ? `One field is a guess: ${uncertain[0]}. Check it before saving.`
-                : `Some fields are guesses: ${uncertain.join(', ')}. Check them before saving.`}
+                ? t('capture.oneGuess', { field: uncertain[0] })
+                : t('capture.someGuesses', { fields: uncertain.join(', ') })}
             </p>
           )}
           <div>
@@ -241,19 +239,19 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
           </div>
           <div>
             <span className="block text-[11px] font-mono font-bold uppercase tracking-[0.1em] text-natural-muted mb-1">
-              Extracted
+              {t('capture.extracted')}
             </span>
             <div className="bg-white border border-natural-border rounded-2xl px-4">
-              {field('Vendor', result.vendor, 'vendor')}
+              {field(t('capture.vendor'), result.vendor, 'vendor')}
               {field(
-                'Amount',
-                result.amount != null ? `$${result.amount.toFixed(2)}` : undefined,
+                t('capture.amount'),
+                result.amount != null ? formatCurrency(result.amount) : undefined,
                 'amount'
               )}
-              {field('Due', result.dueDate, 'dueDate')}
-              {field('Repeats', result.recurrence, 'recurrence')}
-              {field('Account', result.accountHint, 'accountHint')}
-              {field('Category', result.category, 'category')}
+              {field(t('capture.due'), result.dueDate, 'dueDate')}
+              {field(t('capture.repeats'), result.recurrence, 'recurrence')}
+              {field(t('capture.account'), result.accountHint, 'accountHint')}
+              {field(t('capture.category'), result.category, 'category')}
             </div>
           </div>
           {!!result.tags?.length && (
@@ -274,7 +272,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
               onClick={() => setResult(null)}
               className="flex-1 py-2.5 text-sm font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary"
             >
-              Back
+              {t('common.back')}
             </button>
             <button
               type="button"
@@ -282,7 +280,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
               disabled={saving}
               className="flex-1 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full disabled:opacity-60"
             >
-              {saving ? 'Saving...' : 'Save to the vault'}
+              {saving ? t('common.saving') : t('capture.saveToVault')}
             </button>
           </div>
         </div>

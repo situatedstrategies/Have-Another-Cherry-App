@@ -11,18 +11,21 @@ import { Expense, VaultData } from '../types';
  * so the daily server job can send "due tomorrow" pushes to a household
  * that only uses the web. Port of the iOS reminder publisher.
  *
- * The index is the one thing that crosses out of the encrypted side, so
- * without push permission in this browser the stored index is deleted
- * rather than left behind.
+ * Reminders are a Cherry + feature and the index is the one thing that
+ * crosses out of the encrypted side, so without the entitlement, or without
+ * push permission in this browser, the stored index is deleted rather than
+ * left behind.
  */
 export function useReminderPublisher({
   uid,
   groupId,
   expenses,
+  isPlus,
 }: {
   uid: string | null;
   groupId: string | null;
   expenses: Expense[];
+  isPlus: boolean;
 }) {
   const published = useRef<Record<string, string>>({});
   const vaultRef = useRef<VaultData | null>(null);
@@ -31,7 +34,7 @@ export function useReminderPublisher({
   // The vault is loaded here rather than borrowed from the modal, because
   // the index has to stay current whether or not the vault is open.
   useEffect(() => {
-    if (!groupId) return;
+    if (!groupId || !isPlus) return;
     const unsub = onSnapshot(doc(db, 'group_vault', groupId), async (snap) => {
       try {
         const payload = snap.data()?.payload;
@@ -52,13 +55,13 @@ export function useReminderPublisher({
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [groupId, isPlus]);
 
   const publish = async () => {
     if (!uid || !groupId) return;
     const authorized = pushPermission() === 'granted';
     const ref = doc(db, 'reminder_schedules', groupId);
-    if (!authorized) {
+    if (!isPlus || !authorized) {
       if (published.current[groupId] !== '__cleared__') {
         await deleteDoc(ref).catch(() => {});
         published.current[groupId] = '__cleared__';
@@ -95,5 +98,5 @@ export function useReminderPublisher({
   useEffect(() => {
     void publish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid, groupId, expenses]);
+  }, [uid, groupId, expenses, isPlus]);
 }

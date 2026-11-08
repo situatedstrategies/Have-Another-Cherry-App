@@ -4,7 +4,8 @@
 // continueUrl check in particular is a security control, and a security control
 // that cannot be tested without a browser tends not to get tested.
 
-import { PASSWORD_POLICY_MESSAGE } from './password';
+import { t } from '../i18n';
+import { passwordPolicyMessage } from './password';
 
 export const SUPPORT_EMAIL = 'support@haveanothercherry.com';
 
@@ -40,20 +41,20 @@ export function describeCodeError(err: unknown): string {
 
   switch (code) {
     case 'auth/expired-action-code':
-      return 'This link has expired. These links are only good for a short time, so you will need a fresh one.';
+      return t('authAction.err.expired');
     case 'auth/invalid-action-code':
-      return 'This link is no longer valid. It may have already been used, or a newer link may have replaced it.';
+      return t('authAction.err.invalid');
     case 'auth/user-disabled':
-      return `This account has been disabled. Contact ${SUPPORT_EMAIL} if you think that is a mistake.`;
+      return t('authAction.err.userDisabled', { email: SUPPORT_EMAIL });
     case 'auth/user-not-found':
-      return 'We could not find an account for this link. It may have been removed.';
+      return t('authAction.err.userNotFound');
     case 'auth/weak-password':
-      return PASSWORD_POLICY_MESSAGE;
+      return passwordPolicyMessage();
     case 'auth/network-request-failed':
-      return 'We could not reach our servers. Check your connection and try again.';
+      return t('authAction.err.network');
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a few minutes and try again.';
+      return t('authAction.err.tooMany');
     default:
-      return 'Something went wrong handling this link. Please request a new one and try again.';
+      return t('authAction.err.generic');
   }
 }

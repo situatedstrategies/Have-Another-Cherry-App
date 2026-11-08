@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 // Recurring interval arithmetic, ported from the Flutter client's
 // recurring.dart. Both clients write the same ledger, so they have to agree
 // about which day a cycle falls on; scripts/recurring-parity.ts runs the Dart
@@ -9,10 +10,15 @@ export const RECURRING_WEEKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 export const RECURRING_MONTHS = [1, 2, 3, 6, 12] as const;
 
 /** Every cadence offered, flattened. Used by the parity suite. */
-export const RECURRING_INTERVALS: { value: string; label: string }[] = [
-  ...RECURRING_WEEKS.map((n) => ({ value: `${n}_weeks`, label: intervalLabel(`${n}_weeks`) })),
-  ...RECURRING_MONTHS.map((n) => ({ value: `${n}_months`, label: intervalLabel(`${n}_months`) })),
-];
+export const RECURRING_INTERVALS: { value: string; readonly label: string }[] = [
+  ...RECURRING_WEEKS.map((n) => `${n}_weeks`),
+  ...RECURRING_MONTHS.map((n) => `${n}_months`),
+].map((value) => ({
+  value,
+  get label() {
+    return intervalLabel(value);
+  },
+}));
 
 /** The canonical spelling of an interval, for seeding a picker. Legacy records
  *  say `weekly` / `monthly` / `yearly`; a picker needs the value it offers. */
@@ -155,15 +161,14 @@ export function recurringDaysInMonth(
 export function intervalLabel(interval: string): string {
   const weeks = weeksIn(interval);
   if (weeks !== null) {
-    if (weeks === 1) return 'Weekly';
-    if (weeks === 2) return 'Every 2 weeks';
-    return `Every ${weeks} weeks`;
+    if (weeks === 1) return t('recurring.weekly');
+    return t('recurring.everyWeeks', { count: weeks });
   }
   const months = monthsIn(interval);
   if (months !== null) {
-    if (months === 1) return 'Monthly';
-    if (months === 12) return 'Yearly';
-    return `Every ${months} months`;
+    if (months === 1) return t('recurring.monthly');
+    if (months === 12) return t('recurring.yearly');
+    return t('recurring.everyMonths', { count: months });
   }
   return interval;
 }

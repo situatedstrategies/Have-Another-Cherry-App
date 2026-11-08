@@ -5,6 +5,8 @@
 // Mirrored in the Flutter app's `lib/domain/profile/quiz_retake.dart`;
 // change them together.
 
+import { intlLocale, t } from '../i18n';
+
 export const QUIZ_RETAKE_MONTHS = 3;
 
 /** When the next retake opens, or null when it is open now (no timestamp,
@@ -31,10 +33,10 @@ export const quizRetakeBlocker = (
 ): string | null => {
   if (canRetakeQuiz(financialProfileAt, now)) return null;
   const opens = quizRetakeOpensAt(financialProfileAt)!;
-  const when = opens.toLocaleDateString(undefined, {
+  const when = opens.toLocaleDateString(intlLocale(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-  return `You can retake the quiz on ${when}. A style is a reading of a season, so it opens every ${QUIZ_RETAKE_MONTHS} months.`;
+  return t('quiz.retakeBlocker', { date: when, months: QUIZ_RETAKE_MONTHS });
 };

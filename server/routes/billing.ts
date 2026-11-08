@@ -169,7 +169,9 @@ router.post(
       // A webhook has no request to pass, so the event ties to the person,
       // not to a live session. Awaited so the handler never returns mid-send;
       // the calls never throw. After the entitlement write, which is the
-      // thing this webhook exists for.
+      // thing this webhook exists for. The plan value 'ad-free' and the
+      // event name ad_free_purchased mean Cherry +; both are kept as they
+      // are so HeyCatch history stays continuous (CLAUDE.md).
       const store = String(event?.store || '');
       if (DEACTIVATING.includes(type)) {
         await analytics.setIdentity(uid, { plan: 'free' });

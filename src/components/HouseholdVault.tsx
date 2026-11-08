@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { currentLocale } from '../i18n';
+import { formatCurrency, formatDate, formatDateWith } from '../lib/format';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from '../lib/crypto';
@@ -51,21 +54,9 @@ const MAX_FILE_BYTES = 400 * 1024;
 
 const EMPTY_VAULT: VaultData = { bills: [], docs: [], notes: [] };
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+// Sunday-first, one letter each, in the active language.
+const weekdayLetters = () =>
+  [4, 5, 6, 7, 8, 9, 10].map((d) => formatDateWith(new Date(2026, 0, d), { weekday: 'narrow' }));
 
 const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -81,6 +72,7 @@ export default function HouseholdVault({
   categories,
   onClose,
 }: HouseholdVaultProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'notebook' | 'calendar' | 'bills' | 'docs'>('notebook');
   const [capturing, setCapturing] = useState(false);
   const [vault, setVault] = useState<VaultData>(EMPTY_VAULT);
@@ -180,7 +172,7 @@ export default function HouseholdVault({
         }
       } catch (e) {
         console.error('Vault load failed', e);
-        if (!cancelled) setError('Could not load the vault. Please try again.');
+        if (!cancelled) setError(t('vault.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -212,7 +204,7 @@ export default function HouseholdVault({
     } catch (e) {
       console.error('Vault save failed', e);
       setVault(previous);
-      setError('Could not save to the vault. Please try again.');
+      setError(t('vault.saveFailed'));
       return false;
     }
   };
@@ -244,7 +236,7 @@ export default function HouseholdVault({
     setError('');
     const dueDay = Math.min(31, Math.max(1, Math.round(Number(billDueDay) || 1)));
     if (!billName.trim()) {
-      setError('Give the bill a name.');
+      setError(t('vault.billNameRequired'));
       return;
     }
     const bill: VaultBill = {
@@ -283,7 +275,7 @@ export default function HouseholdVault({
     if (!editingDocId) return;
     const name = docName.trim();
     if (!name) {
-      setError('Give the document a name.');
+      setError(t('vault.docNameRequired'));
       return;
     }
     setError('');
@@ -303,7 +295,10 @@ export default function HouseholdVault({
     setError('');
     if (file.size > MAX_FILE_BYTES) {
       setError(
-        `That file is ${(file.size / 1024).toFixed(0)}KB - the vault currently holds files up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB. Larger storage is coming.`
+        t('vault.fileTooLarge', {
+          size: (file.size / 1024).toFixed(0),
+          max: (MAX_FILE_BYTES / 1024).toFixed(0),
+        })
       );
       return;
     }
@@ -337,7 +332,7 @@ export default function HouseholdVault({
       await persistVault({ ...vault, docs: [...vault.docs, meta] });
     } catch (err) {
       console.error('Vault upload failed', err);
-      setError('Could not upload that file. Please try again.');
+      setError(t('vault.uploadFailed'));
     } finally {
       setBusy(false);
     }
@@ -364,21 +359,21 @@ export default function HouseholdVault({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Vault download failed', err);
-      setError('Could not open that document. Please try again.');
+      setError(t('vault.openFailed'));
     } finally {
       setBusy(false);
     }
   };
 
   const handleDeleteDoc = async (meta: VaultDocMeta) => {
-    if (!window.confirm(`Delete "${meta.name}" from the vault? This cannot be undone.`)) return;
+    if (!window.confirm(t('vault.deleteConfirm', { name: meta.name }))) return;
     setBusy(true);
     try {
       await deleteDoc(doc(db, 'group_vault', groupId, 'files', meta.id));
       await persistVault({ ...vault, docs: vault.docs.filter((d) => d.id !== meta.id) });
     } catch (err) {
       console.error('Vault delete failed', err);
-      setError('Could not delete that document. Please try again.');
+      setError(t('vault.deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -446,7 +441,7 @@ export default function HouseholdVault({
   return (
     <Modal
       onClose={onClose}
-      title="Household Vault"
+      title={t('vault.title')}
       icon={<Vault className="h-5 w-5 text-natural-primary" />}
       size="lg"
       bodyClassName=""
@@ -455,10 +450,10 @@ export default function HouseholdVault({
       <div className="flex items-center gap-1.5 px-6 pt-4">
         {(
           [
-            { key: 'notebook', label: 'Notebook', icon: <NotebookPen size={14} /> },
-            { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={14} /> },
-            { key: 'bills', label: 'Recurring Bills', icon: <ReceiptText size={14} /> },
-            { key: 'docs', label: 'Documents', icon: <FileText size={14} /> },
+            { key: 'notebook', label: t('vault.tab.notebook'), icon: <NotebookPen size={14} /> },
+            { key: 'calendar', label: t('vault.tab.calendar'), icon: <CalendarDays size={14} /> },
+            { key: 'bills', label: t('vault.tab.bills'), icon: <ReceiptText size={14} /> },
+            { key: 'docs', label: t('vault.tab.docs'), icon: <FileText size={14} /> },
           ] as const
         ).map((t) => (
           <button
@@ -491,13 +486,13 @@ export default function HouseholdVault({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
               <input
                 type="text"
-                placeholder="Search"
+                placeholder={t('vault.search')}
                 aria-label={
                   tab === 'bills'
-                    ? 'Search bills'
+                    ? t('vault.searchBills')
                     : tab === 'notebook'
-                      ? 'Search notes'
-                      : 'Search documents'
+                      ? t('vault.searchNotes')
+                      : t('vault.searchDocs')
                 }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -507,7 +502,7 @@ export default function HouseholdVault({
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  aria-label="Clear search"
+                  aria-label={t('vault.clearSearch')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted hover:text-natural-text"
                 >
                   <X size={14} />
@@ -521,7 +516,7 @@ export default function HouseholdVault({
                   onClick={() => setCategoryFilter(null)}
                   className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all ${categoryFilter === null ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'}`}
                 >
-                  Everything
+                  {t('vault.everything')}
                 </button>
                 {categoriesInUse.map((c) => (
                   <button
@@ -540,7 +535,7 @@ export default function HouseholdVault({
 
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-natural-muted text-xs font-mono">
-            <RefreshCcw className="h-4 w-4 animate-spin" /> Opening the vault...
+            <RefreshCcw className="h-4 w-4 animate-spin" /> {t('vault.opening')}
           </div>
         ) : tab === 'notebook' ? (
           <div className="space-y-3">
@@ -549,20 +544,18 @@ export default function HouseholdVault({
               onClick={() => setCapturing(true)}
               className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5"
             >
-              <Plus size={15} /> Add to the vault
+              <Plus size={15} /> {t('vault.addToVault')}
             </button>
             {filteredNotes.length === 0 ? (
               <p className="text-xs text-natural-muted text-center py-6">
-                {filtering
-                  ? 'Nothing in the notebook matches.'
-                  : 'Write down or photograph the things the household runs on. They are encrypted before they leave this device.'}
+                {filtering ? t('vault.notebookNoMatch') : t('vault.notebookEmpty')}
               </p>
             ) : (
               filteredNotes.map((note) => {
                 const meta = [
                   note.vendor,
-                  note.amount != null ? `$${note.amount.toFixed(2)}` : null,
-                  note.dueDate ? `due ${note.dueDate}` : null,
+                  note.amount != null ? formatCurrency(note.amount) : null,
+                  note.dueDate ? t('vault.dueDate', { date: note.dueDate }) : null,
                   note.recurrence && note.recurrence !== 'none' ? note.recurrence : null,
                 ].filter(Boolean);
                 return (
@@ -586,7 +579,7 @@ export default function HouseholdVault({
                       <button
                         type="button"
                         onClick={() => deleteNote(note.id)}
-                        aria-label={`Delete ${note.title}`}
+                        aria-label={t('vault.deleteNamed', { name: note.title })}
                         className="text-natural-muted hover:text-natural-primary shrink-0"
                       >
                         <Trash2 size={14} />
@@ -619,7 +612,7 @@ export default function HouseholdVault({
                     )}
                     {!!note.lowConfidenceFields?.length && (
                       <p className="text-[11px] text-natural-primary">
-                        Unverified: {note.lowConfidenceFields.join(', ')}
+                        {t('vault.unverified', { fields: note.lowConfidenceFields.join(', ') })}
                       </p>
                     )}
                   </div>
@@ -632,24 +625,27 @@ export default function HouseholdVault({
             <div className="flex items-center justify-between">
               <button
                 onClick={() => shiftMonth(-1)}
-                aria-label="Previous month"
+                aria-label={t('vault.prevMonth')}
                 className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"
               >
                 <ChevronLeft size={16} />
               </button>
               <div className="text-center">
                 <span className="text-sm font-display font-semibold text-natural-text">
-                  {MONTH_NAMES[viewMonth]} {viewYear}
+                  {formatDateWith(new Date(viewYear, viewMonth, 1), {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
                 </span>
                 {monthTotal > 0 && (
                   <span className="block text-xs font-mono text-natural-muted">
-                    ~${monthTotal.toFixed(2)} in recurring costs
+                    {t('vault.recurringCosts', { amount: formatCurrency(monthTotal) })}
                   </span>
                 )}
               </div>
               <button
                 onClick={() => shiftMonth(1)}
-                aria-label="Next month"
+                aria-label={t('vault.nextMonth')}
                 className="p-1.5 rounded-lg border border-natural-border text-natural-muted hover:text-natural-text hover:bg-natural-sidebar/50"
               >
                 <ChevronRight size={16} />
@@ -657,7 +653,7 @@ export default function HouseholdVault({
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center">
-              {WEEKDAYS.map((d, i) => (
+              {weekdayLetters().map((d, i) => (
                 <span key={i} className="text-xs font-bold text-natural-muted uppercase py-1">
                   {d}
                 </span>
@@ -680,7 +676,7 @@ export default function HouseholdVault({
                           : 'border-natural-border/40'
                     }`}
                     title={items
-                      .map((x) => `${x.label}${x.amount ? ` ($${x.amount.toFixed(2)})` : ''}`)
+                      .map((x) => `${x.label}${x.amount ? ` (${formatCurrency(x.amount)})` : ''}`)
                       .join('\n')}
                   >
                     <span
@@ -698,7 +694,7 @@ export default function HouseholdVault({
                     ))}
                     {items.length > 2 && (
                       <span className="block text-xs text-natural-muted">
-                        +{items.length - 2} more
+                        {t('vault.more', { count: items.length - 2 })}
                       </span>
                     )}
                   </div>
@@ -708,7 +704,7 @@ export default function HouseholdVault({
 
             <p className="text-xs text-natural-muted flex items-center gap-1.5">
               <Repeat size={12} className="shrink-0" />
-              Shows bills catalogued in the vault plus recurring expenses from your ledger.
+              {t('vault.calendarNote')}
             </p>
           </div>
         ) : tab === 'bills' ? (
@@ -721,11 +717,11 @@ export default function HouseholdVault({
                 <span className="text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
                   {editingBillId ? (
                     <>
-                      <Pencil size={14} /> Edit Bill
+                      <Pencil size={14} /> {t('vault.editBill')}
                     </>
                   ) : (
                     <>
-                      <Plus size={14} /> Catalog a Recurring Bill
+                      <Plus size={14} /> {t('vault.catalogBill')}
                     </>
                   )}
                 </span>
@@ -735,7 +731,7 @@ export default function HouseholdVault({
                     onClick={resetBillForm}
                     className="text-xs font-semibold text-natural-muted hover:text-natural-text"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 )}
               </div>
@@ -745,9 +741,9 @@ export default function HouseholdVault({
                   type="text"
                   value={billName}
                   onChange={(e) => setBillName(e.target.value)}
-                  placeholder="Bill name"
+                  placeholder={t('vault.billName')}
                   required
-                  aria-label="Bill name"
+                  aria-label={t('vault.billName')}
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                 />
                 <div className="relative">
@@ -760,13 +756,15 @@ export default function HouseholdVault({
                     step="0.01"
                     value={billAmount}
                     onChange={(e) => setBillAmount(e.target.value)}
-                    placeholder="Amount"
-                    aria-label="Amount (optional)"
+                    placeholder={t('form.amountPlaceholder')}
+                    aria-label={t('vault.amountOptional')}
                     className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-natural-muted whitespace-nowrap">Due day</label>
+                  <label className="text-xs text-natural-muted whitespace-nowrap">
+                    {t('vault.dueDay')}
+                  </label>
                   <input
                     type="number"
                     min="1"
@@ -780,7 +778,7 @@ export default function HouseholdVault({
                 <select
                   value={billCategory}
                   onChange={(e) => setBillCategory(e.target.value)}
-                  aria-label="Category"
+                  aria-label={t('vault.category')}
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
                 >
                   {categoryOptions.map((c) => (
@@ -796,8 +794,8 @@ export default function HouseholdVault({
                   type="text"
                   value={billNotes}
                   onChange={(e) => setBillNotes(e.target.value)}
-                  placeholder="Notes"
-                  aria-label="Notes (optional)"
+                  placeholder={t('vault.notes')}
+                  aria-label={t('vault.notesOptional')}
                   className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                 />
               </div>
@@ -806,13 +804,17 @@ export default function HouseholdVault({
                 disabled={savingBill}
                 className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-60"
               >
-                {savingBill ? 'Saving...' : editingBillId ? 'Save Changes' : 'Add to Vault'}
+                {savingBill
+                  ? t('common.saving')
+                  : editingBillId
+                    ? t('vault.saveChanges')
+                    : t('vault.addToVaultBtn')}
               </button>
             </form>
 
             {filteredBills.length === 0 ? (
               <p className="text-center text-xs text-natural-muted py-4">
-                {filtering ? 'No bills match that.' : 'No recurring bills catalogued yet.'}
+                {filtering ? t('vault.noBillsMatch') : t('vault.noBills')}
               </p>
             ) : (
               <div className="space-y-2">
@@ -824,7 +826,9 @@ export default function HouseholdVault({
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-natural-text">{bill.name}</span>
                       <span className="block text-xs text-natural-muted">
-                        Due the {ordinal(bill.dueDay)}
+                        {t('vault.dueThe', {
+                          day: currentLocale() === 'en' ? ordinal(bill.dueDay) : bill.dueDay,
+                        })}
                         {bill.category ? ` · ${bill.category}` : ''}
                         {bill.notes ? ` · ${bill.notes}` : ''}
                       </span>
@@ -832,22 +836,22 @@ export default function HouseholdVault({
                     <div className="flex items-center gap-3 shrink-0">
                       {bill.amount != null && (
                         <span className="text-sm font-mono font-bold text-natural-text">
-                          ${bill.amount.toFixed(2)}
+                          {formatCurrency(bill.amount)}
                         </span>
                       )}
                       <button
                         onClick={() => startEditBill(bill)}
                         className="text-natural-muted hover:text-natural-primary"
-                        title="Edit"
-                        aria-label={`Edit ${bill.name}`}
+                        title={t('common.edit')}
+                        aria-label={t('vault.editNamed', { name: bill.name })}
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => removeBill(bill.id)}
                         className="text-natural-muted hover:text-natural-primary"
-                        title="Remove"
-                        aria-label={`Remove ${bill.name}`}
+                        title={t('settings.remove')}
+                        aria-label={t('vault.removeNamed', { name: bill.name })}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -861,11 +865,7 @@ export default function HouseholdVault({
           <div className="space-y-4">
             <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <Lock className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
-              <p className="text-xs text-natural-text leading-relaxed">
-                Documents are encrypted with your group's key before they leave this device - the
-                lease, the wifi password, insurance cards. Security rules restrict them to group
-                members.
-              </p>
+              <p className="text-xs text-natural-text leading-relaxed">{t('vault.docsBody')}</p>
             </div>
 
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
@@ -876,13 +876,13 @@ export default function HouseholdVault({
             >
               <Upload size={14} />{' '}
               {busy
-                ? 'Working...'
-                : `Upload a Document (up to ${(MAX_FILE_BYTES / 1024).toFixed(0)}KB)`}
+                ? t('vault.working')
+                : t('vault.upload', { max: (MAX_FILE_BYTES / 1024).toFixed(0) })}
             </button>
 
             {filteredDocs.length === 0 ? (
               <p className="text-center text-xs text-natural-muted py-4">
-                {filtering ? 'No documents match that.' : 'Nothing in the vault yet.'}
+                {filtering ? t('vault.noDocsMatch') : t('vault.noDocs')}
               </p>
             ) : (
               <div className="space-y-2">
@@ -905,7 +905,7 @@ export default function HouseholdVault({
                         onChange={(e) => setDocCategory(e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
                       >
-                        <option value="">No category</option>
+                        <option value="">{t('vault.noCategory')}</option>
                         {categoryOptions.map((c) => (
                           <option key={c} value={c}>
                             {c}
@@ -921,13 +921,13 @@ export default function HouseholdVault({
                           onClick={() => setEditingDocId(null)}
                           className="px-3 py-1.5 text-xs font-semibold text-natural-muted hover:text-natural-text"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                         <button
                           type="submit"
                           className="px-3 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl"
                         >
-                          Save
+                          {t('common.save')}
                         </button>
                       </div>
                     </form>
@@ -941,8 +941,9 @@ export default function HouseholdVault({
                           {d.name}
                         </span>
                         <span className="block text-xs text-natural-muted">
-                          {(d.size / 1024).toFixed(0)}KB · {memberNames[d.uploadedBy] || 'Someone'}{' '}
-                          · {new Date(d.uploadedAt).toLocaleDateString()}
+                          {(d.size / 1024).toFixed(0)}KB ·{' '}
+                          {memberNames[d.uploadedBy] || t('common.someone')} ·{' '}
+                          {formatDate(d.uploadedAt)}
                           {d.category ? ` · ${d.category}` : ''}
                         </span>
                       </div>
@@ -951,8 +952,8 @@ export default function HouseholdVault({
                           onClick={() => startEditDoc(d)}
                           disabled={busy}
                           className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50"
-                          title="Rename or set a category"
-                          aria-label={`Rename ${d.name} or set its category`}
+                          title={t('vault.renameTitle')}
+                          aria-label={t('vault.renameAria', { name: d.name })}
                         >
                           <Pencil size={14} />
                         </button>
@@ -960,8 +961,8 @@ export default function HouseholdVault({
                           onClick={() => handleDownload(d)}
                           disabled={busy}
                           className="p-1.5 text-natural-primary hover:bg-natural-sage/40 rounded-lg border border-natural-border disabled:opacity-50"
-                          title="Download"
-                          aria-label={`Download ${d.name}`}
+                          title={t('vault.download')}
+                          aria-label={t('vault.downloadNamed', { name: d.name })}
                         >
                           <Download size={14} />
                         </button>
@@ -969,8 +970,8 @@ export default function HouseholdVault({
                           onClick={() => handleDeleteDoc(d)}
                           disabled={busy}
                           className="p-1.5 text-natural-muted hover:text-natural-primary rounded-lg border border-natural-border disabled:opacity-50"
-                          title="Delete"
-                          aria-label={`Delete ${d.name}`}
+                          title={t('common.delete')}
+                          aria-label={t('vault.deleteNamed', { name: d.name })}
                         >
                           <Trash2 size={14} />
                         </button>

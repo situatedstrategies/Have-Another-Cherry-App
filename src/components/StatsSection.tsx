@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { Expense, Group } from '../types';
+import { formatAmount } from '../lib/format';
 import {
   isUnclaimed,
   getRemainingSettlementAmount,
@@ -31,6 +33,7 @@ export default function StatsSection({
   orientation = 'band',
   onCardClick,
 }: StatsSectionProps) {
+  const { t } = useTranslation();
   let youOweAmount = 0;
   let othersOweYouAmount = 0;
   let youOweCount = 0;
@@ -110,34 +113,25 @@ export default function StatsSection({
         onClick={() => onCardClick?.('you_owe')}
         className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
         id="stat-card-you-owe"
-        title="See what you still owe"
+        title={t('stats.seeYouOwe')}
       >
         <div className="flex items-center justify-between mb-3">
-          <span className={labelClass}>You Owe</span>
+          <span className={labelClass}>{t('stats.youOwe')}</span>
           <div className="p-2.5 bg-natural-sidebar text-natural-text rounded-2xl">
             <CreditCard className="h-5 w-5" />
           </div>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-display font-semibold text-natural-text">
-            $
-            {youOweAmount.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatAmount(youOweAmount)}
           </span>
         </div>
         <p className="text-xs text-natural-muted mt-2 font-mono">
-          Across {youOweCount} individual {youOweCount === 1 ? 'item' : 'items'}
+          {t('stats.acrossItems', { count: youOweCount })}
         </p>
         {youOwePending > 0.01 && (
           <p className="text-xs text-natural-primary mt-1 font-medium">
-            $
-            {youOwePending.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{' '}
-            awaiting confirmation
+            {t('stats.awaitingConfirmation', { amount: formatAmount(youOwePending) })}
           </p>
         )}
       </button>
@@ -148,34 +142,25 @@ export default function StatsSection({
         onClick={() => onCardClick?.('owed_to_you')}
         className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
         id="stat-card-others-owe"
-        title="See who still owes you"
+        title={t('stats.seeOthersOwe')}
       >
         <div className="flex items-center justify-between mb-3">
-          <span className={labelClass}>Others Owe You</span>
+          <span className={labelClass}>{t('stats.othersOweYou')}</span>
           <div className="p-2.5 bg-natural-sage text-natural-primary rounded-2xl">
             <TrendingUp className="h-5 w-5" />
           </div>
         </div>
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-display font-semibold text-natural-text">
-            $
-            {othersOweYouAmount.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatAmount(othersOweYouAmount)}
           </span>
         </div>
         <p className="text-xs text-natural-text mt-2 font-mono">
-          Across {othersOweYouCount} individual {othersOweYouCount === 1 ? 'item' : 'items'}
+          {t('stats.acrossItems', { count: othersOweYouCount })}
         </p>
         {othersOwePending > 0.01 && (
           <p className="text-xs text-natural-primary mt-1 font-medium">
-            $
-            {othersOwePending.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{' '}
-            pending your confirmation
+            {t('stats.pendingYourConfirmation', { amount: formatAmount(othersOwePending) })}
           </p>
         )}
       </button>
@@ -186,7 +171,7 @@ export default function StatsSection({
         id="stat-card-settled"
       >
         <div className="flex items-center justify-between mb-3">
-          <span className={labelClass}>Fully Settled Items</span>
+          <span className={labelClass}>{t('stats.fullySettledItems')}</span>
           <div className="p-2.5 bg-white text-natural-primary rounded-2xl border border-natural-border">
             <CheckCircle2 className="h-5 w-5" />
           </div>
@@ -195,14 +180,10 @@ export default function StatsSection({
           <span className="text-3xl font-display font-semibold text-natural-primary">
             {settledCount}
           </span>
-          <span className="text-sm text-natural-muted font-medium">items</span>
+          <span className="text-sm text-natural-muted font-medium">{t('stats.items')}</span>
         </div>
         <p className="text-xs text-natural-muted mt-2 font-mono">
-          Total settled spend: $
-          {settledTotalAmount.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          {t('stats.totalSettled', { amount: formatAmount(settledTotalAmount) })}
         </p>
       </div>
     </div>

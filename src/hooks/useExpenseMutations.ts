@@ -6,6 +6,8 @@ import { normalizeAmount } from '../lib/limits';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
+import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
@@ -94,8 +96,8 @@ export function useExpenseMutations({
           : {}),
       };
       addToast(
-        'Rounded',
-        `Saved as $${normalizedAmount.value.toLocaleString()} - amounts this large round to the nearest $100,000.`,
+        t('expenseHook.rounded'),
+        t('expenseHook.roundedBody', { amount: formatCurrency(normalizedAmount.value, 0) }),
         'info'
       );
     }
@@ -145,7 +147,7 @@ export function useExpenseMutations({
               receivedBy: cleanForm.paidBy,
               amount: roundCurrency(Number(share)),
               instrumentType: cleanForm.contributions?.[0]?.instrumentType || 'OTHER',
-              label: 'Logged as already settled',
+              label: t('expenseHook.quickSettleLabel'),
               timestamp: new Date().toISOString(),
               paymentDate: cleanForm.date,
               status: 'confirmed' as const,
@@ -235,9 +237,9 @@ export function useExpenseMutations({
       setSupportError({
         error: {
           code: 'EXPENSE_DELETE_FAILED',
-          title: "That expense didn't delete",
-          message: 'The expense could not be removed, so it still stands in the ledger.',
-          hint: 'Try again in a moment. If it keeps failing, contact us.',
+          title: t('expenseHook.deleteTitle'),
+          message: t('expenseHook.deleteMessage'),
+          hint: t('expenseHook.deleteHint'),
         },
         screen: 'Ledger',
         detail: String(e?.message || e),

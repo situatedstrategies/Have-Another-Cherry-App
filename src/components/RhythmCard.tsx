@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Expense } from '../types';
 import { computeRhythm } from '../lib/rhythm';
 import { HeartHandshake, Cherry, Sparkles } from 'lucide-react';
@@ -11,6 +12,7 @@ interface RhythmCardProps {
 }
 
 export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardProps) {
+  const { t } = useTranslation();
   const rhythm = useMemo(() => (locked ? null : computeRhythm(expenses)), [expenses, locked]);
 
   if (locked) {
@@ -22,14 +24,14 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
       >
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
-            <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> Your Rhythm
+            <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> {t('rhythm.title')}
           </h3>
           <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
             Cherry +
           </span>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center" aria-hidden="true">
-          {['Settled', 'Days to settle', 'Month streak'].map((label) => (
+          {[t('rhythm.settled'), t('rhythm.daysToSettle'), t('rhythm.monthStreak')].map((label) => (
             <div
               key={label}
               className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50"
@@ -44,8 +46,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
           ))}
         </div>
         <p className="text-xs text-natural-muted flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 shrink-0" /> Settle streaks, anniversaries, and milestones -
-          with Cherry +.
+          <Sparkles className="h-3 w-3 shrink-0" /> {t('rhythm.teaser')}
         </p>
       </button>
     );
@@ -59,7 +60,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
       id="rhythm-card"
     >
       <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
-        <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> Your Rhythm
+        <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> {t('rhythm.title')}
       </h3>
 
       {rhythm.celebration && (
@@ -76,7 +77,9 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
           <span className="block text-lg font-display font-semibold text-natural-text">
             {rhythm.settledPct}%
           </span>
-          <span className="block text-xs font-semibold text-natural-muted uppercase">Settled</span>
+          <span className="block text-xs font-semibold text-natural-muted uppercase">
+            {t('rhythm.settled')}
+          </span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
           <span className="block text-lg font-display font-semibold text-natural-text">
@@ -87,7 +90,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
                 : Math.round(rhythm.medianSettleDays)}
           </span>
           <span className="block text-xs font-semibold text-natural-muted uppercase">
-            Days to settle
+            {t('rhythm.daysToSettle')}
           </span>
         </div>
         <div className="bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50">
@@ -95,14 +98,14 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
             {rhythm.streakMonths}
           </span>
           <span className="block text-xs font-semibold text-natural-muted uppercase">
-            Month streak
+            {t('rhythm.monthStreak')}
           </span>
         </div>
       </div>
 
       {rhythm.streakMonths === 0 && !rhythm.celebration && (
         <p className="text-xs text-natural-muted flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 shrink-0" /> Settle out a full month to start a streak.
+          <Sparkles className="h-3 w-3 shrink-0" /> {t('rhythm.startStreak')}
         </p>
       )}
     </div>

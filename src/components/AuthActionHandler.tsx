@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Lock, Mail } from 'lucide-react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
-  PASSWORD_POLICY_MESSAGE,
   PASSWORD_REQUIREMENTS,
   checkPassword,
   isPasswordValid,
+  passwordPolicyMessage,
+  passwordRequirementLabel,
 } from '../lib/password';
 import { SUPPORT_EMAIL, describeCodeError, sanitizeContinueUrl } from '../lib/authAction';
 import CherryLogo from './CherryLogo';
@@ -24,6 +26,7 @@ type Phase =
   | { kind: 'unsupported' };
 
 export default function AuthActionHandler() {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -54,8 +57,7 @@ export default function AuthActionHandler() {
     if (!mode) {
       setPhase({
         kind: 'error',
-        message:
-          'This link is incomplete. Please open the most recent email we sent you, or request a new link.',
+        message: t('authAction.linkIncomplete'),
         offerNewLink: true,
       });
       return;
@@ -64,8 +66,7 @@ export default function AuthActionHandler() {
     if (!oobCode) {
       setPhase({
         kind: 'error',
-        message:
-          'This link is missing the code it needs to work. It may have been cut off by your email client - try opening it from the original email, or request a new link.',
+        message: t('authAction.linkMissingCode'),
         offerNewLink: mode === 'resetPassword',
       });
       return;
@@ -88,9 +89,8 @@ export default function AuthActionHandler() {
             if (!cancelled) {
               setPhase({
                 kind: 'success',
-                heading: 'Email verified',
-                message:
-                  'Your email address is confirmed. You can head back to Have Another Cherry.',
+                heading: t('authAction.emailVerified'),
+                message: t('authAction.emailVerifiedBody'),
               });
             }
             break;
@@ -100,9 +100,8 @@ export default function AuthActionHandler() {
             if (!cancelled) {
               setPhase({
                 kind: 'success',
-                heading: 'Email address restored',
-                message:
-                  'Your account is back on its previous email address. If you did not expect this change, reset your password now to secure the account.',
+                heading: t('authAction.emailRestored'),
+                message: t('authAction.emailRestoredBody'),
               });
             }
             break;
@@ -126,6 +125,9 @@ export default function AuthActionHandler() {
     return () => {
       cancelled = true;
     };
+    // t is stable for the mounted language; a language switch mid-flow would
+    // not re-run this one-shot handler, which is the intended behaviour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, oobCode]);
 
   const checks = checkPassword(password);
@@ -136,11 +138,11 @@ export default function AuthActionHandler() {
     setFormError('');
 
     if (!valid) {
-      setFormError(PASSWORD_POLICY_MESSAGE);
+      setFormError(passwordPolicyMessage());
       return;
     }
     if (password !== confirm) {
-      setFormError('Those passwords do not match.');
+      setFormError(t('authAction.passwordsMismatch'));
       return;
     }
 
@@ -149,8 +151,8 @@ export default function AuthActionHandler() {
       await confirmPasswordReset(auth, oobCode, password);
       setPhase({
         kind: 'success',
-        heading: 'Password updated',
-        message: 'Your new password is set. You can log in with it now.',
+        heading: t('authAction.passwordUpdated'),
+        message: t('authAction.passwordUpdatedBody'),
       });
     } catch (err) {
       // The code is consumed on success and can also expire mid-form, so a
@@ -167,7 +169,7 @@ export default function AuthActionHandler() {
     setNewLinkInfo('');
 
     if (!newLinkEmail) {
-      setNewLinkError('Enter your email address.');
+      setNewLinkError(t('authAction.enterEmail'));
       return;
     }
 
@@ -180,18 +182,14 @@ export default function AuthActionHandler() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Unable to send reset email. Please try again later.');
+        throw new Error(data.error || t('auth.resetSendFailed'));
       }
-      setNewLinkInfo(
-        `A password reset link is on its way to ${newLinkEmail}. Check your inbox and your spam folder.`
-      );
+      setNewLinkInfo(t('auth.resetSent', { email: newLinkEmail }));
     } catch (err: any) {
       // A fetch that never reached the server rejects with a TypeError whose
       // message is written for developers ("Failed to fetch").
       setNewLinkError(
-        err instanceof TypeError
-          ? 'Could not reach the server. Check your connection and try again.'
-          : err?.message || 'Unable to send reset email. Please try again later.'
+        err instanceof TypeError ? t('auth.offline') : err?.message || t('auth.resetSendFailed')
       );
     } finally {
       setSendingNewLink(false);
@@ -199,7 +197,7 @@ export default function AuthActionHandler() {
   };
 
   const continueHref = continueUrl || '/';
-  const continueLabel = continueUrl ? 'Continue' : 'Back to Have Another Cherry';
+  const continueLabel = continueUrl ? t('authAction.continue') : t('authAction.backToApp');
 
   return (
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
@@ -210,31 +208,28 @@ export default function AuthActionHandler() {
               <CherryLogo className="h-10 w-10" />
             </div>
             <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
-              Have Another Cherry
+              {t('common.brand')}
             </h1>
           </div>
 
           {phase.kind === 'loading' && (
-            <p className="text-center text-sm text-natural-muted py-4">Checking your link...</p>
+            <p className="text-center text-sm text-natural-muted py-4">{t('authAction.checkingLink')}</p>
           )}
 
           {phase.kind === 'unsupported' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">Unsupported link</h2>
+                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.unsupportedLink')}</h2>
               </div>
               <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                 <span className="shrink-0">⚠️</span>
-                <span>
-                  We do not recognise this type of link. If you were sent here from one of our
-                  emails, contact {SUPPORT_EMAIL} and we will sort it out.
-                </span>
+                <span>{t('authAction.unsupportedBody', { email: SUPPORT_EMAIL })}</span>
               </div>
               <a
                 href="/"
                 className="block w-full text-center bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm"
               >
-                Back to Have Another Cherry
+                {t('authAction.backToApp')}
               </a>
             </>
           )}
@@ -242,7 +237,7 @@ export default function AuthActionHandler() {
           {phase.kind === 'error' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">This link did not work</h2>
+                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.linkDidNotWork')}</h2>
               </div>
               <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
                 <span className="shrink-0">⚠️</span>
@@ -266,11 +261,11 @@ export default function AuthActionHandler() {
                   {!newLinkInfo && (
                     <form onSubmit={handleRequestNewLink} className="space-y-4 mb-6">
                       <p className="text-sm text-natural-muted">
-                        Enter your email address and we will send you a fresh reset link.
+                        {t('authAction.freshLink')}
                       </p>
                       <div>
                         <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                          Email
+                          {t('auth.email')}
                         </label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -280,7 +275,7 @@ export default function AuthActionHandler() {
                             value={newLinkEmail}
                             onChange={(e) => setNewLinkEmail(e.target.value)}
                             className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
-                            placeholder="you@example.com"
+                            placeholder={t('auth.emailPlaceholder')}
                           />
                         </div>
                       </div>
@@ -289,7 +284,7 @@ export default function AuthActionHandler() {
                         disabled={sendingNewLink}
                         className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
                       >
-                        {sendingNewLink ? 'Please wait...' : 'Send a new link'}
+                        {sendingNewLink ? t('common.pleaseWait') : t('authAction.sendNewLink')}
                       </button>
                     </form>
                   )}
@@ -301,7 +296,7 @@ export default function AuthActionHandler() {
                   href="/"
                   className="text-natural-text hover:underline font-medium transition-colors"
                 >
-                  Back to Have Another Cherry
+                  {t('authAction.backToApp')}
                 </a>
               </p>
             </>
@@ -328,12 +323,15 @@ export default function AuthActionHandler() {
           {phase.kind === 'resetForm' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">Choose a new password</h2>
+                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.chooseNewPassword')}</h2>
               </div>
 
               <p className="text-sm text-natural-muted mb-4">
-                Setting a new password for{' '}
-                <span className="font-medium text-natural-text">{phase.email}</span>.
+                <Trans
+                  i18nKey="authAction.settingFor"
+                  values={{ email: phase.email }}
+                  components={{ 1: <span className="font-medium text-natural-text" /> }}
+                />
               </p>
 
               {formError && (
@@ -346,7 +344,7 @@ export default function AuthActionHandler() {
               <form onSubmit={handleSetPassword} className="space-y-4 mb-6">
                 <div>
                   <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                    New password
+                    {t('authAction.newPassword')}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -363,7 +361,7 @@ export default function AuthActionHandler() {
                   </div>
                   <div className="mt-2">
                     <p className="text-xs font-semibold text-natural-text mb-1">
-                      Create a password with:
+                      {t('auth.createPasswordWith')}
                     </p>
                     <ul className="space-y-1">
                       {PASSWORD_REQUIREMENTS.map((req) => (
@@ -373,7 +371,8 @@ export default function AuthActionHandler() {
                             checks[req.key] ? 'text-natural-text' : 'text-natural-muted'
                           }`}
                         >
-                          <span>{checks[req.key] ? '✓' : '○'}</span> {req.label}
+                          <span>{checks[req.key] ? '✓' : '○'}</span>{' '}
+                          {passwordRequirementLabel(req.labelKey)}
                         </li>
                       ))}
                     </ul>
@@ -382,7 +381,7 @@ export default function AuthActionHandler() {
 
                 <div>
                   <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                    Confirm new password
+                    {t('authAction.confirmNewPassword')}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -404,7 +403,7 @@ export default function AuthActionHandler() {
                   disabled={submitting || !valid || password !== confirm}
                   className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
-                  {submitting ? 'Please wait...' : 'Set new password'}
+                  {submitting ? t('common.pleaseWait') : t('authAction.setNewPassword')}
                 </button>
               </form>
 
@@ -413,7 +412,7 @@ export default function AuthActionHandler() {
                   href="/"
                   className="text-natural-text hover:underline font-medium transition-colors"
                 >
-                  Back to log in
+                  {t('auth.backToLogin')}
                 </a>
               </p>
             </>

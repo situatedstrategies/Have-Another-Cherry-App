@@ -15,6 +15,7 @@ import { disableWebPush } from '../lib/push';
 import { configureBilling, plusEntitlementActive } from '../lib/billing';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -77,6 +78,7 @@ export function useAuthSession({
           .then((active) => {
             setRcPlus(active);
             // A property change, reported when it is known, not on render.
+            // 'ad-free' means Cherry +; the value is kept for HeyCatch continuity.
             analytics.setPersonProperties({ plan: active ? 'ad-free' : 'free' });
           })
           .catch(console.error);
@@ -137,24 +139,17 @@ export function useAuthSession({
       apple.addScope('name');
       await reauthenticateWithPopup(user, apple);
     } else if (providerId === 'password') {
-      const pw = window.prompt(
-        'For your security, please re-enter your password to permanently delete your account:'
-      );
+      const pw = window.prompt(t('authHook.reauthPrompt'));
       if (!pw) throw new Error('cancelled');
       const credential = EmailAuthProvider.credential(user.email || '', pw);
       await reauthenticateWithCredential(user, credential);
     } else {
-      throw new Error('Please sign out and sign back in, then try deleting your account again.');
+      throw new Error(t('authHook.reauthSignOut'));
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (
-      !window.confirm(
-        'Permanently delete your account? This removes you from your current group, deletes your app profile, clears local ledger data, and deletes your sign-in account. This action cannot be undone.'
-      )
-    )
-      return;
+    if (!window.confirm(t('authHook.deleteConfirm'))) return;
     try {
       // First, so a cancelled reauthentication cannot leave the account half-deleted.
       await reauthenticate();
@@ -186,10 +181,7 @@ export function useAuthSession({
     } catch (err: any) {
       if (err?.message === 'cancelled') return;
       console.error('Error deleting account', err);
-      alert(
-        err?.message ||
-          'Failed to delete your account. Please sign out, sign back in, and try again.'
-      );
+      alert(err?.message || t('authHook.deleteFailed'));
     }
   };
 

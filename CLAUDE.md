@@ -106,11 +106,19 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
 - Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
 
-## Monetisation (owner decision, November 2nd 2026)
+## Monetisation (owner decision, November 8th 2026)
 
-- Every feature is free for everyone. Nothing in `src/` may gate a feature on `isPlus`.
-- Ads pay for it: Google AdSense for signed-in members without ad-free (`src/components/AdBanner.tsx`, bottom of the dashboard; the script never loads for ad-free members). Publisher `ca-pub-2443535982979230`, shared with every Situated Strategies site and app.
-- The one purchase is ad-free: the `have_another_cherry` entitlement, read through `lib/entitlements.hasPlus`. It is the Lifetime package of the RevenueCat offering ($3.99 one-time), bought on the web through `CherryPlusModal`, or in the apps. Old Cherry + subscriptions keep it until they lapse.
+- The free tier shows no ads and never will. No AdSense code, ad script or publisher tag (`ca-pub-...`, `google-adsense-account`) may exist anywhere in this repo.
+- Cherry + is the paid tier: the `have_another_cherry` entitlement, read only through `lib/entitlements.hasPlus` (never `isPlus` directly). It gates the Household Vault, monthly trends, Insights, My month ahead, Who's carrying what, Rhythm, Backups and export, creating a Dark Cherry, the spending threshold and Send reminder. Everything else is free.
+- Cherry + is sold as a monthly or yearly subscription or a one-time lifetime purchase, all through RevenueCat: on the web via `CherryPlusModal` and `lib/billing.ts` (Stripe through RevenueCat Web Billing), in the apps through the App Store and Google Play. Prices live in RevenueCat and the stores, never in code or in this file.
+- The November 2nd 2026 ad-supported model (every feature free, one AdSense ad, a one-time Remove ads purchase) is retired and must not be reintroduced.
+
+## Localization (English, Russian, Spanish)
+
+- i18next + react-i18next. Strings live in `src/locales/{en,ru,es}/translation.json` (one namespace, nested keys such as `settings.signOut`). Components use `useTranslation()` and `<Trans>`; non-React helpers import `t` from `src/i18n.ts`. Never hard-code user-visible English in `src/`; add a key to all three files instead.
+- Language follows `navigator.languages` unless picked in Settings or on the sign-in screen (`LanguageSelect`), remembered in localStorage under `hac_locale` and written to `users/{uid}.locale`. English is the fallback. `src/i18n.ts` sets `<html lang>`.
+- Numbers, currency and dates go through `src/lib/format.ts` (`formatCurrency`, `formatAmount`, `formatDate`, `formatDateWith`, ...), which read the active locale. Do not call `toLocaleString('en-US')` directly.
+- Russian needs the `_one/_few/_many/_other` plural forms; Spanish and English use `_one/_other`. Brand names (Have Another Cherry, Cherry +, Dark Cherry, Household Vault, Venmo, Zelle) stay untranslated. Server emails are not localized yet; the `locale` field on the profile is there for when they are.
 
 ## Design system (match this for UI work)
 
@@ -167,6 +175,9 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
   (`free` / `ad-free`) as a person property. Business events:
   `signup_completed` from `AuthScreen` (client-only Firebase Auth), and
   `ad_free_purchased` from the RevenueCat webhook in `server/routes/billing.ts`.
+  The `ad-free` value and the `ad_free_purchased` name date from the retired
+  ad-supported model; they now mean "has Cherry +" and are kept as they are so
+  HeyCatch history stays continuous. Do not rename them.
 - Single-character paths (`/a`-`/z`, `/0`-`/9`) are HeyCatch short links;
   `server/index.ts` 302s them to `/?utm_source=heycatch&utm_campaign=<char>`.
   Do not add a real single-character route.

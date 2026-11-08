@@ -11,6 +11,7 @@ import {
   type Package,
   type CustomerInfo,
 } from '@revenuecat/purchases-js';
+import { t } from '../i18n';
 
 // Must match the entitlement identifier in the RevenueCat dashboard.
 export const PLUS_ENTITLEMENT_ID = 'have_another_cherry';
@@ -116,10 +117,7 @@ export async function purchasePlus(
     console.error('Cherry + purchase failed', e);
     return {
       status: 'error',
-      message:
-        e instanceof PurchasesError && e.message
-          ? e.message
-          : 'The purchase did not go through - you have not been charged.',
+      message: e instanceof PurchasesError && e.message ? e.message : t('billing.purchaseFailed'),
     };
   }
 }

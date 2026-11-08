@@ -1,218 +1,82 @@
 import { useState } from 'react';
 import { db, authHeader } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { useTranslation } from 'react-i18next';
 
 interface ProfileSetupProps {
   userId: string;
   onComplete: () => void;
 }
 
-type Option = { value: string; label: string };
 type Question = {
   key: string;
-  label: string;
   type: 'number' | 'select';
-  placeholder?: string;
-  help?: string;
-  options?: Option[];
+  /** Option values, in display order. Labels come from quiz.q.<key>.opt.<value>. */
+  options?: string[];
+  /** The question has a quiz.q.<key>.help text. */
+  hasHelp?: boolean;
+  /** The question has a quiz.q.<key>.placeholder text. */
+  hasPlaceholder?: boolean;
   /** May be left blank. Someone keeping a ledger alone has no second income to report. */
   optional?: boolean;
 };
-type Step = { title: string; subtitle?: string; questions: Question[] };
+type Step = { questions: Question[] };
 
 // Detailed, interconnected quiz. Answers are analyzed together by the AI to
-// craft a unique profile (see /api/generate-profile).
+// craft a unique profile (see /api/generate-profile). The texts live in
+// src/locales under quiz.steps.<index> and quiz.q.<key>, so the structure
+// here is only keys, types and option values; the values are what the
+// server receives and must not change with the language.
 const STEPS: Step[] = [
   {
-    title: 'Income & instincts',
-    subtitle: "Let's start with the big picture.",
     questions: [
-      {
-        key: 'income',
-        type: 'number',
-        label: 'Your approximate annual income',
-        placeholder: 'Amount',
-      },
-      {
-        key: 'partnerIncome',
-        type: 'number',
-        label: 'Income of the person you share with (if any)',
-        placeholder: 'Amount',
-        optional: true,
-        help: 'Leave it blank if you are keeping this ledger on your own.',
-      },
-      {
-        key: 'spendingStyle',
-        type: 'select',
-        label: 'Which sounds most like you?',
-        options: [
-          { value: 'saver', label: 'A saver - I hold on tight' },
-          { value: 'spender', label: 'A spender - I enjoy today' },
-          { value: 'balanced', label: 'Balanced - a bit of both' },
-          { value: 'depends', label: 'It depends on the month' },
-        ],
-      },
+      { key: 'income', type: 'number', hasPlaceholder: true },
+      { key: 'partnerIncome', type: 'number', hasPlaceholder: true, optional: true, hasHelp: true },
+      { key: 'spendingStyle', type: 'select', options: ['saver', 'spender', 'balanced', 'depends'] },
     ],
   },
   {
-    title: 'Credit & cash habits',
-    subtitle: 'How money actually moves between you.',
     questions: [
-      {
-        key: 'creditCardUsage',
-        type: 'select',
-        label: 'Who reaches for a credit card more often?',
-        options: [
-          { value: 'me', label: 'Me, almost always' },
-          { value: 'partner', label: 'Someone I share with' },
-          { value: 'equal', label: 'We use them about equally' },
-          { value: 'neither', label: 'We mostly use cash / debit' },
-        ],
-      },
+      { key: 'creditCardUsage', type: 'select', options: ['me', 'partner', 'equal', 'neither'] },
       {
         key: 'aprPromo',
         type: 'select',
-        label: 'Are any credit cards on a 0% APR promo right now?',
-        help: 'This helps us understand how you carry balances.',
-        options: [
-          { value: 'none', label: 'No, none are' },
-          { value: 'mine', label: 'Yes, mine are' },
-          { value: 'partners', label: 'Yes, someone I share with has one' },
-          { value: 'some_not_all', label: 'Some cards are, but not all' },
-          { value: 'not_sure', label: 'Not sure' },
-        ],
+        hasHelp: true,
+        options: ['none', 'mine', 'partners', 'some_not_all', 'not_sure'],
       },
       {
         key: 'creditComfort',
         type: 'select',
-        label: 'When a credit card statement arrives, you usually...',
-        options: [
-          { value: 'pay_in_full', label: 'Pay it in full, always' },
-          { value: 'carry_sometimes', label: 'Carry a balance sometimes' },
-          { value: 'carry_often', label: 'Carry a balance often' },
-          { value: 'avoid_credit', label: "Avoid credit so there's nothing to pay" },
-        ],
+        options: ['pay_in_full', 'carry_sometimes', 'carry_often', 'avoid_credit'],
       },
-      {
-        key: 'cashVsCredit',
-        type: 'select',
-        label: 'For shared purchases, what do you prefer?',
-        options: [
-          { value: 'credit_points', label: 'Credit - I like the points/rewards' },
-          { value: 'debit', label: 'Debit - straight from the account' },
-          { value: 'cash', label: 'Cash - it feels more real' },
-          { value: 'whatever', label: "Whatever's easiest in the moment" },
-        ],
-      },
+      { key: 'cashVsCredit', type: 'select', options: ['credit_points', 'debit', 'cash', 'whatever'] },
     ],
   },
   {
-    title: 'Household flow',
-    subtitle: 'The day-to-day of sharing a home.',
     questions: [
-      {
-        key: 'lowOnCash',
-        type: 'select',
-        label: 'Who tends to be lower on liquid cash?',
-        options: [
-          { value: 'me', label: 'Me' },
-          { value: 'partner', label: 'Someone I share with' },
-          { value: 'fluctuates', label: 'It fluctuates evenly' },
-        ],
-      },
-      {
-        key: 'groceries',
-        type: 'select',
-        label: 'Who usually pays for groceries or does the shopping?',
-        options: [
-          { value: 'me', label: 'Mostly me' },
-          { value: 'partner', label: 'Mostly someone I share with' },
-          { value: 'split', label: 'We take turns evenly' },
-          { value: 'together', label: 'We shop and pay as a household' },
-        ],
-      },
-      {
-        key: 'paybackPreference',
-        type: 'select',
-        label: 'How do you prefer to get paid back?',
-        options: [
-          { value: 'cash', label: 'Direct transfer (Cash, Venmo, Zelle)' },
-          { value: 'goods', label: 'In goods (they buy dinner next time)' },
-          { value: 'services', label: 'In services (they handle a chore)' },
-          { value: 'doesnt_matter', label: "Whatever's easiest" },
-        ],
-      },
+      { key: 'lowOnCash', type: 'select', options: ['me', 'partner', 'fluctuates'] },
+      { key: 'groceries', type: 'select', options: ['me', 'partner', 'split', 'together'] },
+      { key: 'paybackPreference', type: 'select', options: ['cash', 'goods', 'services', 'doesnt_matter'] },
     ],
   },
   {
-    title: 'How money feels',
-    subtitle: 'There are no wrong answers here.',
     questions: [
-      {
-        key: 'moneyFeeling',
-        type: 'select',
-        label: 'When you think about money, it mostly represents...',
-        options: [
-          { value: 'security', label: 'Security & peace of mind' },
-          { value: 'freedom', label: 'Freedom & options' },
-          { value: 'stress', label: 'Stress & pressure' },
-          { value: 'status', label: 'Achievement & status' },
-          { value: 'tool', label: 'Just a tool - nothing emotional' },
-        ],
-      },
-      {
-        key: 'moneyTalkComfort',
-        type: 'select',
-        label: 'How do you feel about talking about money?',
-        options: [
-          { value: 'love', label: 'I love it - bring it on' },
-          { value: 'comfortable', label: "I'm comfortable when it comes up" },
-          { value: 'awkward', label: 'It feels a little awkward' },
-          { value: 'avoid', label: 'I tend to avoid it' },
-        ],
-      },
+      { key: 'moneyFeeling', type: 'select', options: ['security', 'freedom', 'stress', 'status', 'tool'] },
+      { key: 'moneyTalkComfort', type: 'select', options: ['love', 'comfortable', 'awkward', 'avoid'] },
     ],
   },
   {
-    title: 'Talking it through',
-    subtitle: 'How you like to handle the conversations.',
     questions: [
       {
         key: 'conversationStyle',
         type: 'select',
-        label: 'How do you like to start a money conversation?',
-        options: [
-          { value: 'direct', label: 'Directly and in the moment' },
-          { value: 'scheduled', label: 'A planned check-in / money date' },
-          { value: 'casual', label: 'Casually, woven into everyday chat' },
-          { value: 'written', label: 'In writing (text/notes) first' },
-          { value: 'avoid', label: "I'd rather not start it at all" },
-        ],
+        options: ['direct', 'scheduled', 'casual', 'written', 'avoid'],
       },
-      {
-        key: 'conflictStyle',
-        type: 'select',
-        label:
-          'When you and the person or people you share with disagree about money, you tend to...',
-        options: [
-          { value: 'compromise', label: 'Look for a middle-ground compromise' },
-          { value: 'data', label: 'Pull up the numbers and get specific' },
-          { value: 'defer', label: 'Defer to whoever cares more' },
-          { value: 'pause', label: 'Take a pause and revisit later' },
-          { value: 'avoid', label: 'Let it go to keep the peace' },
-        ],
-      },
+      { key: 'conflictStyle', type: 'select', options: ['compromise', 'data', 'defer', 'pause', 'avoid'] },
       {
         key: 'appGoal',
         type: 'select',
-        label: 'What is your primary goal for using this app?',
-        options: [
-          { value: 'conversations', label: 'Improving conversations about money' },
-          { value: 'fairness', label: 'Creating more fairness in spending' },
-          { value: 'transparency', label: 'Being more transparent with everyone' },
-          { value: 'detailed', label: 'Detailed spending tracking' },
-          { value: 'accountable', label: 'Keeping everyone accountable' },
-        ],
+        options: ['conversations', 'fairness', 'transparency', 'detailed', 'accountable'],
       },
     ],
   },
@@ -224,6 +88,7 @@ const INITIAL_ANSWERS: Record<string, string> = STEPS.flatMap((s) => s.questions
 );
 
 export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -249,10 +114,9 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
     setLoading(true);
     setSubmitError('');
     const fallbackProfile = {
-      type: 'The Pragmatic Planner',
-      description: 'You prefer stable financial boundaries and clear, kind communication.',
-      quote:
-        '"Do not save what is left after spending, but spend what is left after saving." - Warren Buffett',
+      type: t('quiz.fallback.type'),
+      description: t('quiz.fallback.description'),
+      quote: t('quiz.fallback.quote'),
       greetingTone: 'harmonious',
     };
     try {
@@ -298,9 +162,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         // answers never reached the account. Say so rather than dropping
         // back to the quiz as if nothing happened.
         console.error('Profile save failed', innerErr);
-        setSubmitError(
-          'Your answers could not be saved. Check your connection and try again; nothing you entered has been lost.'
-        );
+        setSubmitError(t('quiz.saveFailed'));
         setLoading(false);
       }
     }
@@ -312,9 +174,9 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-natural-border border-t-natural-text rounded-full animate-spin mx-auto"></div>
           <h2 className="text-xl font-display font-semibold text-natural-text">
-            Crafting your financial style...
+            {t('quiz.crafting')}
           </h2>
-          <p className="text-sm text-natural-muted">Reading between the lines of your answers.</p>
+          <p className="text-sm text-natural-muted">{t('quiz.reading')}</p>
         </div>
       </div>
     );
@@ -325,10 +187,10 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
       <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-display font-semibold text-natural-text mb-1">
-            Financial Profile Quiz
+            {t('quiz.title')}
           </h1>
           <p className="text-sm text-natural-muted">
-            {currentStep.subtitle || "Let's tailor the app to your habits."}
+            {t(`quiz.steps.${step}.subtitle`, { defaultValue: t('quiz.defaultSubtitle') })}
           </p>
           {/* Progress */}
           <div className="flex gap-1.5 mt-4">
@@ -340,7 +202,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
             ))}
           </div>
           <p className="text-[11px] font-bold text-natural-muted uppercase tracking-wider mt-3">
-            Step {step + 1} of {STEPS.length} · {currentStep.title}
+            {t('quiz.stepOf', { step: step + 1, total: STEPS.length, title: t(`quiz.steps.${step}.title`) })}
           </p>
         </div>
 
@@ -355,7 +217,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
           {currentStep.questions.map((q) => (
             <div key={q.key}>
               <label className="block text-sm font-semibold text-natural-text mb-2">
-                {q.label}
+                {t(`quiz.q.${q.key}.label`)}
               </label>
               {q.type === 'number' ? (
                 <div className="relative">
@@ -369,7 +231,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                     step="1000"
                     value={answers[q.key] || ''}
                     onChange={(e) => setAnswer(q.key, e.target.value)}
-                    placeholder={q.placeholder}
+                    placeholder={q.hasPlaceholder ? t('group.amount') : undefined}
                     className="w-full pl-7 p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                   />
                 </div>
@@ -379,15 +241,17 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                   onChange={(e) => setAnswer(q.key, e.target.value)}
                   className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
                 >
-                  <option value="">Select...</option>
-                  {q.options?.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
+                  <option value="">{t('quiz.select')}</option>
+                  {q.options?.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`quiz.q.${q.key}.opt.${value}`)}
                     </option>
                   ))}
                 </select>
               )}
-              {q.help && <p className="text-xs text-natural-muted mt-1">{q.help}</p>}
+              {q.hasHelp && (
+                <p className="text-xs text-natural-muted mt-1">{t(`quiz.q.${q.key}.help`)}</p>
+              )}
             </div>
           ))}
 
@@ -397,7 +261,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                 onClick={() => setStep((s) => s - 1)}
                 className="w-1/3 bg-natural-border text-natural-text font-medium py-3 px-4 rounded-md hover:bg-natural-border/80"
               >
-                Back
+                {t('common.back')}
               </button>
             )}
             {!isLastStep ? (
@@ -406,7 +270,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                 disabled={!isStepComplete}
                 className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary/90 disabled:opacity-50`}
               >
-                Next
+                {t('common.next')}
               </button>
             ) : (
               <button
@@ -414,7 +278,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                 disabled={!isStepComplete}
                 className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary-ink transition-colors disabled:opacity-50`}
               >
-                Generate Profile
+                {t('quiz.generateProfile')}
               </button>
             )}
           </div>

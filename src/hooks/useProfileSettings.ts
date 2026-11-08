@@ -16,6 +16,8 @@ import { quizRetakeBlocker } from '../lib/quizRetake';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
+import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
@@ -328,7 +330,7 @@ export function useProfileSettings({
 
   const handleSaveName = async (newName: string) => {
     if (!newName) {
-      addToast('Name Required', 'Please enter a name.', 'info');
+      addToast(t('profileHook.nameRequired'), t('profileHook.enterName'), 'info');
       return;
     }
     try {
@@ -348,7 +350,7 @@ export function useProfileSettings({
         await updateDoc(doc(db, 'groups', group.id), { members: newMembers });
       }
       setUserProfile((prev: any) => ({ ...(prev || {}), name: newName }));
-      addToast('Name Updated', 'Your name has been updated.', 'success');
+      addToast(t('profileHook.nameUpdated'), t('profileHook.nameUpdatedBody'), 'success');
     } catch (e) {
       console.error('Failed to update name', e);
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - name' });
@@ -381,14 +383,14 @@ export function useProfileSettings({
   const handleSaveIncome = async (raw: string): Promise<boolean> => {
     const err = incomeInputError(raw);
     if (err) {
-      addToast('Check the income', err, 'error');
+      addToast(t('profileHook.checkIncome'), err, 'error');
       return false;
     }
     const income = normalizeIncome(parseIncome(raw)!);
     try {
       await updateDoc(doc(db, 'users', activeUser), { income });
       setUserProfile((prev: any) => ({ ...(prev || {}), income }));
-      addToast('Income Updated', 'The new figure now shows on your household roster.', 'success');
+      addToast(t('profileHook.incomeUpdated'), t('profileHook.incomeUpdatedBody'), 'success');
       return true;
     } catch (e) {
       console.error('Failed to save income', e);
@@ -406,8 +408,10 @@ export function useProfileSettings({
       await updateDoc(doc(db, 'users', activeUser), { recurringThreshold: val });
       setUserProfile((prev: any) => ({ ...(prev || {}), recurringThreshold: val }));
       addToast(
-        'Threshold Saved',
-        val > 0 ? `We'll flag shared expenses over $${val}.` : 'Threshold cleared.',
+        t('profileHook.thresholdSaved'),
+        val > 0
+          ? t('profileHook.willFlag', { amount: formatCurrency(val, 0) })
+          : t('profileHook.thresholdCleared'),
         'success'
       );
     } catch (e) {
@@ -442,11 +446,7 @@ export function useProfileSettings({
         paymentHandles: undefined,
       }));
       setPaymentHandlesByUid((prev) => ({ ...prev, [activeUser]: handles }));
-      addToast(
-        'Payment Info Saved',
-        'Encrypted and saved. Group members can now pay you directly through Venmo or Zelle.',
-        'success'
-      );
+      addToast(t('profileHook.paymentSaved'), t('profileHook.paymentSavedBody'), 'success');
     } catch (e) {
       console.error('Failed to save payment handles', e);
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - payment handles' });
@@ -458,7 +458,7 @@ export function useProfileSettings({
   const handleRetakeQuiz = async () => {
     const blocker = quizRetakeBlocker(userProfile?.financialProfileAt);
     if (blocker) {
-      addToast('Not yet', blocker, 'info');
+      addToast(t('profileHook.notYet'), blocker, 'info');
       return;
     }
     try {

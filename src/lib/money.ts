@@ -1,4 +1,5 @@
 import { Expense } from '../types';
+import { t } from '../i18n';
 
 export const roundCurrency = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
@@ -166,13 +167,13 @@ export const getNormalizedExpenseStatus = (expense: Expense): NormalizedExpenseS
 export const getExpenseStatusLabel = (expense: Expense): string => {
   // Not "Open": nothing is owed and nothing can be settled until someone
   // claims it, so it does not belong in the same bucket as a real debt.
-  if (isUnclaimed(expense)) return 'Needs a payer';
+  if (isUnclaimed(expense)) return t('status.needsPayer');
 
   const status = getNormalizedExpenseStatus(expense);
 
-  if (status === 'CLOSED') return 'Fully Settled';
-  if (status === 'PENDING') return 'Pending Confirmation';
-  if (status === 'PARTIALLY_SETTLED') return 'Partially Settled';
+  if (status === 'CLOSED') return t('status.fullySettled');
+  if (status === 'PENDING') return t('status.pendingConfirmation');
+  if (status === 'PARTIALLY_SETTLED') return t('status.partiallySettled');
 
-  return 'Open';
+  return t('status.open');
 };

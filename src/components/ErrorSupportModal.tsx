@@ -1,4 +1,5 @@
 import { AlertTriangle, LifeBuoy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import { CherryError, supportMailto, SUPPORT_EMAIL } from '../lib/errors';
 
@@ -18,6 +19,7 @@ export default function ErrorSupportModal({
   detail?: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal
       onClose={onClose}
@@ -32,17 +34,17 @@ export default function ErrorSupportModal({
             href={supportMailto(error, screen, detail)}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-natural-border text-sm font-bold text-natural-text hover:border-natural-primary/50 transition-colors"
           >
-            <LifeBuoy className="h-4 w-4" /> Contact Support
+            <LifeBuoy className="h-4 w-4" /> {t('support.contact')}
           </a>
           <button
             onClick={onClose}
             className="flex-1 bg-natural-primary hover:bg-natural-primary-ink text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors"
           >
-            OK
+            {t('common.ok')}
           </button>
         </div>
         <p className="text-[10px] text-natural-muted">
-          No mail app? Write to {SUPPORT_EMAIL} and mention what happened.
+          {t('support.noMailApp', { email: SUPPORT_EMAIL })}
         </p>
       </div>
     </Modal>

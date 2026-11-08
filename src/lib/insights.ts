@@ -7,6 +7,7 @@
 // money) and `settlements[].instrumentType` (how they were paid back).
 
 import { Expense } from '../types';
+import { t } from '../i18n';
 import { roundCurrency, isExpenseFullySettled, isUnclaimed } from './money';
 
 // Venmo's instant transfer fee, as a fraction, with its floor and ceiling.
@@ -106,7 +107,7 @@ export interface CategoryTrend {
 }
 
 const categoryName = (e: Expense) =>
-  (e.category || '').trim() === '' ? 'Uncategorised' : e.category;
+  (e.category || '').trim() === '' ? t('insights.uncategorised') : e.category;
 
 export const categoryTrends = (expenses: Expense[]): CategoryTrend[] => {
   const byCategory: Record<string, Expense[]> = {};

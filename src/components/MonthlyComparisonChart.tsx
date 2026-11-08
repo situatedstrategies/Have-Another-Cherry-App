@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { t as tr } from '../i18n';
+import { formatCurrency, formatDateWith } from '../lib/format';
 import {
   LineChart,
   Line,
@@ -19,21 +22,6 @@ interface MonthlyComparisonChartProps {
   expenses: Expense[];
   members: User[];
 }
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
 
 const RANGES: { key: string; label: string; months: number }[] = [
   { key: '1M', label: '1M', months: 1 },
@@ -61,10 +49,12 @@ function LendingTooltip({ active, payload, label, compare }: any) {
     >
       <p style={{ fontWeight: 700, color: colors.text, marginBottom: 4 }}>{label}</p>
       <p style={{ color: colors.text, fontWeight: 600 }}>
-        Total lent: ${Number(d.lending || 0).toFixed(2)}
+        {tr('chart.totalLent', { amount: formatCurrency(Number(d.lending || 0)) })}
       </p>
       {compare && (
-        <p style={{ color: colors.subtle }}>Previous: ${Number(d.prevLending || 0).toFixed(2)}</p>
+        <p style={{ color: colors.subtle }}>
+          {tr('chart.previous', { amount: formatCurrency(Number(d.prevLending || 0)) })}
+        </p>
       )}
       {Object.keys(lentBy).length > 0 && (
         <div style={{ marginTop: 6 }}>
@@ -76,11 +66,11 @@ function LendingTooltip({ active, payload, label, compare }: any) {
               letterSpacing: '0.05em',
             }}
           >
-            Lent by
+            {tr('chart.lentBy')}
           </p>
           {Object.entries(lentBy).map(([name, amt]) => (
             <p key={name} style={{ color: colors.text }}>
-              {name}: <strong>${Number(amt).toFixed(2)}</strong>
+              {name}: <strong>{formatCurrency(Number(amt))}</strong>
             </p>
           ))}
         </div>
@@ -95,11 +85,11 @@ function LendingTooltip({ active, payload, label, compare }: any) {
               letterSpacing: '0.05em',
             }}
           >
-            Borrowed by
+            {tr('chart.borrowedBy')}
           </p>
           {Object.entries(borrowedBy).map(([name, amt]) => (
             <p key={name} style={{ color: colors.text }}>
-              {name}: <strong>${Number(amt).toFixed(2)}</strong>
+              {name}: <strong>{formatCurrency(Number(amt))}</strong>
             </p>
           ))}
         </div>
@@ -109,6 +99,7 @@ function LendingTooltip({ active, payload, label, compare }: any) {
 }
 
 export default function MonthlyComparisonChart({ expenses, members }: MonthlyComparisonChartProps) {
+  const { t } = useTranslation();
   const [rangeKey, setRangeKey] = useState('6M');
   const [compare, setCompare] = useState(false);
 
@@ -128,7 +119,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
           year: d.getFullYear(),
           month: d.getMonth(),
           label:
-            MONTH_NAMES[d.getMonth()].substring(0, 3) +
+            formatDateWith(d, { month: 'short' }) +
             (withYear ? ` '${String(d.getFullYear()).slice(2)}` : ''),
         };
       });
@@ -176,7 +167,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
             }
           });
           if (exp.splitType === 'third_party' && exp.thirdPersonShare) {
-            const n = exp.thirdPersonName || 'Third person';
+            const n = exp.thirdPersonName || t('chart.thirdPerson');
             b.borrowedBy[n] = roundCurrency((b.borrowedBy[n] || 0) + exp.thirdPersonShare);
           }
           (exp.extraParticipants || []).forEach((g) => {
@@ -199,12 +190,16 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       lentBy: b.lentBy,
       borrowedBy: b.borrowedBy,
     }));
-  }, [expenses, members, months]);
+  }, [expenses, members, months, t]);
 
   const rangeLabel =
-    RANGES.find((r) => r.key === rangeKey)?.months === 1 ? 'Last month' : `Last ${months} months`;
+    RANGES.find((r) => r.key === rangeKey)?.months === 1
+      ? t('chart.lastMonth')
+      : t('chart.lastMonths', { count: months });
   const subtitle = compare
-    ? `${rangeLabel} vs previous ${months === 1 ? 'month' : `${months} months`}`
+    ? months === 1
+      ? t('chart.vsPreviousMonth', { range: rangeLabel })
+      : t('chart.vsPreviousMonths', { range: rangeLabel, count: months })
     : rangeLabel;
 
   const Controls = (
@@ -234,7 +229,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
             : 'bg-white text-natural-muted border-natural-border hover:border-natural-primary/50'
         }`}
       >
-        Compare previous
+        {t('chart.comparePrevious')}
       </button>
     </div>
   );
@@ -244,7 +239,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-natural-text uppercase tracking-wider">
-            Spending &amp; Lending Trends
+            {t('chart.title')}
           </h3>
           <p className="text-xs text-natural-muted mt-1">{subtitle}</p>
         </div>
@@ -255,7 +250,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
         {/* Spending */}
         <div className="bg-white rounded-xl border border-natural-border shadow-sm p-6">
           <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">
-            Monthly Spending
+            {t('chart.monthlySpending')}
           </h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -281,15 +276,15 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                   }}
                   formatter={(value, name) => [
-                    `$${Number(value).toFixed(2)}`,
-                    name === 'prevSpending' ? 'Previous' : 'This period',
+                    formatCurrency(Number(value)),
+                    name === 'prevSpending' ? t('chart.previousLabel') : t('chart.thisPeriod'),
                   ]}
                 />
                 {compare && <Legend wrapperStyle={{ fontSize: 11 }} />}
                 <Line
                   type="monotone"
                   dataKey="spending"
-                  name="This period"
+                  name={t('chart.thisPeriod')}
                   stroke={colors.primary}
                   strokeWidth={3}
                   dot={{ r: 4, fill: colors.primary }}
@@ -299,7 +294,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                   <Line
                     type="monotone"
                     dataKey="prevSpending"
-                    name="Previous"
+                    name={t('chart.previousLabel')}
                     stroke={colors.primary}
                     strokeDasharray="4 4"
                     strokeWidth={2}
@@ -315,7 +310,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
         {/* Lending */}
         <div className="bg-white rounded-xl border border-natural-border shadow-sm p-6">
           <h4 className="text-xs font-bold text-natural-text uppercase tracking-wider mb-4">
-            Monthly Lending
+            {t('chart.monthlyLending')}
           </h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -339,7 +334,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                 <Line
                   type="monotone"
                   dataKey="lending"
-                  name="This period"
+                  name={t('chart.thisPeriod')}
                   stroke={colors.text}
                   strokeWidth={3}
                   dot={{ r: 4, fill: colors.text }}
@@ -349,7 +344,7 @@ export default function MonthlyComparisonChart({ expenses, members }: MonthlyCom
                   <Line
                     type="monotone"
                     dataKey="prevLending"
-                    name="Previous"
+                    name={t('chart.previousLabel')}
                     stroke={colors.text}
                     strokeDasharray="4 4"
                     strokeWidth={2}

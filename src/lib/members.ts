@@ -8,6 +8,7 @@
 // together.
 
 import { Group } from '../types';
+import { t } from '../i18n';
 
 // A group can be created with up to five people, and an existing group can
 // grow by up to two more after the fact (a couple bringing in a roommate, a
@@ -42,7 +43,8 @@ export const nameOf = (
   uid: string,
   members: { uid: string; name?: string }[],
   selfUid?: string
-): string => (uid === selfUid ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone');
+): string =>
+  uid === selfUid ? t('common.you') : members.find((m) => m.uid === uid)?.name || t('common.someone');
 
 export const getFullDefaultSplit = (group: any) => {
   if (!group) return {};
@@ -60,10 +62,10 @@ export const pendingSeats = (group: Partial<Group> | null | undefined): PendingS
   const raw: any[] = Array.isArray(group?.availableSplits) ? (group!.availableSplits as any[]) : [];
   return raw.map((s, idx) => {
     if (s && typeof s === 'object') {
-      return { name: String(s.name || `Person ${idx + 2}`), split: Number(s.split) || 0 };
+      return { name: String(s.name || t('members.personN', { n: idx + 2 })), split: Number(s.split) || 0 };
     }
-    if (typeof s === 'number') return { name: `Person ${idx + 2}`, split: s };
-    return { name: String(s || `Person ${idx + 2}`), split: 0 };
+    if (typeof s === 'number') return { name: t('members.personN', { n: idx + 2 }), split: s };
+    return { name: String(s || t('members.personN', { n: idx + 2 })), split: 0 };
   });
 };
 
@@ -103,12 +105,12 @@ export const addedSeats = (group: Partial<Group> | null | undefined): number =>
 
 /** Why a seat cannot be added right now, or null when one can. */
 export const seatAddBlocker = (group: Partial<Group> | null | undefined): string | null => {
-  if (!group) return 'No group loaded.';
+  if (!group) return t('members.noGroupLoaded');
   if (addedSeats(group) >= MAX_ADDED_SEATS) {
-    return 'This group has already grown by two people, which is as far as a group can grow.';
+    return t('members.grownMax');
   }
   if (seatsInUse(group) >= MAX_GROUP_MEMBERS) {
-    return `A group can have up to ${MAX_GROUP_MEMBERS} people.`;
+    return t('members.upTo', { max: MAX_GROUP_MEMBERS });
   }
   return null;
 };
@@ -177,10 +179,10 @@ export const withAddedSeat = (group: Partial<Group>, name: string, percent: numb
   const blocker = seatAddBlocker(group);
   if (blocker) throw new Error(blocker);
   const cleanName = name.trim();
-  if (!cleanName) throw new Error('Enter a name for the new person.');
+  if (!cleanName) throw new Error(t('members.enterName'));
   const pct = round1(Number(percent));
   if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-    throw new Error('Enter a percentage between 0 and 100.');
+    throw new Error(t('members.enterPercent'));
   }
   const pending = [...pendingSeats(group), { name: cleanName, split: pct }];
   // Scale everyone who was already here into what is left after the new seat.
@@ -202,7 +204,7 @@ export const withAddedSeat = (group: Partial<Group>, name: string, percent: numb
  */
 export const withRemovedSeat = (group: Partial<Group>, index: number): SeatUpdate => {
   const pending = pendingSeats(group);
-  if (index < 0 || index >= pending.length) throw new Error('That seat no longer exists.');
+  if (index < 0 || index >= pending.length) throw new Error(t('members.seatGone'));
   const remaining = pending.filter((_, i) => i !== index);
   const { defaultSplit, availableSplits } = rebalance(group, remaining, 0);
   const seats = joinedUids(group).length + remaining.length;
@@ -222,16 +224,19 @@ export const incomeRecalcBlocker = (
   incomesByName: Record<string, number | null>
 ): string | null => {
   const names = Object.keys(incomesByName);
-  if (names.length === 0) return 'Nobody has joined yet.';
+  if (names.length === 0) return t('members.nobodyJoined');
   const missing = names.filter((n) => incomesByName[n] == null);
   if (missing.length === names.length) {
-    return 'Nobody has shared an income yet. Each person adds theirs from their own profile.';
+    return t('members.nobodyIncome');
   }
   if (missing.length > 0) {
-    return `${missing.join(' and ')} ${missing.length === 1 ? "hasn't" : "haven't"} shared an income yet.`;
+    return t('members.missingIncome', {
+      names: missing.join(` ${t('common.and')} `),
+      count: missing.length,
+    });
   }
   const total = names.reduce((t, n) => t + (incomesByName[n] || 0), 0);
-  if (total <= 0) return 'The incomes add up to $0, so there is no ratio.';
+  if (total <= 0) return t('members.incomesZero');
   return null;
 };
 

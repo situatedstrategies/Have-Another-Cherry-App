@@ -11,12 +11,13 @@ import {
   type PlusPlan,
 } from '../lib/billing';
 import { labelClass } from '../lib/ui';
+import { useTranslation } from 'react-i18next';
 
-// The ad-free page. Every feature is free; ads pay for the app, and this is
-// the one thing for sale: a single payment that turns them off on every
-// device you sign in to. Web selling runs through lib/billing.ts and
-// RevenueCat's hosted checkout when VITE_RC_WEB_KEY is set; with no key the
-// page explains where else to buy and offers the launch-news list instead.
+// The Cherry + page. Three plans, monthly, yearly and lifetime, all from the
+// current RevenueCat offering so no price is ever typed here. Web selling
+// runs through lib/billing.ts and RevenueCat's hosted checkout when
+// VITE_RC_WEB_KEY is set; with no key the page explains where else to buy
+// and offers the launch-news list instead.
 export default function CherryPlusModal({
   onClose,
   customerEmail,
@@ -26,6 +27,7 @@ export default function CherryPlusModal({
   customerEmail?: string;
   onPurchased?: () => void;
 }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [plans, setPlans] = useState<PlusPlan[] | null>(billingAvailable() ? null : []);
@@ -40,12 +42,10 @@ export default function CherryPlusModal({
     (async () => {
       const [offerings, portal] = await Promise.all([plusOfferings(), manageSubscriptionUrl()]);
       if (!cancelled) {
-        // The one-time plan is the only thing for sale. The monthly and
-        // yearly packages stay in the shared offering for subscribers who
-        // already have them and are never offered to a new buyer; if the
-        // one-time plan is missing, the page says it is not open yet rather
-        // than selling a subscription the site no longer describes.
-        setPlans(offerings.filter((p) => p.key === 'lifetime'));
+        // Every package of the current offering, monthly first and lifetime
+        // last (lib/billing.ts orders them). An empty list means the offering
+        // is not set up yet and the page says so.
+        setPlans(offerings);
         setManageUrl(portal);
       }
     })();
@@ -86,11 +86,16 @@ export default function CherryPlusModal({
     }
   };
 
+  // Monthly and yearly carry a 14-day free trial; lifetime is one payment.
   const PLAN_BLURB: Record<string, string> = {
-    lifetime: 'One payment. No ads, forever.',
+    monthly: t('plus.monthlyBlurb'),
+    yearly: t('plus.yearlyBlurb'),
+    lifetime: t('plus.lifetimeBlurb'),
   };
   const PLAN_LABEL: Record<string, string> = {
-    lifetime: 'Remove ads',
+    monthly: t('plus.monthly'),
+    yearly: t('plus.yearly'),
+    lifetime: t('plus.lifetime'),
   };
 
   const storeReady = (plans?.length ?? 0) > 0;
@@ -98,7 +103,7 @@ export default function CherryPlusModal({
   return (
     <Modal
       onClose={onClose}
-      title="Remove ads"
+      title={t('plus.title')}
       icon={<Cherry className="h-5 w-5 text-natural-primary" />}
     >
       <div className="space-y-5 text-center">
@@ -109,28 +114,26 @@ export default function CherryPlusModal({
         {purchaseState === 'purchased' ? (
           <div className="space-y-3">
             <h3 className="text-xl font-display font-semibold text-natural-text">
-              Ads are off. Thank you.
+              {t('plus.welcome')}
             </h3>
             <div className="bg-natural-sage/40 border border-natural-primary/20 rounded-xl p-4 flex items-center justify-center gap-2 text-sm font-bold text-natural-primary">
-              <Check className="h-4 w-4" /> Ad-free follows your account to every device, apps
-              included.
+              <Check className="h-4 w-4" /> {t('plus.unlocked')}
             </div>
             <button
               onClick={onClose}
               className="bg-natural-primary hover:bg-natural-primary-ink text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-colors"
             >
-              Back to the ledger
+              {t('plus.backToLedger')}
             </button>
           </div>
         ) : storeReady ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-xl font-display font-semibold text-natural-text">
-                Everything is free. The ads pay for it.
+                {t('plus.headline')}
               </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                One payment turns them off for good, on every device you sign in to. Nothing else
-                changes: every feature is already yours.
+                {t('plus.body')}
               </p>
             </div>
             <div className="space-y-2 max-w-sm mx-auto">
@@ -167,55 +170,52 @@ export default function CherryPlusModal({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-natural-muted hover:text-natural-text"
               >
-                Manage an existing purchase <ExternalLink className="h-3 w-3" />
+                {t('plus.manage')} <ExternalLink className="h-3 w-3" />
               </a>
             )}
             {isSandboxBilling && (
               <p className="text-[10px] text-natural-muted">
-                Sandbox billing - test cards only, no real charges.
+                {t('plus.sandbox')}
               </p>
             )}
             <p className="text-[10px] text-natural-muted max-w-sm mx-auto">
-              Prices subject to change with notice. Taxes may apply. Payments are processed by
-              RevenueCat; we never see your card. Bought ad-free in the iPhone or Android app? It
-              applies here too, on the same account.
+              {t('plus.fineprint')}
             </p>
           </div>
         ) : plans === null ? (
-          <p className="text-sm text-natural-muted">Loading...</p>
+          <p className="text-sm text-natural-muted">{t('common.loading')}</p>
         ) : (
           <>
             <div>
               <h3 className="text-xl font-display font-semibold text-natural-text">
-                Not open for purchase on the web just yet.
+                {t('plus.notOpenYet')}
               </h3>
               <p className="text-sm text-natural-muted mt-2 leading-relaxed max-w-sm mx-auto">
-                Every feature is free. Removing the ads will be a single small payment; leave your
-                email and we will write when it opens here.
+                {t('plus.notOpenBody')}
               </p>
             </div>
 
             {status === 'done' ? (
               <div className="bg-natural-sage/40 border border-natural-primary/20 rounded-xl p-4 flex items-center justify-center gap-2 text-sm font-bold text-natural-primary">
-                <Check className="h-4 w-4" /> You're on the list - we'll write when it's ready.
+                <Check className="h-4 w-4" /> {t('plus.onTheList')}
               </div>
             ) : (
               <form onSubmit={handleWaitlist} className="max-w-sm mx-auto space-y-2">
-                <label className={`${labelClass} block`}>Get a note when it opens</label>
+                <label className={`${labelClass} block`}>{t('plus.getNote')}</label>
                 <div className="flex gap-2">
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     className="flex-1 px-3 py-2.5 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-xl text-sm outline-none transition-all"
                   />
                   <button
                     type="submit"
                     disabled={status === 'sending'}
                     className="bg-natural-primary hover:bg-natural-primary-ink text-white px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
-                    aria-label="Sign up for updates"
+                    aria-label={t('plus.signUpForUpdates')}
                   >
                     {status === 'sending' ? (
                       <span className="animate-spin inline-block text-xs">◌</span>
@@ -226,11 +226,11 @@ export default function CherryPlusModal({
                 </div>
                 {status === 'error' && (
                   <p className="text-xs text-natural-primary font-medium">
-                    Couldn't save that - please try again.
+                    {t('plus.couldNotSave')}
                   </p>
                 )}
                 <p className="text-xs text-natural-muted">
-                  Just launch news - no spam, and never your ledger.
+                  {t('plus.justLaunchNews')}
                 </p>
               </form>
             )}
@@ -238,8 +238,7 @@ export default function CherryPlusModal({
             <div className="flex items-start gap-3 text-left bg-natural-pebble/60 border border-natural-border rounded-xl p-3.5 max-w-sm mx-auto">
               <Smartphone className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
               <p className="text-xs text-natural-muted leading-relaxed">
-                Ad-free can be bought in the iPhone and Android apps. Buy it there once and it
-                applies here too, on the same account.
+                {t('plus.buyInApps')}
               </p>
             </div>
           </>
