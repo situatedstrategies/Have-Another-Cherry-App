@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { getFullMembers } from '../lib/members';
 import { Expense, Group } from '../types';
 import {
@@ -35,7 +36,8 @@ import DarkCherryInfoModal, {
 } from './DarkCherryInfoModal';
 import ReflectionsSection from './ReflectionsSection';
 import { intervalLabel } from '../lib/recurring';
-import { formatDate, formatDateTime } from '../lib/format';
+import { formatCurrency, formatDate, formatDateTime } from '../lib/format';
+import { instrumentLabel } from '../lib/instruments';
 import { labelClass } from '../lib/ui';
 
 interface ExpenseDetailProps {
@@ -68,6 +70,7 @@ export default function ExpenseDetail({
   onClaim,
   onGentleRemind,
 }: ExpenseDetailProps) {
+  const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
   const [nudging, setNudging] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -84,7 +87,7 @@ export default function ExpenseDetail({
 
   const members = useMemo(() => getFullMembers(group), [group]);
   const payerMember = members.find((m) => m.uid === expense.paidBy);
-  const payerName = payerMember?.name || 'Someone';
+  const payerName = payerMember?.name || t('common.someone');
   const isPayerActive = expense.paidBy === activeUser;
   // A nudge is a push to a real account. A pending seat (ghost_N) has no
   // device to reach, so the button only shows when someone who has actually
@@ -127,7 +130,7 @@ export default function ExpenseDetail({
         >
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
-              Expense Details
+              {t('detail.title')}
             </span>
             <span
               className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
@@ -144,7 +147,7 @@ export default function ExpenseDetail({
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="text-natural-muted hover:text-natural-text hover:bg-natural-sidebar p-2 rounded-xl transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
@@ -180,11 +183,15 @@ export default function ExpenseDetail({
                     <Cherry className="h-7 w-7 text-natural-primary" /> •••
                   </span>
                 ) : (
-                  `$${expense.amount.toFixed(2)}`
+                  formatCurrency(expense.amount)
                 )}
               </span>
               <span className="block text-xs font-semibold text-natural-muted mt-1">
-                Paid by <span className="capitalize text-natural-text">{payerName}</span>
+                <Trans
+                  i18nKey="detail.paidBy"
+                  values={{ name: payerName }}
+                  components={{ 1: <span className="capitalize text-natural-text" /> }}
+                />
               </span>
             </div>
           </div>
@@ -206,11 +213,13 @@ export default function ExpenseDetail({
                       <AlertCircle className="h-4 w-4 text-natural-text mt-0.5 shrink-0" />
                       <div className="text-xs">
                         <p className="font-bold text-natural-text capitalize">
-                          {members.find((m) => m.uid === s.paidBy)?.name || 'Someone'} paid $
-                          {s.amount.toFixed(2)}
+                          {t('detail.someonePaid', {
+                            name: members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
+                            amount: formatCurrency(s.amount),
+                          })}
                         </p>
                         <p className="text-natural-muted mt-0.5">
-                          via {s.instrumentType}
+                          {t('detail.via', { method: instrumentLabel(s.instrumentType) })}
                           {s.paymentDate ? ` · ${formatDate(s.paymentDate)}` : ''}
                         </p>
                         {s.label && <p className="text-natural-muted mt-0.5 italic">"{s.label}"</p>}
@@ -220,7 +229,7 @@ export default function ExpenseDetail({
                       onClick={() => onConfirmReceipt(s.id)}
                       className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <ShieldCheck className="h-4 w-4" /> Confirm Receipt
+                      <ShieldCheck className="h-4 w-4" /> {t('detail.confirmReceipt')}
                     </button>
                   </div>
                 ))}
@@ -232,7 +241,7 @@ export default function ExpenseDetail({
             expense.settlements?.some((s) => s.status === 'pending' && s.paidBy === activeUser) && (
               <div className="text-xs font-bold text-natural-text bg-natural-sidebar px-4 py-3 rounded-xl flex items-center gap-1.5 border border-natural-border/20">
                 <Clock className="h-5 w-5 animate-pulse shrink-0" />
-                <span>Waiting for {payerName} to confirm your payment.</span>
+                <span>{t('detail.waitingConfirm', { name: payerName })}</span>
               </div>
             )}
 
@@ -240,52 +249,51 @@ export default function ExpenseDetail({
           {isDark ? (
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
-                <EyeOff className="h-3.5 w-3.5" /> Dark Cherry - Blind Split
+                <EyeOff className="h-3.5 w-3.5" /> {t('detail.darkHeading')}
               </h3>
               {isPayerActive ? (
                 <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-natural-muted">Pot target</span>
+                    <span className="text-natural-muted">{t('detail.potTarget')}</span>
                     <span className="font-bold font-mono text-natural-text">
-                      ${expense.amount.toFixed(2)}
+                      {formatCurrency(expense.amount)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-natural-muted">Collected (confirmed)</span>
+                    <span className="text-natural-muted">{t('detail.collected')}</span>
                     <span className="font-bold font-mono text-natural-primary">
-                      ${getDarkCherryPotTotal(expense, false).toFixed(2)}
+                      {formatCurrency(getDarkCherryPotTotal(expense, false))}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-natural-muted">Still to go</span>
+                    <span className="text-natural-muted">{t('detail.stillToGo')}</span>
                     <span className="font-bold font-mono text-natural-text">
-                      ${getDarkCherryRemaining(expense, false).toFixed(2)}
+                      {formatCurrency(getDarkCherryRemaining(expense, false))}
                     </span>
                   </div>
                   <p className="text-xs text-natural-muted pt-2 border-t border-natural-border/50">
-                    Members can log between{' '}
-                    <span className="font-mono font-semibold">
-                      ${(expense.blindMin || 0).toFixed(2)}
-                    </span>{' '}
-                    and{' '}
-                    <span className="font-mono font-semibold">
-                      ${(expense.blindMax || 0).toFixed(2)}
-                    </span>{' '}
-                    per payment. Only you can see these numbers.
+                    <Trans
+                      i18nKey="detail.membersCanLog"
+                      values={{
+                        min: formatCurrency(expense.blindMin || 0),
+                        max: formatCurrency(expense.blindMax || 0),
+                      }}
+                      components={{
+                        1: <span className="font-mono font-semibold" />,
+                        3: <span className="font-mono font-semibold" />,
+                      }}
+                    />
                   </p>
                 </div>
               ) : (
                 <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4">
-                  <p className="text-sm text-natural-text leading-relaxed">
-                    This is a blind split: chip in what you can, when you can. The total and the pot
-                    stay hidden - when it's covered, the cherry closes on its own.
-                  </p>
+                  <p className="text-sm text-natural-text leading-relaxed">{t('detail.blindBody')}</p>
                   <button
                     type="button"
                     onClick={() => setShowDarkIntro(true)}
                     className="mt-2 text-xs font-bold text-natural-primary hover:underline"
                   >
-                    What's a Dark Cherry?
+                    {t('detail.whatsDark')}
                   </button>
                 </div>
               )}
@@ -293,7 +301,7 @@ export default function ExpenseDetail({
           ) : (
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
-                Cost Breakdown
+                {t('detail.costBreakdown')}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {Object.entries(expense.shares || {}).map(([uid, shareAmt]) => {
@@ -305,12 +313,12 @@ export default function ExpenseDetail({
                       className={`p-3 rounded-xl border ${isMe ? 'bg-natural-sidebar border-natural-border shadow-sm' : 'bg-transparent border-natural-border/50'}`}
                     >
                       <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">
-                        {isMe ? 'My Share' : m?.name || 'Someone'}
+                        {isMe ? t('detail.myShare') : m?.name || t('common.someone')}
                       </span>
                       <span
                         className={`text-lg font-semibold font-display mt-1 block ${isMe ? 'text-natural-primary' : 'text-natural-text'}`}
                       >
-                        ${shareAmt.toFixed(2)}
+                        {formatCurrency(shareAmt)}
                       </span>
                     </div>
                   );
@@ -318,10 +326,10 @@ export default function ExpenseDetail({
                 {expense.splitType === 'third_party' && (
                   <div className="p-3 rounded-xl border bg-transparent border-natural-border/50 text-center">
                     <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">
-                      {expense.thirdPersonName}'s Share
+                      {t('detail.personShare', { name: expense.thirdPersonName })}
                     </span>
                     <span className="text-lg font-semibold font-display text-natural-text mt-1 block">
-                      ${expense.thirdPersonShare?.toFixed(2)}
+                      {formatCurrency(expense.thirdPersonShare || 0)}
                     </span>
                   </div>
                 )}
@@ -331,10 +339,10 @@ export default function ExpenseDetail({
                     className="p-3 rounded-xl border bg-transparent border-natural-border/50"
                   >
                     <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider truncate">
-                      {g.name} (guest)
+                      {t('detail.guestTag', { name: g.name })}
                     </span>
                     <span className="text-lg font-semibold font-display text-natural-text mt-1 block">
-                      ${g.share.toFixed(2)}
+                      {formatCurrency(g.share)}
                     </span>
                   </div>
                 ))}
@@ -345,7 +353,7 @@ export default function ExpenseDetail({
           {/* Audit Trail Section */}
           <div className="space-y-4 pt-4 border-t border-natural-border">
             <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
-              Expense Audit Trail
+              {t('detail.auditTrail')}
             </h3>
 
             <div className="relative border-l-2 border-natural-border pl-5 ml-2.5 space-y-6">
@@ -355,10 +363,15 @@ export default function ExpenseDetail({
                   <Tag className="h-3.5 w-3.5" />
                 </div>
                 <div>
-                  <span className="block text-xs font-bold text-natural-text">Expense Logged</span>
+                  <span className="block text-xs font-bold text-natural-text">
+                    {t('detail.expenseLogged')}
+                  </span>
                   <p className="text-xs text-natural-muted mt-0.5">
-                    Logged by{' '}
-                    <span className="font-semibold capitalize text-natural-text">{payerName}</span>.
+                    <Trans
+                      i18nKey="detail.loggedBy"
+                      values={{ name: payerName }}
+                      components={{ 1: <span className="font-semibold capitalize text-natural-text" /> }}
+                    />
                   </p>
                   <span className="text-xs text-natural-muted font-mono mt-1 block">
                     {formatDateTime(expense.createdAt)}
@@ -374,7 +387,7 @@ export default function ExpenseDetail({
                 const canVoid =
                   !isVoided && (activeUser === s.paidBy || activeUser === s.receivedBy);
                 const voidedByName = s.voidedBy
-                  ? members.find((m) => m.uid === s.voidedBy)?.name || 'someone'
+                  ? members.find((m) => m.uid === s.voidedBy)?.name || t('common.someone')
                   : null;
                 return (
                   <div key={s.id} className="relative">
@@ -398,45 +411,48 @@ export default function ExpenseDetail({
                         className={`block text-xs font-bold flex items-center gap-1 ${isVoided ? 'text-natural-muted' : 'text-natural-text'}`}
                       >
                         {isVoided
-                          ? 'Payment Removed'
+                          ? t('detail.paymentRemoved')
                           : s.status === 'confirmed'
-                            ? 'Payment Confirmed'
-                            : 'Payment Logged (Pending)'}
+                            ? t('detail.paymentConfirmed')
+                            : t('detail.paymentPending')}
                         <span className="text-xs font-normal text-natural-primary group-hover:underline">
-                          {isExpanded ? 'Hide' : 'Details'}
+                          {isExpanded ? t('detail.hide') : t('detail.details')}
                         </span>
                       </span>
                       <p
                         className={`text-xs text-natural-muted mt-0.5 ${isVoided ? 'line-through' : ''}`}
                       >
-                        <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>
-                          {members.find((m) => m.uid === s.paidBy)?.name || 'Someone'}
-                        </strong>{' '}
-                        paid{' '}
-                        {maskNumbers && s.paidBy !== activeUser ? (
-                          <strong>a contribution</strong>
-                        ) : (
-                          <strong>${s.amount.toFixed(2)}</strong>
-                        )}{' '}
-                        to{' '}
-                        <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}>
-                          {members.find((m) => m.uid === s.receivedBy)?.name || payerName}
-                        </strong>{' '}
-                        via {s.instrumentType}.
+                        <Trans
+                          i18nKey="detail.paidTo"
+                          values={{
+                            payer: members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
+                            amount:
+                              maskNumbers && s.paidBy !== activeUser
+                                ? t('detail.aContribution')
+                                : formatCurrency(s.amount),
+                            receiver: members.find((m) => m.uid === s.receivedBy)?.name || payerName,
+                            method: instrumentLabel(s.instrumentType),
+                          }}
+                          components={{
+                            1: <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`} />,
+                            3: <strong />,
+                            5: <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`} />,
+                          }}
+                        />
                       </p>
                       {isVoided && (
                         <p className="text-xs text-natural-muted mt-0.5">
-                          Removed
                           {voidedByName ? (
-                            <>
-                              {' '}
-                              by <span className="font-semibold capitalize">{voidedByName}</span>
-                            </>
+                            <Trans
+                              i18nKey="detail.removedBy"
+                              values={{ name: voidedByName }}
+                              components={{ 1: <span className="font-semibold capitalize" /> }}
+                            />
                           ) : (
-                            ''
+                            t('detail.removed')
                           )}
-                          {s.voidedAt ? ` on ${formatDateTime(s.voidedAt)}` : ''}. No longer counts
-                          toward the balance.
+                          {s.voidedAt ? t('detail.onDate', { date: formatDateTime(s.voidedAt) }) : ''}.{' '}
+                          {t('detail.noLongerCounts')}
                         </p>
                       )}
                       <span className="text-xs text-natural-muted font-mono mt-1 block">
@@ -447,54 +463,54 @@ export default function ExpenseDetail({
                     {isExpanded && (
                       <div className="mt-2 bg-natural-sidebar/40 border border-natural-border/60 rounded-lg p-3 text-xs space-y-1.5">
                         <div className="flex justify-between">
-                          <span className="text-natural-muted">Amount</span>
+                          <span className="text-natural-muted">{t('detail.amount')}</span>
                           <span className="font-bold text-natural-text">
                             {maskNumbers && s.paidBy !== activeUser ? (
                               <span className="inline-flex items-center gap-1">
                                 <Cherry className="h-3.5 w-3.5 text-natural-primary" /> •••
                               </span>
                             ) : (
-                              `$${s.amount.toFixed(2)}`
+                              formatCurrency(s.amount)
                             )}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-natural-muted">Method</span>
+                          <span className="text-natural-muted">{t('detail.method')}</span>
                           <span className="font-semibold text-natural-text">
-                            {s.instrumentType}
+                            {instrumentLabel(s.instrumentType)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-natural-muted">Payment date</span>
+                          <span className="text-natural-muted">{t('detail.paymentDate')}</span>
                           <span className="font-semibold text-natural-text">
                             {s.paymentDate ? formatDate(s.paymentDate) : ' - '}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-natural-muted">Logged</span>
+                          <span className="text-natural-muted">{t('detail.logged')}</span>
                           <span className="font-semibold text-natural-text">
                             {formatDateTime(s.timestamp)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-natural-muted">Status</span>
+                          <span className="text-natural-muted">{t('detail.status')}</span>
                           <span
                             className={`font-bold ${isVoided ? 'text-natural-muted' : s.status === 'confirmed' ? 'text-natural-primary' : 'text-natural-text'}`}
                           >
                             {isVoided
-                              ? 'Removed'
+                              ? t('detail.statusRemoved')
                               : s.status === 'confirmed'
-                                ? 'Confirmed'
-                                : 'Pending confirmation'}
+                                ? t('detail.statusConfirmed')
+                                : t('detail.statusPending')}
                           </span>
                         </div>
                         <div className="pt-1.5 border-t border-natural-border/50">
-                          <span className="text-natural-muted block mb-0.5">Note</span>
+                          <span className="text-natural-muted block mb-0.5">{t('detail.note')}</span>
                           <span className="text-natural-text">
                             {s.label ? (
                               s.label
                             ) : (
-                              <span className="italic text-natural-muted">No note added.</span>
+                              <span className="italic text-natural-muted">{t('detail.noNote')}</span>
                             )}
                           </span>
                         </div>
@@ -503,7 +519,7 @@ export default function ExpenseDetail({
                             {voidingSettlement === s.id ? (
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-xs font-bold text-natural-primary uppercase">
-                                  Remove this payment entry?
+                                  {t('detail.removeEntryQ')}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <button
@@ -511,7 +527,7 @@ export default function ExpenseDetail({
                                     onClick={() => setVoidingSettlement(null)}
                                     className="text-xs font-bold text-natural-muted hover:text-natural-text cursor-pointer"
                                   >
-                                    Cancel
+                                    {t('common.cancel')}
                                   </button>
                                   <button
                                     type="button"
@@ -521,7 +537,7 @@ export default function ExpenseDetail({
                                     }}
                                     className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md cursor-pointer"
                                   >
-                                    Yes, Remove
+                                    {t('detail.yesRemove')}
                                   </button>
                                 </div>
                               </div>
@@ -531,7 +547,7 @@ export default function ExpenseDetail({
                                 onClick={() => setVoidingSettlement(s.id)}
                                 className="text-xs font-bold text-natural-primary hover:text-natural-dark flex items-center gap-1 cursor-pointer"
                               >
-                                <Ban className="h-3 w-3" /> Remove entry (logged in error)
+                                <Ban className="h-3 w-3" /> {t('detail.removeEntry')}
                               </button>
                             )}
                           </div>
@@ -547,7 +563,7 @@ export default function ExpenseDetail({
           {/* Comments Section */}
           <div className="space-y-4 pt-4 border-t border-natural-border">
             <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
-              Discussion
+              {t('detail.discussion')}
             </h3>
 
             <form onSubmit={handleCommentSubmit} className="relative flex items-center">
@@ -555,14 +571,14 @@ export default function ExpenseDetail({
                 type="text"
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Comment"
-                aria-label="Add a comment"
+                placeholder={t('detail.commentPlaceholder')}
+                aria-label={t('detail.addComment')}
                 className="w-full text-xs px-3.5 py-2.5 bg-natural-sidebar/50 border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary pr-10"
               />
               <button
                 type="submit"
                 disabled={!commentText.trim()}
-                aria-label="Send comment"
+                aria-label={t('detail.sendComment')}
                 className="absolute right-2 text-natural-primary hover:text-natural-dark disabled:opacity-50 disabled:cursor-not-allowed p-1 cursor-pointer"
               >
                 <Send className="w-4 h-4" />
@@ -579,7 +595,7 @@ export default function ExpenseDetail({
                     <div className="bg-natural-sidebar/30 p-3 rounded-xl rounded-tl-none border border-natural-border/50 flex-1">
                       <div className="flex justify-between items-baseline mb-1">
                         <span className="text-xs font-bold text-natural-text capitalize">
-                          {members.find((m) => m.uid === c.userId)?.name || 'Someone'}
+                          {members.find((m) => m.uid === c.userId)?.name || t('common.someone')}
                         </span>
                         <span className="text-xs text-natural-muted">
                           {formatDateTime(c.timestamp)}
@@ -611,25 +627,25 @@ export default function ExpenseDetail({
                   onClick={onEdit}
                   className="px-3 py-2 text-xs font-semibold text-natural-text hover:bg-natural-sidebar border border-transparent hover:border-natural-border rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <Edit2 className="h-3.5 w-3.5" /> Edit
+                  <Edit2 className="h-3.5 w-3.5" /> {t('common.edit')}
                 </button>
 
                 {isDeleting ? (
                   <div className="flex items-center gap-2 border border-natural-primary/25 bg-natural-primary/5 px-3 py-1.5 rounded-xl">
                     <span className="text-xs font-bold text-natural-primary uppercase">
-                      Confirm Delete?
+                      {t('detail.confirmDelete')}
                     </span>
                     <button
                       onClick={() => setIsDeleting(false)}
                       className="text-xs font-bold text-natural-muted hover:text-natural-text"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button
                       onClick={onDelete}
                       className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md"
                     >
-                      Yes, Delete
+                      {t('detail.yesDelete')}
                     </button>
                   </div>
                 ) : (
@@ -637,7 +653,7 @@ export default function ExpenseDetail({
                     onClick={() => setIsDeleting(true)}
                     className="px-3 py-2 text-xs font-semibold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-sidebar/30 border border-natural-primary/15 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
                   >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                    <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
                   </button>
                 )}
               </>
@@ -651,10 +667,9 @@ export default function ExpenseDetail({
               is made: there is nobody to pay. */}
           {isUnclaimed(expense) && (
             <div className="bg-natural-sidebar/60 border border-natural-border rounded-2xl p-4 mb-4">
-              <p className={labelClass}>Nobody has paid this yet</p>
+              <p className={labelClass}>{t('detail.nobodyPaid')}</p>
               <p className="text-sm text-natural-muted mt-1.5 leading-relaxed">
-                This bill came around again. Whoever covered it takes it on, and the split below
-                applies from there.
+                {t('detail.nobodyPaidBody')}
               </p>
               <div className="mt-3 flex flex-col gap-2">
                 {members.map((m) => (
@@ -663,7 +678,7 @@ export default function ExpenseDetail({
                     onClick={() => onClaim?.(m.uid)}
                     className="w-full px-4 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-xl transition-colors cursor-pointer"
                   >
-                    {m.uid === activeUser ? 'I paid this' : `${m.name} paid this`}
+                    {m.uid === activeUser ? t('detail.iPaid') : t('detail.theyPaid', { name: m.name })}
                   </button>
                 ))}
               </div>
@@ -682,7 +697,7 @@ export default function ExpenseDetail({
                       onClick={onSettleClick}
                       className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <Cherry className="h-4 w-4" /> Dark Cherry Chip In
+                      <Cherry className="h-4 w-4" /> {t('settle.titleDark')}
                     </button>
                   );
                 }
@@ -694,7 +709,8 @@ export default function ExpenseDetail({
                     onClick={onSettleClick}
                     className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
-                    <CreditCard className="h-4 w-4" /> Settle My Share (${leftToPay.toFixed(2)})
+                    <CreditCard className="h-4 w-4" />{' '}
+                    {t('detail.settleMyShare', { amount: formatCurrency(leftToPay) })}
                   </button>
                 ) : null;
               })()}
@@ -713,24 +729,24 @@ export default function ExpenseDetail({
                       }
                     }}
                     disabled={nudging}
-                    title="Send a gentle push notification. It says a look is due; never any amounts."
+                    title={t('detail.remindTitle')}
                     className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <BellRing className="h-4 w-4" /> {nudging ? 'Nudging...' : 'Gently Remind'}
+                    <BellRing className="h-4 w-4" /> {nudging ? t('detail.nudging') : t('detail.gentlyRemind')}
                   </button>
                 )}
                 <button
                   onClick={onSettleClick}
                   className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <CreditCard className="h-4 w-4" /> Log Received Payment
+                  <CreditCard className="h-4 w-4" /> {t('settle.titleReceived')}
                 </button>
               </>
             )}
 
             {isExpenseFullySettled(expense) && (
               <div className="text-xs font-bold text-natural-primary bg-natural-sage px-3 py-2 rounded-xl flex items-center gap-1.5 border border-natural-primary/20">
-                <ShieldCheck className="h-4 w-4" /> Settle Completed
+                <ShieldCheck className="h-4 w-4" /> {t('detail.settleCompleted')}
               </div>
             )}
           </div>

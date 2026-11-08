@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { t } from '../i18n';
 
 // One bad expense should cost you one card, not the whole dashboard.
 //
@@ -45,17 +46,18 @@ export default class ModuleBoundary extends React.Component<Props, State> {
         <div className="flex items-start gap-3">
           <AlertTriangle className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="font-semibold text-natural-text">{this.props.label} could not be shown</p>
+            <p className="font-semibold text-natural-text">
+              {t('module.couldNotShow', { label: this.props.label })}
+            </p>
             <p className="text-natural-muted mt-1 leading-relaxed">
-              The rest of this page is fine, and nothing has been changed or lost. Reloading usually
-              clears it.
+              {t('module.restFine')}
             </p>
             <button
               type="button"
               onClick={() => this.setState({ error: null })}
               className="mt-3 inline-flex items-center gap-1.5 text-natural-primary font-semibold hover:underline"
             >
-              <RefreshCcw className="h-3.5 w-3.5" /> Try again
+              <RefreshCcw className="h-3.5 w-3.5" /> {t('common.tryAgain')}
             </button>
           </div>
         </div>

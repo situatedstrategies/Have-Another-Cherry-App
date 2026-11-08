@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, PaymentInstrument } from '../types';
 import {
@@ -35,6 +36,8 @@ import {
   RECURRING_MONTHS,
 } from '../lib/recurring';
 import { labelClass } from '../lib/ui';
+import { formatCurrency, formatAmount } from '../lib/format';
+import { PAYMENT_INSTRUMENTS, instrumentShortLabel } from '../lib/instruments';
 
 interface ExpenseFormProps {
   group: Group;
@@ -65,6 +68,7 @@ export default function ExpenseForm({
   paymentHandlesByUid,
   prefill,
 }: ExpenseFormProps) {
+  const { t } = useTranslation();
   const seed = editingExpense ? null : prefill;
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
@@ -240,19 +244,17 @@ export default function ExpenseForm({
         const items = Array.isArray(result.data.items) ? result.data.items : [];
         setScannedItems(
           items.map((it: any) => ({
-            name: String(it.name || 'Item'),
+            name: String(it.name || t('form.item')),
             price: Number(it.price) || 0,
           }))
         );
         setItemAssign({});
       } else {
-        setError(
-          'Could not read that receipt. Try a clearer photo, or enter the details manually.'
-        );
+        setError(t('form.scanFailedRead'));
       }
     } catch (err) {
       console.error('Scan failed', err);
-      setError('Receipt scan failed. Please enter the details manually.');
+      setError(t('form.scanFailed'));
     } finally {
       setScanning(false);
     }
@@ -417,12 +419,12 @@ export default function ExpenseForm({
     setError(null);
 
     if (!title.trim()) {
-      setError('Please enter a description or title for the expense.');
+      setError(t('form.err.title'));
       return;
     }
 
     if (!amount || isNaN(numericAmount) || numericAmount <= 0) {
-      setError('Please enter a valid amount greater than zero.');
+      setError(t('form.err.amount'));
       return;
     }
 
@@ -437,9 +439,7 @@ export default function ExpenseForm({
     // Heads-up if a debtor's share exceeds their spending threshold.
     if (thresholdWarnings.length > 0) {
       const names = thresholdWarnings.map((m) => m.name).join(', ');
-      const ok = window.confirm(
-        `Heads up: this split exceeds ${names}'s spending threshold. They'll see a notification on their side. Log it anyway?`
-      );
+      const ok = window.confirm(t('form.confirmThreshold', { names }));
       if (!ok) return;
     }
 
@@ -452,15 +452,15 @@ export default function ExpenseForm({
     const blindMaxNum = roundCurrency(parseFloat(blindMax) || 0);
     if (splitType === 'dark_cherry') {
       if (blindMinNum <= 0) {
-        setError('Set a minimum per payment greater than zero.');
+        setError(t('form.err.blindMin'));
         return;
       }
       if (blindMaxNum < blindMinNum) {
-        setError('The maximum per payment must be at least the minimum.');
+        setError(t('form.err.blindMaxLtMin'));
         return;
       }
       if (blindMinNum > numericAmount) {
-        setError('The minimum per payment cannot exceed the total amount.');
+        setError(t('form.err.blindMinGtTotal'));
         return;
       }
     }
@@ -487,7 +487,7 @@ export default function ExpenseForm({
         pct: parseFloat(g.pct) || 0,
       }));
       if (guestEntries.some((g) => !g.name)) {
-        setError('Please enter a name for each added cherry.');
+        setError(t('form.err.guestName'));
         return;
       }
       // Per-line ceiling (quiet headroom above 100% exists for lending with
@@ -513,7 +513,7 @@ export default function ExpenseForm({
       // is allowed on purpose: that is how interest is expressed - the shares
       // then intentionally sum past the amount.
       if (totalPct < 100 - 0.01) {
-        setError('Percentages (members + added cherries) must cover at least 100%.');
+        setError(t('form.err.pctCover'));
         return;
       }
       // Round each share, then absorb any leftover cent into the last line
@@ -547,7 +547,7 @@ export default function ExpenseForm({
     } else if (splitType === 'custom_amount') {
       const amts = members.map((m) => parseFloat(customAmt[m.uid]) || 0);
       if (amts.some((a) => a < 0)) {
-        setError('Individual shares cannot be negative.');
+        setError(t('form.err.sharesNegative'));
         return;
       }
       const shareCapError = amts.map((a) => amountError(a)).find(Boolean);
@@ -558,7 +558,10 @@ export default function ExpenseForm({
       const totalAmt = amts.reduce((a, b) => a + b, 0);
       if (Math.abs(totalAmt - numericAmount) > 0.02) {
         setError(
-          `Individual shares ($${totalAmt.toFixed(2)}) must equal the total amount ($${numericAmount.toFixed(2)}).`
+          t('form.err.sharesMustEqual', {
+            shares: formatCurrency(totalAmt),
+            total: formatCurrency(numericAmount),
+          })
         );
         return;
       }
@@ -572,18 +575,18 @@ export default function ExpenseForm({
       }
     } else if (splitType === 'third_party') {
       if (!thirdPersonName.trim()) {
-        setError("Please enter the third person's name.");
+        setError(t('form.err.thirdName'));
         return;
       }
       if (!thirdPersonEmail.trim()) {
-        setError("Please enter the third person's email.");
+        setError(t('form.err.thirdEmail'));
         return;
       }
       let totalPct = parseFloat(thirdPartyPct['third_party']) || 0;
       members.forEach((m) => (totalPct += parseFloat(thirdPartyPct[m.uid]) || 0));
 
       if (Math.abs(totalPct - 100) > 0.01) {
-        setError('Custom percentages must add up to 100%.');
+        setError(t('form.err.pct100'));
         return;
       }
 
@@ -604,7 +607,7 @@ export default function ExpenseForm({
 
     const finalCategory = category.trim();
     if (!finalCategory) {
-      setError('Please enter a category.');
+      setError(t('form.err.category'));
       return;
     }
 
@@ -662,7 +665,7 @@ export default function ExpenseForm({
     <Modal
       onClose={onClose}
       size="lg"
-      title={editingExpense ? 'Edit Expense' : 'Log New Expense'}
+      title={editingExpense ? t('form.editTitle') : t('form.newTitle')}
       bodyClassName=""
       footer={
         <div className="flex items-center justify-end gap-3">
@@ -671,14 +674,14 @@ export default function ExpenseForm({
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             form="expense-form"
             className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            {editingExpense ? 'Update Expense' : 'Save Expense'}
+            {editingExpense ? t('form.update') : t('form.save')}
           </button>
         </div>
       }
@@ -698,11 +701,9 @@ export default function ExpenseForm({
         <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
           <div className="flex-1">
             <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
-              <Sparkles size={16} className="text-natural-primary" /> Smart Scan
+              <Sparkles size={16} className="text-natural-primary" /> {t('form.smartScan')}
             </h3>
-            <p className="text-xs text-natural-muted mt-1">
-              Auto-fill details by scanning a receipt.
-            </p>
+            <p className="text-xs text-natural-muted mt-1">{t('form.smartScanBody')}</p>
           </div>
           <input
             ref={scanInputRef}
@@ -718,7 +719,7 @@ export default function ExpenseForm({
             disabled={scanning}
             className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
           >
-            <Camera size={16} /> {scanning ? 'Scanning...' : 'Scan Receipt'}
+            <Camera size={16} /> {scanning ? t('form.scanning') : t('form.scanReceipt')}
           </button>
         </div>
 
@@ -730,7 +731,7 @@ export default function ExpenseForm({
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-natural-text uppercase tracking-wider">
-                Who Had What?
+                {t('form.whoHadWhat')}
               </span>
               <button
                 type="button"
@@ -740,13 +741,11 @@ export default function ExpenseForm({
                 }}
                 className="text-xs font-semibold text-natural-muted hover:text-natural-text"
               >
-                Dismiss
+                {t('app.dismiss')}
               </button>
             </div>
             <p className="text-xs text-natural-muted leading-relaxed">
-              We read {scannedItems.length} item{scannedItems.length === 1 ? '' : 's'} off the
-              receipt. Assign each one, leave it shared, then apply - tax and tip get shared
-              automatically.
+              {t('form.itemsRead', { count: scannedItems.length })}
             </p>
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {scannedItems.map((it, i) => (
@@ -758,14 +757,14 @@ export default function ExpenseForm({
                     {it.name}
                   </span>
                   <span className="text-xs font-mono font-semibold text-natural-text shrink-0">
-                    ${it.price.toFixed(2)}
+                    {formatCurrency(it.price)}
                   </span>
                   <select
                     value={itemAssign[i] || 'shared'}
                     onChange={(e) => setItemAssign((prev) => ({ ...prev, [i]: e.target.value }))}
                     className="text-xs bg-natural-bg/60 border border-natural-border rounded-lg px-1.5 py-1 outline-none shrink-0 max-w-28"
                   >
-                    <option value="shared">Shared</option>
+                    <option value="shared">{t('form.shared')}</option>
                     {members.map((m) => (
                       <option key={m.uid} value={m.uid}>
                         {m.name}
@@ -781,7 +780,7 @@ export default function ExpenseForm({
               disabled={numericAmount <= 0}
               className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-50"
             >
-              Apply Items to Split
+              {t('form.applyItems')}
             </button>
           </div>
         )}
@@ -792,12 +791,15 @@ export default function ExpenseForm({
             <span className="text-natural-primary shrink-0 font-bold">!</span>
             <p className="text-xs text-natural-text leading-relaxed">
               {thresholdWarnings
-                .map(
-                  (m) =>
-                    `${m.name}'s share ($${(previewShares[m.uid] || 0).toFixed(2)}) is over their spending threshold of $${(memberThresholds?.[m.uid] || 0).toFixed(0)}`
+                .map((m) =>
+                  t('form.thresholdLine', {
+                    name: m.name,
+                    share: formatCurrency(previewShares[m.uid] || 0),
+                    threshold: formatCurrency(memberThresholds?.[m.uid] || 0, 0),
+                  })
                 )
                 .join('; ')}
-              . They'll get a heads-up on their side.
+              . {t('form.thresholdHeadsUp')}
             </p>
           </div>
         )}
@@ -805,14 +807,14 @@ export default function ExpenseForm({
         {/* Description */}
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Description / Title
+            {t('form.description')}
           </label>
           <div className="relative">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title"
+              placeholder={t('form.titlePlaceholder')}
               className="w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all"
               id="expense-title-input"
             />
@@ -823,7 +825,7 @@ export default function ExpenseForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-              Amount ($)
+              {t('form.amount')}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted font-medium">
@@ -847,7 +849,7 @@ export default function ExpenseForm({
 
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-              Date
+              {t('form.date')}
             </label>
             <div className="relative">
               <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
@@ -870,7 +872,7 @@ export default function ExpenseForm({
                   className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
                 />
                 <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5">
-                  <Repeat size={14} className="text-natural-muted" /> Recurring Expense
+                  <Repeat size={14} className="text-natural-muted" /> {t('form.recurring')}
                 </span>
               </label>
 
@@ -882,7 +884,7 @@ export default function ExpenseForm({
                 <div className="mt-3 pl-6 space-y-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
-                      Every so many weeks
+                      {t('form.everyWeeks')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {RECURRING_WEEKS.map((w) => (
@@ -904,7 +906,7 @@ export default function ExpenseForm({
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
-                      Or every so many months
+                      {t('form.everyMonths')}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {RECURRING_MONTHS.map((m) => (
@@ -919,7 +921,7 @@ export default function ExpenseForm({
                               : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
                           }`}
                         >
-                          {m === 12 ? 'Year' : m}
+                          {m === 12 ? t('form.year') : m}
                         </button>
                       ))}
                     </div>
@@ -933,20 +935,10 @@ export default function ExpenseForm({
         {/* Transaction Payment Type */}
         <div className="pb-4">
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Transaction Payment Type
+            {t('settle.paymentType')}
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {(
-              [
-                'CASH',
-                'CREDIT',
-                'DEBIT',
-                'TRANSFER',
-                'VENMO',
-                'ZELLE',
-                'OTHER',
-              ] as PaymentInstrument[]
-            ).map((inst) => (
+            {PAYMENT_INSTRUMENTS.map((inst) => (
               <button
                 key={inst}
                 type="button"
@@ -957,21 +949,23 @@ export default function ExpenseForm({
                     : 'bg-white border-natural-border text-natural-muted hover:bg-natural-sidebar'
                 }`}
               >
-                {inst === 'TRANSFER' ? 'BANK' : inst}
+                {instrumentShortLabel(inst)}
               </button>
             ))}
           </div>
           {(instrumentType === 'VENMO' || instrumentType === 'ZELLE') && (
             <div className="mt-2 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-natural-muted mb-1.5">
-                {instrumentType === 'VENMO' ? 'Venmo' : 'Zelle'} handles
+                {t('form.handles', { network: instrumentType === 'VENMO' ? 'Venmo' : 'Zelle' })}
               </p>
               {peerHandles.length === 0 ? (
                 <p className="text-xs text-natural-muted">
                   {members.filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'))
                     .length === 0
-                    ? 'No one else in the group yet.'
-                    : `No one else has added a ${instrumentType === 'VENMO' ? 'Venmo' : 'Zelle'} handle yet.`}
+                    ? t('form.noOneElse')
+                    : t('form.noHandleYet', {
+                        network: instrumentType === 'VENMO' ? 'Venmo' : 'Zelle',
+                      })}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -980,7 +974,7 @@ export default function ExpenseForm({
                       key={h.uid}
                       type="button"
                       onClick={() => copyHandle(h.text)}
-                      title={`Copy ${h.name}'s handle`}
+                      title={t('form.copyHandle', { name: h.name })}
                       className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
                     >
                       <span className="font-semibold">{h.name}</span>
@@ -998,8 +992,8 @@ export default function ExpenseForm({
                 type="text"
                 value={instrumentLabel}
                 onChange={(e) => setInstrumentLabel(e.target.value)}
-                placeholder="Card name"
-                aria-label="Card or account name"
+                placeholder={t('form.cardName')}
+                aria-label={t('form.cardAria')}
                 className="w-full pl-3 pr-3 py-2 text-xs bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text outline-none transition-all"
               />
             </div>
@@ -1011,7 +1005,7 @@ export default function ExpenseForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-              Category
+              {t('form.category')}
             </label>
             <div className="relative">
               <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
@@ -1020,7 +1014,7 @@ export default function ExpenseForm({
                 type="text"
                 value={category}
                 onChange={handleCategoryChange}
-                placeholder="Category"
+                placeholder={t('form.category')}
                 list="category-options"
                 className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
                 id="expense-category-input"
@@ -1036,7 +1030,7 @@ export default function ExpenseForm({
 
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-              Paid By
+              {t('form.paidBy')}
             </label>
             <div className="flex flex-wrap gap-2 bg-natural-sidebar p-1.5 rounded-xl w-full">
               {members.map((m) => (
@@ -1061,7 +1055,7 @@ export default function ExpenseForm({
         {/* Split Rule Selector */}
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Split Rules
+            {t('form.splitRules')}
           </label>
           <div className="space-y-2" id="split-rules-group">
             {/* Default split option */}
@@ -1083,9 +1077,9 @@ export default function ExpenseForm({
                 />
                 <div>
                   <span className="block text-sm font-semibold text-natural-text">
-                    Standard Split
+                    {t('form.standardSplit')}
                   </span>
-                  <span className="block text-xs text-natural-muted">Default split</span>
+                  <span className="block text-xs text-natural-muted">{t('form.defaultSplit')}</span>
                 </div>
               </div>
               <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1111,10 +1105,10 @@ export default function ExpenseForm({
                   id="rule-5050"
                 />
                 <div>
-                  <span className="block text-sm font-semibold text-natural-text">Even Split</span>
-                  <span className="block text-xs text-natural-muted">
-                    Equal split among members
+                  <span className="block text-sm font-semibold text-natural-text">
+                    {t('form.evenSplit')}
                   </span>
+                  <span className="block text-xs text-natural-muted">{t('form.evenSplitBody')}</span>
                 </div>
               </div>
               <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1141,11 +1135,9 @@ export default function ExpenseForm({
                 />
                 <div>
                   <span className="block text-sm font-semibold text-natural-text">
-                    Custom Percentages
+                    {t('form.customPct')}
                   </span>
-                  <span className="block text-xs text-natural-muted">
-                    Manually set custom split percentages
-                  </span>
+                  <span className="block text-xs text-natural-muted">{t('form.customPctBody')}</span>
                 </div>
               </div>
               <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1172,11 +1164,9 @@ export default function ExpenseForm({
                 />
                 <div>
                   <span className="block text-sm font-semibold text-natural-text">
-                    Custom Amounts
+                    {t('form.customAmt')}
                   </span>
-                  <span className="block text-xs text-natural-muted">
-                    Manually specify individual flat shares
-                  </span>
+                  <span className="block text-xs text-natural-muted">{t('form.customAmtBody')}</span>
                 </div>
               </div>
               <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
@@ -1204,10 +1194,10 @@ export default function ExpenseForm({
                   />
                   <div>
                     <span className="block text-sm font-semibold text-natural-text">
-                      Add Third Person
+                      {t('form.addThird')}
                     </span>
                     <span className="block text-xs text-natural-muted">
-                      Split with an additional person
+                      {t('form.addThirdBody')}
                     </span>
                   </div>
                 </div>
@@ -1245,13 +1235,13 @@ export default function ExpenseForm({
                         setShowCherryPlus(true);
                       }}
                       className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
-                      title="About Cherry +"
+                      title={t('form.aboutPlus')}
                     >
                       Cherry +
                     </button>
                   </span>
                   <span className="block text-xs text-natural-muted">
-                    Blind split - others contribute what they can, no numbers shown.{' '}
+                    {t('form.darkBody')}{' '}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1260,7 +1250,7 @@ export default function ExpenseForm({
                       }}
                       className="text-natural-primary font-semibold hover:underline"
                     >
-                      What's this?
+                      {t('form.whatsThis')}
                     </button>
                   </span>
                 </div>
@@ -1279,16 +1269,13 @@ export default function ExpenseForm({
             id="dark-cherry-inputs"
           >
             <span className="block text-xs font-bold text-natural-text uppercase tracking-wider flex items-center gap-1.5">
-              <EyeOff className="h-3.5 w-3.5" /> Blind Split Settings
+              <EyeOff className="h-3.5 w-3.5" /> {t('form.blindSettings')}
             </span>
-            <p className="text-xs text-natural-muted leading-relaxed">
-              The amount above is what settles this cherry. Group members will only see the payment
-              range you set here - never the total, the remainder, or who paid what.
-            </p>
+            <p className="text-xs text-natural-muted leading-relaxed">{t('form.blindBody')}</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-natural-muted mb-1">
-                  Minimum per payment
+                  {t('form.minPerPayment')}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -1300,14 +1287,14 @@ export default function ExpenseForm({
                     min="0"
                     value={blindMin}
                     onChange={(e) => setBlindMin(e.target.value)}
-                    placeholder="Amount"
+                    placeholder={t('form.amountPlaceholder')}
                     className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                   />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-natural-muted mb-1">
-                  Maximum per payment
+                  {t('form.maxPerPayment')}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -1319,7 +1306,7 @@ export default function ExpenseForm({
                     min="0"
                     value={blindMax}
                     onChange={(e) => setBlindMax(e.target.value)}
-                    placeholder="Amount"
+                    placeholder={t('form.amountPlaceholder')}
                     className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
                   />
                 </div>
@@ -1344,13 +1331,13 @@ export default function ExpenseForm({
                 id="custom-pct-inputs"
               >
                 <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
-                  Set Split Percentages
+                  {t('form.setPct')}
                 </span>
                 <div className="grid grid-cols-2 gap-4">
                   {members.map((m) => (
                     <div key={`pct-${m.uid}`}>
                       <label className="block text-xs text-natural-muted mb-1 font-semibold">
-                        {m.name}'s %
+                        {t('form.memberPct', { name: m.name })}
                       </label>
                       <div className="relative">
                         <input
@@ -1373,7 +1360,7 @@ export default function ExpenseForm({
                 {guests.length > 0 && (
                   <div className="space-y-2 pt-2 border-t border-natural-border/60">
                     <span className="block text-[10px] font-bold text-natural-muted uppercase tracking-wider">
-                      Added for this expense only
+                      {t('form.addedForThis')}
                     </span>
                     {guests.map((g) => (
                       <div key={g.id} className="flex items-center gap-2">
@@ -1381,8 +1368,8 @@ export default function ExpenseForm({
                           type="text"
                           value={g.name}
                           onChange={(e) => updateGuest(g.id, 'name', e.target.value)}
-                          placeholder="Name"
-                          aria-label="Guest name"
+                          placeholder={t('form.namePlaceholder')}
+                          aria-label={t('form.guestNameAria')}
                           className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text text-sm outline-none transition-all"
                         />
                         <div className="relative w-24 shrink-0">
@@ -1403,8 +1390,8 @@ export default function ExpenseForm({
                           type="button"
                           onClick={() => removeGuest(g.id)}
                           className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0"
-                          title="Remove"
-                          aria-label={`Remove ${g.name.trim() || 'this guest'}`}
+                          title={t('settings.remove')}
+                          aria-label={t('form.removeGuest', { name: g.name.trim() || t('form.thisGuest') })}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1419,12 +1406,12 @@ export default function ExpenseForm({
                     onClick={addGuest}
                     className="flex items-center gap-1.5 text-xs font-bold text-natural-primary hover:text-natural-dark"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Add a cherry
+                    <Plus className="h-3.5 w-3.5" /> {t('form.addCherry')}
                   </button>
                   <span
                     className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}
                   >
-                    Total: {pctTotal.toFixed(1)}%{balanced ? ' ✓' : ' / 100%'}
+                    {t('form.total', { total: pctTotal.toFixed(1) })}{balanced ? ' ✓' : ' / 100%'}
                   </span>
                 </div>
               </div>
@@ -1439,17 +1426,17 @@ export default function ExpenseForm({
           >
             <div className="flex items-center justify-between">
               <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
-                Specify Shares
+                {t('form.specifyShares')}
               </span>
               <span className="text-xs text-natural-muted font-mono">
-                Total expense: ${numericAmount.toFixed(2)}
+                {t('form.totalExpense', { amount: formatCurrency(numericAmount) })}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {members.map((m) => (
                 <div key={`amt-${m.uid}`}>
                   <label className="block text-xs text-natural-muted mb-1 font-semibold">
-                    {m.name}'s Share ($)
+                    {t('form.memberShare', { name: m.name })}
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-xs">
@@ -1479,36 +1466,40 @@ export default function ExpenseForm({
             id="third-party-inputs"
           >
             <span className="block text-xs font-bold text-natural-text uppercase tracking-wider">
-              Third Person Details
+              {t('form.thirdDetails')}
             </span>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-natural-muted mb-1 font-semibold">Name</label>
+                <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                  {t('form.name')}
+                </label>
                 <input
                   type="text"
                   value={thirdPersonName}
                   onChange={(e) => setThirdPersonName(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                  placeholder="Name"
+                  placeholder={t('form.namePlaceholder')}
                   id="third-person-name-input"
                 />
               </div>
               <div>
-                <label className="block text-xs text-natural-muted mb-1 font-semibold">Email</label>
+                <label className="block text-xs text-natural-muted mb-1 font-semibold">
+                  {t('form.email')}
+                </label>
                 <input
                   type="email"
                   value={thirdPersonEmail}
                   onChange={(e) => setThirdPersonEmail(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-natural-text font-sans text-sm outline-none transition-all"
-                  placeholder="Email"
+                  placeholder={t('form.email')}
                   id="third-person-email-input"
                 />
               </div>
             </div>
 
             <div className="pt-2 border-t border-natural-border">
-              <span className={`${labelClass} block mb-3`}>Set 3-Way Split Percentages</span>
+              <span className={`${labelClass} block mb-3`}>{t('form.threeWay')}</span>
               <div className="grid grid-cols-2 gap-4">
                 {members.map((m) => (
                   <div key={`third-pct-${m.uid}`}>
@@ -1533,7 +1524,7 @@ export default function ExpenseForm({
                 ))}
                 <div>
                   <label className="block text-xs text-natural-muted mb-1 font-semibold">
-                    {thirdPersonName || 'Third Person'}
+                    {thirdPersonName || t('form.thirdPerson')}
                   </label>
                   <div className="relative">
                     <input
@@ -1562,24 +1553,22 @@ export default function ExpenseForm({
             id="split-preview"
           >
             <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1">
-              <Calculator className="h-3 w-3" /> Split Breakdown
+              <Calculator className="h-3 w-3" /> {t('form.splitBreakdown')}
             </span>
             <div className="grid grid-cols-2 gap-4 pt-1">
               {members.map((m) => (
                 <div key={`preview-${m.uid}`} className="flex flex-col">
                   <span className="text-xs text-natural-muted font-semibold">
-                    {m.name}'s Share (
-                    {Math.round(((previewShares[m.uid] || 0) / numericAmount) * 100) || 0}%)
-                  </span>
-                  <span className="text-lg font-display font-semibold text-natural-text">
-                    $
-                    {(previewShares[m.uid] || 0).toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                    {t('form.shareWithPct', {
+                      name: m.name,
+                      pct: Math.round(((previewShares[m.uid] || 0) / numericAmount) * 100) || 0,
                     })}
                   </span>
+                  <span className="text-lg font-display font-semibold text-natural-text">
+                    {formatAmount(previewShares[m.uid] || 0)}
+                  </span>
                   <span className="text-xs text-natural-text font-medium">
-                    {paidBy === m.uid ? 'Paid - No debt' : 'Owes payer'}
+                    {paidBy === m.uid ? t('form.paidNoDebt') : t('form.owesPayer')}
                   </span>
                 </div>
               ))}
@@ -1589,17 +1578,16 @@ export default function ExpenseForm({
                   .map((g) => (
                     <div key={`preview-${g.id}`} className="flex flex-col">
                       <span className="text-xs text-natural-muted font-semibold">
-                        {g.name.trim() || 'Guest'}'s Share ({parseFloat(g.pct) || 0}%)
+                        {t('form.shareWithPct', {
+                          name: g.name.trim() || t('form.guest'),
+                          pct: parseFloat(g.pct) || 0,
+                        })}
                       </span>
                       <span className="text-lg font-display font-semibold text-natural-text">
-                        $
-                        {((numericAmount * (parseFloat(g.pct) || 0)) / 100).toLocaleString(
-                          'en-US',
-                          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                        )}
+                        {formatAmount((numericAmount * (parseFloat(g.pct) || 0)) / 100)}
                       </span>
                       <span className="text-xs text-natural-text font-medium">
-                        Guest (this expense)
+                        {t('form.guestThisExpense')}
                       </span>
                     </div>
                   ))}
@@ -1617,10 +1605,11 @@ export default function ExpenseForm({
               className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
             />
             <span>
-              <span className="block text-sm font-bold text-natural-text">Already settled</span>
+              <span className="block text-sm font-bold text-natural-text">
+                {t('form.alreadySettled')}
+              </span>
               <span className="block text-xs text-natural-muted mt-0.5">
-                Everyone's paid up on this one - log it as fully settled (no balances owed). Great
-                for recording a past expense that's already been paid back.
+                {t('form.alreadySettledBody')}
               </span>
             </span>
           </label>
@@ -1629,12 +1618,12 @@ export default function ExpenseForm({
         {/* Notes */}
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Private Notes (Optional)
+            {t('form.privateNotes')}
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes"
+            placeholder={t('form.notesPlaceholder')}
             rows={2}
             className="w-full p-3 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all resize-none"
             id="expense-notes-input"

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { analytics } from '@heycatch/sdk';
+import './i18n';
 import App from './App.tsx';
 import AuthActionHandler from './components/AuthActionHandler.tsx';
 import './index.css';

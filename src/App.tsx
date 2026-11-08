@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { useTranslation, Trans } from 'react-i18next';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { formatCurrency } from './lib/format';
 import { db, authHeader } from './firebase';
 import { getFullMembers } from './lib/members';
 import { isDarkCherry } from './lib/money';
@@ -58,6 +60,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const { t } = useTranslation();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const activeUser = currentUser?.uid;
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -282,7 +285,7 @@ export default function App() {
   }
 
   if (isLoading) {
-    return <LoadingScreen label="Loading your ledger..." />;
+    return <LoadingScreen label={t('common.loadingLedger')} />;
   }
 
   if (userProfile && !userProfile.financialProfile) {
@@ -312,7 +315,7 @@ export default function App() {
 
   // Group data not here yet: a loading screen, never the create/join screen.
   if (!group) {
-    return <LoadingScreen label="Loading your group..." />;
+    return <LoadingScreen label={t('common.loadingGroup')} />;
   }
 
   // Members who have not finished their quiz. Non-blocking: a dismissible banner.
@@ -376,19 +379,13 @@ export default function App() {
             <div className="flex gap-3 items-start">
               <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-bold text-natural-text">
-                  Conversation Starter: Financial Alignment
-                </h3>
-                <p className="text-sm text-natural-muted mt-1">
-                  It looks like there's a discrepancy between what you reported as your income and
-                  what someone else in the group estimated (or vice versa). Money conversations can
-                  be tough, but clarity is the first step to fairness.
-                </p>
+                <h3 className="text-sm font-bold text-natural-text">{t('app.alignmentTitle')}</h3>
+                <p className="text-sm text-natural-muted mt-1">{t('app.alignmentBody')}</p>
                 <button
                   onClick={() => setShowAlignmentModal(true)}
                   className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline"
                 >
-                  Review Financial Profiles
+                  {t('app.reviewProfiles')}
                 </button>
               </div>
             </div>
@@ -416,9 +413,9 @@ export default function App() {
             <button
               onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
               className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title="Household Vault"
+              title={t('app.vaultTitle')}
             >
-              <VaultIcon className="h-4 w-4 shrink-0" /> Vault
+              <VaultIcon className="h-4 w-4 shrink-0" /> {t('app.vault')}
               {!isPlus && (
                 <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
                   Cherry +
@@ -428,18 +425,18 @@ export default function App() {
             <button
               onClick={() => setShowPlanPurchase(true)}
               className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title="Plan a shared purchase"
+              title={t('app.planTitle')}
             >
               <TrendingUp className="h-4 w-4 shrink-0" />
-              <span className="sm:hidden">Plan</span>
-              <span className="hidden sm:inline">Plan a Purchase</span>
+              <span className="sm:hidden">{t('app.planShort')}</span>
+              <span className="hidden sm:inline">{t('app.planPurchase')}</span>
             </button>
             <button
               onClick={() => setShowOrchard(true)}
               className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title="Settle the ledger by swiping"
+              title={t('app.cherryPickTitle')}
             >
-              <CherryIcon className="h-4 w-4 shrink-0" /> Cherry Pick
+              <CherryIcon className="h-4 w-4 shrink-0" /> {t('app.cherryPick')}
             </button>
             <button
               onClick={() => {
@@ -449,8 +446,8 @@ export default function App() {
               className="min-w-0 w-full sm:w-auto bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs sm:text-xs px-2.5 sm:px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4 shrink-0" />
-              <span className="sm:hidden">Log</span>
-              <span className="hidden sm:inline">Log Expense</span>
+              <span className="sm:hidden">{t('app.logShort')}</span>
+              <span className="hidden sm:inline">{t('app.logExpense')}</span>
             </button>
           </div>
         </header>
@@ -466,11 +463,13 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-natural-text">
-                  Welcome back,{' '}
-                  <span className="capitalize">
-                    {userProfile?.name || currentUser?.displayName || 'Friend'}
-                  </span>
-                  !
+                  <Trans
+                    i18nKey="app.welcomeBack"
+                    values={{
+                      name: userProfile?.name || currentUser?.displayName || t('common.friend'),
+                    }}
+                    components={{ 1: <span className="capitalize" /> }}
+                  />
                 </h3>
                 {userProfile?.weeklyGreeting?.text && (
                   <p className="text-xs text-natural-primary font-medium mt-1 italic leading-snug max-w-md">
@@ -481,10 +480,12 @@ export default function App() {
                   <button
                     onClick={() => setShowGroupMenu((v) => !v)}
                     className="text-xs text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
-                    title="Switch group"
+                    title={t('app.switchGroup')}
                   >
-                    Group:{' '}
-                    <strong className="text-natural-text">{group.name || 'Unnamed Group'}</strong>
+                    {t('app.groupLabel')}{' '}
+                    <strong className="text-natural-text">
+                      {group.name || t('app.unnamedGroup')}
+                    </strong>
                     <ChevronDown
                       size={12}
                       className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`}
@@ -495,14 +496,14 @@ export default function App() {
                       <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
                       <div className="absolute left-0 mt-1 z-20 w-64 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
                         <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">
-                          Your Groups
+                          {t('app.yourGroups')}
                         </p>
                         {groupIds.map((gid) => {
                           const isActive = gid === activeGroupId;
                           const name =
                             gid === group.id
-                              ? group.name || 'Unnamed Group'
-                              : groupSummaries[gid]?.name || 'Unnamed Group';
+                              ? group.name || t('app.unnamedGroup')
+                              : groupSummaries[gid]?.name || t('app.unnamedGroup');
                           return (
                             <button
                               key={gid}
@@ -525,7 +526,7 @@ export default function App() {
                           }}
                           className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
                         >
-                          <Plus size={14} /> Join or create another group
+                          <Plus size={14} /> {t('app.joinOrCreateAnother')}
                         </button>
                       </div>
                     </>
@@ -537,10 +538,12 @@ export default function App() {
               <button
                 onClick={() => setShowSettings(true)}
                 className="text-natural-muted hover:text-natural-primary flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 border border-natural-border rounded-md shadow-sm"
-                title="Account Settings"
+                title={t('app.accountSettings')}
               >
                 <Settings size={14} />
-                <span className="text-xs font-semibold uppercase tracking-widest">Settings</span>
+                <span className="text-xs font-semibold uppercase tracking-widest">
+                  {t('app.settings')}
+                </span>
               </button>
             </div>
           </div>
@@ -555,20 +558,15 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">
-                  {pendingConfirmCount === 1
-                    ? 'A payment needs your confirmation'
-                    : `${pendingConfirmCount} payments need your confirmation`}
+                  {t('app.paymentsNeedConfirmation', { count: pendingConfirmCount })}
                 </h3>
-                <p className="text-xs text-natural-muted mt-1">
-                  Someone logged a payment to you. Confirm receipt so it clears and updates their
-                  balance.
-                </p>
+                <p className="text-xs text-natural-muted mt-1">{t('app.confirmReceiptBody')}</p>
               </div>
               <button
                 onClick={() => setSelectedExpense(pendingToConfirm[0])}
                 className="shrink-0 bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
               >
-                Review
+                {t('app.review')}
               </button>
             </div>
           )}
@@ -578,22 +576,22 @@ export default function App() {
               <AlertCircle className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-natural-text">
-                  {overThresholdExpenses.length === 1
-                    ? 'A shared expense is over your threshold'
-                    : `${overThresholdExpenses.length} shared expenses are over your threshold`}
+                  {t('app.overThreshold', { count: overThresholdExpenses.length })}
                 </h3>
                 <p className="text-xs text-natural-muted mt-1">
-                  Your share{' '}
-                  {overThresholdExpenses.length === 1 ? 'here exceeds' : 'on these exceeds'} your
-                  spending threshold of ${myThreshold.toFixed(0)}. Worth a look, and a conversation
-                  if the timing's tight.
+                  {t(
+                    overThresholdExpenses.length === 1
+                      ? 'app.overThresholdBodyOne'
+                      : 'app.overThresholdBodyMany',
+                    { amount: formatCurrency(myThreshold, 0) }
+                  )}
                 </p>
               </div>
               <button
                 onClick={() => setSelectedExpense(overThresholdExpenses[0])}
                 className="shrink-0 bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs px-4 py-2 rounded-full shadow-sm transition-colors"
               >
-                Review
+                {t('app.review')}
               </button>
             </div>
           )}
@@ -607,22 +605,21 @@ export default function App() {
                 <AlertCircle className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-natural-text">
-                    {group.splitChange.byName} updated the household split
+                    {t('app.splitUpdatedBy', { name: group.splitChange.byName })}
                   </h3>
                   <p className="text-xs text-natural-muted mt-1">
-                    The default ratio is now{' '}
-                    <span className="font-mono font-semibold text-natural-text">
-                      {group.splitChange.summary}
-                    </span>
-                    . It applies to every new expense; anything already logged keeps the split it
-                    had.
+                    <Trans
+                      i18nKey="app.splitUpdatedBody"
+                      values={{ summary: group.splitChange.summary }}
+                      components={{ 1: <span className="font-mono font-semibold text-natural-text" /> }}
+                    />
                   </p>
                 </div>
                 <button
                   onClick={() => dismissSplitChange(group.splitChange!.at)}
                   className="text-natural-primary hover:text-natural-dark bg-white/60 p-1 rounded-full border border-natural-primary/25 shrink-0"
-                  title="Got it"
-                  aria-label="Dismiss split change notice"
+                  title={t('common.gotIt')}
+                  aria-label={t('app.dismissSplitNotice')}
                 >
                   <X size={14} />
                 </button>
@@ -633,18 +630,14 @@ export default function App() {
             <div className="bg-natural-primary/5 border border-natural-primary/25 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-natural-text">
-                  Some members are still setting up
-                </h3>
-                <p className="text-xs text-natural-muted mt-1">
-                  You can start logging and settling expenses right away. Income-based splits and
-                  financial insights will get more accurate once everyone finishes their profile
-                  quiz.
-                </p>
+                <h3 className="text-sm font-bold text-natural-text">{t('app.membersSettingUp')}</h3>
+                <p className="text-xs text-natural-muted mt-1">{t('app.membersSettingUpBody')}</p>
                 <div className="mt-2 space-y-0.5">
                   {missingProfiles.map((id) => (
                     <div key={id} className="text-xs font-medium text-natural-primary">
-                      {groupUsers[id]?.name || 'Someone'} hasn't completed setup yet.
+                      {t('app.hasntCompletedSetup', {
+                        name: groupUsers[id]?.name || t('common.someone'),
+                      })}
                     </div>
                   ))}
                 </div>
@@ -652,8 +645,8 @@ export default function App() {
               <button
                 onClick={() => setDismissedWaiting(true)}
                 className="text-natural-primary hover:text-natural-dark bg-white/60 p-1 rounded-full border border-natural-primary/25 shrink-0"
-                title="Dismiss"
-                aria-label="Dismiss"
+                title={t('app.dismiss')}
+                aria-label={t('app.dismiss')}
               >
                 <X size={14} />
               </button>
@@ -666,10 +659,10 @@ export default function App() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
-                    Shared Ledger
+                    {t('app.sharedLedger')}
                   </h3>
                 </div>
-                <ModuleBoundary label="Shared Ledger">
+                <ModuleBoundary label={t('app.sharedLedger')}>
                   <ExpenseList
                     expenses={expenses}
                     group={group}
@@ -680,7 +673,7 @@ export default function App() {
               </div>
               {/* Gated: month-over-month is on the paywall as "Insights and monthly trends". */}
               {isPlus && (
-                <ModuleBoundary label="Monthly trends">
+                <ModuleBoundary label={t('app.monthlyTrends')}>
                   <MonthlyComparisonChart
                     expenses={statsVisibleExpenses}
                     members={getFullMembers(group)}
@@ -691,7 +684,7 @@ export default function App() {
 
             <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
               {/* Balances are the free splitter itself, never gated. */}
-              <ModuleBoundary label="Balances">
+              <ModuleBoundary label={t('app.balances')}>
                 <StatsSection
                   expenses={statsVisibleExpenses}
                   group={group}
@@ -701,7 +694,7 @@ export default function App() {
                 />
               </ModuleBoundary>
               {/* Cherry +: the member's share of the month, dated, before it comes due. */}
-              <ModuleBoundary label="My month ahead">
+              <ModuleBoundary label={t('app.myMonthAhead')}>
                 <MonthAheadCard
                   expenses={statsVisibleExpenses}
                   activeUser={activeUser}
@@ -711,7 +704,7 @@ export default function App() {
               </ModuleBoundary>
               {isPlus && (
                 <>
-                  <ModuleBoundary label="Insights">
+                  <ModuleBoundary label={t('app.insights')}>
                     <InsightsSection
                       expenses={statsVisibleExpenses}
                       members={getFullMembers(group)}
@@ -719,7 +712,7 @@ export default function App() {
                     />
                   </ModuleBoundary>
                   {/* The free Insights teaser below already names this one. */}
-                  <ModuleBoundary label="Who's carrying what">
+                  <ModuleBoundary label={t('app.whosCarrying')}>
                     <CarryingCard
                       expenses={statsVisibleExpenses}
                       members={getFullMembers(group)}
@@ -736,25 +729,22 @@ export default function App() {
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
-                      Insights
+                      {t('app.insights')}
                     </span>
                     <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
                       Cherry +
                     </span>
                   </div>
                   <p className="mt-2 font-display text-lg font-semibold text-natural-text">
-                    See where the money actually goes
+                    {t('app.insightsTeaserTitle')}
                   </p>
-                  <p className="mt-1 text-sm text-natural-muted">
-                    How it was paid, who is carrying the card, how long things take to come back,
-                    and what Venmo instant transfers are quietly costing.
-                  </p>
+                  <p className="mt-1 text-sm text-natural-muted">{t('app.insightsTeaserBody')}</p>
                   <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
-                    See Cherry +
+                    {t('app.seeCherryPlus')}
                   </span>
                 </button>
               )}
-              <ModuleBoundary label="Rhythm">
+              <ModuleBoundary label={t('app.rhythm')}>
                 <RhythmCard
                   expenses={expenses}
                   locked={!isPlus}
@@ -769,8 +759,8 @@ export default function App() {
           className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1"
           id="app-footer"
         >
-          <p>Have Another Cherry • Shared Home Ledger</p>
-          <p className="font-mono">Real-time Cloud Sync Active</p>
+          <p>{t('app.footerTagline')}</p>
+          <p className="font-mono">{t('app.footerSync')}</p>
         </footer>
       </main>
 
@@ -801,6 +791,11 @@ export default function App() {
           onSaveName={handleSaveName}
           onSaveIncome={handleSaveIncome}
           onSaveMarketingOptIn={handleSaveMarketingOptIn}
+          onSaveLocale={(locale) => {
+            // Remembered on the profile so server emails can follow it later.
+            setUserProfile((prev: any) => ({ ...(prev || {}), locale }));
+            setDoc(doc(db, 'users', activeUser), { locale }, { merge: true }).catch(() => {});
+          }}
           onRetakeQuiz={handleRetakeQuiz}
           onRecalculateSplit={handleRecalculateSplit}
           paymentHandlesByUid={paymentHandlesByUid}

@@ -3,6 +3,8 @@
 // interest); amounts save exactly to $999,999, round to the nearest $100,000
 // from $1,000,000, and are refused past the hard cap as a typo.
 
+import { t } from '../i18n';
+
 export const MAX_PERCENT = 500;
 export const MAX_EXACT_AMOUNT = 999_999;
 export const AMOUNT_HARD_CAP = 999_999_999;
@@ -25,10 +27,10 @@ export function normalizeAmount(raw: number): NormalizedAmount | null {
 /** Error message for an unusable dollar amount, or null when acceptable
  *  (possibly after rounding - call normalizeAmount on save). */
 export function amountError(raw: number): string | null {
-  if (!Number.isFinite(raw)) return 'Enter an amount.';
-  if (raw < 0) return "An amount can't be negative.";
+  if (!Number.isFinite(raw)) return t('limits.enterAmount');
+  if (raw < 0) return t('limits.amountNegative');
   if (raw > AMOUNT_HARD_CAP) {
-    return 'That amount looks too large to be right - check for a typo.';
+    return t('limits.amountTooLarge');
   }
   return null;
 }
@@ -36,10 +38,10 @@ export function amountError(raw: number): string | null {
 /** Error message for an unusable percentage, or null when acceptable. The
  *  500 ceiling is quiet headroom for interest and never stated outright. */
 export function percentError(raw: number): string | null {
-  if (!Number.isFinite(raw)) return 'Enter a percentage.';
-  if (raw < 0) return "A percentage can't be negative.";
+  if (!Number.isFinite(raw)) return t('limits.enterPercent');
+  if (raw < 0) return t('limits.percentNegative');
   if (raw > MAX_PERCENT) {
-    return 'That percentage looks too high - check for a typo.';
+    return t('limits.percentTooHigh');
   }
   return null;
 }

@@ -13,25 +13,25 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { analytics } from '@heycatch/sdk';
+import { Trans, useTranslation } from 'react-i18next';
+import { t } from '../i18n';
+import LanguageSelect from './LanguageSelect';
 import { auth, db, applyKeepSignedIn } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
 import {
-  PASSWORD_POLICY_MESSAGE,
   PASSWORD_REQUIREMENTS,
   checkPassword,
   isPasswordValid,
+  passwordPolicyMessage,
+  passwordRequirementLabel,
 } from '../lib/password';
 import CherryLogo from './CherryLogo';
 
 // Eligibility is 13+ (parent or guardian permission under 18) and signup records an age attestation.
 const TERMS_VERSION = '2026-09-02';
 
-const NO_ACCOUNT_MESSAGE =
-  'We could not find an account for that email. Check the spelling, or create one.';
-const OTHER_PROVIDER_MESSAGE = 'This email signs in with Google or Apple. Use that button instead.';
-const OFFLINE_MESSAGE = 'Could not reach the server. Check your connection and try again.';
 
 // Firebase folds an unknown address and a wrong password into one error, so a
 // failed sign-in asks the server whether the address has an account and which
@@ -70,33 +70,33 @@ function friendlyAuthError(err: any): string {
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
-      return "That email or password doesn't match. Please try again.";
+      return t('auth.err.credential');
     case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
+      return t('auth.err.invalidEmail');
     case 'auth/email-already-in-use':
-      return 'An account already exists for this email. Try logging in instead.';
+      return t('auth.err.emailInUse');
     case 'auth/weak-password':
     case 'auth/password-does-not-meet-requirements':
-      return PASSWORD_POLICY_MESSAGE;
+      return passwordPolicyMessage();
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
-      return 'Sign-in was cancelled.';
+      return t('auth.err.cancelled');
     case 'auth/account-exists-with-different-credential':
-      return 'You already have an account with this email using a different sign-in method. Try that one.';
+      return t('auth.err.differentCredential');
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.';
+      return t('auth.err.tooMany');
     case 'auth/operation-not-allowed':
-      return "That sign-in method isn't switched on for this app yet. Please try another way to sign in.";
+      return t('auth.err.notAllowed');
     case 'auth/network-request-failed':
-      return 'Couldn’t reach the sign-in service. Check your connection. VPNs, ad blockers, or strict privacy settings can block it. Then try again.';
+      return t('auth.err.network');
     case 'auth/popup-blocked':
-      return 'Your browser blocked the Google sign-in window. Allow popups for this site and try again.';
+      return t('auth.err.popupBlocked');
     case 'auth/unauthorized-domain':
-      return 'Sign-in isn’t authorized on this domain. Please use the official app link.';
+      return t('auth.err.unauthorizedDomain');
     case 'auth/ui-timeout':
-      return 'Sign-in is taking too long. If a Google window opened and closed without signing you in, your browser may be blocking cross-site sign-in. Try email and password, or a different browser.';
+      return t('auth.err.timeout');
     default:
-      return 'Something went wrong. Please try again.';
+      return t('errors.generic');
   }
 }
 
@@ -173,6 +173,7 @@ function initialIsLogin(): boolean {
 }
 
 export default function AuthScreen() {
+  const { t } = useTranslation();
   const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -240,9 +241,7 @@ export default function AuthScreen() {
   ) => {
     // New (sign-up) accounts must accept the terms first - matches the email flow.
     if (!isLogin && !agreeTerms) {
-      setError(
-        "Please confirm you're at least 13 and agree to the Terms of Service and Privacy Policy to create an account."
-      );
+      setError(t('auth.confirmTerms'));
       return;
     }
     setError('');
@@ -310,7 +309,7 @@ export default function AuthScreen() {
     setError('');
     setInfo('');
     if (!email) {
-      setError('Enter your email address to reset your password.');
+      setError(t('auth.enterEmailToReset'));
       return;
     }
     setEmailLoading(true);
@@ -322,18 +321,14 @@ export default function AuthScreen() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Unable to send reset email. Please try again later.');
+        throw new Error(data.error || t('auth.resetSendFailed'));
       }
-      setInfo(
-        `A password reset link is on its way to ${email}. Check your inbox and your spam folder.`
-      );
+      setInfo(t('auth.resetSent', { email }));
     } catch (err: any) {
       // A fetch that never reached the server rejects with a TypeError whose
       // message is written for developers ("Failed to fetch").
       setError(
-        err instanceof TypeError
-          ? OFFLINE_MESSAGE
-          : err?.message || 'Unable to send reset email. Please try again later.'
+        err instanceof TypeError ? t('auth.offline') : err?.message || t('auth.resetSendFailed')
       );
     } finally {
       setEmailLoading(false);
@@ -372,19 +367,17 @@ export default function AuthScreen() {
         // 20 characters, the checklist quietly shows one unmet item, and the
         // policy sentence reads like the password is fine.
         const missing = PASSWORD_REQUIREMENTS.filter((req) => !passwordChecks[req.key]).map((req) =>
-          req.label.toLowerCase()
+          passwordRequirementLabel(req.labelKey).toLowerCase()
         );
         setError(
           missing.length === 1
-            ? `Your password needs ${missing[0]}.`
-            : `Your password still needs: ${missing.join(', ')}.`
+            ? t('auth.passwordNeedsOne', { rule: missing[0] })
+            : t('auth.passwordNeedsMany', { rules: missing.join(', ') })
         );
         return;
       }
       if (!agreeTerms) {
-        setError(
-          "Please confirm you're at least 13 and agree to the Terms of Service and Privacy Policy to create an account."
-        );
+        setError(t('auth.confirmTerms'));
         return;
       }
     }
@@ -426,12 +419,12 @@ export default function AuthScreen() {
       if (isLogin && isCredentialMismatch(err?.code)) {
         const account = await accountLookup(email);
         if (account && !account.exists) {
-          message = NO_ACCOUNT_MESSAGE;
+          message = t('auth.noAccount');
         } else if (account && account.exists && !account.providers.includes('password')) {
           // The address is real but was created through Google or Apple, so
           // there is no password to match: "doesn't match" would send them
           // off to reset a password they never had.
-          message = OTHER_PROVIDER_MESSAGE;
+          message = t('auth.otherProvider');
         }
       }
       setError(message);
@@ -445,15 +438,18 @@ export default function AuthScreen() {
         <a href="https://haveanothercherry.com" className="flex items-center gap-2">
           <CherryLogo className="h-6 w-6" />
           <span className="font-display font-semibold text-natural-text tracking-tight">
-            Have Another Cherry
+            {t('common.brand')}
           </span>
         </a>
-        <a
-          href="https://haveanothercherry.com/blog"
-          className="text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
-        >
-          Blog
-        </a>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://haveanothercherry.com/blog"
+            className="text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
+          >
+            {t('auth.blog')}
+          </a>
+          <LanguageSelect compact />
+        </div>
       </nav>
 
       <div className="flex-1 flex items-center justify-center p-4">
@@ -466,13 +462,13 @@ export default function AuthScreen() {
                 <CherryLogo className="h-10 w-10" />
               </div>
               <h1 className="text-2xl sm:text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
-                Have Another Cherry
+                {t('common.brand')}
               </h1>
               {/* The category line the marketing homepage carries above its
                   tagline (owner, November 8th 2026), so someone who lands here
                   first still learns what the app is. */}
               <p className="font-mono text-xs leading-relaxed text-natural-accent">
-                The shared expense app for people who keep their own money
+                {t('auth.categoryLine')}
               </p>
             </div>
 
@@ -492,7 +488,7 @@ export default function AuthScreen() {
               button meant hunting for the form you had already asked for. */}
                 {isReset ? (
                   <div className="text-center mb-6">
-                    <h2 className="text-sm font-medium text-natural-muted">Reset your password</h2>
+                    <h2 className="text-sm font-medium text-natural-muted">{t('auth.resetYourPassword')}</h2>
                   </div>
                 ) : (
                   <div
@@ -501,8 +497,8 @@ export default function AuthScreen() {
                   >
                     {(
                       [
-                        ['login', 'Log in'],
-                        ['signup', 'Sign up'],
+                        ['login', t('auth.login')],
+                        ['signup', t('auth.signup')],
                       ] as const
                     ).map(([mode, label]) => {
                       const active = isLogin === (mode === 'login');
@@ -543,15 +539,14 @@ export default function AuthScreen() {
                 <form onSubmit={handleEmailAuth} className="space-y-4 mb-6 sm:mb-0">
                   {isReset && (
                     <p className="text-sm text-natural-muted -mt-1">
-                      Enter the email address for your account and we'll send you a link to create a
-                      new password.
+                      {t('auth.resetExplainer')}
                     </p>
                   )}
 
                   {!isLogin && !isReset && (
                     <div>
                       <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                        Name
+                        {t('auth.name')}
                       </label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -561,7 +556,7 @@ export default function AuthScreen() {
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
-                          placeholder="Name"
+                          placeholder={t('auth.name')}
                         />
                       </div>
                     </div>
@@ -569,7 +564,7 @@ export default function AuthScreen() {
 
                   <div>
                     <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                      Email
+                      {t('auth.email')}
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -579,7 +574,7 @@ export default function AuthScreen() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
-                        placeholder="you@example.com"
+                        placeholder={t('auth.emailPlaceholder')}
                       />
                     </div>
                   </div>
@@ -587,7 +582,7 @@ export default function AuthScreen() {
                   {!isReset && (
                     <div>
                       <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                        Password
+                        {t('auth.password')}
                       </label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
@@ -604,7 +599,7 @@ export default function AuthScreen() {
                       {!isLogin && (
                         <div className="mt-2">
                           <p className="text-xs font-semibold text-natural-text mb-1">
-                            Create a password with:
+                            {t('auth.createPasswordWith')}
                           </p>
                           <ul className="space-y-1">
                             {PASSWORD_REQUIREMENTS.map((req) => (
@@ -618,7 +613,8 @@ export default function AuthScreen() {
                                       : 'text-natural-muted'
                                 }`}
                               >
-                                <span>{passwordChecks[req.key] ? '✓' : '○'}</span> {req.label}
+                                <span>{passwordChecks[req.key] ? '✓' : '○'}</span>{' '}
+                                {passwordRequirementLabel(req.labelKey)}
                               </li>
                             ))}
                           </ul>
@@ -631,7 +627,7 @@ export default function AuthScreen() {
                             onClick={() => switchMode('reset')}
                             className="text-xs font-medium text-natural-primary hover:underline"
                           >
-                            Forgot password?
+                            {t('auth.forgotPassword')}
                           </button>
                         </div>
                       )}
@@ -647,24 +643,25 @@ export default function AuthScreen() {
                         className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
                       />
                       <span>
-                        I'm at least 13 years old (13 to 17 with a parent or guardian's permission),
-                        and I agree to the{' '}
-                        <button
-                          type="button"
-                          onClick={() => setLegalDoc('terms')}
-                          className="font-semibold text-natural-primary hover:underline"
-                        >
-                          Terms of Service
-                        </button>{' '}
-                        and{' '}
-                        <button
-                          type="button"
-                          onClick={() => setLegalDoc('privacy')}
-                          className="font-semibold text-natural-primary hover:underline"
-                        >
-                          Privacy Policy
-                        </button>
-                        .
+                        <Trans
+                          i18nKey="auth.ageAndAgree"
+                          components={{
+                            1: (
+                              <button
+                                type="button"
+                                onClick={() => setLegalDoc('terms')}
+                                className="font-semibold text-natural-primary hover:underline"
+                              />
+                            ),
+                            3: (
+                              <button
+                                type="button"
+                                onClick={() => setLegalDoc('privacy')}
+                                className="font-semibold text-natural-primary hover:underline"
+                              />
+                            ),
+                          }}
+                        />
                       </span>
                     </label>
                   )}
@@ -681,10 +678,9 @@ export default function AuthScreen() {
                       />
                       <span>
                         <span className="font-semibold text-natural-text">
-                          Keep me signed in on this device.
+                          {t('auth.keepSignedInTitle')}
                         </span>{' '}
-                        Skip the login screen next time. Signing out in Settings turns this back
-                        off.
+                        {t('auth.keepSignedInBody')}
                       </span>
                     </label>
                   )}
@@ -695,12 +691,12 @@ export default function AuthScreen() {
                     className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                   >
                     {emailLoading
-                      ? 'Please wait...'
+                      ? t('common.pleaseWait')
                       : isReset
-                        ? 'Send reset link'
+                        ? t('auth.sendResetLink')
                         : isLogin
-                          ? 'Log In'
-                          : 'Sign Up'}
+                          ? t('auth.logInButton')
+                          : t('auth.signUpButton')}
                   </button>
                 </form>
               </div>
@@ -712,7 +708,7 @@ export default function AuthScreen() {
                       <div className="w-full border-t border-natural-border sm:w-px sm:border-t-0 sm:border-l"></div>
                     </div>
                     <div className="relative flex justify-center text-xs sm:items-center sm:h-full">
-                      <span className="px-2 bg-white text-natural-muted sm:py-2">or</span>
+                      <span className="px-2 bg-white text-natural-muted sm:py-2">{t('common.or')}</span>
                     </div>
                   </div>
 
@@ -729,7 +725,7 @@ export default function AuthScreen() {
                           d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"
                         />
                       </svg>
-                      {appleLoading ? 'Waiting for Apple...' : 'Continue with Apple'}
+                      {appleLoading ? t('auth.waitingApple') : t('auth.continueApple')}
                     </button>
 
                     <button
@@ -756,7 +752,7 @@ export default function AuthScreen() {
                           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                         />
                       </svg>
-                      {googleLoading ? 'Waiting for Google...' : 'Continue with Google'}
+                      {googleLoading ? t('auth.waitingGoogle') : t('auth.continueGoogle')}
                     </button>
                   </div>
                 </>
@@ -765,12 +761,12 @@ export default function AuthScreen() {
 
             {isReset ? (
               <p className="text-center text-sm text-natural-muted mt-6">
-                Remembered your password?{' '}
+                {t('auth.rememberedPassword')}{' '}
                 <button
                   onClick={() => switchMode('login')}
                   className="text-natural-text hover:underline font-medium transition-colors"
                 >
-                  Back to log in
+                  {t('auth.backToLogin')}
                 </button>
               </p>
             ) : (
@@ -784,7 +780,7 @@ export default function AuthScreen() {
                taller than Apple's for the two black plates to match. */
                 <>
                   <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
-                    Everything you need is free. No credit card required.
+                    {t('auth.freeNoCard')}
                   </p>
                   <div className="mt-4 flex items-center justify-center gap-2.5">
                     <a
@@ -795,7 +791,7 @@ export default function AuthScreen() {
                     >
                       <img
                         src="/app-store-badge.svg"
-                        alt="Download on the App Store"
+                        alt={t('auth.appStoreAlt')}
                         width={120}
                         height={40}
                         className="h-10 w-auto"
@@ -809,7 +805,7 @@ export default function AuthScreen() {
                     >
                       <img
                         src="/google-play-badge.svg"
-                        alt="Get it on Google Play"
+                        alt={t('auth.playAlt')}
                         width={155}
                         height={60}
                         className="-mx-1.5 -my-2.5 h-[60px] w-auto"
@@ -824,7 +820,7 @@ export default function AuthScreen() {
                       href="https://haveanothercherry.com/features"
                       className="font-medium text-natural-text underline underline-offset-2 hover:text-natural-primary transition-colors"
                     >
-                      See how it works
+                      {t('auth.seeHowItWorks')}
                     </a>
                   </p>
                 </>
@@ -834,15 +830,27 @@ export default function AuthScreen() {
                 it is hidden (index.css) and Google's required notice takes its
                 place, in the words Google asks for. */}
             <p className="mt-6 text-center text-[11px] leading-relaxed text-natural-accent">
-              This site is protected by reCAPTCHA and the Google{' '}
-              <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                Privacy Policy
-              </a>{' '}
-              and{' '}
-              <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-                Terms of Service
-              </a>{' '}
-              apply.
+              <Trans
+                i18nKey="auth.recaptcha"
+                components={{
+                  1: (
+                    <a
+                      href="https://policies.google.com/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                    />
+                  ),
+                  3: (
+                    <a
+                      href="https://policies.google.com/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                    />
+                  ),
+                }}
+              />
             </p>
           </div>
         </div>

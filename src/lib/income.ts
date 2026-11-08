@@ -4,6 +4,8 @@
 // write the same users/{uid}.income string, and the income-based split
 // recommendation divides by the group total.
 
+import { intlLocale, t } from '../i18n';
+
 /** Parse what someone typed (or what an old profile stored): `$65,000`,
  *  `65000`, `65,000.50` all read. Null when it is not a number at all. */
 export function parseIncome(raw: string): number | null {
@@ -16,9 +18,9 @@ export function parseIncome(raw: string): number | null {
 /** Why the typed income cannot be saved, or null when it can. */
 export function incomeInputError(raw: string): string | null {
   const n = parseIncome(raw);
-  if (n === null) return 'Enter a yearly amount, like 65000.';
-  if (n < 0) return "Income can't be negative.";
-  if (n >= 1_000_000_000) return 'Enter a yearly amount under $1,000,000,000.';
+  if (n === null) return t('income.enterYearly');
+  if (n < 0) return t('income.negative');
+  if (n >= 1_000_000_000) return t('income.tooLarge');
   return null;
 }
 
@@ -37,7 +39,7 @@ export function formatIncome(raw: string | undefined | null): string | null {
   if (!trimmed) return null;
   const n = parseIncome(trimmed);
   if (n === null) return trimmed;
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(intlLocale(), {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,

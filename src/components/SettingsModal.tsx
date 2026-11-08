@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Settings,
   LogOut,
@@ -27,6 +28,7 @@ import { quizRetakeBlocker } from '../lib/quizRetake';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { formatIncome } from '../lib/income';
+import LanguageSelect from './LanguageSelect';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -40,6 +42,8 @@ interface SettingsModalProps {
   onSaveIncome: (raw: string) => Promise<boolean>;
   /** Newsletters and offers. Off by default; this switch is the only place it is asked. */
   onSaveMarketingOptIn: (optIn: boolean) => Promise<void>;
+  /** The language switcher also records the choice on the profile. */
+  onSaveLocale: (locale: string) => void;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => Promise<void> | void;
   /** Every member's decrypted Venmo/Zelle handles, keyed by uid, so the
@@ -74,6 +78,7 @@ export default function SettingsModal({
   onSaveName,
   onSaveIncome,
   onSaveMarketingOptIn,
+  onSaveLocale,
   onRetakeQuiz,
   onRecalculateSplit,
   paymentHandlesByUid,
@@ -87,6 +92,7 @@ export default function SettingsModal({
   onSignOut,
   extraSection,
 }: SettingsModalProps) {
+  const { t } = useTranslation();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
@@ -247,11 +253,13 @@ export default function SettingsModal({
   let seatPreview: { name: string; pct: number }[] | null = null;
   if (addingSeat && group) {
     try {
-      const next = withAddedSeat(group, seatName || 'New person', parseFloat(seatPercent));
+      const next = withAddedSeat(group, seatName || t('settings.newPerson'), parseFloat(seatPercent));
       seatPreview = [
         ...joinedUids(group).map((uid) => ({
           name:
-            groupUsers[uid]?.name || group.members?.find((m) => m.uid === uid)?.name || 'Member',
+            groupUsers[uid]?.name ||
+            group.members?.find((m) => m.uid === uid)?.name ||
+            t('settings.member'),
           pct: next.defaultSplit[uid],
         })),
         ...next.availableSplits.map((p) => ({ name: p.name, pct: p.split })),
@@ -276,7 +284,7 @@ export default function SettingsModal({
       await onAddSeat(seatName, parseFloat(seatPercent), seatEmail.trim() || undefined);
       setAddingSeat(false);
     } catch (err: any) {
-      setSeatError(err?.message || 'Could not add that person. Please try again.');
+      setSeatError(err?.message || t('settings.couldNotAddPerson'));
     } finally {
       setSeatBusy(false);
     }
@@ -314,7 +322,9 @@ export default function SettingsModal({
   };
 
   const hasRealName = userProfile?.name && !RESERVED_NAMES.includes(userProfile.name);
-  const displayName = hasRealName ? userProfile.name : currentUser?.displayName || 'Add your name';
+  const displayName = hasRealName
+    ? userProfile.name
+    : currentUser?.displayName || t('settings.addYourName');
   const fp = userProfile?.financialProfile;
 
   const saveName = () => {
@@ -326,14 +336,14 @@ export default function SettingsModal({
     <Modal
       onClose={onClose}
       icon={<Settings className="h-5 w-5 text-natural-primary" />}
-      title="Account Settings"
+      title={t('settings.title')}
       bodyClassName="p-6 space-y-6"
       footer={
         <button
           onClick={onSignOut}
           className="w-full flex items-center justify-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-primary/5 border border-natural-primary/25 py-2.5 rounded-xl transition-colors shadow-sm"
         >
-          <LogOut size={16} /> Sign Out
+          <LogOut size={16} /> {t('settings.signOut')}
         </button>
       }
     >
@@ -342,22 +352,21 @@ export default function SettingsModal({
       {/* Notifications (web push) */}
       {pushState !== 'unavailable' && (
         <div>
-          <h3 className={`${labelClass} mb-2`}>Notifications</h3>
+          <h3 className={`${labelClass} mb-2`}>{t('settings.notifications')}</h3>
           <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <Bell className="h-4 w-4 text-natural-primary mt-0.5 shrink-0" />
               <p className="text-xs text-natural-muted leading-relaxed">
-                Get an alert in this browser when someone adds to the ledger or sends a gentle
-                reminder. Never any amounts, just who and which group.
+                {t('settings.notificationsBody')}
               </p>
             </div>
             {pushState === 'granted' ? (
               <span className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1">
-                <Check className="h-3.5 w-3.5" /> On
+                <Check className="h-3.5 w-3.5" /> {t('settings.on')}
               </span>
             ) : pushState === 'denied' ? (
               <span className="shrink-0 text-xs font-semibold text-natural-muted text-right">
-                Blocked in browser settings
+                {t('settings.blockedInBrowser')}
               </span>
             ) : (
               <button
@@ -365,7 +374,7 @@ export default function SettingsModal({
                 disabled={enablingPush}
                 className="shrink-0 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-full shadow-sm transition-colors disabled:opacity-60"
               >
-                {enablingPush ? 'Asking...' : 'Turn on'}
+                {enablingPush ? t('settings.asking') : t('settings.turnOn')}
               </button>
             )}
           </div>
@@ -376,8 +385,18 @@ export default function SettingsModal({
           asked: signup carries no pre-ticked box, because agreeing to the
           terms is not agreeing to a newsletter. The privacy policy points
           people here to change their mind. */}
+      {/* Language. Follows the browser until picked here; the choice lives in
+          localStorage (so it applies before sign-in) and on the profile. */}
       <div>
-        <h3 className={`${labelClass} mb-2`}>Email</h3>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.language')}</h3>
+        <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex items-center justify-between gap-3">
+          <p className="text-xs text-natural-muted leading-relaxed">{t('settings.languageBody')}</p>
+          <LanguageSelect compact onChange={onSaveLocale} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.email')}</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border">
           <label className="flex items-start gap-2.5 cursor-pointer select-none">
             <input
@@ -389,10 +408,9 @@ export default function SettingsModal({
             />
             <span className="text-xs text-natural-muted leading-relaxed">
               <span className="font-semibold text-natural-text flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 text-natural-primary" /> Newsletters and offers
+                <Mail className="h-3.5 w-3.5 text-natural-primary" /> {t('settings.newsletters')}
               </span>
-              Off unless you turn it on. Change it here any time. Emails the app has to send, such
-              as invites and password resets, are not affected.
+              {t('settings.newslettersBody')}
             </span>
           </label>
         </div>
@@ -400,10 +418,10 @@ export default function SettingsModal({
 
       {/* User profile */}
       <div>
-        <h3 className={`${labelClass} mb-2`}>User Profile</h3>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.userProfile')}</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-2">
           <div className="flex justify-between items-center gap-2">
-            <span className="text-sm text-natural-muted">Name</span>
+            <span className="text-sm text-natural-muted">{t('settings.name')}</span>
             {editingName ? (
               <div className="flex items-center gap-1.5">
                 <input
@@ -414,22 +432,22 @@ export default function SettingsModal({
                     if (e.key === 'Escape') setEditingName(false);
                   }}
                   autoFocus
-                  placeholder="Your name"
+                  placeholder={t('settings.yourName')}
                   className="w-36 px-2 py-1 text-sm text-right border border-natural-border focus:border-natural-primary rounded-md outline-none"
                 />
                 <button
                   onClick={saveName}
                   className="text-natural-primary hover:text-natural-dark p-1"
-                  title="Save"
-                  aria-label="Save name"
+                  title={t('common.save')}
+                  aria-label={t('settings.saveName')}
                 >
                   <Check size={16} />
                 </button>
                 <button
                   onClick={() => setEditingName(false)}
                   className="text-natural-muted hover:text-natural-text p-1"
-                  title="Cancel"
-                  aria-label="Cancel editing name"
+                  title={t('common.cancel')}
+                  aria-label={t('settings.cancelEditingName')}
                 >
                   <X size={16} />
                 </button>
@@ -441,7 +459,7 @@ export default function SettingsModal({
                   setEditingName(true);
                 }}
                 className="flex items-center gap-1.5 group"
-                title="Edit your name"
+                title={t('settings.editYourName')}
               >
                 <span className="text-sm font-semibold text-natural-text capitalize">
                   {displayName}
@@ -451,7 +469,7 @@ export default function SettingsModal({
             )}
           </div>
           <div className="flex justify-between items-center gap-2">
-            <span className="text-sm text-natural-muted">Annual Income</span>
+            <span className="text-sm text-natural-muted">{t('settings.annualIncome')}</span>
             {incomeEditorAt === 'profile' ? (
               <form onSubmit={submitIncome} className="flex items-center gap-1.5">
                 <div className="relative">
@@ -466,8 +484,8 @@ export default function SettingsModal({
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') setIncomeEditorAt(null);
                     }}
-                    placeholder="Yearly income"
-                    aria-label="Your yearly income"
+                    placeholder={t('settings.yearlyIncome')}
+                    aria-label={t('settings.yourYearlyIncome')}
                     className="w-32 pl-5 pr-2 py-1 text-sm text-right font-mono border border-natural-border focus:border-natural-primary rounded-md outline-none"
                   />
                 </div>
@@ -475,8 +493,8 @@ export default function SettingsModal({
                   type="submit"
                   disabled={incomeBusy}
                   className="text-natural-primary hover:text-natural-dark p-1"
-                  title="Save"
-                  aria-label="Save income"
+                  title={t('common.save')}
+                  aria-label={t('settings.saveIncome')}
                 >
                   <Check size={16} />
                 </button>
@@ -484,8 +502,8 @@ export default function SettingsModal({
                   type="button"
                   onClick={() => setIncomeEditorAt(null)}
                   className="text-natural-muted hover:text-natural-text p-1"
-                  title="Cancel"
-                  aria-label="Cancel editing income"
+                  title={t('common.cancel')}
+                  aria-label={t('settings.cancelEditingIncome')}
                 >
                   <X size={16} />
                 </button>
@@ -494,10 +512,10 @@ export default function SettingsModal({
               <button
                 onClick={() => openIncomeEditor('profile')}
                 className="flex items-center gap-1.5 group"
-                title="Edit your income"
+                title={t('settings.editYourIncome')}
               >
                 <span className="text-sm font-semibold text-natural-text">
-                  {formatIncome(userProfile?.income) || 'Not set yet'}
+                  {formatIncome(userProfile?.income) || t('settings.notSetYet')}
                 </span>
                 <Edit2 size={13} className="text-natural-muted group-hover:text-natural-primary" />
               </button>
@@ -505,7 +523,7 @@ export default function SettingsModal({
           </div>
           {fp && (
             <div className="pt-2 mt-2 border-t border-natural-border">
-              <span className="text-xs text-natural-muted block mb-1">Financial Style</span>
+              <span className="text-xs text-natural-muted block mb-1">{t('settings.financialStyle')}</span>
               <span className="text-sm font-semibold text-natural-primary block">{fp.type}</span>
               <p className="text-xs text-natural-text mt-1 leading-relaxed">{fp.description}</p>
               {Array.isArray(fp.traits) && fp.traits.length > 0 && (
@@ -522,17 +540,17 @@ export default function SettingsModal({
               )}
               {fp.strengths && (
                 <p className="text-xs text-natural-text mt-2">
-                  <strong className="text-natural-muted">Strength:</strong> {fp.strengths}
+                  <strong className="text-natural-muted">{t('settings.strength')}</strong> {fp.strengths}
                 </p>
               )}
               {fp.watchouts && (
                 <p className="text-xs text-natural-text mt-1">
-                  <strong className="text-natural-muted">Watch-out:</strong> {fp.watchouts}
+                  <strong className="text-natural-muted">{t('settings.watchOut')}</strong> {fp.watchouts}
                 </p>
               )}
               {fp.communicationStyle && (
                 <p className="text-xs text-natural-text mt-1">
-                  <strong className="text-natural-muted">Money talk:</strong>{' '}
+                  <strong className="text-natural-muted">{t('settings.moneyTalk')}</strong>{' '}
                   {fp.communicationStyle}
                 </p>
               )}
@@ -548,7 +566,7 @@ export default function SettingsModal({
                   onClick={onRetakeQuiz}
                   className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
                 >
-                  Retake Profile Quiz
+                  {t('settings.retakeQuiz')}
                 </button>
               )}
             </div>
@@ -558,25 +576,25 @@ export default function SettingsModal({
 
       {/* Group details */}
       <div>
-        <h3 className={`${labelClass} mb-2`}>Group Details</h3>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.groupDetails')}</h3>
         <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-natural-muted">Group Name</span>
+            <span className="text-sm text-natural-muted">{t('settings.groupName')}</span>
             <span className="text-sm font-semibold text-natural-text">
-              {group?.name || 'Unnamed Group'}
+              {group?.name || t('app.unnamedGroup')}
             </span>
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <span className="text-sm text-natural-muted block mb-2">Group Members</span>
+            <span className="text-sm text-natural-muted block mb-2">{t('settings.groupMembers')}</span>
             <div className="space-y-3">
               {group &&
                 Object.entries(getFullDefaultSplit(group)).map(([uid, pct]) => {
                   const isGhost = uid.startsWith('ghost_');
                   const memberName = isGhost
                     ? (group.availableSplits?.find((_, i) => `ghost_${i}` === uid) as any)?.name ||
-                      'Someone'
-                    : groupUsers[uid]?.name || 'Someone';
+                      t('common.someone')
+                    : groupUsers[uid]?.name || t('common.someone');
                   return (
                     <div
                       key={uid}
@@ -599,7 +617,7 @@ export default function SettingsModal({
                           <span className="text-natural-text font-semibold">
                             {memberName}
                             {!isGhost && uid === currentUser?.uid && (
-                              <span className="text-natural-muted font-normal"> (you)</span>
+                              <span className="text-natural-muted font-normal">{t('settings.youSuffix')}</span>
                             )}
                           </span>
                           {editingSplit ? (
@@ -613,14 +631,14 @@ export default function SettingsModal({
                                 onChange={(e) =>
                                   setSplitDraft((prev) => ({ ...prev, [uid]: e.target.value }))
                                 }
-                                aria-label={`${memberName}'s share of the split`}
+                                aria-label={t('settings.shareOfSplit', { name: memberName })}
                                 className="w-16 px-2 py-1 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs font-mono text-right outline-none"
                               />
                               <span className="text-xs font-mono text-natural-muted">%</span>
                             </span>
                           ) : (
                             <span className="text-xs font-mono text-natural-muted">
-                              {Number(pct)}% split
+                              {t('settings.pctSplit', { pct: Number(pct) })}
                             </span>
                           )}
                         </div>
@@ -628,7 +646,7 @@ export default function SettingsModal({
                           {!isGhost ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-xs bg-natural-sidebar text-natural-text px-2 py-0.5 rounded-full font-medium">
-                                Joined
+                                {t('settings.joined')}
                               </span>
                               {!editingSplit && (
                                 <ChevronDown
@@ -643,7 +661,7 @@ export default function SettingsModal({
                           ) : (
                             <div className="flex items-center gap-2">
                               <span className="text-xs bg-natural-primary/10 text-natural-primary px-2 py-0.5 rounded-full font-medium">
-                                Pending
+                                {t('settings.pending')}
                               </span>
                               <button
                                 onClick={() => {
@@ -652,17 +670,17 @@ export default function SettingsModal({
                                 }}
                                 className="text-xs uppercase font-bold text-natural-primary hover:underline"
                               >
-                                {resendFor === uid ? 'Cancel' : 'Resend Invite'}
+                                {resendFor === uid ? t('common.cancel') : t('settings.resendInvite')}
                               </button>
                               <button
                                 onClick={() => removeSeat(Number(uid.slice('ghost_'.length)))}
                                 disabled={removingSeat !== null}
                                 className="text-xs uppercase font-bold text-natural-muted hover:text-natural-primary hover:underline disabled:opacity-50"
-                                title="Remove this pending seat and give its share back to everyone else"
+                                title={t('settings.removeSeatTitle')}
                               >
                                 {removingSeat === Number(uid.slice('ghost_'.length))
-                                  ? 'Removing...'
-                                  : 'Remove'}
+                                  ? t('settings.removing')
+                                  : t('settings.remove')}
                               </button>
                             </div>
                           )}
@@ -679,8 +697,8 @@ export default function SettingsModal({
                             autoFocus
                             value={resendEmail}
                             onChange={(e) => setResendEmail(e.target.value)}
-                            placeholder="Email"
-                            aria-label={`Email address for ${memberName}`}
+                            placeholder={t('settings.email')}
+                            aria-label={t('settings.emailFor', { name: memberName })}
                             className="flex-1 px-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs outline-none"
                           />
                           <button
@@ -688,7 +706,7 @@ export default function SettingsModal({
                             disabled={resendBusy || !resendEmail.trim()}
                             className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
                           >
-                            {resendBusy ? 'Sending...' : 'Send'}
+                            {resendBusy ? t('settings.sending') : t('settings.send')}
                           </button>
                         </form>
                       )}
@@ -711,7 +729,7 @@ export default function SettingsModal({
                               <div className="flex items-start justify-between gap-2">
                                 <div>
                                   <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-0.5">
-                                    Annual income
+                                    {t('settings.annualIncomeLabel')}
                                   </span>
                                   {isSelf && incomeEditorAt === 'roster' ? null : income ? (
                                     <span className="text-base font-bold text-natural-text">
@@ -719,7 +737,7 @@ export default function SettingsModal({
                                     </span>
                                   ) : (
                                     <span className="text-xs text-natural-muted">
-                                      {isSelf ? 'Not set yet' : 'Not shared yet'}
+                                      {isSelf ? t('settings.notSetYet') : t('settings.notSharedYet')}
                                     </span>
                                   )}
                                 </div>
@@ -728,7 +746,7 @@ export default function SettingsModal({
                                     onClick={() => openIncomeEditor('roster')}
                                     className="flex items-center gap-1 text-xs font-bold text-natural-primary hover:underline shrink-0"
                                   >
-                                    <Edit2 size={12} /> {income ? 'Edit' : 'Add'}
+                                    <Edit2 size={12} /> {income ? t('common.edit') : t('settings.add')}
                                   </button>
                                 )}
                               </div>
@@ -747,8 +765,8 @@ export default function SettingsModal({
                                         onKeyDown={(e) => {
                                           if (e.key === 'Escape') setIncomeEditorAt(null);
                                         }}
-                                        placeholder="Yearly income"
-                                        aria-label="Your yearly income"
+                                        placeholder={t('settings.yearlyIncome')}
+                                        aria-label={t('settings.yourYearlyIncome')}
                                         className="w-full pl-6 pr-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
                                       />
                                     </div>
@@ -757,19 +775,18 @@ export default function SettingsModal({
                                       disabled={incomeBusy}
                                       className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
                                     >
-                                      {incomeBusy ? 'Saving...' : 'Save'}
+                                      {incomeBusy ? t('common.saving') : t('common.save')}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setIncomeEditorAt(null)}
                                       className="text-xs font-semibold text-natural-muted hover:text-natural-text"
                                     >
-                                      Cancel
+                                      {t('common.cancel')}
                                     </button>
                                   </form>
                                   <p className="text-[11px] text-natural-muted">
-                                    Approximate is fine. Your household can see it, and it powers
-                                    the income-based split suggestion.
+                                    {t('settings.incomeHelp')}
                                   </p>
                                 </div>
                               )}
@@ -778,7 +795,7 @@ export default function SettingsModal({
                                   rules let group members read each other. */}
                               <div>
                                 <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
-                                  Payment handles
+                                  {t('settings.paymentHandles')}
                                 </span>
                                 {(() => {
                                   const h = paymentHandlesByUid?.[uid];
@@ -792,8 +809,8 @@ export default function SettingsModal({
                                     return (
                                       <span className="text-xs text-natural-muted">
                                         {isSelf
-                                          ? 'Add yours under How people pay you.'
-                                          : `${memberName} hasn't added any yet.`}
+                                          ? t('settings.addYoursUnder')
+                                          : t('settings.hasntAddedHandles', { name: memberName })}
                                       </span>
                                     );
                                   }
@@ -804,7 +821,7 @@ export default function SettingsModal({
                                           key={r.label}
                                           type="button"
                                           onClick={() => copyHandle(r.text)}
-                                          title={`Copy ${memberName}'s ${r.label} handle`}
+                                          title={t('settings.copyHandle', { name: memberName, label: r.label })}
                                           className="text-xs text-natural-muted flex items-center gap-1 hover:text-natural-primary"
                                         >
                                           <span className="font-semibold">{r.label}</span>
@@ -824,7 +841,7 @@ export default function SettingsModal({
                               </div>
                               <div>
                                 <span className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-natural-muted mb-1">
-                                  Financial style
+                                  {t('settings.financialStyleLabel')}
                                 </span>
                                 {mfp ? (
                                   <div>
@@ -850,14 +867,14 @@ export default function SettingsModal({
                                     )}
                                     {mfp.strengths && (
                                       <p className="text-xs text-natural-text mt-2">
-                                        <strong className="text-natural-muted">Strengths:</strong>{' '}
+                                        <strong className="text-natural-muted">{t('settings.strengths')}</strong>{' '}
                                         {mfp.strengths}
                                       </p>
                                     )}
                                     {mfp.watchouts && (
                                       <p className="text-xs text-natural-text mt-1">
                                         <strong className="text-natural-muted">
-                                          Watch out for:
+                                          {t('settings.watchOutFor')}
                                         </strong>{' '}
                                         {mfp.watchouts}
                                       </p>
@@ -865,7 +882,9 @@ export default function SettingsModal({
                                     {mfp.communicationStyle && (
                                       <p className="text-xs text-natural-text mt-1">
                                         <strong className="text-natural-muted">
-                                          Talking money with {isSelf ? 'you' : memberName}:
+                                          {isSelf
+                                            ? t('settings.talkingMoneyWithYou')
+                                            : t('settings.talkingMoneyWith', { name: memberName })}
                                         </strong>{' '}
                                         {mfp.communicationStyle}
                                       </p>
@@ -885,7 +904,7 @@ export default function SettingsModal({
                                           onClick={onRetakeQuiz}
                                           className="mt-3 text-xs font-semibold text-natural-primary hover:underline"
                                         >
-                                          Retake Profile Quiz
+                                          {t('settings.retakeQuiz')}
                                         </button>
                                       ))}
                                   </div>
@@ -894,11 +913,11 @@ export default function SettingsModal({
                                     onClick={onRetakeQuiz}
                                     className="text-xs font-bold text-natural-primary hover:underline"
                                   >
-                                    Find your style
+                                    {t('settings.findYourStyle')}
                                   </button>
                                 ) : (
                                   <span className="text-xs text-natural-muted">
-                                    {memberName} hasn&apos;t taken the style quiz yet.
+                                    {t('settings.hasntTakenQuiz', { name: memberName })}
                                   </span>
                                 )}
                               </div>
@@ -916,7 +935,7 @@ export default function SettingsModal({
                 className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
                 onClick={openSplitEditor}
               >
-                Adjust Split
+                {t('settings.adjustSplit')}
               </button>
             ) : (
               <div className="mt-3 space-y-2">
@@ -927,8 +946,8 @@ export default function SettingsModal({
                       : 'text-natural-primary font-bold'
                   }`}
                 >
-                  Total: {splitDraftTotal.toFixed(0)}%{' '}
-                  {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : '— needs to be 100%'}
+                  {t('settings.splitTotal', { total: splitDraftTotal.toFixed(0) })}
+                  {Math.abs(splitDraftTotal - 100) <= 0.05 ? '' : `: ${t('settings.needsToBe100')}`}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -936,18 +955,18 @@ export default function SettingsModal({
                     onClick={() => setEditingSplit(false)}
                     disabled={splitBusy}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg transition-colors disabled:opacity-60"
                     onClick={saveSplit}
                     disabled={splitBusy || Math.abs(splitDraftTotal - 100) > 0.05}
                   >
-                    {splitBusy ? 'Saving...' : 'Save New Split'}
+                    {splitBusy ? t('common.saving') : t('settings.saveNewSplit')}
                   </button>
                 </div>
                 <p className="text-[11px] text-natural-muted text-center">
-                  Everyone in the group will see a note that the split changed.
+                  {t('settings.splitChangeNote')}
                 </p>
               </div>
             )}
@@ -961,11 +980,10 @@ export default function SettingsModal({
                   onClick={recalculate}
                   disabled={recalcBusy}
                 >
-                  {recalcBusy ? 'Recalculating...' : 'Recalculate Using Reported Incomes'}
+                  {recalcBusy ? t('settings.recalculating') : t('settings.recalculate')}
                 </button>
                 <p className="mt-1.5 text-xs text-natural-muted">
-                  Applies to what you log from now on. Past expenses keep the shares they were
-                  logged with.
+                  {t('settings.recalculateNote')}
                 </p>
               </>
             )}
@@ -979,12 +997,14 @@ export default function SettingsModal({
                   onClick={openSeatForm}
                   disabled={!!seatBlocker}
                 >
-                  <UserPlus size={14} /> Add a Person
+                  <UserPlus size={14} /> {t('settings.addPerson')}
                 </button>
                 <p className="text-xs text-natural-muted mt-1.5 text-center">
                   {seatBlocker
                     ? seatBlocker
-                    : `Bring in up to ${growthLeft === 1 ? 'one more person' : 'two more people'}. Everyone's share is rescaled to make room.`}
+                    : growthLeft === 1
+                      ? t('settings.bringInOne')
+                      : t('settings.bringInTwo')}
                 </p>
               </div>
             ) : (
@@ -997,7 +1017,7 @@ export default function SettingsModal({
                     autoFocus
                     value={seatName}
                     onChange={(e) => setSeatName(e.target.value)}
-                    placeholder="Their name"
+                    placeholder={t('settings.theirName')}
                     maxLength={40}
                     className="px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
                   />
@@ -1011,7 +1031,7 @@ export default function SettingsModal({
                       value={seatPercent}
                       onChange={(e) => setSeatPercent(e.target.value)}
                       className="w-full pl-3 pr-7 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
-                      aria-label="Their share of the split"
+                      aria-label={t('settings.theirShare')}
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
                       %
@@ -1023,17 +1043,17 @@ export default function SettingsModal({
                     type="email"
                     value={seatEmail}
                     onChange={(e) => setSeatEmail(e.target.value)}
-                    placeholder="Email"
-                    aria-label="Their email address (optional)"
+                    placeholder={t('settings.email')}
+                    aria-label={t('settings.theirEmailOptional')}
                     className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
                   />
                   <p className="text-xs text-natural-muted mt-1">
-                    Optional. With an email, the invite goes out as soon as the seat is added.
+                    {t('settings.emailOptionalNote')}
                   </p>
                 </div>
                 {seatPreview && (
                   <div className="text-xs text-natural-muted space-y-1">
-                    <p className="font-bold uppercase tracking-wider text-[10px]">New split</p>
+                    <p className="font-bold uppercase tracking-wider text-[10px]">{t('settings.newSplit')}</p>
                     {seatPreview.map((row, i) => (
                       <div key={i} className="flex justify-between font-mono">
                         <span className="font-sans">{row.name}</span>
@@ -1051,14 +1071,18 @@ export default function SettingsModal({
                     onClick={() => setAddingSeat(false)}
                     className="flex-1 text-sm font-bold text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={seatBusy}
                     className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg disabled:opacity-60"
                   >
-                    {seatBusy ? 'Adding...' : seatEmail.trim() ? 'Add & Invite' : 'Add'}
+                    {seatBusy
+                      ? t('settings.adding')
+                      : seatEmail.trim()
+                        ? t('settings.addAndInvite')
+                        : t('settings.add')}
                   </button>
                 </div>
               </form>
@@ -1066,7 +1090,7 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <span className="text-sm text-natural-muted block mb-2">Invite Code</span>
+            <span className="text-sm text-natural-muted block mb-2">{t('settings.inviteCode')}</span>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
                 {group?.inviteCode}
@@ -1074,14 +1098,16 @@ export default function SettingsModal({
               <button
                 onClick={copyInviteCode}
                 className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
-                title={copied ? 'Copied' : 'Copy to clipboard'}
-                aria-label={copied ? 'Invite code copied' : 'Copy invite code'}
+                title={copied ? t('common.copied') : t('settings.copyToClipboard')}
+                aria-label={copied ? t('settings.inviteCodeCopied') : t('settings.copyInviteCode')}
               >
                 {copied ? <Check size={18} className="text-natural-primary" /> : <Copy size={18} />}
               </button>
             </div>
             {copied && (
-              <p className="text-xs text-natural-primary font-medium mt-1.5 text-right">Copied</p>
+              <p className="text-xs text-natural-primary font-medium mt-1.5 text-right">
+                {t('common.copied')}
+              </p>
             )}
           </div>
 
@@ -1090,10 +1116,10 @@ export default function SettingsModal({
               onClick={onLeaveGroup}
               className="w-full py-2 flex items-center justify-center gap-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
             >
-              <LogOut size={14} /> Leave This Group
+              <LogOut size={14} /> {t('settings.leaveGroup')}
             </button>
             <p className="text-xs text-natural-muted mt-1.5 text-center">
-              Removes you from this group but keeps your account.
+              {t('settings.leaveGroupNote')}
             </p>
           </div>
         </div>
@@ -1101,25 +1127,25 @@ export default function SettingsModal({
 
       {/* Local ledger + legal */}
       <div>
-        <h3 className={`${labelClass} mb-2`}>Local Ledger</h3>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.localLedger')}</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3 mb-4">
           <button
             onClick={onOpenBackup}
             className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Cloud size={16} className="text-natural-primary" /> Backup & Sync Options
+              <Cloud size={16} className="text-natural-primary" /> {t('settings.backupSync')}
             </span>
           </button>
         </div>
-        <h3 className={`${labelClass} mb-2`}>Legal & Privacy</h3>
+        <h3 className={`${labelClass} mb-2`}>{t('settings.legalPrivacy')}</h3>
         <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border space-y-3">
           <button
             onClick={onOpenPrivacy}
             className="w-full py-2 px-3 flex items-center justify-between text-sm font-semibold text-natural-text hover:bg-white border border-transparent hover:border-natural-border rounded-lg transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Shield size={16} className="text-natural-primary" /> Data, Privacy & Security
+              <Shield size={16} className="text-natural-primary" /> {t('settings.dataPrivacySecurity')}
             </span>
           </button>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { todayLocal } from '../lib/recurring';
 import { Expense, Group, PaymentInstrument } from '../types';
 import { Check, Cherry, ExternalLink, Copy } from 'lucide-react';
@@ -12,6 +13,8 @@ import {
 import { venmoTarget, zelleTarget } from '../lib/paymentLinks';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
+import { formatCurrency } from '../lib/format';
+import { PAYMENT_INSTRUMENTS, instrumentLabel } from '../lib/instruments';
 
 interface SettleUpModalProps {
   expense: Expense;
@@ -37,6 +40,7 @@ export default function SettleUpModal({
   onClose,
   onSubmit,
 }: SettleUpModalProps) {
+  const { t } = useTranslation();
   const [paymentMethod, setPaymentMethod] = useState<PaymentInstrument>('TRANSFER');
   const [notes, setNotes] = useState('');
   const [paymentDate, setPaymentDate] = useState(todayLocal());
@@ -81,12 +85,12 @@ export default function SettleUpModal({
     const remaining = getRemainingAmount(selectedDebtor);
 
     if (!selectedDebtor) {
-      setError('Please select the person making the payment.');
+      setError(t('settle.selectPerson'));
       return;
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('Enter a valid payment amount greater than zero.');
+      setError(t('settle.validAmount'));
       return;
     }
 
@@ -96,18 +100,18 @@ export default function SettleUpModal({
       const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
       if (amount < min || amount > max) {
         setError(
-          `Payments on this Dark Cherry are between $${min.toFixed(2)} and $${max.toFixed(2)}.`
+          t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) })
         );
         return;
       }
     } else {
       if (remaining <= 0) {
-        setError('This person has no remaining balance on this transaction.');
+        setError(t('settle.noRemaining'));
         return;
       }
 
       if (amount > remaining) {
-        setError(`Payment cannot exceed the remaining balance of $${remaining.toFixed(2)}.`);
+        setError(t('settle.exceeds', { amount: formatCurrency(remaining) }));
         return;
       }
     }
@@ -115,15 +119,9 @@ export default function SettleUpModal({
     onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor, paymentDate);
   };
 
-  const methods: { label: string; value: PaymentInstrument }[] = [
-    { label: 'Cash', value: 'CASH' },
-    { label: 'Credit Card', value: 'CREDIT' },
-    { label: 'Debit Card', value: 'DEBIT' },
-    { label: 'Bank Transfer', value: 'TRANSFER' },
-    { label: 'Venmo', value: 'VENMO' },
-    { label: 'Zelle', value: 'ZELLE' },
-    { label: 'Other', value: 'OTHER' },
-  ];
+  const methods: { label: string; value: PaymentInstrument }[] = PAYMENT_INSTRUMENTS.map(
+    (value) => ({ label: instrumentLabel(value), value })
+  );
 
   // Deep-link-lite: hand the payer straight into Venmo/Zelle. With a stored
   // handle, Venmo opens prefilled; otherwise the button still gets them there.
@@ -148,10 +146,10 @@ export default function SettleUpModal({
       onClose={onClose}
       title={
         isCreditor
-          ? 'Log Received Payment'
+          ? t('settle.titleReceived')
           : blindContributor
-            ? 'Dark Cherry Chip In'
-            : 'Settle Expense Share'
+            ? t('settle.titleDark')
+            : t('settle.titleShare')
       }
       icon={blindContributor ? <Cherry className="h-5 w-5 text-natural-primary" /> : undefined}
       bodyClassName=""
@@ -164,13 +162,13 @@ export default function SettleUpModal({
         )}
         <div className="bg-natural-sidebar/30 p-4 rounded-2xl border border-natural-border space-y-2">
           <span className="text-[10px] font-bold text-natural-muted uppercase tracking-widest">
-            Expense Details
+            {t('settle.expenseDetails')}
           </span>
           <span className="block text-sm font-bold text-natural-text">{expense.title}</span>
 
           {isCreditor ? (
             <div className="pt-2 border-t border-natural-border/60">
-              <label className={`${labelClass} block mb-1.5`}>Payment Received From</label>
+              <label className={`${labelClass} block mb-1.5`}>{t('settle.receivedFrom')}</label>
               <select
                 value={selectedDebtor}
                 onChange={(e) => handleDebtorChange(e.target.value)}
@@ -178,7 +176,7 @@ export default function SettleUpModal({
               >
                 {debtors.map((uid) => (
                   <option key={uid} value={uid}>
-                    {members.find((m) => m.uid === uid)?.name || 'Someone'}
+                    {members.find((m) => m.uid === uid)?.name || t('common.someone')}
                   </option>
                 ))}
               </select>
@@ -191,19 +189,25 @@ export default function SettleUpModal({
                     key={s.id}
                     className="mt-2 text-xs text-natural-muted bg-natural-primary/5 border border-natural-primary/25 rounded-lg px-2.5 py-1.5"
                   >
-                    They already logged{' '}
-                    <span className="font-bold text-natural-text">${s.amount.toFixed(2)}</span> (
-                    {s.instrumentType}). It's waiting for your confirmation on the expense screen.
-                    Only log a payment here if this is a{' '}
-                    <span className="font-semibold">different</span> one.
+                    <Trans
+                      i18nKey="settle.alreadyLogged"
+                      values={{
+                        amount: formatCurrency(s.amount),
+                        method: instrumentLabel(s.instrumentType),
+                      }}
+                      components={{
+                        1: <span className="font-bold text-natural-text" />,
+                        3: <span className="font-semibold" />,
+                      }}
+                    />
                   </p>
                 ))}
             </div>
           ) : (
             <div className="flex justify-between items-center pt-2 border-t border-natural-border/60">
-              <span className="text-xs text-natural-muted font-medium">Paying To:</span>
+              <span className="text-xs text-natural-muted font-medium">{t('settle.payingTo')}</span>
               <span className="text-xs font-bold text-natural-text bg-natural-sidebar px-2 py-0.5 rounded-lg capitalize tracking-wider">
-                {members.find((m) => m.uid === expense.paidBy)?.name || 'Someone'}
+                {members.find((m) => m.uid === expense.paidBy)?.name || t('common.someone')}
               </span>
             </div>
           )}
@@ -211,7 +215,7 @@ export default function SettleUpModal({
 
         <div className="flex flex-col items-center justify-center py-4 bg-natural-sage/20 rounded-2xl border border-dashed border-natural-primary/50">
           <span className="text-[10px] font-bold text-natural-primary uppercase tracking-wider">
-            {blindContributor ? 'Dark Cherry Chip In' : 'Settle Amount'}
+            {blindContributor ? t('settle.titleDark') : t('settle.settleAmount')}
           </span>
           <div className="flex items-center text-3xl sm:text-4xl font-display font-semibold text-natural-text mt-1">
             $
@@ -232,29 +236,33 @@ export default function SettleUpModal({
           </div>
           {blindContributor ? (
             <span className="text-xs font-medium text-natural-muted mt-1">
-              Anything between{' '}
-              <span className="font-bold text-natural-text">
-                ${(expense.blindMin || 0).toFixed(2)}
-              </span>{' '}
-              and{' '}
-              <span className="font-bold text-natural-text">
-                ${(expense.blindMax || 0).toFixed(2)}
-              </span>
+              <Trans
+                i18nKey="settle.anythingBetween"
+                values={{
+                  min: formatCurrency(expense.blindMin || 0),
+                  max: formatCurrency(expense.blindMax || 0),
+                }}
+                components={{
+                  1: <span className="font-bold text-natural-text" />,
+                  3: <span className="font-bold text-natural-text" />,
+                }}
+              />
             </span>
           ) : (
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-medium text-natural-muted">
-                Remaining owed:{' '}
-                <span className="font-bold text-natural-text">
-                  ${getRemainingAmount(selectedDebtor).toFixed(2)}
-                </span>
+                <Trans
+                  i18nKey="settle.remainingOwed"
+                  values={{ amount: formatCurrency(getRemainingAmount(selectedDebtor)) }}
+                  components={{ 1: <span className="font-bold text-natural-text" /> }}
+                />
               </span>
               <button
                 type="button"
                 onClick={() => setAmountToPay(getRemainingAmount(selectedDebtor).toFixed(2))}
                 className="text-xs font-bold text-natural-primary hover:underline"
               >
-                Settle full
+                {t('settle.settleFull')}
               </button>
             </div>
           )}
@@ -262,7 +270,7 @@ export default function SettleUpModal({
 
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Payment Date
+            {t('settle.paymentDate')}
           </label>
           <input
             type="date"
@@ -275,7 +283,7 @@ export default function SettleUpModal({
 
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Transaction Payment Type
+            {t('settle.paymentType')}
           </label>
           <div className="grid grid-cols-3 gap-2">
             {methods.map((m) => (
@@ -300,13 +308,15 @@ export default function SettleUpModal({
               <p className="text-xs text-natural-muted">
                 {venmo ? (
                   <>
-                    Pay <span className="font-bold text-natural-text">{venmo.handle}</span> in Venmo
-                    - amount and note come prefilled.
+                    <Trans
+                      i18nKey="settle.venmoPrefilled"
+                      values={{ handle: venmo.handle }}
+                      components={{ 1: <span className="font-bold text-natural-text" /> }}
+                    />
                   </>
                 ) : (
                   <>
-                    They haven't added a Venmo handle yet, but you can head to Venmo and pay them
-                    there.
+                    {t('settle.venmoNoHandle')}
                   </>
                 )}
               </p>
@@ -316,11 +326,9 @@ export default function SettleUpModal({
                 rel="noopener noreferrer"
                 className="w-full py-2 text-xs font-bold text-white bg-[#008CFF] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
               >
-                <ExternalLink size={14} /> Open Venmo
+                <ExternalLink size={14} /> {t('settle.openVenmo')}
               </a>
-              <p className="text-xs text-natural-muted">
-                Then come back and log the payment below so it hits the ledger.
-              </p>
+              <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
             </div>
           )}
 
@@ -329,21 +337,23 @@ export default function SettleUpModal({
               {zelle ? (
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-natural-muted min-w-0">
-                    Their Zelle:{' '}
-                    <span className="font-bold text-natural-text break-all">{zelle.handle}</span>
+                    <Trans
+                      i18nKey="settle.theirZelle"
+                      values={{ handle: zelle.handle }}
+                      components={{ 1: <span className="font-bold text-natural-text break-all" /> }}
+                    />
                   </p>
                   <button
                     type="button"
                     onClick={copyZelleHandle}
                     className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline"
                   >
-                    <Copy size={12} /> {copiedZelle ? 'Copied' : 'Copy'}
+                    <Copy size={12} /> {copiedZelle ? t('common.copied') : t('common.copy')}
                   </button>
                 </div>
               ) : (
                 <p className="text-xs text-natural-muted">
-                  They haven't added a Zelle handle yet. Zelle lives inside your banking app - open
-                  it there, or start from Zelle's site.
+                  {t('settle.zelleNoHandle')}
                 </p>
               )}
               <a
@@ -352,24 +362,22 @@ export default function SettleUpModal({
                 rel="noopener noreferrer"
                 className="w-full py-2 text-xs font-bold text-white bg-[#6D1ED4] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
               >
-                <ExternalLink size={14} /> Open Zelle
+                <ExternalLink size={14} /> {t('settle.openZelle')}
               </a>
-              <p className="text-xs text-natural-muted">
-                Then come back and log the payment below so it hits the ledger.
-              </p>
+              <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
             </div>
           )}
         </div>
 
         <div>
           <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            Transfer Details / Notes
+            {t('settle.notesLabel')}
           </label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Note"
+            placeholder={t('settle.notePlaceholder')}
             className="w-full px-3.5 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all"
           />
         </div>
@@ -380,7 +388,7 @@ export default function SettleUpModal({
             onClick={onClose}
             className="w-full py-2.5 text-sm font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -389,7 +397,7 @@ export default function SettleUpModal({
             }
             className="w-full py-2.5 text-sm font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
           >
-            <Check className="h-4 w-4" /> Log Payment
+            <Check className="h-4 w-4" /> {t('settle.logPayment')}
           </button>
         </div>
       </form>

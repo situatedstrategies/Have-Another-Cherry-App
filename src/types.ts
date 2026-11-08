@@ -58,6 +58,9 @@ export interface User {
   marketingOptIn?: boolean;
   marketingOptInAt?: string;
   marketingOptOutAt?: string;
+  // The language the person picked ('en' | 'ru' | 'es'), written from the
+  // language switcher so emails can follow it later. Absent = browser default.
+  locale?: string;
 }
 
 export interface Group {
