@@ -77,6 +77,7 @@ export function useAuthSession({
           .then((active) => {
             setRcPlus(active);
             // A property change, reported when it is known, not on render.
+            // 'ad-free' means Cherry +; the value is kept for HeyCatch continuity.
             analytics.setPersonProperties({ plan: active ? 'ad-free' : 'free' });
           })
           .catch(console.error);

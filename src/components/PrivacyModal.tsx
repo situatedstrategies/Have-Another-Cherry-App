@@ -59,11 +59,9 @@ export default function PrivacyModal({
               delivery services and lands on your lock screen.
             </li>
             <li>
-              <strong>Ads never read your ledger:</strong> the app is free and one Google ad at the
-              bottom of the dashboard pays for it, unless you have bought ad-free. The ad request
-              carries the page, your IP address and basic browser details, never an amount, a
-              balance, an expense name or a member name, and the ad sits outside your expense list.
-              Ad-free stops the ad code from loading at all.
+              <strong>No ads:</strong> the app shows no advertising, on the free plan or on Cherry +,
+              and no ad network ever receives anything from it: not your ledger, not your email, not
+              your device.
             </li>
             <li>
               <strong>You can delete all of it:</strong> deleting your account removes you from your

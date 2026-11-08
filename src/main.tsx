@@ -8,7 +8,8 @@ import './index.css';
 // HeyCatch product analytics (https://heycatch.ai/agents.md). Module scope, in
 // the entry file, before anything renders: pageviews, clicks and view changes
 // are captured from here on; identity lives in useAuthSession and the business
-// events (signup_completed, ad_free_purchased) in AuthScreen and the server's
+// events (signup_completed, ad_free_purchased, the latter meaning a Cherry +
+// purchase; the name is kept for continuity) in AuthScreen and the server's
 // RevenueCat webhook. The key is publishable, so it is inlined on purpose.
 analytics.init({
   projectKey: 'hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK',

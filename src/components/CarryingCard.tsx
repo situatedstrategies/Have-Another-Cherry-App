@@ -20,8 +20,8 @@ const count = (n: number) => `${n} ${n === 1 ? 'expense' : 'expenses'}`;
 /**
  * Who's carrying what: each member's money that is out for the household and
  * not back yet, split by whether it is riding on a card or already gone from
- * their account. Arithmetic in `lib/carrying.ts`. Free for everyone since November
- * 2026, mounted by App under Insights.
+ * their account. Arithmetic in `lib/carrying.ts`. Cherry + only, mounted by
+ * App under Insights.
  */
 export default function CarryingCard({ expenses, members, activeUser }: Props) {
   const nameOf = (uid: string) =>

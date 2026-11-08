@@ -1,10 +1,9 @@
-// Cherry + entitlements. Since November 2026 every feature is free and the
-// entitlement means one thing: no ads. The apps and the web sell it through
+// Cherry + entitlements. The apps and the web sell the "plus" entitlement through
 // RevenueCat with appUserID = Firebase uid; the webhook (/api/revenuecat-webhook)
 // mirrors it onto users/{uid} as { isPlus, plusEntitlement }, and every client
 // reads it through hasPlus(). Nothing else may check isPlus directly.
 
-// Historical list of what Cherry + used to gate; nothing checks it any more.
+// Keep in sync with the store copy and haveanothercherry.com/features.html.
 export const PLUS_FEATURES = [
   'dark_cherry',
   'vault',

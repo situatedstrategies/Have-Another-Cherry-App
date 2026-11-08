@@ -247,12 +247,11 @@ function TermsOfService() {
 
       <Section title="Plans & Billing">
         <p>
-          Every feature is free: unlimited expenses, receipt scanning, the Household Vault, blind
-          splits, insights, no daily limits. Ads pay for it: one ad at the bottom of the dashboard
-          on the web and on the Android home screen, never inside your ledger and never fed by it.
-          The one purchase is ad-free, $3.99 once per account, bought on the web or through the App
-          Store and Google Play under those stores' terms, and it applies to every device you sign
-          in on. Earlier Cherry + subscriptions keep ad-free until they lapse.
+          The free plan is genuinely free: unlimited expenses, no ads, no daily limits. Cherry + is
+          our optional premium tier (the Household Vault, blind splits, spending thresholds, rhythm,
+          insights and backups), sold as a monthly or yearly subscription or a one-time lifetime
+          purchase, on the web through RevenueCat and Stripe or in the apps through the App Store
+          and Google Play under those stores' terms. It applies to every device you sign in on.
         </p>
       </Section>
 
