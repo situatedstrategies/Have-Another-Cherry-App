@@ -14,6 +14,7 @@ import {
   handoffForInstrument,
   handoffsForRegion,
   instrumentForHandoff,
+  isImmediateHandoffCode,
   normalizeRegion,
 } from '../src/lib/handoffs';
 
@@ -54,8 +55,24 @@ assert.equal(instrumentForHandoff('zelle'), 'ZELLE');
 assert.equal(instrumentForHandoff('cash'), 'CASH');
 assert.equal(instrumentForHandoff('bank_transfer'), 'TRANSFER');
 assert.equal(instrumentForHandoff('other'), 'OTHER');
-assert.equal(instrumentForHandoff('bizum'), 'bizum', 'other handoffs are stored as their id');
-assert.equal(handoffForInstrument('CREDIT'), null, 'a card is not a handoff');
+assert.equal(
+  instrumentForHandoff('bizum'),
+  'BIZUM',
+  'other handoffs are stored as their id, upper case'
+);
+assert.equal(instrumentForHandoff('mercadopago'), 'MERCADOPAGO');
+assert.equal(handoffForInstrument('bizum'), 'bizum', 'reading is case-insensitive');
+assert.equal(handoffForInstrument('Sbp'), 'sbp');
+assert.equal(handoffForInstrument('TRANSFER'), 'bank_transfer');
+assert.equal(handoffForInstrument('CREDIT'), 'other', 'a card reads as other');
+assert.equal(handoffForInstrument('DEBIT'), 'other');
+assert.equal(handoffForInstrument('nonsense'), 'other', 'an unknown code reads as other');
+assert.equal(handoffForInstrument(undefined), 'other');
+assert.equal(isImmediateHandoffCode('SBP'), true);
+assert.equal(isImmediateHandoffCode('paypal'), true);
+assert.equal(isImmediateHandoffCode('CASH'), false);
+assert.equal(isImmediateHandoffCode('OTHER'), false);
+assert.equal(isImmediateHandoffCode('CREDIT'), false);
 
 assert.deepEqual(handoffsForRegion('us').slice(0, 4), ['venmo', 'zelle', 'cashapp', 'paypal']);
 assert.deepEqual(handoffsForRegion('RU'), ['sbp', 'bank_transfer', 'cash', 'other']);

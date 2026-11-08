@@ -456,9 +456,10 @@ export function handoffsForRegion(region: string): HandoffId[] {
 
 // ---- Settlements ------------------------------------------------------------
 
-// The ledger already stores VENMO and ZELLE (and CASH, TRANSFER, OTHER) as
-// instrument codes both clients read, so those keep their codes; every other
-// handoff is stored as its own id.
+// Settlement instrument codes are upper case on both clients: VENMO, ZELLE,
+// CASH, TRANSFER and OTHER as the ledger always stored them, and every other
+// handoff as its id upper-cased (SBP, BIZUM, MERCADOPAGO, ...). Reading is
+// case-insensitive, and a card or an unknown code reads as `other`.
 export function instrumentForHandoff(id: HandoffId): PaymentInstrument {
   switch (id) {
     case 'venmo':
@@ -472,12 +473,13 @@ export function instrumentForHandoff(id: HandoffId): PaymentInstrument {
     case 'other':
       return 'OTHER';
     default:
-      return id;
+      return id.toUpperCase() as PaymentInstrument;
   }
 }
 
-export function handoffForInstrument(code: string | undefined | null): HandoffId | null {
-  switch (code) {
+export function handoffForInstrument(code: string | undefined | null): HandoffId {
+  const upper = (code || '').toUpperCase();
+  switch (upper) {
     case 'VENMO':
       return 'venmo';
     case 'ZELLE':
@@ -486,11 +488,17 @@ export function handoffForInstrument(code: string | undefined | null): HandoffId
       return 'cash';
     case 'TRANSFER':
       return 'bank_transfer';
-    case 'OTHER':
-      return 'other';
-    default:
-      return isHandoffId(code) ? code : null;
+    default: {
+      const lower = upper.toLowerCase();
+      return isHandoffId(lower) && lower !== 'other' ? lower : 'other';
+    }
   }
+}
+
+/** True when the code is a payment handoff that moves money at once (not a card, not "other"). */
+export function isImmediateHandoffCode(code: string | undefined | null): boolean {
+  const h = handoffForInstrument(code);
+  return h !== 'other' && h !== 'cash';
 }
 
 // ---- Opening a handoff ------------------------------------------------------

@@ -120,24 +120,25 @@ export type SplitType =
 
 // 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
 // their own instruments so the settle flow can hand the payer into those apps.
-// The lower case codes are the regional payment handoffs of lib/handoffs.ts
-// (the shared contract with the Flutter app); venmo, zelle, cash, bank
-// transfer and other keep the upper case codes the ledger already stores.
+// The upper case ids are the regional payment handoffs of lib/handoffs.ts
+// (the shared contract with the Flutter app, which writes the same codes);
+// venmo, zelle, cash, bank transfer and other keep the codes the ledger
+// already stores. Readers compare case-insensitively.
 export type HandoffInstrument =
-  | 'cashapp'
-  | 'paypal'
-  | 'sbp'
-  | 'bizum'
-  | 'spei'
-  | 'mercadopago'
-  | 'modo'
-  | 'nequi'
-  | 'daviplata'
-  | 'bancolombia'
-  | 'yape'
-  | 'plin'
-  | 'mach'
-  | 'tenpo';
+  | 'CASHAPP'
+  | 'PAYPAL'
+  | 'SBP'
+  | 'BIZUM'
+  | 'SPEI'
+  | 'MERCADOPAGO'
+  | 'MODO'
+  | 'NEQUI'
+  | 'DAVIPLATA'
+  | 'BANCOLOMBIA'
+  | 'YAPE'
+  | 'PLIN'
+  | 'MACH'
+  | 'TENPO';
 export type PaymentInstrument =
   'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER' | HandoffInstrument;
 
@@ -185,13 +186,18 @@ export interface GroupSetup {
 }
 
 // Who has been invited and how, so the invite screen can show invited next
-// to joined and offer a resend. `to` is the address or number typed, empty
-// for a share sheet or a copied code.
+// to joined and offer a resend. Same shape on both clients: `name` is who
+// was asked (the name typed, or the address when no name was), empty for a
+// share sheet or a copied code; `by` is the inviter's uid. Records written
+// by early 2.0 web builds carried the address as `to`; readers accept it
+// as the name.
 export interface GroupInvite {
+  name: string;
   channel: 'share' | 'email' | 'sms' | 'code';
-  to: string;
   at: string;
   by: string;
+  /** @deprecated early 2.0 web shape; read as `name`. */
+  to?: string;
 }
 
 export type MismatchType =

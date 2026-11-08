@@ -33,14 +33,17 @@ export async function shareInvite(title: string, text: string, url: string): Pro
   }
 }
 
-/** Appends to groups/{id}.invites so the invite screen shows who was asked. */
+/** Appends to groups/{id}.invites (the shape both clients write) so the invite screen shows who was asked. */
+export const inviteName = (inv: GroupInvite): string => inv.name ?? inv.to ?? '';
+
 export async function recordInvite(
   groupId: string,
   invite: Omit<GroupInvite, 'at'>
 ): Promise<void> {
   const entry: GroupInvite = {
-    ...invite,
-    to: invite.to.slice(0, 120),
+    name: invite.name.slice(0, 120),
+    channel: invite.channel,
+    by: invite.by,
     at: new Date().toISOString(),
   };
   try {

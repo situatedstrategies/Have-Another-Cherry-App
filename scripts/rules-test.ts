@@ -404,7 +404,7 @@ async function main() {
   await check('another member CAN still record an invite', () =>
     assertSucceeds(
       updateDoc(doc(other, 'groups', SHARED), {
-        invites: [{ channel: 'email', to: 'x@y.z', at: '2026-11-08T00:00:00.000Z', by: PEER }],
+        invites: [{ name: 'x@y.z', channel: 'email', at: '2026-11-08T00:00:00.000Z', by: PEER }],
       })
     )
   );

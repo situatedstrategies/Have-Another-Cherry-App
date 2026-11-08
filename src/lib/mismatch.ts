@@ -1,4 +1,5 @@
 import { PaymentInstrument, MismatchType, Expense } from '../types';
+import { isImmediateHandoffCode } from './handoffs';
 
 // Immediate money has left the payer's account; deferred money (a credit card)
 // is being carried until the statement. Shared with lib/carrying.
@@ -6,11 +7,13 @@ export const getInstrumentClass = (
   instrument?: PaymentInstrument
 ): 'IMMEDIATE' | 'DEFERRED' | null => {
   if (!instrument) return null;
-  if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(instrument)) return 'IMMEDIATE';
+  const code = instrument.toUpperCase();
+  if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(code)) return 'IMMEDIATE';
+  if (code === 'CREDIT') return 'DEFERRED';
+  if (code === 'OTHER') return null;
   // Every regional payment handoff (lib/handoffs.ts) moves money at once.
-  if (instrument === instrument.toLowerCase() && instrument.length > 0) return 'IMMEDIATE';
-  if (instrument === 'CREDIT') return 'DEFERRED';
-  return null; // OTHER
+  if (isImmediateHandoffCode(code)) return 'IMMEDIATE';
+  return null;
 };
 
 const classifyMismatch = (

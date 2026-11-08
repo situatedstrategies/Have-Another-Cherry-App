@@ -7,6 +7,7 @@ import {
   canShare,
   inviteLink,
   inviteMessage,
+  inviteName as inviteWho,
   inviteSubject,
   mailtoHref,
   recordInvite,
@@ -15,6 +16,8 @@ import {
 } from '../lib/invites';
 import type { Group, GroupInvite } from '../types';
 import { intlLocale } from '../i18n';
+
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 interface Props {
   groupId: string;
@@ -63,7 +66,7 @@ export default function InvitePanel({
       .then(() => {
         setCopied(what);
         setTimeout(() => setCopied(null), 2000);
-        if (what === 'code') void recordInvite(groupId, { channel: 'code', to: '', by: uid() });
+        if (what === 'code') void recordInvite(groupId, { channel: 'code', name: '', by: uid() });
       })
       .catch(() => {});
   };
@@ -72,7 +75,7 @@ export default function InvitePanel({
 
   const share = async () => {
     const ok = await shareInvite(subject, message, link);
-    if (ok) void recordInvite(groupId, { channel: 'share', to: '', by: uid() });
+    if (ok) void recordInvite(groupId, { channel: 'share', name: '', by: uid() });
   };
 
   const sendEmail = async (email: string, name: string) => {
@@ -98,7 +101,13 @@ export default function InvitePanel({
     setStatus('sending');
     try {
       await sendEmail(inviteEmail.trim(), inviteName.trim());
-      await recordInvite(groupId, { channel: 'email', to: inviteEmail.trim(), by: uid() });
+      // The address stands in as the name when none was typed, which is
+      // also what makes a resend possible later.
+      await recordInvite(groupId, {
+        channel: 'email',
+        name: inviteName.trim() || inviteEmail.trim(),
+        by: uid(),
+      });
       setStatus('success');
       setInviteEmail('');
       setInviteName('');
@@ -114,12 +123,15 @@ export default function InvitePanel({
     }
   };
 
+  // A resend needs an address; only entries whose name is one can be resent.
+  const resendable = (inv: GroupInvite) => inv.channel === 'email' && isEmail(inviteWho(inv));
   const resend = async (inv: GroupInvite) => {
-    if (inv.channel !== 'email' || !inv.to || resending) return;
-    setResending(inv.to);
+    const to = inviteWho(inv);
+    if (!resendable(inv) || resending) return;
+    setResending(to);
     try {
-      await sendEmail(inv.to, '');
-      await recordInvite(groupId, { channel: 'email', to: inv.to, by: uid() });
+      await sendEmail(to, '');
+      await recordInvite(groupId, { channel: 'email', name: to, by: uid() });
     } catch (e) {
       console.error('Resend failed', e);
     } finally {
@@ -172,14 +184,14 @@ export default function InvitePanel({
           )}
           <a
             href={mailtoHref(subject, message)}
-            onClick={() => void recordInvite(groupId, { channel: 'email', to: '', by: uid() })}
+            onClick={() => void recordInvite(groupId, { channel: 'email', name: '', by: uid() })}
             className={btn}
           >
             <Mail size={14} /> {t('invite.email')}
           </a>
           <a
             href={smsHref(message)}
-            onClick={() => void recordInvite(groupId, { channel: 'sms', to: '', by: uid() })}
+            onClick={() => void recordInvite(groupId, { channel: 'sms', name: '', by: uid() })}
             className={btn}
           >
             <MessageSquare size={14} /> {t('invite.text')}
@@ -259,18 +271,18 @@ export default function InvitePanel({
                   >
                     <span className="min-w-0 truncate">
                       {t(`invite.channel.${inv.channel}`)}
-                      {inv.to ? `: ${inv.to}` : ''} · {when(inv.at)}
+                      {inviteWho(inv) ? `: ${inviteWho(inv)}` : ''} · {when(inv.at)}
                     </span>
-                    {inv.channel === 'email' && inv.to && (
+                    {resendable(inv) && (
                       <button
                         type="button"
                         onClick={() => resend(inv)}
-                        disabled={resending === inv.to}
+                        disabled={resending === inviteWho(inv)}
                         className="shrink-0 text-natural-primary font-bold inline-flex items-center gap-1 hover:underline disabled:opacity-50"
                       >
                         <RefreshCw
                           size={11}
-                          className={resending === inv.to ? 'animate-spin' : ''}
+                          className={resending === inviteWho(inv) ? 'animate-spin' : ''}
                         />
                         {t('invite.resend')}
                       </button>

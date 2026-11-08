@@ -155,10 +155,11 @@ export default function SettleUpModal({
   // the recipient's handle on this app, and the payer's own bank where the
   // app lives inside a bank. Nothing is paid here; the person confirms in
   // their own app and comes back to log it.
+  // A card or an unknown code reads as `other`, which has no handle and so
+  // shows no panel.
   const selectedHandoff = handoffForInstrument(paymentMethod);
-  const handoffDef = selectedHandoff ? HANDOFFS[selectedHandoff] : null;
-  const showsHandoff =
-    !!handoffDef && handoffDef.handle !== 'none' && selectedHandoff !== 'bank_transfer';
+  const handoffDef = HANDOFFS[selectedHandoff];
+  const showsHandoff = handoffDef.handle !== 'none' && selectedHandoff !== 'bank_transfer';
   const recipientHandles = paymentHandlesByUid?.[expense.paidBy] || {};
   const payAmount = roundCurrency(Number(amountToPay) || 0);
   const payNote = `Have Another Cherry: ${expense.title}`.slice(0, 140);

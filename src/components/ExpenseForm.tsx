@@ -109,7 +109,7 @@ export default function ExpenseForm({
   // have no profile to read, and your own handle is not who you are paying.
   const peerHandles = useMemo(() => {
     const handoff = handoffForInstrument(instrumentType);
-    if (!handoff || HANDOFFS[handoff].handle === 'none') return [];
+    if (HANDOFFS[handoff].handle === 'none') return [];
     return members
       .filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'))
       .map((m) => {
