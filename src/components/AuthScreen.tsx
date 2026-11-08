@@ -468,6 +468,12 @@ export default function AuthScreen() {
               <h1 className="text-2xl sm:text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 Have Another Cherry
               </h1>
+              {/* The category line the marketing homepage carries above its
+                  tagline (owner, November 8th 2026), so someone who lands here
+                  first still learns what the app is. */}
+              <p className="font-mono text-xs leading-relaxed text-natural-accent">
+                The shared expense app for people who keep their own money
+              </p>
             </div>
 
             {/* Wide and short rather than narrow and tall: on anything larger
@@ -810,6 +816,17 @@ export default function AuthScreen() {
                       />
                     </a>
                   </div>
+                  {/* The marketing hero's secondary action, "See how it works"
+                      (owner, November 8th 2026), as a quiet link here so it never
+                      competes with the form's own Sign up button. */}
+                  <p className="mt-4 text-center text-sm">
+                    <a
+                      href="https://haveanothercherry.com/features"
+                      className="font-medium text-natural-text underline underline-offset-2 hover:text-natural-primary transition-colors"
+                    >
+                      See how it works
+                    </a>
+                  </p>
                 </>
               )
             )}
