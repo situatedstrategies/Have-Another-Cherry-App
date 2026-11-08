@@ -38,6 +38,7 @@ import {
 import { labelClass } from '../lib/ui';
 import { formatCurrency, formatAmount } from '../lib/format';
 import { PAYMENT_INSTRUMENTS, instrumentShortLabel } from '../lib/instruments';
+import { HANDOFFS, displayHandle, handoffForInstrument } from '../lib/handoffs';
 
 interface ExpenseFormProps {
   group: Group;
@@ -52,7 +53,7 @@ interface ExpenseFormProps {
   /** Every member's decrypted Venmo/Zelle handles, keyed by uid. Shown the
    *  moment Venmo or Zelle is picked, so the handle is in hand while the
    *  payment is being made. */
-  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
+  paymentHandlesByUid?: Record<string, Record<string, string>>;
   /** Seed a new expense from the purchase planner. Ignored when editing. */
   prefill?: { title: string; amount: number; paidBy: string; splitType: SplitType } | null;
 }
@@ -107,19 +108,15 @@ export default function ExpenseForm({
   // The other joined members' handles for the picked network. Ghost seats
   // have no profile to read, and your own handle is not who you are paying.
   const peerHandles = useMemo(() => {
-    if (instrumentType !== 'VENMO' && instrumentType !== 'ZELLE') return [];
+    const handoff = handoffForInstrument(instrumentType);
+    if (!handoff || HANDOFFS[handoff].handle === 'none') return [];
     return members
       .filter((m) => m.uid !== activeUser && !m.uid.startsWith('ghost_'))
       .map((m) => {
-        const h = paymentHandlesByUid?.[m.uid];
-        const raw = instrumentType === 'VENMO' ? h?.venmo : h?.zelle;
-        const text = raw?.trim();
+        const raw = paymentHandlesByUid?.[m.uid]?.[handoff];
+        const text = displayHandle(handoff, raw || '');
         if (!text) return null;
-        return {
-          uid: m.uid,
-          name: m.name,
-          text: instrumentType === 'VENMO' ? `@${text.replace(/^@/, '')}` : text,
-        };
+        return { uid: m.uid, name: m.name, text };
       })
       .filter(Boolean) as { uid: string; name: string; text: string }[];
   }, [instrumentType, members, activeUser, paymentHandlesByUid]);

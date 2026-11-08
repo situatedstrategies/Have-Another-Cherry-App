@@ -753,8 +753,36 @@
       "TRANSFER": "Bank",
       "VENMO": "Venmo",
       "ZELLE": "Zelle",
-      "OTHER": "Other"
-    }
+      "OTHER": "Other",
+      "cashapp": "Cash App",
+      "paypal": "PayPal",
+      "sbp": "SBP",
+      "bizum": "Bizum",
+      "spei": "SPEI",
+      "mercadopago": "Mercado Pago",
+      "modo": "MODO",
+      "nequi": "Nequi",
+      "daviplata": "Daviplata",
+      "bancolombia": "Bancolombia",
+      "yape": "Yape",
+      "plin": "Plin",
+      "mach": "Mach",
+      "tenpo": "Tenpo"
+    },
+    "cashapp": "Cash App",
+    "paypal": "PayPal",
+    "sbp": "SBP transfer",
+    "bizum": "Bizum",
+    "spei": "SPEI",
+    "mercadopago": "Mercado Pago",
+    "modo": "MODO",
+    "nequi": "Nequi",
+    "daviplata": "Daviplata",
+    "bancolombia": "Bancolombia",
+    "yape": "Yape",
+    "plin": "Plin",
+    "mach": "Mach",
+    "tenpo": "Tenpo"
   },
   "list": {
     "title": "Itemized Transactions",
@@ -1124,10 +1152,12 @@
     "zeroOff": "0 turns it off.",
     "unlock": "Unlock with Cherry +",
     "howPeoplePay": "How people pay you",
-    "howPeoplePayBody": "Add your handles and group members get a one-tap way into Venmo or Zelle when they settle up with you.",
+    "howPeoplePayBody": "Add your handles for the apps your group uses and members get a one-tap way into them when they settle up with you.",
     "venmoUsername": "Venmo username",
     "zelleHandle": "Zelle email or phone",
-    "savePaymentInfo": "Save Payment Info"
+    "savePaymentInfo": "Save Payment Info",
+    "yourBankFor": "Your bank app for {{app}}",
+    "noHandoffs": "Your group has not picked any payment apps yet. The ones for your region are shown."
   },
   "reflect": {
     "mood": {
@@ -1480,5 +1510,34 @@
     "account": "Account",
     "category": "Category",
     "saveToVault": "Save to the vault"
+  },
+  "handoff": {
+    "app": {
+      "venmo": "Venmo",
+      "zelle": "Zelle",
+      "bank_transfer": "Bank transfer",
+      "cash": "Cash",
+      "other": "Other"
+    },
+    "prefilled": "Pay <1>{{handle}}</1> in {{app}}. Amount and note come prefilled.",
+    "copyThenOpen": "Their {{app}}: <1>{{handle}}</1>. Copy it, open your bank app and paste it there.",
+    "theirHandle": "Their {{app}}: <1>{{handle}}</1>",
+    "noHandle": "They haven't added a {{app}} handle yet. You can still open {{app}} and find them there.",
+    "open": "Open {{app}}",
+    "openBank": "Open {{bank}}",
+    "openYourBank": "Open your bank app",
+    "pickBank": "Which bank app do you use for {{app}}?",
+    "chooseBank": "Choose your bank",
+    "otherBank": "Another bank",
+    "rememberBank": "We remember this for next time. Change it in Settings.",
+    "comeBack": "Then come back and log the payment below so it hits the ledger.",
+    "never": "Have Another Cherry never moves money itself. You confirm the payment inside your own app.",
+    "placeholder": {
+      "username": "Username",
+      "phone": "Phone number",
+      "email_or_phone": "Email or phone",
+      "alias": "Alias or account",
+      "tag": "Cashtag"
+    }
   }
 }

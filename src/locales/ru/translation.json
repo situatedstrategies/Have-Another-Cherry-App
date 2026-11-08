@@ -753,8 +753,36 @@
       "TRANSFER": "Банк",
       "VENMO": "Venmo",
       "ZELLE": "Zelle",
-      "OTHER": "Другое"
-    }
+      "OTHER": "Другое",
+      "cashapp": "Cash App",
+      "paypal": "PayPal",
+      "sbp": "СБП",
+      "bizum": "Bizum",
+      "spei": "SPEI",
+      "mercadopago": "Mercado Pago",
+      "modo": "MODO",
+      "nequi": "Nequi",
+      "daviplata": "Daviplata",
+      "bancolombia": "Bancolombia",
+      "yape": "Yape",
+      "plin": "Plin",
+      "mach": "Mach",
+      "tenpo": "Tenpo"
+    },
+    "cashapp": "Cash App",
+    "paypal": "PayPal",
+    "sbp": "Перевод по СБП",
+    "bizum": "Bizum",
+    "spei": "SPEI",
+    "mercadopago": "Mercado Pago",
+    "modo": "MODO",
+    "nequi": "Nequi",
+    "daviplata": "Daviplata",
+    "bancolombia": "Bancolombia",
+    "yape": "Yape",
+    "plin": "Plin",
+    "mach": "Mach",
+    "tenpo": "Tenpo"
   },
   "list": {
     "title": "Список операций",
@@ -1124,10 +1152,12 @@
     "zeroOff": "0 отключает.",
     "unlock": "Открыть с Cherry +",
     "howPeoplePay": "Как вам платят",
-    "howPeoplePayBody": "Добавьте свои реквизиты, и участники группы смогут в одно касание открыть Venmo или Zelle, когда рассчитываются с вами.",
+    "howPeoplePayBody": "Добавьте свои реквизиты для приложений, которыми пользуется ваша группа, и участники смогут в одно касание перейти в них, когда рассчитываются с вами.",
     "venmoUsername": "Имя в Venmo",
     "zelleHandle": "Почта или телефон Zelle",
-    "savePaymentInfo": "Сохранить реквизиты"
+    "savePaymentInfo": "Сохранить реквизиты",
+    "yourBankFor": "Ваше банковское приложение для {{app}}",
+    "noHandoffs": "Ваша группа ещё не выбрала платёжные приложения. Показаны варианты для вашего региона."
   },
   "reflect": {
     "mood": {
@@ -1480,5 +1510,34 @@
     "account": "Счёт",
     "category": "Категория",
     "saveToVault": "Сохранить в хранилище"
+  },
+  "handoff": {
+    "app": {
+      "venmo": "Venmo",
+      "zelle": "Zelle",
+      "bank_transfer": "Банковский перевод",
+      "cash": "Наличные",
+      "other": "Другое"
+    },
+    "prefilled": "Оплатите <1>{{handle}}</1> в {{app}}. Сумма и комментарий уже заполнены.",
+    "copyThenOpen": "Их {{app}}: <1>{{handle}}</1>. Скопируйте, откройте приложение банка и вставьте там.",
+    "theirHandle": "Их {{app}}: <1>{{handle}}</1>",
+    "noHandle": "Они ещё не добавили реквизиты для {{app}}. Вы всё равно можете открыть {{app}} и найти их там.",
+    "open": "Открыть {{app}}",
+    "openBank": "Открыть {{bank}}",
+    "openYourBank": "Открыть приложение банка",
+    "pickBank": "Каким банковским приложением вы пользуетесь для {{app}}?",
+    "chooseBank": "Выберите банк",
+    "otherBank": "Другой банк",
+    "rememberBank": "Мы запомним это на следующий раз. Изменить можно в настройках.",
+    "comeBack": "Затем вернитесь и запишите платёж ниже, чтобы он попал в книгу.",
+    "never": "Have Another Cherry никогда не переводит деньги сам. Вы подтверждаете платёж в своём приложении.",
+    "placeholder": {
+      "username": "Имя пользователя",
+      "phone": "Номер телефона",
+      "email_or_phone": "Почта или телефон",
+      "alias": "Алиас или счёт",
+      "tag": "Cashtag"
+    }
   }
 }

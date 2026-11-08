@@ -7,6 +7,8 @@ export const getInstrumentClass = (
 ): 'IMMEDIATE' | 'DEFERRED' | null => {
   if (!instrument) return null;
   if (['CASH', 'DEBIT', 'TRANSFER', 'VENMO', 'ZELLE'].includes(instrument)) return 'IMMEDIATE';
+  // Every regional payment handoff (lib/handoffs.ts) moves money at once.
+  if (instrument === instrument.toLowerCase() && instrument.length > 0) return 'IMMEDIATE';
   if (instrument === 'CREDIT') return 'DEFERRED';
   return null; // OTHER
 };

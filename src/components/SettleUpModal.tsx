@@ -10,18 +10,36 @@ import {
   isDarkCherry,
   getDarkCherryRemaining,
 } from '../lib/money';
-import { venmoTarget, zelleTarget } from '../lib/paymentLinks';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { formatCurrency } from '../lib/format';
-import { PAYMENT_INSTRUMENTS, instrumentLabel } from '../lib/instruments';
+import { instrumentLabel } from '../lib/instruments';
+import {
+  BANKS,
+  HANDOFFS,
+  banksFor,
+  buildHandoffTarget,
+  handoffForInstrument,
+  handoffsForRegion,
+  instrumentForHandoff,
+  isBankId,
+  openHandoff,
+  type HandoffId,
+} from '../lib/handoffs';
+import { track } from '../lib/analytics';
 
 interface SettleUpModalProps {
   expense: Expense;
   group: Group;
   activeUser: string;
-  /** Decrypted Venmo/Zelle handles per member uid (decrypted in App). */
-  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
+  /** Every member's payment handles by handoff id, keyed by uid. */
+  paymentHandlesByUid?: Record<string, Record<string, string>>;
+  /** The payer's own bank app per pick-your-bank handoff. */
+  payerBankApp?: Record<string, string>;
+  /** Remember the payer's bank for a handoff (written to their profile). */
+  onSaveBankApp?: (handoff: string, bank: string) => void;
+  /** The group's region, for the handoffs offered when it has not chosen. */
+  region: string;
   onClose: () => void;
   onSubmit: (
     paymentInstrument: PaymentInstrument,
@@ -37,6 +55,9 @@ export default function SettleUpModal({
   group,
   activeUser,
   paymentHandlesByUid,
+  payerBankApp,
+  onSaveBankApp,
+  region,
   onClose,
   onSubmit,
 }: SettleUpModalProps) {
@@ -119,26 +140,69 @@ export default function SettleUpModal({
     onSubmit(paymentMethod, amount, notes.trim(), selectedDebtor, paymentDate);
   };
 
-  const methods: { label: string; value: PaymentInstrument }[] = PAYMENT_INSTRUMENTS.map(
-    (value) => ({ label: instrumentLabel(value), value })
+  // The payment methods on offer: the card kinds, then the group's payment
+  // apps (its household setup) or, before it has chosen, the region's.
+  const groupHandoffs = (group.setup?.handoffs || []).filter(
+    (id): id is HandoffId => id in HANDOFFS
   );
+  const offered = groupHandoffs.length > 0 ? groupHandoffs : handoffsForRegion(region);
+  const handoffCodes = offered.map(instrumentForHandoff);
+  const baseCodes: PaymentInstrument[] = ['CASH', 'CREDIT', 'DEBIT', 'TRANSFER', 'OTHER'];
+  const methods: { label: string; value: PaymentInstrument }[] = [
+    ...baseCodes,
+    ...handoffCodes.filter((c) => !baseCodes.includes(c)),
+  ].map((value) => ({ label: instrumentLabel(value), value }));
 
-  // Deep-link-lite: hand the payer straight into Venmo/Zelle. With a stored
-  // handle, Venmo opens prefilled; otherwise the button still gets them there.
+  // The handoff behind the chosen method, if it is one that opens an app:
+  // the recipient's handle on this app, and the payer's own bank where the
+  // app lives inside a bank. Nothing is paid here; the person confirms in
+  // their own app and comes back to log it.
+  const selectedHandoff = handoffForInstrument(paymentMethod);
+  const handoffDef = selectedHandoff ? HANDOFFS[selectedHandoff] : null;
+  const showsHandoff =
+    !!handoffDef && handoffDef.handle !== 'none' && selectedHandoff !== 'bank_transfer';
   const recipientHandles = paymentHandlesByUid?.[expense.paidBy] || {};
   const payAmount = roundCurrency(Number(amountToPay) || 0);
   const payNote = `Have Another Cherry: ${expense.title}`.slice(0, 140);
-  const venmo = recipientHandles.venmo
-    ? venmoTarget(recipientHandles.venmo, payAmount, payNote)
-    : null;
-  const zelle = recipientHandles.zelle ? zelleTarget(recipientHandles.zelle) : null;
-  const [copiedZelle, setCopiedZelle] = useState(false);
+  const [bankDraft, setBankDraft] = useState<string>('');
+  const chosenBank =
+    selectedHandoff && isBankId(payerBankApp?.[selectedHandoff] || '')
+      ? (payerBankApp![selectedHandoff] as string)
+      : isBankId(bankDraft)
+        ? bankDraft
+        : null;
+  const target =
+    selectedHandoff && showsHandoff
+      ? buildHandoffTarget(
+          selectedHandoff,
+          recipientHandles[selectedHandoff],
+          payAmount,
+          payNote,
+          isBankId(chosenBank) ? chosenBank : null
+        )
+      : null;
+  const appName = selectedHandoff ? instrumentLabel(instrumentForHandoff(selectedHandoff)) : '';
+  const [copiedHandle, setCopiedHandle] = useState(false);
 
-  const copyZelleHandle = () => {
-    if (!zelle) return;
-    navigator.clipboard.writeText(zelle.copyText || zelle.handle).catch(() => {});
-    setCopiedZelle(true);
-    setTimeout(() => setCopiedZelle(false), 2000);
+  const copyRecipientHandle = () => {
+    if (!target?.copyText) return;
+    navigator.clipboard.writeText(target.copyText).catch(() => {});
+    setCopiedHandle(true);
+    setTimeout(() => setCopiedHandle(false), 2000);
+  };
+
+  const pickBank = (bank: string) => {
+    setBankDraft(bank);
+    if (selectedHandoff && isBankId(bank) && onSaveBankApp) onSaveBankApp(selectedHandoff, bank);
+  };
+
+  const launchHandoff = () => {
+    if (!target || !selectedHandoff) return;
+    if (target.copyText && !target.prefilled) {
+      navigator.clipboard.writeText(target.copyText).catch(() => {});
+    }
+    track({ name: 'handoff_opened', handoff: selectedHandoff });
+    openHandoff(target);
   };
 
   return (
@@ -302,69 +366,75 @@ export default function SettleUpModal({
             ))}
           </div>
 
-          {/* Deep-link-lite: jump out of the app into Venmo/Zelle. */}
-          {!isCreditor && paymentMethod === 'VENMO' && (
+          {/* Hand the payer into the chosen app; the payment itself happens there. */}
+          {!isCreditor && showsHandoff && target && handoffDef && (
             <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
-              <p className="text-xs text-natural-muted">
-                {venmo ? (
-                  <>
-                    <Trans
-                      i18nKey="settle.venmoPrefilled"
-                      values={{ handle: venmo.handle }}
-                      components={{ 1: <span className="font-bold text-natural-text" /> }}
-                    />
-                  </>
-                ) : (
-                  <>
-                    {t('settle.venmoNoHandle')}
-                  </>
-                )}
-              </p>
-              <a
-                href={venmo?.url || 'https://venmo.com/'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 text-xs font-bold text-white bg-[#008CFF] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
-              >
-                <ExternalLink size={14} /> {t('settle.openVenmo')}
-              </a>
-              <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
-            </div>
-          )}
-
-          {!isCreditor && paymentMethod === 'ZELLE' && (
-            <div className="mt-3 bg-natural-sidebar/40 border border-natural-border rounded-xl p-3 space-y-2">
-              {zelle ? (
+              {target.handle ? (
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-natural-muted min-w-0">
                     <Trans
-                      i18nKey="settle.theirZelle"
-                      values={{ handle: zelle.handle }}
+                      i18nKey={
+                        target.prefilled
+                          ? 'handoff.prefilled'
+                          : handoffDef.bankPicker
+                            ? 'handoff.copyThenOpen'
+                            : 'handoff.theirHandle'
+                      }
+                      values={{ handle: target.handle, app: appName }}
                       components={{ 1: <span className="font-bold text-natural-text break-all" /> }}
                     />
                   </p>
-                  <button
-                    type="button"
-                    onClick={copyZelleHandle}
-                    className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline"
-                  >
-                    <Copy size={12} /> {copiedZelle ? t('common.copied') : t('common.copy')}
-                  </button>
+                  {!target.prefilled && (
+                    <button
+                      type="button"
+                      onClick={copyRecipientHandle}
+                      className="shrink-0 text-xs font-bold text-natural-primary flex items-center gap-1 hover:underline"
+                    >
+                      <Copy size={12} /> {copiedHandle ? t('common.copied') : t('common.copy')}
+                    </button>
+                  )}
                 </div>
               ) : (
-                <p className="text-xs text-natural-muted">
-                  {t('settle.zelleNoHandle')}
-                </p>
+                <p className="text-xs text-natural-muted">{t('handoff.noHandle', { app: appName })}</p>
               )}
-              <a
-                href="https://www.zellepay.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 text-xs font-bold text-white bg-[#6D1ED4] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
+
+              {handoffDef.bankPicker && selectedHandoff && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-natural-muted mb-1">
+                    {t('handoff.pickBank', { app: appName })}
+                  </label>
+                  <select
+                    value={chosenBank || ''}
+                    onChange={(e) => pickBank(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                  >
+                    <option value="">{t('handoff.chooseBank')}</option>
+                    {banksFor(selectedHandoff).map((b) => (
+                      <option key={b} value={b}>
+                        {b === 'other_bank' ? t('handoff.otherBank') : BANKS[b].name}
+                      </option>
+                    ))}
+                  </select>
+                  {chosenBank && (
+                    <p className="text-[11px] text-natural-muted mt-1">{t('handoff.rememberBank')}</p>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={launchHandoff}
+                className="w-full py-2 text-xs font-bold text-white bg-natural-dark hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
               >
-                <ExternalLink size={14} /> {t('settle.openZelle')}
-              </a>
-              <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
+                <ExternalLink size={14} />{' '}
+                {target.bank && target.bank !== 'other_bank'
+                  ? t('handoff.openBank', { bank: BANKS[target.bank].name })
+                  : handoffDef.bankPicker
+                    ? t('handoff.openYourBank')
+                    : t('handoff.open', { app: appName })}
+              </button>
+              <p className="text-xs text-natural-muted">{t('handoff.comeBack')}</p>
+              <p className="text-[11px] text-natural-muted">{t('handoff.never')}</p>
             </div>
           )}
         </div>

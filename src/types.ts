@@ -61,6 +61,12 @@ export interface User {
   // The language the person picked ('en' | 'ru' | 'es'), written from the
   // language switcher so emails can follow it later. Absent = browser default.
   locale?: string;
+  // 2.0: payment handles by handoff id (lib/handoffs.ts), the bank app the
+  // person picked for each pick-your-bank handoff, and the assessment. The
+  // handles replace paymentHandlesEnc, which is still written for 1.x clients.
+  handles?: Record<string, string>;
+  bankApp?: Record<string, string>;
+  assessment?: Assessment;
 }
 
 export interface Group {
@@ -87,6 +93,13 @@ export interface Group {
     at: string; // ISO datetime
     summary: string; // e.g. "Olivia 65% / Sam 35%"
   };
+  // 2.0: the creator (the only one who may change setup and region), the
+  // household setup quiz, the region its payment handoffs come from, and
+  // the invites sent so far.
+  createdBy?: string;
+  setup?: GroupSetup;
+  region?: string;
+  invites?: GroupInvite[];
 }
 
 // 'dark_cherry' is the blind split (a Plus feature): the creator sets the pot
@@ -102,8 +115,85 @@ export type SplitType =
 
 // 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
 // their own instruments so the settle flow can hand the payer into those apps.
+// The lower case codes are the regional payment handoffs of lib/handoffs.ts
+// (the shared contract with the Flutter app); venmo, zelle, cash, bank
+// transfer and other keep the upper case codes the ledger already stores.
+export type HandoffInstrument =
+  | 'cashapp'
+  | 'paypal'
+  | 'sbp'
+  | 'bizum'
+  | 'spei'
+  | 'mercadopago'
+  | 'modo'
+  | 'nequi'
+  | 'daviplata'
+  | 'bancolombia'
+  | 'yape'
+  | 'plin'
+  | 'mach'
+  | 'tenpo';
 export type PaymentInstrument =
-  'CASH' | 'CREDIT' | 'DEBIT' | 'TRANSFER' | 'VENMO' | 'ZELLE' | 'OTHER';
+  | 'CASH'
+  | 'CREDIT'
+  | 'DEBIT'
+  | 'TRANSFER'
+  | 'VENMO'
+  | 'ZELLE'
+  | 'OTHER'
+  | HandoffInstrument;
+
+// ---- 2.0 setup path (docs/REBUILD_PLAN.md section 11 in the mobile repo) ----
+
+// The Gemini financial assessment, written by the server (POST /api/assessment)
+// once per account and again on a retake. Advisory copy about how this
+// person handles shared money; never read for another member.
+export interface Assessment {
+  version: number;
+  createdAt: string;
+  language: string;
+  style: string;
+  summary: string;
+  strengths: string[];
+  watchFor: string[];
+  suggestedSplit: { kind: 'even' | 'income' | 'custom'; why: string };
+  thresholds: { category: string; monthly: number }[];
+  reminderCadence: 'weekly' | 'biweekly' | 'monthly';
+  conversationOpeners: string[];
+}
+
+export type GroupKind = 'partners' | 'housemates' | 'family' | 'friends' | 'trip' | 'team' | 'other';
+export type GroupPaying = 'one_fronts' | 'whoever' | 'shared_account' | 'varies';
+export type GroupSettle = 'as_you_go' | 'weekly' | 'monthly' | 'when_big';
+export type GroupSplitAnswer = 'even' | 'income' | 'shares' | 'each_time';
+export type GroupRecurring = 'rent' | 'utilities' | 'subscriptions' | 'groceries' | 'childcare';
+
+// The household setup quiz, one per group, asked when the group is created
+// and editable from group settings by whoever created it.
+export interface GroupSetup {
+  version: number;
+  completedBy: string;
+  completedAt: string;
+  kind: GroupKind;
+  paying: GroupPaying;
+  settle: GroupSettle;
+  split: GroupSplitAnswer;
+  handoffs: string[];
+  recurring: GroupRecurring[];
+  thresholdsWanted: boolean;
+  trip: { start: string; end: string; currency: string } | null;
+  note: string;
+}
+
+// Who has been invited and how, so the invite screen can show invited next
+// to joined and offer a resend. `to` is the address or number typed, empty
+// for a share sheet or a copied code.
+export interface GroupInvite {
+  channel: 'share' | 'email' | 'sms' | 'code';
+  to: string;
+  at: string;
+  by: string;
+}
 
 export type MismatchType =
   | 'NO_MISMATCH'

@@ -2,6 +2,15 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Wallet } from 'lucide-react';
 import { labelClass } from '../lib/ui';
+import {
+  BANKS,
+  HANDOFFS,
+  HANDLE_HANDOFFS,
+  banksFor,
+  handoffsForRegion,
+  type HandoffId,
+} from '../lib/handoffs';
+import { instrumentForHandoff, instrumentLabel } from '../lib/instruments';
 
 interface Props {
   isPlus: boolean;
@@ -11,16 +20,33 @@ interface Props {
   setThresholdInput: Dispatch<SetStateAction<string>>;
   savingThreshold: boolean;
   handleSaveThreshold: () => Promise<void>;
-  venmoInput: string;
-  setVenmoInput: Dispatch<SetStateAction<string>>;
-  zelleInput: string;
-  setZelleInput: Dispatch<SetStateAction<string>>;
+  /** Handles by handoff id, mirrored from the profile until Save. */
+  handlesInput: Record<string, string>;
+  setHandlesInput: Dispatch<SetStateAction<Record<string, string>>>;
+  /** The bank app picked for each pick-your-bank handoff. */
+  bankAppInput: Record<string, string>;
+  setBankAppInput: Dispatch<SetStateAction<Record<string, string>>>;
   savingHandles: boolean;
   handleSavePaymentHandles: () => Promise<void>;
+  /** The group's chosen payment apps (its household setup), if any. */
+  groupHandoffs?: string[];
+  /** The group's region, for the apps offered when it has not chosen. */
+  region: string;
+}
+
+/** The handoffs a person can store a handle for: the group's picks, else the region's. */
+export function handleHandoffsFor(groupHandoffs: string[] | undefined, region: string): HandoffId[] {
+  const chosen = (groupHandoffs || []).filter((id): id is HandoffId =>
+    HANDLE_HANDOFFS.includes(id as HandoffId)
+  );
+  const base = chosen.length > 0 ? chosen : handoffsForRegion(region);
+  return base.filter((id) => HANDLE_HANDOFFS.includes(id) && id !== 'bank_transfer');
 }
 
 // The "Budget & Payments" block of the Settings modal: the Cherry + spending
-// threshold and the Venmo/Zelle handles other members use to pay this user.
+// threshold and the payment handles other members use to pay this user, one
+// per app the group (or the region) uses, with the person's own bank app for
+// the handoffs that live inside a bank app.
 export default function BudgetPaymentsSettings({
   isPlus,
   setShowSettings,
@@ -29,14 +55,20 @@ export default function BudgetPaymentsSettings({
   setThresholdInput,
   savingThreshold,
   handleSaveThreshold,
-  venmoInput,
-  setVenmoInput,
-  zelleInput,
-  setZelleInput,
+  handlesInput,
+  setHandlesInput,
+  bankAppInput,
+  setBankAppInput,
   savingHandles,
   handleSavePaymentHandles,
+  groupHandoffs,
+  region,
 }: Props) {
   const { t } = useTranslation();
+  const handoffs = handleHandoffsFor(groupHandoffs, region);
+  const bankHandoffs = handoffs.filter((id) => HANDOFFS[id].bankPicker);
+  const appName = (id: HandoffId) => instrumentLabel(instrumentForHandoff(id));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -104,26 +136,54 @@ export default function BudgetPaymentsSettings({
             <Wallet size={12} /> {t('budget.howPeoplePay')}
           </label>
           <p className="text-xs text-natural-muted mb-2">{t('budget.howPeoplePayBody')}</p>
+          {(groupHandoffs || []).length === 0 && (
+            <p className="text-[11px] text-natural-muted mb-2">{t('budget.noHandoffs')}</p>
+          )}
           <div className="space-y-2">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
-                @
-              </span>
-              <input
-                type="text"
-                value={venmoInput}
-                onChange={(e) => setVenmoInput(e.target.value)}
-                placeholder={t('budget.venmoUsername')}
-                className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-              />
-            </div>
-            <input
-              type="text"
-              value={zelleInput}
-              onChange={(e) => setZelleInput(e.target.value)}
-              placeholder={t('budget.zelleHandle')}
-              className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
-            />
+            {handoffs.map((id) => {
+              const def = HANDOFFS[id];
+              const prefix = def.handle === 'username' ? '@' : def.handle === 'tag' ? '$' : '';
+              return (
+                <div key={id} className="relative">
+                  {prefix && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
+                      {prefix}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    value={handlesInput[id] || ''}
+                    onChange={(e) =>
+                      setHandlesInput((prev) => ({ ...prev, [id]: e.target.value }))
+                    }
+                    placeholder={`${appName(id)}: ${t(`handoff.placeholder.${def.handle}`)}`}
+                    aria-label={appName(id)}
+                    className={`w-full ${prefix ? 'pl-7' : 'pl-3'} pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary`}
+                  />
+                </div>
+              );
+            })}
+            {bankHandoffs.map((id) => (
+              <div key={`bank-${id}`}>
+                <label className="block text-[11px] font-semibold text-natural-muted mb-1">
+                  {t('budget.yourBankFor', { app: appName(id) })}
+                </label>
+                <select
+                  value={bankAppInput[id] || ''}
+                  onChange={(e) =>
+                    setBankAppInput((prev) => ({ ...prev, [id]: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                >
+                  <option value="">{t('handoff.chooseBank')}</option>
+                  {banksFor(id).map((b) => (
+                    <option key={b} value={b}>
+                      {b === 'other_bank' ? t('handoff.otherBank') : BANKS[b].name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
             <button
               onClick={handleSavePaymentHandles}
               disabled={savingHandles}

@@ -13,6 +13,7 @@ import { encryptData, decryptData } from '../lib/crypto';
 import { getGreetingKey } from '../lib/greeting';
 import { incomeInputError, parseIncome, normalizeIncome } from '../lib/income';
 import { quizRetakeBlocker } from '../lib/quizRetake';
+import { isBankId, isHandoffId } from '../lib/handoffs';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
@@ -22,6 +23,29 @@ import { SupportError } from '../lib/errors';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
 type Setter<T> = Dispatch<SetStateAction<T>>;
+
+// A member's handles by handoff id: the 2.0 `handles` map, else the 1.x
+// encrypted Venmo and Zelle pair, else the pre-encryption plaintext.
+async function readHandles(profile: any, uid: string | undefined): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  if (profile?.handles && typeof profile.handles === 'object') {
+    for (const [id, v] of Object.entries(profile.handles)) {
+      if (isHandoffId(id) && typeof v === 'string' && v.trim()) out[id] = v.trim();
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  let legacy: any = profile?.paymentHandles || null;
+  if (profile?.paymentHandlesEnc && uid) {
+    try {
+      legacy = await decryptData(profile.paymentHandlesEnc, uid);
+    } catch (e) {
+      console.error('Could not decrypt payment handles', e);
+    }
+  }
+  if (legacy?.venmo) out.venmo = String(legacy.venmo).replace(/^@/, '');
+  if (legacy?.zelle) out.zelle = String(legacy.zelle);
+  return out;
+}
 
 export function useProfileSettings({
   currentUser,
@@ -48,9 +72,10 @@ export function useProfileSettings({
 }) {
   const [thresholdInput, setThresholdInput] = useState('');
 
-  const [venmoInput, setVenmoInput] = useState('');
-
-  const [zelleInput, setZelleInput] = useState('');
+  // Payment handles by handoff id and the bank app picked per pick-your-bank
+  // handoff (lib/handoffs.ts). Inputs mirror the profile until Save.
+  const [handlesInput, setHandlesInput] = useState<Record<string, string>>({});
+  const [bankAppInput, setBankAppInput] = useState<Record<string, string>>({});
 
   const [savingThreshold, setSavingThreshold] = useState(false);
 
@@ -119,25 +144,21 @@ export function useProfileSettings({
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Settings inputs mirror the profile. Handles are stored encrypted with the
-  // owner's uid; legacy plaintext paymentHandles is the fallback.
+  // Settings inputs mirror the profile. 2.0 stores `handles` by handoff id
+  // and `bankApp` by handoff id in the clear (the people who read them are
+  // the group members who have to pay the person, so the uid-keyed
+  // encryption of 1.x hid nothing from them). A profile that only has the
+  // 1.x paymentHandlesEnc (Venmo and Zelle) is read through it.
   useEffect(() => {
     setThresholdInput(
       userProfile?.recurringThreshold > 0 ? String(userProfile.recurringThreshold) : ''
     );
     let cancelled = false;
     (async () => {
-      let handles = userProfile?.paymentHandles || null;
-      if (userProfile?.paymentHandlesEnc && activeUser) {
-        try {
-          handles = await decryptData(userProfile.paymentHandlesEnc, activeUser);
-        } catch (e) {
-          console.error('Could not decrypt own payment handles', e);
-        }
-      }
+      const handles = await readHandles(userProfile, activeUser);
       if (!cancelled) {
-        setVenmoInput(handles?.venmo || '');
-        setZelleInput(handles?.zelle || '');
+        setHandlesInput(handles);
+        setBankAppInput({ ...(userProfile?.bankApp || {}) });
       }
     })();
     return () => {
@@ -145,32 +166,27 @@ export function useProfileSettings({
     };
   }, [
     userProfile?.recurringThreshold,
+    userProfile?.handles,
+    userProfile?.bankApp,
     userProfile?.paymentHandlesEnc,
     userProfile?.paymentHandles,
     activeUser,
   ]);
 
-  // Every member's handles, decrypted with their uid (which groupmates know),
-  // for the settle screen's Venmo/Zelle handoff.
+  // Every member's handles by handoff id, for the settle screen's handoffs
+  // and the roster. Legacy encrypted handles are decrypted with the member's
+  // uid, which groupmates know.
   const [paymentHandlesByUid, setPaymentHandlesByUid] = useState<
-    Record<string, { venmo?: string; zelle?: string }>
+    Record<string, Record<string, string>>
   >({});
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const next: Record<string, { venmo?: string; zelle?: string }> = {};
+      const next: Record<string, Record<string, string>> = {};
       for (const [uid, u] of Object.entries(groupUsers) as [string, any][]) {
-        if (u?.paymentHandlesEnc) {
-          try {
-            const dec = await decryptData(u.paymentHandlesEnc, uid);
-            if (dec && (dec.venmo || dec.zelle)) next[uid] = dec;
-          } catch (e) {
-            console.error('Could not decrypt payment handles for member', uid, e);
-          }
-        } else if (u?.paymentHandles && (u.paymentHandles.venmo || u.paymentHandles.zelle)) {
-          next[uid] = u.paymentHandles; // legacy plaintext
-        }
+        const handles = await readHandles(u, uid);
+        if (Object.keys(handles).length > 0) next[uid] = handles;
       }
       if (!cancelled) setPaymentHandlesByUid(next);
     })();
@@ -425,23 +441,36 @@ export function useProfileSettings({
     }
   };
 
-  // Written only encrypted (keyed by the owner's uid); any legacy plaintext
-  // copy is deleted on save. Handles never enter cloud backups.
+  // Writes `handles` and `bankApp` (the 2.0 shape both clients read), plus
+  // the 1.x encrypted Venmo and Zelle pair so a phone still on 1.2 keeps its
+  // handoffs; any legacy plaintext copy is deleted. Handles never enter
+  // cloud backups.
   const handleSavePaymentHandles = async () => {
     if (savingHandles) return;
-    const handles = {
-      venmo: venmoInput.trim().replace(/^@/, ''),
-      zelle: zelleInput.trim(),
-    };
+    const handles: Record<string, string> = {};
+    for (const [id, raw] of Object.entries(handlesInput)) {
+      if (!isHandoffId(id)) continue;
+      const v = raw.trim().replace(/^[@$]/, '');
+      if (v) handles[id] = v.slice(0, 120);
+    }
+    const bankApp: Record<string, string> = {};
+    for (const [id, bank] of Object.entries(bankAppInput)) {
+      if (isHandoffId(id) && isBankId(bank)) bankApp[id] = bank;
+    }
     setSavingHandles(true);
     try {
-      const enc = await encryptData(handles, activeUser);
+      const legacy = { venmo: handles.venmo || '', zelle: handles.zelle || '' };
+      const enc = await encryptData(legacy, activeUser);
       await updateDoc(doc(db, 'users', activeUser), {
+        handles,
+        bankApp,
         paymentHandlesEnc: enc,
         paymentHandles: deleteField(),
       });
       setUserProfile((prev: any) => ({
         ...(prev || {}),
+        handles,
+        bankApp,
         paymentHandlesEnc: enc,
         paymentHandles: undefined,
       }));
@@ -452,6 +481,20 @@ export function useProfileSettings({
       setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - payment handles' });
     } finally {
       setSavingHandles(false);
+    }
+  };
+
+  // The payer's bank for a pick-your-bank handoff, remembered from the settle
+  // sheet so the next settlement opens the right app straight away.
+  const handleSaveBankApp = async (handoff: string, bank: string) => {
+    if (!isHandoffId(handoff) || !isBankId(bank)) return;
+    const next = { ...(userProfile?.bankApp || {}), [handoff]: bank };
+    setBankAppInput(next);
+    setUserProfile((prev: any) => ({ ...(prev || {}), bankApp: next }));
+    try {
+      await updateDoc(doc(db, 'users', activeUser), { bankApp: next });
+    } catch (e) {
+      console.error('Failed to save bank app', e);
     }
   };
 
@@ -472,10 +515,10 @@ export function useProfileSettings({
   return {
     thresholdInput,
     setThresholdInput,
-    venmoInput,
-    setVenmoInput,
-    zelleInput,
-    setZelleInput,
+    handlesInput,
+    setHandlesInput,
+    bankAppInput,
+    setBankAppInput,
     savingThreshold,
     savingHandles,
     paymentHandlesByUid,
@@ -485,6 +528,7 @@ export function useProfileSettings({
     handleSaveMarketingOptIn,
     handleSaveThreshold,
     handleSavePaymentHandles,
+    handleSaveBankApp,
     handleRetakeQuiz,
   };
 }

@@ -2,6 +2,7 @@
 // never change; only what the screen shows does.
 import { t } from '../i18n';
 import { PaymentInstrument } from '../types';
+export { instrumentForHandoff, handoffForInstrument } from './handoffs';
 
 export const PAYMENT_INSTRUMENTS: PaymentInstrument[] = [
   'CASH',

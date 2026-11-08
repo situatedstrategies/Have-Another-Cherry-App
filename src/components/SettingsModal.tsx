@@ -27,6 +27,8 @@ import { PushStatus, pushPermission, webPushSupported, enableWebPush } from '../
 import { quizRetakeBlocker } from '../lib/quizRetake';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
+import { displayHandle, isHandoffId, type HandoffId } from '../lib/handoffs';
+import { instrumentForHandoff, instrumentLabel } from '../lib/instruments';
 import { formatIncome } from '../lib/income';
 import LanguageSelect from './LanguageSelect';
 
@@ -46,9 +48,9 @@ interface SettingsModalProps {
   onSaveLocale: (locale: string) => void;
   onRetakeQuiz: () => void;
   onRecalculateSplit: () => Promise<void> | void;
-  /** Every member's decrypted Venmo/Zelle handles, keyed by uid, so the
-   *  roster shows how to pay each person. */
-  paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
+  /** Every member's payment handles by handoff id (lib/handoffs.ts), keyed
+   *  by uid, so the roster shows how to pay each person. */
+  paymentHandlesByUid?: Record<string, Record<string, string>>;
   /** Save an edited standing split (joined uid -> %, plus pending-seat %s in
    *  availableSplits order). Resolves true when it saved. */
   onSaveDefaultSplit: (joined: Record<string, number>, ghostSplits: number[]) => Promise<boolean>;
@@ -798,13 +800,14 @@ export default function SettingsModal({
                                   {t('settings.paymentHandles')}
                                 </span>
                                 {(() => {
-                                  const h = paymentHandlesByUid?.[uid];
-                                  const rows = [
-                                    h?.venmo
-                                      ? { label: 'Venmo', text: `@${h.venmo.replace(/^@/, '')}` }
-                                      : null,
-                                    h?.zelle ? { label: 'Zelle', text: h.zelle } : null,
-                                  ].filter(Boolean) as { label: string; text: string }[];
+                                  const h = paymentHandlesByUid?.[uid] || {};
+                                  const rows = Object.entries(h)
+                                    .filter(([id]) => isHandoffId(id))
+                                    .map(([id, raw]) => ({
+                                      label: instrumentLabel(instrumentForHandoff(id as HandoffId)),
+                                      text: displayHandle(id as HandoffId, raw),
+                                    }))
+                                    .filter((r) => r.text);
                                   if (rows.length === 0) {
                                     return (
                                       <span className="text-xs text-natural-muted">

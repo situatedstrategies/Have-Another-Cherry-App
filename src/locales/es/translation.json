@@ -753,8 +753,36 @@
       "TRANSFER": "Banco",
       "VENMO": "Venmo",
       "ZELLE": "Zelle",
-      "OTHER": "Otro"
-    }
+      "OTHER": "Otro",
+      "cashapp": "Cash App",
+      "paypal": "PayPal",
+      "sbp": "SBP",
+      "bizum": "Bizum",
+      "spei": "SPEI",
+      "mercadopago": "Mercado Pago",
+      "modo": "MODO",
+      "nequi": "Nequi",
+      "daviplata": "Daviplata",
+      "bancolombia": "Bancolombia",
+      "yape": "Yape",
+      "plin": "Plin",
+      "mach": "Mach",
+      "tenpo": "Tenpo"
+    },
+    "cashapp": "Cash App",
+    "paypal": "PayPal",
+    "sbp": "Transferencia SBP",
+    "bizum": "Bizum",
+    "spei": "SPEI",
+    "mercadopago": "Mercado Pago",
+    "modo": "MODO",
+    "nequi": "Nequi",
+    "daviplata": "Daviplata",
+    "bancolombia": "Bancolombia",
+    "yape": "Yape",
+    "plin": "Plin",
+    "mach": "Mach",
+    "tenpo": "Tenpo"
   },
   "list": {
     "title": "Movimientos detallados",
@@ -1124,10 +1152,12 @@
     "zeroOff": "0 lo desactiva.",
     "unlock": "Desbloquear con Cherry +",
     "howPeoplePay": "Cómo te pagan",
-    "howPeoplePayBody": "Añade tus cuentas y los miembros del grupo tendrán un acceso de un toque a Venmo o Zelle cuando liquiden contigo.",
+    "howPeoplePayBody": "Añade tus datos para las apps que usa tu grupo y los miembros tendrán un acceso de un toque a ellas cuando salden cuentas contigo.",
     "venmoUsername": "Usuario de Venmo",
     "zelleHandle": "Correo o teléfono de Zelle",
-    "savePaymentInfo": "Guardar datos de pago"
+    "savePaymentInfo": "Guardar datos de pago",
+    "yourBankFor": "Tu app bancaria para {{app}}",
+    "noHandoffs": "Tu grupo aún no ha elegido apps de pago. Se muestran las de tu región."
   },
   "reflect": {
     "mood": {
@@ -1480,5 +1510,34 @@
     "account": "Cuenta",
     "category": "Categoría",
     "saveToVault": "Guardar en el vault"
+  },
+  "handoff": {
+    "app": {
+      "venmo": "Venmo",
+      "zelle": "Zelle",
+      "bank_transfer": "Transferencia bancaria",
+      "cash": "Efectivo",
+      "other": "Otro"
+    },
+    "prefilled": "Paga a <1>{{handle}}</1> en {{app}}. El importe y la nota ya van rellenados.",
+    "copyThenOpen": "Su {{app}}: <1>{{handle}}</1>. Cópialo, abre la app de tu banco y pégalo allí.",
+    "theirHandle": "Su {{app}}: <1>{{handle}}</1>",
+    "noHandle": "Todavía no han añadido sus datos de {{app}}. Aun así puedes abrir {{app}} y buscarlos allí.",
+    "open": "Abrir {{app}}",
+    "openBank": "Abrir {{bank}}",
+    "openYourBank": "Abrir la app de tu banco",
+    "pickBank": "¿Qué app bancaria usas para {{app}}?",
+    "chooseBank": "Elige tu banco",
+    "otherBank": "Otro banco",
+    "rememberBank": "Lo recordaremos para la próxima vez. Puedes cambiarlo en Ajustes.",
+    "comeBack": "Luego vuelve y registra el pago abajo para que llegue al libro.",
+    "never": "Have Another Cherry nunca mueve dinero por sí misma. Confirmas el pago dentro de tu propia app.",
+    "placeholder": {
+      "username": "Nombre de usuario",
+      "phone": "Número de teléfono",
+      "email_or_phone": "Correo o teléfono",
+      "alias": "Alias o cuenta",
+      "tag": "Cashtag"
+    }
   }
 }

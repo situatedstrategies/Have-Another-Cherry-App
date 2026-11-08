@@ -22,6 +22,7 @@ import CherryLogo from './components/CherryLogo';
 import ModuleBoundary from './components/ModuleBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import BudgetPaymentsSettings from './components/BudgetPaymentsSettings';
+import { deviceRegion, normalizeRegion } from './lib/handoffs';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -200,10 +201,10 @@ export default function App() {
   const {
     thresholdInput,
     setThresholdInput,
-    venmoInput,
-    setVenmoInput,
-    zelleInput,
-    setZelleInput,
+    handlesInput,
+    setHandlesInput,
+    bankAppInput,
+    setBankAppInput,
     savingThreshold,
     savingHandles,
     paymentHandlesByUid,
@@ -213,6 +214,7 @@ export default function App() {
     handleSaveMarketingOptIn,
     handleSaveThreshold,
     handleSavePaymentHandles,
+    handleSaveBankApp,
     handleRetakeQuiz,
   } = useProfileSettings({
     currentUser,
@@ -329,6 +331,10 @@ export default function App() {
 
   // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
   const isPlus = hasPlus(userProfile) || rcPlus;
+
+  // Where the group's payment handoffs come from: the group's region when it
+  // has one, else this device's.
+  const groupRegion = normalizeRegion(group.region, deviceRegion());
 
   // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
@@ -827,12 +833,14 @@ export default function App() {
               setThresholdInput={setThresholdInput}
               savingThreshold={savingThreshold}
               handleSaveThreshold={handleSaveThreshold}
-              venmoInput={venmoInput}
-              setVenmoInput={setVenmoInput}
-              zelleInput={zelleInput}
-              setZelleInput={setZelleInput}
+              handlesInput={handlesInput}
+              setHandlesInput={setHandlesInput}
+              bankAppInput={bankAppInput}
+              setBankAppInput={setBankAppInput}
               savingHandles={savingHandles}
               handleSavePaymentHandles={handleSavePaymentHandles}
+              groupHandoffs={group.setup?.handoffs}
+              region={groupRegion}
             />
           }
         />
@@ -1001,6 +1009,9 @@ export default function App() {
           group={group}
           activeUser={activeUser}
           paymentHandlesByUid={paymentHandlesByUid}
+          payerBankApp={userProfile?.bankApp || {}}
+          onSaveBankApp={handleSaveBankApp}
+          region={groupRegion}
           onClose={() => setShowSettleModal(false)}
           onSubmit={handleSettleUpProposal}
         />
