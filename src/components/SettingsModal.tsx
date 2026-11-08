@@ -28,6 +28,7 @@ import { quizRetakeBlocker } from '../lib/quizRetake';
 import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { displayHandle, isHandoffId, type HandoffId } from '../lib/handoffs';
+import InvitePanel from './InvitePanel';
 import { instrumentForHandoff, instrumentLabel } from '../lib/instruments';
 import { formatIncome } from '../lib/income';
 import LanguageSelect from './LanguageSelect';
@@ -151,18 +152,6 @@ export default function SettingsModal({
   const [resendFor, setResendFor] = useState<string | null>(null);
   const [resendEmail, setResendEmail] = useState('');
   const [resendBusy, setResendBusy] = useState(false);
-
-  // Copy feedback for the invite code button.
-  const [copied, setCopied] = useState(false);
-  const copyInviteCode = () => {
-    navigator.clipboard
-      .writeText(group?.inviteCode || '')
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {});
-  };
 
   const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
   const copyHandle = (text: string) => {
@@ -1093,24 +1082,20 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <span className="text-sm text-natural-muted block mb-2">{t('settings.inviteCode')}</span>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
-                {group?.inviteCode}
-              </div>
-              <button
-                onClick={copyInviteCode}
-                className="p-2.5 bg-white text-natural-muted hover:text-natural-primary border border-natural-border rounded-lg shadow-sm transition-colors"
-                title={copied ? t('common.copied') : t('settings.copyToClipboard')}
-                aria-label={copied ? t('settings.inviteCodeCopied') : t('settings.copyInviteCode')}
-              >
-                {copied ? <Check size={18} className="text-natural-primary" /> : <Copy size={18} />}
-              </button>
-            </div>
-            {copied && (
-              <p className="text-xs text-natural-primary font-medium mt-1.5 text-right">
-                {t('common.copied')}
-              </p>
+            {group && (
+              <InvitePanel
+                compact
+                groupId={group.id}
+                groupName={group.name || ''}
+                inviteCode={group.inviteCode}
+                inviterName={
+                  (userProfile?.name && !RESERVED_NAMES.includes(userProfile.name)
+                    ? userProfile.name
+                    : currentUser?.displayName) || t('group.aFriend')
+                }
+                invites={group.invites}
+                members={group.members}
+              />
             )}
           </div>
 

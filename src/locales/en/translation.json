@@ -1539,5 +1539,27 @@
       "alias": "Alias or account",
       "tag": "Cashtag"
     }
+  },
+  "invite": {
+    "message": "{{name}} invited you to share expenses in {{group}} on Have Another Cherry. Open {{link}} or enter the code {{code}} in the app.",
+    "subject": "{{name}} invited you to {{group}} on Have Another Cherry",
+    "copyCode": "Copy code",
+    "copyLink": "Copy link",
+    "howToSend": "Send the link however you usually reach them.",
+    "share": "Share",
+    "email": "Email",
+    "text": "Text",
+    "nothingSentForYou": "Your own mail or messaging app opens with the message ready. Nothing is sent until you tap Send there.",
+    "weEmailThem": "Or we can email them for you",
+    "joined": "Joined",
+    "asked": "Invited",
+    "nobodyYet": "Nobody yet.",
+    "resend": "Resend",
+    "channel": {
+      "share": "Shared",
+      "email": "Email",
+      "sms": "Text",
+      "code": "Code copied"
+    }
   }
 }

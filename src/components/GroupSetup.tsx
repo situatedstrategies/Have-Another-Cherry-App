@@ -2,10 +2,12 @@ import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
+import { db, auth, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
-import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
+import { Users, Key, Plus, ArrowRight, ArrowLeft } from 'lucide-react';
+import InvitePanel from './InvitePanel';
+import { clearPendingInvite, pendingInvite } from '../lib/invites';
 import CherryLogo from './CherryLogo';
 import { labelClass } from '../lib/ui';
 import { useTranslation } from 'react-i18next';
@@ -27,9 +29,10 @@ export default function GroupSetup({
   onCancel?: () => void;
 }) {
   const { t } = useTranslation();
-  const inviteFallbackError = t('group.inviteFallbackError');
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
-  const [inviteCode, setInviteCode] = useState('');
+  // A code that arrived on an invite link opens the join step filled in.
+  const arrived = pendingInvite();
+  const [mode, setMode] = useState<'choose' | 'create' | 'join'>(arrived ? 'join' : 'choose');
+  const [inviteCode, setInviteCode] = useState(arrived || '');
   const [error, setError] = useState('');
 
   // Create mode state
@@ -44,16 +47,9 @@ export default function GroupSetup({
     numCodes: number;
     groupName: string;
   } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteStatus, setInviteStatus] = useState<'idle' | 'sending' | 'success' | 'error'>(
-    'idle'
-  );
-  const [inviteError, setInviteError] = useState('');
   const [partnerIncome, setPartnerIncome] = useState('');
   const [myIncome, setMyIncome] = useState('');
   const [recMessage, setRecMessage] = useState('');
-  const [inviteName, setInviteName] = useState('');
 
   // The split has to add up to 100% before a group can be created, so this
   // total gates the submit button. Derived once here rather than recomputed
@@ -105,55 +101,6 @@ export default function GroupSetup({
 
     setSplits([String(myPct), String(partnerPct)]);
     setRecMessage(t('group.recommended', { mine: myPct, name: otherName, theirs: partnerPct }));
-  };
-
-  const handleSendInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail || !createdGroupInfo) return;
-    setInviteStatus('sending');
-    try {
-      const res = await fetch('/api/send-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-        body: JSON.stringify({
-          email: inviteEmail,
-          groupName: createdGroupInfo.groupName,
-          inviteCode: createdGroupInfo.inviteCode,
-          recipientName: inviteName,
-          fromName:
-            auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || t('group.aFriend'),
-          // A solo group has no split to show yet: the creator holds 100%
-          // until someone joins, so the email uses its "set up together" row.
-          split:
-            numPeople > 1
-              ? splits.map((s, i) => ({
-                  name:
-                    i === 0
-                      ? auth.currentUser?.displayName ||
-                        auth.currentUser?.email?.split('@')[0] ||
-                        t('common.you')
-                      : memberNames[i]?.trim() || t('group.personN', { n: i + 1 }),
-                  split: parseFloat(s) || 0,
-                }))
-              : undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || inviteFallbackError);
-      setInviteStatus('success');
-      setInviteEmail('');
-      setInviteName('');
-      setTimeout(() => setInviteStatus('idle'), 3000);
-    } catch (err: any) {
-      console.error(err);
-      // A fetch that never reached the server rejects with a TypeError and a
-      // message meant for developers, not the person reading the screen.
-      setInviteError(
-        err instanceof TypeError ? inviteFallbackError : err?.message || inviteFallbackError
-      );
-      setInviteStatus('error');
-      setTimeout(() => setInviteStatus('idle'), 5000);
-    }
   };
 
   const generateInviteCode = () => {
@@ -396,22 +343,13 @@ export default function GroupSetup({
         { merge: true }
       );
 
+      clearPendingInvite();
       onComplete(joinedGroupId);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard
-      .writeText(createdGroupInfo?.inviteCode || '')
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {});
   };
 
   if (createdGroupInfo) {
@@ -433,66 +371,31 @@ export default function GroupSetup({
               </p>
             </div>
 
-            <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
-              <p className={`${labelClass} mb-3`}>{t('group.inviteCode')}</p>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">
-                  {createdGroupInfo.inviteCode}
-                </span>
-              </div>
-              <button
-                onClick={copyToClipboard}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark transition-colors"
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? t('group.copied') : t('group.copyToClipboard')}
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleSendInvite}
-              className="mb-8 p-6 bg-natural-sage/20 border border-natural-sage/30 rounded-xl"
-            >
-              <p className="text-sm font-bold text-natural-text mb-3">{t('group.sendInviteEmail')}</p>
-              <input
-                type="text"
-                required
-                placeholder={t('group.theirName')}
-                value={inviteName}
-                onChange={(e) => setInviteName(e.target.value)}
-                className="w-full mb-2 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
+            <div className="mb-8">
+              <InvitePanel
+                groupId={createdGroupInfo.groupId}
+                groupName={createdGroupInfo.groupName}
+                inviteCode={createdGroupInfo.inviteCode}
+                inviterName={
+                  auth.currentUser?.displayName ||
+                  auth.currentUser?.email?.split('@')[0] ||
+                  t('group.aFriend')
+                }
+                split={
+                  numPeople > 1
+                    ? splits.map((s, i) => ({
+                        name:
+                          i === 0
+                            ? auth.currentUser?.displayName ||
+                              auth.currentUser?.email?.split('@')[0] ||
+                              t('common.you')
+                            : memberNames[i]?.trim() || t('group.personN', { n: i + 1 }),
+                        split: parseFloat(s) || 0,
+                      }))
+                    : undefined
+                }
               />
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  required
-                  placeholder={t('auth.email')}
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
-                />
-                <button
-                  type="submit"
-                  disabled={inviteStatus === 'sending'}
-                  aria-label={t('group.sendInvite')}
-                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
-                >
-                  {inviteStatus === 'sending' ? (
-                    <span className="animate-spin inline-block">◌</span>
-                  ) : (
-                    <Send size={18} />
-                  )}
-                </button>
-              </div>
-              {inviteStatus === 'success' && (
-                <p className="text-xs text-natural-primary font-medium mt-2">{t('group.inviteSent')}</p>
-              )}
-              {inviteStatus === 'error' && (
-                <p className="text-xs text-natural-primary font-medium mt-2">
-                  {inviteError || inviteFallbackError}
-                </p>
-              )}
-            </form>
+            </div>
 
             <button
               onClick={() => onComplete(createdGroupInfo.groupId)}

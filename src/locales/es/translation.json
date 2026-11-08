@@ -1539,5 +1539,27 @@
       "alias": "Alias o cuenta",
       "tag": "Cashtag"
     }
+  },
+  "invite": {
+    "message": "{{name}} te invita a compartir gastos en {{group}} en Have Another Cherry. Abre {{link}} o escribe el código {{code}} en la app.",
+    "subject": "{{name}} te invita a {{group}} en Have Another Cherry",
+    "copyCode": "Copiar código",
+    "copyLink": "Copiar enlace",
+    "howToSend": "Envía el enlace por donde sueles hablar con esa persona.",
+    "share": "Compartir",
+    "email": "Correo",
+    "text": "Mensaje",
+    "nothingSentForYou": "Se abre tu propia app de correo o mensajes con el texto listo. No se envía nada hasta que pulses Enviar allí.",
+    "weEmailThem": "O te lo enviamos por correo nosotros",
+    "joined": "Se unieron",
+    "asked": "Invitados",
+    "nobodyYet": "Nadie todavía.",
+    "resend": "Reenviar",
+    "channel": {
+      "share": "Compartido",
+      "email": "Correo",
+      "sms": "Mensaje",
+      "code": "Código copiado"
+    }
   }
 }

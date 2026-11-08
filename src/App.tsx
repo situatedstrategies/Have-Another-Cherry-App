@@ -23,6 +23,7 @@ import ModuleBoundary from './components/ModuleBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import BudgetPaymentsSettings from './components/BudgetPaymentsSettings';
 import { deviceRegion, normalizeRegion } from './lib/handoffs';
+import { captureInviteFromUrl } from './lib/invites';
 import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -59,6 +60,10 @@ import {
   Vault as VaultIcon,
   Cherry as CherryIcon,
 } from 'lucide-react';
+
+// An invite link (?invite=CODE) is captured before anything renders, so the
+// code survives sign-in and the join step opens with it filled.
+captureInviteFromUrl();
 
 export default function App() {
   const { t } = useTranslation();
