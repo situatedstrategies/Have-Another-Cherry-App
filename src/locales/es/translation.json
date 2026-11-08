@@ -1561,5 +1561,96 @@
       "sms": "Mensaje",
       "code": "Código copiado"
     }
+  },
+  "household": {
+    "title": "Configura este hogar",
+    "editTitle": "Configuración del hogar",
+    "subtitle": "Unas preguntas sobre cómo maneja el dinero este grupo. Fijan los valores por defecto; todo se puede cambiar después.",
+    "stepOf": "Pregunta {{step}} de {{total}}",
+    "skip": "Omitir por ahora",
+    "finish": "Terminar",
+    "saveFailed": "No se pudo guardar la configuración. Inténtalo de nuevo.",
+    "settingsRow": "Configuración del hogar",
+    "notYet": "Aún sin configurar.",
+    "setUp": "Configurar",
+    "q": {
+      "kind": "¿Qué tipo de grupo es?",
+      "paying": "¿Cómo soléis pagar las cosas compartidas?",
+      "settle": "¿Cómo os gusta saldar cuentas?",
+      "split": "¿Cómo se reparte la mayoría de los gastos?",
+      "handoffs": "¿Qué apps de pago usa este grupo?",
+      "recurring": "¿Qué paga el grupo en común cada mes?",
+      "thresholds": "¿Quieres un aviso cuando un gasto se haga grande?",
+      "trip": "¿Cuándo es el viaje y en qué moneda?",
+      "note": "¿Algo más que la app deba saber sobre cómo maneja el dinero este grupo?"
+    },
+    "kind": {
+      "partners": "Pareja",
+      "housemates": "Compañeros de piso",
+      "family": "Familia",
+      "friends": "Amigos",
+      "trip": "Un viaje",
+      "team": "Un equipo o proyecto",
+      "other": "Otra cosa"
+    },
+    "paying": {
+      "one_fronts": "Suele adelantarlo una persona",
+      "whoever": "Paga quien esté",
+      "shared_account": "Una tarjeta o cuenta compartida",
+      "varies": "Depende"
+    },
+    "settle": {
+      "as_you_go": "Sobre la marcha",
+      "weekly": "Cada semana",
+      "monthly": "Cada mes",
+      "when_big": "Cuando se acumula"
+    },
+    "split": {
+      "even": "A partes iguales",
+      "income": "Según ingresos",
+      "shares": "Por partes fijas",
+      "each_time": "Lo decidimos cada vez"
+    },
+    "incomeLater": "Cada persona introduce sus ingresos en Ajustes; el reparto sale de ahí.",
+    "region": "Región",
+    "regionName": {
+      "US": "Estados Unidos",
+      "RU": "Rusia",
+      "ES": "España",
+      "MX": "México",
+      "AR": "Argentina",
+      "CO": "Colombia",
+      "PE": "Perú",
+      "CL": "Chile",
+      "other": "Otro lugar"
+    },
+    "viaBankApp": "desde la app del banco",
+    "handlesLater": "Cada miembro añade sus datos en Ajustes.",
+    "recurring": {
+      "rent": "Alquiler o hipoteca",
+      "utilities": "Suministros",
+      "subscriptions": "Suscripciones",
+      "groceries": "Compra",
+      "childcare": "Cuidado de niños",
+      "none": "Nada todavía"
+    },
+    "recurringCategory": {
+      "rent": "Alquiler",
+      "utilities": "Suministros",
+      "subscriptions": "Suscripciones",
+      "groceries": "Compra",
+      "childcare": "Niños"
+    },
+    "thresholds": {
+      "yes": "Sí, avísame cuando una parte supere un límite que fije",
+      "no": "No, no para este grupo"
+    },
+    "thresholdsPlus": "Los límites de gasto forman parte de Cherry +. Tu respuesta se guarda y se aplica en cuanto esté activo.",
+    "trip": {
+      "start": "Empieza",
+      "end": "Termina",
+      "currency": "Código de moneda"
+    },
+    "notePlaceholder": "Opcional. Con tus palabras."
   }
 }

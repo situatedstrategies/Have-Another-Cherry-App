@@ -315,7 +315,7 @@ export default function App() {
   if (!activeGroupId) {
     return (
       <div className="animate-in fade-in duration-300">
-        <GroupSetup onComplete={applyJoinedGroup} />
+        <GroupSetup onComplete={applyJoinedGroup} isPlus={hasPlus(userProfile) || rcPlus} />
       </div>
     );
   }
@@ -777,7 +777,11 @@ export default function App() {
 
       {showAddGroup && (
         <div className="fixed inset-0 z-50 overflow-auto animate-in fade-in duration-200">
-          <GroupSetup onComplete={applyJoinedGroup} onCancel={() => setShowAddGroup(false)} />
+          <GroupSetup
+            onComplete={applyJoinedGroup}
+            onCancel={() => setShowAddGroup(false)}
+            isPlus={isPlus}
+          />
         </div>
       )}
       {showBackup && isPlus && (
@@ -812,6 +816,7 @@ export default function App() {
           paymentHandlesByUid={paymentHandlesByUid}
           onSaveDefaultSplit={handleSaveDefaultSplit}
           onResendInvite={handleResendInvite}
+          isPlus={isPlus}
           onAddSeat={handleAddSeat}
           onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}

@@ -7,6 +7,8 @@ import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
 import { Users, Key, Plus, ArrowRight, ArrowLeft } from 'lucide-react';
 import InvitePanel from './InvitePanel';
+import HouseholdSetup from './HouseholdSetup';
+import { deviceRegion } from '../lib/handoffs';
 import { clearPendingInvite, pendingInvite } from '../lib/invites';
 import CherryLogo from './CherryLogo';
 import { labelClass } from '../lib/ui';
@@ -24,9 +26,12 @@ function cherryLabel(t: TFunction, index: number) {
 export default function GroupSetup({
   onComplete,
   onCancel,
+  isPlus = false,
 }: {
   onComplete: (groupId: string) => void;
   onCancel?: () => void;
+  /** Whether the creator has Cherry +, so the household quiz can seed the vault. */
+  isPlus?: boolean;
 }) {
   const { t } = useTranslation();
   // A code that arrived on an invite link opens the join step filled in.
@@ -41,6 +46,9 @@ export default function GroupSetup({
   const [splits, setSplits] = useState<string[]>(['50', '50']);
   const [memberNames, setMemberNames] = useState<string[]>(['', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  // The household quiz runs once between creating the group and inviting.
+  const [createdGroup, setCreatedGroup] = useState<Group | null>(null);
+  const [quizDone, setQuizDone] = useState(false);
   const [createdGroupInfo, setCreatedGroupInfo] = useState<{
     inviteCode: string;
     groupId: string;
@@ -178,9 +186,14 @@ export default function GroupSetup({
         ...(numPeople > 1 ? { targetNumPeople: numPeople } : {}),
         availableSplits,
         categories: [...DEFAULT_CATEGORIES],
+        // 2.0: the creator owns the household setup; the region seeds the
+        // payment apps offered until the quiz picks them.
+        createdBy: currentUser.uid,
+        region: deviceRegion(),
       };
 
       await setDoc(doc(db, 'groups', groupId), newGroup);
+      setCreatedGroup(newGroup);
 
       // Add this group to the user's membership set and make it active. Uses
       // arrayUnion so creating an additional group never drops the existing ones.
@@ -351,6 +364,22 @@ export default function GroupSetup({
       setLoading(false);
     }
   };
+
+  if (createdGroupInfo && createdGroup && !quizDone) {
+    return (
+      <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
+        <HouseholdSetup
+          group={createdGroup}
+          uid={createdGroup.createdBy || auth.currentUser?.uid || ''}
+          isPlus={isPlus}
+          initialRegion={deviceRegion()}
+          mode="create"
+          onDone={() => setQuizDone(true)}
+          onSkip={() => setQuizDone(true)}
+        />
+      </div>
+    );
+  }
 
   if (createdGroupInfo) {
     return (

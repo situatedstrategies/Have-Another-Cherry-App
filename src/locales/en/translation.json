@@ -1561,5 +1561,96 @@
       "sms": "Text",
       "code": "Code copied"
     }
+  },
+  "household": {
+    "title": "Set up this household",
+    "editTitle": "Household setup",
+    "subtitle": "A few questions about how this group handles money. They set the defaults; everything can be changed later.",
+    "stepOf": "Question {{step}} of {{total}}",
+    "skip": "Skip for now",
+    "finish": "Finish setup",
+    "saveFailed": "The setup could not be saved. Try again.",
+    "settingsRow": "Household setup",
+    "notYet": "Not set up yet.",
+    "setUp": "Set up",
+    "q": {
+      "kind": "What kind of group is this?",
+      "paying": "How do you usually pay for shared things?",
+      "settle": "How do you like to settle up?",
+      "split": "How should most things be split?",
+      "handoffs": "Which payment apps does this group use?",
+      "recurring": "What does this group pay for together every month?",
+      "thresholds": "Do you want a heads-up when a single expense gets big?",
+      "trip": "When is the trip, and in which currency?",
+      "note": "Anything the app should know about how this group handles money?"
+    },
+    "kind": {
+      "partners": "Partners",
+      "housemates": "Housemates",
+      "family": "Family",
+      "friends": "Friends",
+      "trip": "A trip",
+      "team": "A team or project",
+      "other": "Something else"
+    },
+    "paying": {
+      "one_fronts": "One person usually fronts it",
+      "whoever": "Whoever is there pays",
+      "shared_account": "A shared card or account",
+      "varies": "It varies"
+    },
+    "settle": {
+      "as_you_go": "As we go",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "when_big": "When it gets big"
+    },
+    "split": {
+      "even": "Evenly",
+      "income": "By income",
+      "shares": "By set shares",
+      "each_time": "Decide each time"
+    },
+    "incomeLater": "Each person enters their income in Settings; the split follows from there.",
+    "region": "Region",
+    "regionName": {
+      "US": "United States",
+      "RU": "Russia",
+      "ES": "Spain",
+      "MX": "Mexico",
+      "AR": "Argentina",
+      "CO": "Colombia",
+      "PE": "Peru",
+      "CL": "Chile",
+      "other": "Somewhere else"
+    },
+    "viaBankApp": "through your bank app",
+    "handlesLater": "Each member adds their own handle in Settings.",
+    "recurring": {
+      "rent": "Rent or mortgage",
+      "utilities": "Utilities",
+      "subscriptions": "Subscriptions",
+      "groceries": "Groceries",
+      "childcare": "Childcare",
+      "none": "Nothing yet"
+    },
+    "recurringCategory": {
+      "rent": "Rent",
+      "utilities": "Utilities",
+      "subscriptions": "Subscriptions",
+      "groceries": "Groceries",
+      "childcare": "Childcare"
+    },
+    "thresholds": {
+      "yes": "Yes, tell me when a split goes over a limit I set",
+      "no": "No, not for this group"
+    },
+    "thresholdsPlus": "Spending thresholds are part of Cherry +. Your answer is kept and takes effect the moment it is on.",
+    "trip": {
+      "start": "Starts",
+      "end": "Ends",
+      "currency": "Currency code"
+    },
+    "notePlaceholder": "Optional. In your own words."
   }
 }

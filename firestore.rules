@@ -106,6 +106,29 @@ service cloud.firestore {
       return request.resource.data.keys().hasAny(['isPlus', 'plusEntitlement']);
     }
 
+    // 2.0 household setup. The quiz answers (`setup`), the region its payment
+    // apps come from and the record of who created the group belong to the
+    // creator; every member reads them with the group. Groups made before 2.0
+    // have no `createdBy`, so the first listed member stands in. A document
+    // that has neither (an empty members list) denies, which is the right
+    // answer for a record nobody owns.
+    function setupOwner() {
+      return resource.data.get('createdBy', resource.data.get('members', [])[0].uid);
+    }
+
+    function touchesSetup() {
+      return request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny(['setup', 'region', 'createdBy']);
+    }
+
+    function setupWriteAllowed() {
+      return !touchesSetup()
+        || (signedIn()
+            && request.auth.uid == setupOwner()
+            && request.resource.data.get('createdBy', request.auth.uid) == setupOwner());
+    }
+
     // Marketing email is opt-in and whatever sends it will read
     // users/{uid}.marketingOptIn straight from Firestore, so the field has to
     // be a real boolean. The string "true" would show as opted out in the apps
@@ -155,10 +178,11 @@ service cloud.firestore {
       allow create:
         if signedIn()
         && request.resource.data.memberIds is list
-        && request.auth.uid in request.resource.data.memberIds;
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.get('createdBy', request.auth.uid) == request.auth.uid;
 
       allow update:
-        if isExistingGroupMember() || isValidSelfJoin();
+        if (isExistingGroupMember() && setupWriteAllowed()) || isValidSelfJoin();
 
       allow delete:
         if isExistingGroupMember();

@@ -29,6 +29,9 @@ import Modal from './Modal';
 import { labelClass } from '../lib/ui';
 import { displayHandle, isHandoffId, type HandoffId } from '../lib/handoffs';
 import InvitePanel from './InvitePanel';
+import HouseholdSetup from './HouseholdSetup';
+import { setupOwner, setupSummary } from '../lib/householdSetup';
+import { deviceRegion } from '../lib/handoffs';
 import { instrumentForHandoff, instrumentLabel } from '../lib/instruments';
 import { formatIncome } from '../lib/income';
 import LanguageSelect from './LanguageSelect';
@@ -68,6 +71,8 @@ interface SettingsModalProps {
   onSignOut: () => void;
   /** Optional extra block (thresholds, payment handles, and so on) rendered up top. */
   extraSection?: React.ReactNode;
+  /** Cherry +, so editing the household setup can seed the vault. */
+  isPlus?: boolean;
 }
 
 const RESERVED_NAMES = ['Anonymous', 'Unknown'];
@@ -94,6 +99,7 @@ export default function SettingsModal({
   onOpenPrivacy,
   onSignOut,
   extraSection,
+  isPlus = false,
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const [editingName, setEditingName] = useState(false);
@@ -152,6 +158,9 @@ export default function SettingsModal({
   const [resendFor, setResendFor] = useState<string | null>(null);
   const [resendEmail, setResendEmail] = useState('');
   const [resendBusy, setResendBusy] = useState(false);
+
+  // The household setup quiz, reopened to edit by whoever created the group.
+  const [editingSetup, setEditingSetup] = useState(false);
 
   const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
   const copyHandle = (text: string) => {
@@ -322,6 +331,22 @@ export default function SettingsModal({
     onSaveName(nameInput.trim());
     setEditingName(false);
   };
+
+  if (editingSetup && group) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-auto bg-natural-sidebar/95 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <HouseholdSetup
+          group={group}
+          uid={currentUser?.uid || ''}
+          isPlus={isPlus}
+          initialRegion={deviceRegion()}
+          mode="edit"
+          onDone={() => setEditingSetup(false)}
+          onSkip={() => setEditingSetup(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <Modal
@@ -574,6 +599,26 @@ export default function SettingsModal({
             <span className="text-sm font-semibold text-natural-text">
               {group?.name || t('app.unnamedGroup')}
             </span>
+          </div>
+
+          <div className="border-t border-natural-border/50 pt-3">
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0">
+                <span className="text-sm text-natural-muted block">{t('household.settingsRow')}</span>
+                <span className="text-xs text-natural-text font-semibold block mt-0.5">
+                  {group?.setup ? setupSummary(group.setup) : t('household.notYet')}
+                </span>
+              </div>
+              {group && setupOwner(group) === currentUser?.uid && (
+                <button
+                  type="button"
+                  onClick={() => setEditingSetup(true)}
+                  className="shrink-0 text-xs font-bold text-natural-primary hover:underline"
+                >
+                  {group.setup ? t('common.edit') : t('household.setUp')}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">

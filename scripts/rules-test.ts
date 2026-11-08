@@ -365,6 +365,77 @@ async function main() {
     )
   );
 
+  // --- 2.0 household setup: creator-owned fields on the group ------------
+  await env.clearFirestore();
+  await seed();
+  const creator = env.authenticatedContext(MEMBER).firestore();
+  const other = env.authenticatedContext(PEER).firestore();
+  const setupDoc = {
+    version: 1,
+    completedBy: MEMBER,
+    completedAt: '2026-11-08T00:00:00.000Z',
+    kind: 'partners',
+    paying: 'one_fronts',
+    settle: 'monthly',
+    split: 'even',
+    handoffs: ['venmo', 'zelle'],
+    recurring: ['rent'],
+    thresholdsWanted: false,
+    trip: null,
+    note: '',
+  };
+
+  await check('the first member CAN write setup and region on a pre-2.0 group', () =>
+    assertSucceeds(updateDoc(doc(creator, 'groups', SHARED), { setup: setupDoc, region: 'US' }))
+  );
+
+  await check('another member CANNOT change the setup', () =>
+    assertFails(updateDoc(doc(other, 'groups', SHARED), { setup: { ...setupDoc, kind: 'trip' } }))
+  );
+
+  await check('another member CANNOT change the region', () =>
+    assertFails(updateDoc(doc(other, 'groups', SHARED), { region: 'MX' }))
+  );
+
+  await check('another member CANNOT claim createdBy', () =>
+    assertFails(updateDoc(doc(other, 'groups', SHARED), { createdBy: PEER }))
+  );
+
+  await check('another member CAN still record an invite', () =>
+    assertSucceeds(
+      updateDoc(doc(other, 'groups', SHARED), {
+        invites: [{ channel: 'email', to: 'x@y.z', at: '2026-11-08T00:00:00.000Z', by: PEER }],
+      })
+    )
+  );
+
+  await check('a creator CANNOT create a group as somebody else', () =>
+    assertFails(
+      setDoc(doc(creator, 'groups', 'NEWONE'), {
+        inviteCode: 'NEWONE',
+        members: [{ uid: MEMBER, name: 'Member', email: '' }],
+        memberIds: [MEMBER],
+        defaultSplit: { [MEMBER]: 100 },
+        categories: [],
+        createdBy: PEER,
+      })
+    )
+  );
+
+  await check('a creator CAN create a group with createdBy set to themselves', () =>
+    assertSucceeds(
+      setDoc(doc(creator, 'groups', 'NEWTWO'), {
+        inviteCode: 'NEWTWO',
+        members: [{ uid: MEMBER, name: 'Member', email: '' }],
+        memberIds: [MEMBER],
+        defaultSplit: { [MEMBER]: 100 },
+        categories: [],
+        createdBy: MEMBER,
+        region: 'US',
+      })
+    )
+  );
+
   await env.cleanup();
   console.log(failures === 0 ? '\nALL RULES CHECKS PASSED' : `\n${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);
