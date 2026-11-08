@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { updateDoc, doc, deleteField, onSnapshot } from 'firebase/firestore';
+import { updateDoc, doc, deleteField, onSnapshot, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { auth, db, authHeader } from '../firebase';
 import { getFullMembers } from '../lib/members';
@@ -16,7 +16,7 @@ import { quizRetakeBlocker } from '../lib/quizRetake';
 import { isBankId, isHandoffId } from '../lib/handoffs';
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
-import { Expense, Group } from '../types';
+import { Assessment, Expense, Group } from '../types';
 import { t } from '../i18n';
 import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
@@ -76,6 +76,34 @@ export function useProfileSettings({
   // handoff (lib/handoffs.ts). Inputs mirror the profile until Save.
   const [handlesInput, setHandlesInput] = useState<Record<string, string>>({});
   const [bankAppInput, setBankAppInput] = useState<Record<string, string>>({});
+
+  // users/{uid}/private: the bank app per handoff (`prefs`) and the written
+  // assessment, both readable by their owner only (firestore.rules). Live
+  // listeners, like the profile, so a save on another device shows up here.
+  const [bankApp, setBankApp] = useState<Record<string, string>>({});
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  useEffect(() => {
+    if (!currentUser) return;
+    const base = doc(db, 'users', currentUser.uid);
+    const unsubPrefs = onSnapshot(
+      doc(base, 'private', 'prefs'),
+      (snap) => {
+        const next = (snap.data()?.bankApp || {}) as Record<string, string>;
+        setBankApp(next);
+        setBankAppInput(next);
+      },
+      (e) => console.error('Private prefs listener failed', e)
+    );
+    const unsubAssessment = onSnapshot(
+      doc(base, 'private', 'assessment'),
+      (snap) => setAssessment(snap.exists() ? (snap.data() as Assessment) : null),
+      (e) => console.error('Assessment listener failed', e)
+    );
+    return () => {
+      unsubPrefs();
+      unsubAssessment();
+    };
+  }, [currentUser]);
 
   const [savingThreshold, setSavingThreshold] = useState(false);
 
@@ -145,10 +173,10 @@ export function useProfileSettings({
   }, [currentUser]);
 
   // Settings inputs mirror the profile. 2.0 stores `handles` by handoff id
-  // and `bankApp` by handoff id in the clear (the people who read them are
-  // the group members who have to pay the person, so the uid-keyed
-  // encryption of 1.x hid nothing from them). A profile that only has the
-  // 1.x paymentHandlesEnc (Venmo and Zelle) is read through it.
+  // in the clear (the people who read them are the group members who have
+  // to pay the person, so the uid-keyed encryption of 1.x hid nothing from
+  // them). A profile that only has the 1.x paymentHandlesEnc (Venmo and
+  // Zelle) is read through it.
   useEffect(() => {
     setThresholdInput(
       userProfile?.recurringThreshold > 0 ? String(userProfile.recurringThreshold) : ''
@@ -156,10 +184,7 @@ export function useProfileSettings({
     let cancelled = false;
     (async () => {
       const handles = await readHandles(userProfile, activeUser);
-      if (!cancelled) {
-        setHandlesInput(handles);
-        setBankAppInput({ ...(userProfile?.bankApp || {}) });
-      }
+      if (!cancelled) setHandlesInput(handles);
     })();
     return () => {
       cancelled = true;
@@ -167,7 +192,6 @@ export function useProfileSettings({
   }, [
     userProfile?.recurringThreshold,
     userProfile?.handles,
-    userProfile?.bankApp,
     userProfile?.paymentHandlesEnc,
     userProfile?.paymentHandles,
     activeUser,
@@ -441,10 +465,10 @@ export function useProfileSettings({
     }
   };
 
-  // Writes `handles` and `bankApp` (the 2.0 shape both clients read), plus
-  // the 1.x encrypted Venmo and Zelle pair so a phone still on 1.2 keeps its
-  // handoffs; any legacy plaintext copy is deleted. Handles never enter
-  // cloud backups.
+  // Writes `handles` (the 2.0 shape both clients read) plus the 1.x
+  // encrypted Venmo and Zelle pair so a phone still on 1.2 keeps its
+  // handoffs; any legacy plaintext copy is deleted. The bank app per handoff
+  // goes to the private prefs document. Handles never enter cloud backups.
   const handleSavePaymentHandles = async () => {
     if (savingHandles) return;
     const handles: Record<string, string> = {};
@@ -463,14 +487,14 @@ export function useProfileSettings({
       const enc = await encryptData(legacy, activeUser);
       await updateDoc(doc(db, 'users', activeUser), {
         handles,
-        bankApp,
         paymentHandlesEnc: enc,
         paymentHandles: deleteField(),
       });
+      await setDoc(doc(db, 'users', activeUser, 'private', 'prefs'), { bankApp }, { merge: true });
+      setBankApp(bankApp);
       setUserProfile((prev: any) => ({
         ...(prev || {}),
         handles,
-        bankApp,
         paymentHandlesEnc: enc,
         paymentHandles: undefined,
       }));
@@ -488,11 +512,15 @@ export function useProfileSettings({
   // sheet so the next settlement opens the right app straight away.
   const handleSaveBankApp = async (handoff: string, bank: string) => {
     if (!isHandoffId(handoff) || !isBankId(bank)) return;
-    const next = { ...(userProfile?.bankApp || {}), [handoff]: bank };
+    const next = { ...bankApp, [handoff]: bank };
+    setBankApp(next);
     setBankAppInput(next);
-    setUserProfile((prev: any) => ({ ...(prev || {}), bankApp: next }));
     try {
-      await updateDoc(doc(db, 'users', activeUser), { bankApp: next });
+      await setDoc(
+        doc(db, 'users', activeUser, 'private', 'prefs'),
+        { bankApp: next },
+        { merge: true }
+      );
     } catch (e) {
       console.error('Failed to save bank app', e);
     }
@@ -519,6 +547,8 @@ export function useProfileSettings({
     setHandlesInput,
     bankAppInput,
     setBankAppInput,
+    bankApp,
+    assessment,
     savingThreshold,
     savingHandles,
     paymentHandlesByUid,

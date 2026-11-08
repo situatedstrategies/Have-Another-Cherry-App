@@ -436,6 +436,44 @@ async function main() {
     )
   );
 
+  // --- users/{uid}/private: owner only, even for groupmates -------------
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', MEMBER, 'private', 'assessment'), {
+      version: 1,
+      summary: 'A reading.',
+    });
+  });
+  const privOwner = env.authenticatedContext(MEMBER).firestore();
+  const privPeer = env.authenticatedContext(PEER).firestore();
+
+  await check('the owner CAN read their assessment', () =>
+    assertSucceeds(getDoc(doc(privOwner, 'users', MEMBER, 'private', 'assessment')))
+  );
+
+  await check('a groupmate CANNOT read a peer assessment', () =>
+    assertFails(getDoc(doc(privPeer, 'users', MEMBER, 'private', 'assessment')))
+  );
+
+  await check('the owner CAN write their private prefs', () =>
+    assertSucceeds(
+      setDoc(doc(privOwner, 'users', MEMBER, 'private', 'prefs'), { bankApp: { zelle: 'chase' } })
+    )
+  );
+
+  await check('a groupmate CANNOT write a peer prefs document', () =>
+    assertFails(
+      setDoc(doc(privPeer, 'users', MEMBER, 'private', 'prefs'), { bankApp: { zelle: 'bofa' } })
+    )
+  );
+
+  await check('a groupmate CANNOT read a peer prefs document', () =>
+    assertFails(getDoc(doc(privPeer, 'users', MEMBER, 'private', 'prefs')))
+  );
+
+  await check('nobody signed out CAN read a private document', () =>
+    assertFails(getDoc(doc(anon, 'users', MEMBER, 'private', 'assessment')))
+  );
+
   await env.cleanup();
   console.log(failures === 0 ? '\nALL RULES CHECKS PASSED' : `\n${failures} FAILURE(S)`);
   process.exit(failures === 0 ? 0 : 1);

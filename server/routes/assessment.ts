@@ -9,8 +9,9 @@ import { analytics } from '../heycatch';
 // answers and the three optional extras below: never a ledger amount, never
 // another member, never the email. The result is advisory copy about how the
 // person handles shared money, not advice about investments or credit, and
-// it is written to users/{uid}.assessment here so both clients read the same
-// object.
+// it is written to users/{uid}/private/assessment here (a subcollection only
+// its owner may read, see firestore.rules) so both clients read the same
+// object and no group member ever sees it.
 
 const router = express.Router();
 
@@ -177,7 +178,12 @@ router.post('/api/assessment', requireAuth, rateLimit('assessment', 10), async (
 
     await ensureAdminApp();
     const { getFirestore } = await import('firebase-admin/firestore');
-    await getFirestore().collection('users').doc(uid).set({ assessment }, { merge: true });
+    await getFirestore()
+      .collection('users')
+      .doc(uid)
+      .collection('private')
+      .doc('assessment')
+      .set(assessment);
 
     // The server is the side that knows the assessment exists; no answers
     // and nothing from the result go into the event.

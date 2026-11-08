@@ -212,6 +212,8 @@ export default function App() {
     setHandlesInput,
     bankAppInput,
     setBankAppInput,
+    bankApp,
+    assessment,
     savingThreshold,
     savingHandles,
     paymentHandlesByUid,
@@ -837,6 +839,7 @@ export default function App() {
           onSaveDefaultSplit={handleSaveDefaultSplit}
           onResendInvite={handleResendInvite}
           isPlus={isPlus}
+          assessment={assessment}
           onAddSeat={handleAddSeat}
           onRemoveSeat={handleRemoveSeat}
           onLeaveGroup={handleLeaveGroup}
@@ -1039,7 +1042,7 @@ export default function App() {
           group={group}
           activeUser={activeUser}
           paymentHandlesByUid={paymentHandlesByUid}
-          payerBankApp={userProfile?.bankApp || {}}
+          payerBankApp={bankApp}
           onSaveBankApp={handleSaveBankApp}
           region={groupRegion}
           onClose={() => setShowSettleModal(false)}

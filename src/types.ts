@@ -61,12 +61,17 @@ export interface User {
   // The language the person picked ('en' | 'ru' | 'es'), written from the
   // language switcher so emails can follow it later. Absent = browser default.
   locale?: string;
-  // 2.0: payment handles by handoff id (lib/handoffs.ts), the bank app the
-  // person picked for each pick-your-bank handoff, and the assessment. The
-  // handles replace paymentHandlesEnc, which is still written for 1.x clients.
+  // 2.0: payment handles by handoff id (lib/handoffs.ts), read by the group
+  // members who pay this person. They replace paymentHandlesEnc, which is
+  // still written for 1.x clients. The person's own bank app per handoff
+  // (`bankApp`) and the written assessment live under users/{uid}/private
+  // (docs `prefs` and `assessment`), which only the owner can read.
   handles?: Record<string, string>;
+}
+
+// users/{uid}/private/prefs: settings nobody else needs to see.
+export interface PrivatePrefs {
   bankApp?: Record<string, string>;
-  assessment?: Assessment;
 }
 
 export interface Group {
@@ -139,7 +144,7 @@ export type PaymentInstrument =
 // ---- 2.0 setup path (docs/REBUILD_PLAN.md section 11 in the mobile repo) ----
 
 // The Gemini financial assessment, written by the server (POST /api/assessment)
-// once per account and again on a retake. Advisory copy about how this
+// to users/{uid}/private/assessment once per account and again on a retake. Advisory copy about how this
 // person handles shared money; never read for another member.
 export interface Assessment {
   version: number;

@@ -14,7 +14,7 @@ import {
   Mail,
   ChevronDown,
 } from 'lucide-react';
-import { Group } from '../types';
+import { Assessment, Group } from '../types';
 import {
   getFullDefaultSplit,
   joinedUids,
@@ -74,6 +74,8 @@ interface SettingsModalProps {
   extraSection?: React.ReactNode;
   /** Cherry +, so editing the household setup can seed the vault. */
   isPlus?: boolean;
+  /** The signed-in person's written assessment (users/{uid}/private/assessment). */
+  assessment?: Assessment | null;
 }
 
 const RESERVED_NAMES = ['Anonymous', 'Unknown'];
@@ -101,6 +103,7 @@ export default function SettingsModal({
   onSignOut,
   extraSection,
   isPlus = false,
+  assessment = null,
 }: SettingsModalProps) {
   const { t } = useTranslation();
   const [editingName, setEditingName] = useState(false);
@@ -584,12 +587,12 @@ export default function SettingsModal({
                   {fp.quote}
                 </blockquote>
               )}
-              {userProfile?.assessment?.summary && (
+              {assessment?.summary && (
                 <div className="mt-4 border-t border-natural-border/50 pt-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-natural-muted mb-2">
                     {t('assessment.settingsTitle')}
                   </p>
-                  <AssessmentResult assessment={userProfile.assessment} compact />
+                  <AssessmentResult assessment={assessment} compact />
                 </div>
               )}
               {retakeBlocker ? (
@@ -599,7 +602,7 @@ export default function SettingsModal({
                   onClick={onRetakeQuiz}
                   className="mt-4 text-xs font-semibold text-natural-primary hover:underline"
                 >
-                  {userProfile?.assessment ? t('assessment.retake') : t('settings.retakeQuiz')}
+                  {assessment ? t('assessment.retake') : t('settings.retakeQuiz')}
                 </button>
               )}
             </div>

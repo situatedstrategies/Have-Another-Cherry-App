@@ -165,6 +165,16 @@ service cloud.firestore {
         );
     }
 
+    // users/{uid}/private/*: what nobody but the account holder needs. The
+    // written assessment (`assessment`, server-written through the Admin SDK,
+    // client-readable) and the person's own preferences (`prefs`: the bank
+    // app per payment handoff). A group member can read a peer's profile
+    // document for the roster; nothing under here is reachable that way.
+    match /users/{userId}/private/{docId} {
+      allow read, write:
+        if signedIn() && request.auth.uid == userId;
+    }
+
     match /groups/{groupId} {
       // Required so a signed-in invite recipient can retrieve the group
       // using the invite code, which is also the document ID.
