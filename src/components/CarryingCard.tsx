@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CreditCard } from 'lucide-react';
 import { Expense } from '../types';
 import { computeCarrying, householdCredit } from '../lib/carrying';
@@ -14,9 +15,6 @@ interface Props {
 
 const panel = 'bg-white border border-natural-border rounded-3xl p-5 shadow-sm';
 
-const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
-const count = (n: number) => `${n} ${n === 1 ? 'expense' : 'expenses'}`;
-
 /**
  * Who's carrying what: each member's money that is out for the household and
  * not back yet, split by whether it is riding on a card or already gone from
@@ -24,8 +22,13 @@ const count = (n: number) => `${n} ${n === 1 ? 'expense' : 'expenses'}`;
  * App under Insights.
  */
 export default function CarryingCard({ expenses, members, activeUser }: Props) {
+  const { t } = useTranslation();
+  const days = (n: number) => t('carrying.days', { count: n });
+  const count = (n: number) => t('carrying.expenses', { count: n });
   const nameOf = (uid: string) =>
-    uid === activeUser ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone';
+    uid === activeUser
+      ? t('common.you')
+      : members.find((m) => m.uid === uid)?.name || t('common.someone');
 
   const { rows, household } = useMemo(() => {
     const rows = computeCarrying(expenses, todayLocal());
@@ -36,18 +39,13 @@ export default function CarryingCard({ expenses, members, activeUser }: Props) {
     <section className={`${panel} space-y-3`} id="carrying-card">
       <div>
         <h3 className={`${labelClass} flex items-center gap-1.5`}>
-          <CreditCard className="h-3.5 w-3.5 text-natural-primary" /> Who's carrying what
+          <CreditCard className="h-3.5 w-3.5 text-natural-primary" /> {t('carrying.title')}
         </h3>
-        <p className="mt-1 text-xs text-natural-muted">
-          Money out for the household that has not come back. A card balance someone is floating is
-          a different favour from cash already gone.
-        </p>
+        <p className="mt-1 text-xs text-natural-muted">{t('carrying.body')}</p>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-natural-muted">
-          Nobody is carrying anything right now. Everything fronted has come back.
-        </p>
+        <p className="text-sm text-natural-muted">{t('carrying.nobody')}</p>
       ) : (
         <>
           <p className="flex items-baseline gap-1.5">
@@ -55,8 +53,9 @@ export default function CarryingCard({ expenses, members, activeUser }: Props) {
               {formatAmount(household.onCredit)}
             </span>
             <span className="font-mono text-xs text-natural-muted">
-              on cards
-              {household.longestDays !== null && <>, longest {days(household.longestDays)}</>}
+              {t('carrying.onCards')}
+              {household.longestDays !== null &&
+                t('carrying.longest', { days: days(household.longestDays) })}
             </span>
           </p>
 
@@ -73,8 +72,9 @@ export default function CarryingCard({ expenses, members, activeUser }: Props) {
                   {r.onCredit > 0.01 && (
                     <p className="flex justify-between gap-2">
                       <span>
-                        On a card, {count(r.onCreditCount)}
-                        {r.oldestCreditDays !== null && <>, oldest {days(r.oldestCreditDays)}</>}
+                        {t('carrying.onCard', { count: count(r.onCreditCount) })}
+                        {r.oldestCreditDays !== null &&
+                          t('carrying.oldest', { days: days(r.oldestCreditDays) })}
                       </span>
                       <span className="text-natural-primary font-semibold">
                         {formatAmount(r.onCredit)}
@@ -83,13 +83,13 @@ export default function CarryingCard({ expenses, members, activeUser }: Props) {
                   )}
                   {r.fromOwnMoney > 0.01 && (
                     <p className="flex justify-between gap-2">
-                      <span>From their own money, {count(r.fromOwnMoneyCount)}</span>
+                      <span>{t('carrying.ownMoney', { count: count(r.fromOwnMoneyCount) })}</span>
                       <span>{formatAmount(r.fromOwnMoney)}</span>
                     </p>
                   )}
                   {r.unknown > 0.01 && (
                     <p className="flex justify-between gap-2">
-                      <span>How it was paid not recorded</span>
+                      <span>{t('carrying.unknown')}</span>
                       <span>{formatAmount(r.unknown)}</span>
                     </p>
                   )}
@@ -100,9 +100,7 @@ export default function CarryingCard({ expenses, members, activeUser }: Props) {
         </>
       )}
 
-      <p className="text-[10px] text-natural-muted">
-        Confirmed payments only, so it agrees with Balances.
-      </p>
+      <p className="text-[10px] text-natural-muted">{t('carrying.confirmedOnly')}</p>
     </section>
   );
 }

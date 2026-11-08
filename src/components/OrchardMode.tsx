@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatCurrency, formatShortDate, formatDate } from '../lib/format';
 import {
   Cherry,
   Check,
@@ -28,17 +30,15 @@ interface Props {
   onClose: () => void;
 }
 
-const money = (v: number) => `$${v.toFixed(2)}`;
+const money = (v: number) => formatCurrency(v);
 const label = 'text-[11px] font-mono font-bold uppercase tracking-[0.1em] text-natural-muted';
 const shortDate = (iso: string) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return Number.isNaN(d.getTime()) ? iso : formatShortDate(iso);
 };
 const fullDate = (iso: string) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+  return Number.isNaN(d.getTime()) ? iso : formatDate(iso);
 };
 
 /**
@@ -56,9 +56,12 @@ export default function OrchardMode({
   onAddComment,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const members = useMemo(() => getFullMembers(group), [group]);
   const memberName = (uid: string) =>
-    uid === activeUser ? 'You' : members.find((m) => m.uid === uid)?.name || 'Someone';
+    uid === activeUser
+      ? t('common.you')
+      : members.find((m) => m.uid === uid)?.name || t('common.someone');
 
   // Ids cleared or skipped this session: the deck never re-orders under
   // the user's finger the moment something settles.
@@ -137,14 +140,14 @@ export default function OrchardMode({
     <div className="fixed inset-0 z-50 bg-natural-sidebar flex flex-col">
       <header className="flex items-center justify-between px-5 py-3">
         <h2 className="text-[11px] font-mono font-bold uppercase tracking-[0.1em] text-natural-primary flex items-center gap-1.5">
-          <Cherry className="h-3.5 w-3.5" /> Cherry Pick
+          <Cherry className="h-3.5 w-3.5" /> {t('orchard.title')}
         </h2>
         <button
           type="button"
           onClick={onClose}
           className="text-sm font-semibold text-natural-primary hover:underline"
         >
-          Ledger
+          {t('orchard.ledger')}
         </button>
       </header>
 
@@ -154,10 +157,8 @@ export default function OrchardMode({
         <div className="flex-1 flex flex-col min-h-0 max-w-md w-full mx-auto">
           <div className="px-5 pb-3">
             <div className="flex justify-between font-mono text-[11px] text-natural-muted">
-              <span>
-                {page + 1} of {total}
-              </span>
-              <span>{handled.size} handled</span>
+              <span>{t('orchard.pageOf', { page: page + 1, total })}</span>
+              <span>{t('orchard.handled', { count: handled.size })}</span>
             </div>
             <div className="mt-2 h-[5px] rounded-full bg-natural-border overflow-hidden">
               <div
@@ -197,7 +198,7 @@ export default function OrchardMode({
             {page > 0 && (
               <button
                 type="button"
-                aria-label="Previous"
+                aria-label={t('orchard.previous')}
                 onClick={back}
                 className="hidden sm:flex absolute left-[-2.5rem] top-1/2 -translate-y-1/2 p-2 rounded-full bg-white border border-natural-border shadow-sm text-natural-muted hover:text-natural-text"
               >
@@ -207,7 +208,7 @@ export default function OrchardMode({
             {page < total - 1 && (
               <button
                 type="button"
-                aria-label="Next"
+                aria-label={t('orchard.next')}
                 onClick={advance}
                 className="hidden sm:flex absolute right-[-2.5rem] top-1/2 -translate-y-1/2 p-2 rounded-full bg-white border border-natural-border shadow-sm text-natural-muted hover:text-natural-text"
               >
@@ -223,7 +224,7 @@ export default function OrchardMode({
                 onClick={onClose}
                 className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5"
               >
-                <Check className="h-4 w-4" /> Back to the ledger
+                <Check className="h-4 w-4" /> {t('orchard.backToLedger')}
               </button>
             </div>
           )}
@@ -263,6 +264,7 @@ function Card({
   onOpen: () => void;
   onAddComment: (text: string) => Promise<void> | void;
 }) {
+  const { t } = useTranslation();
   const [comment, setComment] = useState('');
   const dark = isDarkCherry(expense);
   const status = getNormalizedExpenseStatus(expense);
@@ -283,7 +285,7 @@ function Card({
   return (
     <div className="h-full bg-white rounded-3xl border border-natural-border shadow-sm p-5 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between">
-        <span className={label}>{cleared ? 'Settled' : 'Outstanding'}</span>
+        <span className={label}>{cleared ? t('orchard.settled') : t('orchard.outstanding')}</span>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pill}`}>
           {getExpenseStatusLabel(expense)}
         </span>
@@ -296,9 +298,11 @@ function Card({
         <Meta icon={<Calendar className="h-3 w-3" />} text={shortDate(expense.date)} />
         <Meta
           icon={<Wallet className="h-3 w-3" />}
-          text={`Paid by ${memberName(expense.paidBy)}`}
+          text={t('orchard.paidBy', { name: memberName(expense.paidBy) })}
         />
-        {expense.isRecurring && <Meta icon={<Repeat className="h-3 w-3" />} text="Recurring" />}
+        {expense.isRecurring && (
+          <Meta icon={<Repeat className="h-3 w-3" />} text={t('orchard.recurring')} />
+        )}
       </div>
 
       <div className="mt-4">
@@ -309,10 +313,10 @@ function Card({
         </p>
         <p className="text-xs text-natural-muted mt-0.5">
           {cleared
-            ? 'Nothing left on this one'
+            ? t('orchard.nothingLeft')
             : dark
-              ? 'Your chip-in closes the pot'
-              : `of ${money(expense.amount)} total`}
+              ? t('orchard.chipInCloses')
+              : t('orchard.ofTotal', { amount: money(expense.amount) })}
         </p>
       </div>
 
@@ -324,13 +328,13 @@ function Card({
 
       {!dark && Object.keys(expense.shares || {}).length > 0 && (
         <div className="mt-4">
-          <span className={label}>Split</span>
+          <span className={label}>{t('orchard.split')}</span>
           <div className="mt-2 space-y-1">
             {Object.entries(expense.shares).map(([uid, share]) => (
               <div key={uid} className="flex justify-between text-xs">
                 <span className="text-natural-text">{memberName(uid)}</span>
                 <span className="font-mono text-natural-muted">
-                  {uid === expense.paidBy ? 'paid' : money(share)}
+                  {uid === expense.paidBy ? t('orchard.paid') : money(share)}
                 </span>
               </div>
             ))}
@@ -339,12 +343,12 @@ function Card({
       )}
 
       <div className="mt-4 flex items-center justify-between">
-        <span className={label}>Conversation</span>
+        <span className={label}>{t('orchard.conversation')}</span>
         <span className="font-mono text-[10px] text-natural-muted">{comments.length}</span>
       </div>
       <div className="mt-2 flex-1 min-h-[3rem] overflow-y-auto space-y-2">
         {comments.length === 0 ? (
-          <p className="text-xs text-natural-accent">No comments on this one</p>
+          <p className="text-xs text-natural-accent">{t('orchard.noComments')}</p>
         ) : (
           comments.map((c) => {
             const mine = c.userId === activeUser;
@@ -374,15 +378,15 @@ function Card({
           onKeyDown={(e) => {
             if (e.key === 'Enter') send();
           }}
-          placeholder="Comment"
-          aria-label="Comment"
+          placeholder={t('detail.commentPlaceholder')}
+          aria-label={t('detail.commentPlaceholder')}
           className="w-full pl-3 pr-9 py-2 text-[13px] bg-natural-bg border border-natural-border focus:border-natural-text rounded-xl outline-none"
         />
         <button
           type="button"
           onClick={send}
           disabled={!comment.trim()}
-          aria-label="Send comment"
+          aria-label={t('detail.sendComment')}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-natural-primary disabled:text-natural-accent"
         >
           <Send className="h-4 w-4" />
@@ -395,7 +399,7 @@ function Card({
             <span className="inline-flex p-1.5 rounded-full bg-natural-pebble text-natural-primary">
               <Check className="h-3.5 w-3.5" />
             </span>
-            Swipe for the next one
+            {t('orchard.swipeNext')}
           </p>
         ) : (
           <button
@@ -403,7 +407,7 @@ function Card({
             onClick={onSettle}
             className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5"
           >
-            <Handshake className="h-4 w-4" /> {dark ? 'Chip in' : 'Settle this'}
+            <Handshake className="h-4 w-4" /> {dark ? t('orchard.chipIn') : t('orchard.settleThis')}
           </button>
         )}
         <div className="flex gap-2">
@@ -412,14 +416,14 @@ function Card({
             onClick={onOpen}
             className="flex-1 py-2 text-sm font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary"
           >
-            Details
+            {t('detail.details')}
           </button>
           <button
             type="button"
             onClick={onSkip}
             className="flex-1 py-2 text-sm font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary"
           >
-            Skip
+            {t('orchard.skip')}
           </button>
         </div>
       </div>
@@ -428,6 +432,7 @@ function Card({
 }
 
 function AllClear({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex-1 flex items-center justify-center p-8">
       <div className="text-center max-w-xs">
@@ -435,17 +440,15 @@ function AllClear({ onClose }: { onClose: () => void }) {
           <Check className="h-6 w-6" />
         </span>
         <h3 className="mt-4 font-display text-[22px] font-semibold text-natural-text">
-          The orchard is clear
+          {t('orchard.clearTitle')}
         </h3>
-        <p className="mt-1.5 text-[13.5px] text-natural-muted">
-          Nothing is waiting on you right now.
-        </p>
+        <p className="mt-1.5 text-[13.5px] text-natural-muted">{t('orchard.clearBody')}</p>
         <button
           type="button"
           onClick={onClose}
           className="mt-5 px-5 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full"
         >
-          Back to the ledger
+          {t('orchard.backToLedger')}
         </button>
       </div>
     </div>

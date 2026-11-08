@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CalendarRange, Sparkles, Repeat } from 'lucide-react';
 import { Expense } from '../types';
 import { forecastMonth } from '../lib/forecast';
 import { todayLocal, parseLocalDate } from '../lib/recurring';
-import { formatAmount, formatShortDate } from '../lib/format';
+import { formatAmount, formatShortDate, formatDateWith } from '../lib/format';
 import { labelClass } from '../lib/ui';
 
 interface Props {
@@ -18,7 +19,7 @@ const panel = 'bg-white border border-natural-border rounded-3xl p-5 shadow-sm';
 const tile = 'bg-natural-bg/50 rounded-xl p-2 border border-natural-border/50 text-center';
 
 const monthName = (year: number, monthIndex: number) =>
-  new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'long' });
+  formatDateWith(new Date(year, monthIndex, 1), { month: 'long' });
 
 const SHOWN = 6;
 
@@ -28,6 +29,7 @@ const SHOWN = 6;
  * mounted by App in the right rail under Balances.
  */
 export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock }: Props) {
+  const { t } = useTranslation();
   // 0 is the current month, 1 the next: people budget by calendar month.
   const [offset, setOffset] = useState<0 | 1>(0);
   const today = todayLocal();
@@ -48,25 +50,28 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
       >
         <div className="flex items-center justify-between">
           <h3 className={`${labelClass} flex items-center gap-1.5`}>
-            <CalendarRange className="h-3.5 w-3.5 text-natural-primary" /> My month ahead
+            <CalendarRange className="h-3.5 w-3.5 text-natural-primary" /> {t('monthAhead.title')}
           </h3>
           <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
             Cherry +
           </span>
         </div>
         <div className="grid grid-cols-3 gap-2" aria-hidden="true">
-          {['Left to pay', 'Your share', 'Carried in'].map((l) => (
-            <div key={l} className={tile}>
-              <span className="block text-lg font-display font-semibold text-natural-border select-none">
-                ···
-              </span>
-              <span className="block text-xs font-semibold text-natural-muted uppercase">{l}</span>
-            </div>
-          ))}
+          {[t('monthAhead.leftToPay'), t('monthAhead.yourShare'), t('monthAhead.carriedIn')].map(
+            (l) => (
+              <div key={l} className={tile}>
+                <span className="block text-lg font-display font-semibold text-natural-border select-none">
+                  ···
+                </span>
+                <span className="block text-xs font-semibold text-natural-muted uppercase">
+                  {l}
+                </span>
+              </div>
+            )
+          )}
         </div>
         <p className="text-xs text-natural-muted flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 shrink-0" /> Your share of the month, dated, before it comes
-          due - with Cherry +.
+          <Sparkles className="h-3 w-3 shrink-0" /> {t('monthAhead.teaser')}
         </p>
       </button>
     );
@@ -86,12 +91,12 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
     <section className={`${panel} space-y-3`} id="month-ahead-card">
       <div className="flex items-center justify-between gap-2">
         <h3 className={`${labelClass} flex items-center gap-1.5`}>
-          <CalendarRange className="h-3.5 w-3.5 text-natural-primary" /> My month ahead
+          <CalendarRange className="h-3.5 w-3.5 text-natural-primary" /> {t('monthAhead.title')}
         </h3>
         <div
           className="flex rounded-lg border border-natural-border overflow-hidden text-[11px] font-semibold"
           role="tablist"
-          aria-label="Month"
+          aria-label={t('monthAhead.monthAria')}
         >
           {([0, 1] as const).map((o) => (
             <button
@@ -106,17 +111,14 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
                   : 'bg-white text-natural-muted hover:text-natural-text'
               }`}
             >
-              {o === 0 ? 'This month' : 'Next month'}
+              {o === 0 ? t('monthAhead.thisMonth') : t('monthAhead.nextMonth')}
             </button>
           ))}
         </div>
       </div>
 
       {empty ? (
-        <p className="text-sm text-natural-muted">
-          Nothing with your name on it in {name} yet. Recurring costs show up here before they come
-          due.
-        </p>
+        <p className="text-sm text-natural-muted">{t('monthAhead.empty', { month: name })}</p>
       ) : (
         <>
           <div>
@@ -124,18 +126,20 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
               <span className="font-display text-3xl font-semibold text-natural-text">
                 {formatAmount(forecast.leftToPay)}
               </span>
-              <span className="font-mono text-xs text-natural-muted">left to pay in {name}</span>
+              <span className="font-mono text-xs text-natural-muted">
+                {t('monthAhead.leftToPayIn', { month: name })}
+              </span>
             </p>
             <p className="mt-1 text-xs text-natural-muted">
-              Your share of the month is {formatAmount(forecast.total)}:{' '}
-              {formatAmount(forecast.loggedShare)} logged
-              {forecast.projectedShare > 0.01 && (
-                <> and {formatAmount(forecast.projectedShare)} still expected</>
-              )}
+              {t('monthAhead.shareSummary', {
+                total: formatAmount(forecast.total),
+                logged: formatAmount(forecast.loggedShare),
+              })}
+              {forecast.projectedShare > 0.01 &&
+                t('monthAhead.stillExpected', { amount: formatAmount(forecast.projectedShare) })}
               .
-              {forecast.carriedIn > 0.01 && (
-                <> Plus {formatAmount(forecast.carriedIn)} still open from earlier months.</>
-              )}
+              {forecast.carriedIn > 0.01 &&
+                t('monthAhead.plusCarried', { amount: formatAmount(forecast.carriedIn) })}
             </p>
           </div>
 
@@ -150,7 +154,8 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
                       {i.kind === 'projected' && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <Repeat className="h-2.5 w-2.5" aria-hidden="true" /> expected
+                          <Repeat className="h-2.5 w-2.5" aria-hidden="true" />{' '}
+                          {t('monthAhead.expected')}
                         </>
                       )}
                     </span>
@@ -163,14 +168,14 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
             </ul>
           )}
           {more > 0 && (
-            <p className="font-mono text-[10px] text-natural-muted">and {more} more this month</p>
+            <p className="font-mono text-[10px] text-natural-muted">
+              {t('monthAhead.andMore', { count: more })}
+            </p>
           )}
         </>
       )}
 
-      <p className="text-[10px] text-natural-muted">
-        Your household's own numbers, arranged by date. Not financial advice.
-      </p>
+      <p className="text-[10px] text-natural-muted">{t('monthAhead.disclaimer')}</p>
     </section>
   );
 }

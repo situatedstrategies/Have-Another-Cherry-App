@@ -113,6 +113,13 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Cherry + is sold as a monthly or yearly subscription or a one-time lifetime purchase, all through RevenueCat: on the web via `CherryPlusModal` and `lib/billing.ts` (Stripe through RevenueCat Web Billing), in the apps through the App Store and Google Play. Prices live in RevenueCat and the stores, never in code or in this file.
 - The November 2nd 2026 ad-supported model (every feature free, one AdSense ad, a one-time Remove ads purchase) is retired and must not be reintroduced.
 
+## Localization (English, Russian, Spanish)
+
+- i18next + react-i18next. Strings live in `src/locales/{en,ru,es}/translation.json` (one namespace, nested keys such as `settings.signOut`). Components use `useTranslation()` and `<Trans>`; non-React helpers import `t` from `src/i18n.ts`. Never hard-code user-visible English in `src/`; add a key to all three files instead.
+- Language follows `navigator.languages` unless picked in Settings or on the sign-in screen (`LanguageSelect`), remembered in localStorage under `hac_locale` and written to `users/{uid}.locale`. English is the fallback. `src/i18n.ts` sets `<html lang>`.
+- Numbers, currency and dates go through `src/lib/format.ts` (`formatCurrency`, `formatAmount`, `formatDate`, `formatDateWith`, ...), which read the active locale. Do not call `toLocaleString('en-US')` directly.
+- Russian needs the `_one/_few/_many/_other` plural forms; Spanish and English use `_one/_other`. Brand names (Have Another Cherry, Cherry +, Dark Cherry, Household Vault, Venmo, Zelle) stay untranslated. Server emails are not localized yet; the `locale` field on the profile is there for when they are.
+
 ## Design system (match this for UI work)
 
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).

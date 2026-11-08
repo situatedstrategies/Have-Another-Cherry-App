@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NotebookPen, Lock, Users, Trash2, Share2 } from 'lucide-react';
 import { Group } from '../types';
 import { getFullMembers, nameOf } from '../lib/members';
@@ -27,6 +28,7 @@ export default function ReflectionsSection({
   group,
   activeUser,
 }: ReflectionsSectionProps) {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<Reflection[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
@@ -79,9 +81,7 @@ export default function ReflectionsSection({
       setShareWithGroup(false);
     } catch (err) {
       console.error('Reflection save failed', err);
-      setError(
-        'Could not save that reflection. Your words are still in the box; try again in a moment.'
-      );
+      setError(t('reflect.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -95,9 +95,7 @@ export default function ReflectionsSection({
       setEntries((prev) => prev.map((x) => (x.id === r.id ? { ...x, shared: true } : x)));
     } catch (err) {
       console.error('Reflection share failed', err);
-      setError(
-        'Could not share that reflection. It is still private to you; try again in a moment.'
-      );
+      setError(t('reflect.shareFailed'));
     } finally {
       setSharingId(null);
     }
@@ -111,7 +109,7 @@ export default function ReflectionsSection({
       setEntries((prev) => prev.filter((x) => x.id !== r.id));
     } catch (err) {
       console.error('Reflection delete failed', err);
-      setError('Could not delete that reflection. Try again in a moment.');
+      setError(t('reflect.deleteFailed'));
     }
   };
 
@@ -119,10 +117,10 @@ export default function ReflectionsSection({
     <div className="space-y-4 pt-4 border-t border-natural-border" id="reflections-section">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
-          <NotebookPen className="h-3.5 w-3.5" /> Reflections
+          <NotebookPen className="h-3.5 w-3.5" /> {t('reflect.title')}
         </h3>
         <span className="text-[10px] text-natural-muted flex items-center gap-1">
-          <Lock className="h-3 w-3" /> Private to you unless you share
+          <Lock className="h-3 w-3" /> {t('reflect.privateUnless')}
         </span>
       </div>
 
@@ -136,7 +134,7 @@ export default function ReflectionsSection({
         onSubmit={handleSave}
         className="bg-natural-sidebar/30 border border-natural-border/60 rounded-2xl p-3.5 space-y-3"
       >
-        <p className="text-xs font-semibold text-natural-text">How did splitting this one feel?</p>
+        <p className="text-xs font-semibold text-natural-text">{t('reflect.howDidItFeel')}</p>
 
         <div className="flex flex-wrap gap-1.5">
           {REFLECTION_MOODS.map((m) => (
@@ -161,8 +159,8 @@ export default function ReflectionsSection({
           onChange={(e) => setText(e.target.value)}
           rows={2}
           maxLength={2000}
-          placeholder="Reflection"
-          aria-label="Reflection"
+          placeholder={t('reflect.placeholder')}
+          aria-label={t('reflect.placeholder')}
           className="w-full text-xs px-3.5 py-2.5 bg-white border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary resize-y"
         />
 
@@ -174,14 +172,14 @@ export default function ReflectionsSection({
               onChange={(e) => setShareWithGroup(e.target.checked)}
               className="h-3.5 w-3.5 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
             />
-            <span>Share with the group. Unchecked, it stays only yours.</span>
+            <span>{t('reflect.shareWithGroup')}</span>
           </label>
           <button
             type="submit"
             disabled={!text.trim() || saving}
             className="px-4 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer self-end sm:self-auto"
           >
-            {saving ? 'Saving...' : 'Save reflection'}
+            {saving ? t('common.saving') : t('reflect.save')}
           </button>
         </div>
       </form>
@@ -204,7 +202,7 @@ export default function ReflectionsSection({
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-natural-primary">
-                        <Lock className="h-3 w-3" /> Only you
+                        <Lock className="h-3 w-3" /> {t('reflect.onlyYou')}
                       </span>
                     )}
                     {moodMeta && (
@@ -230,25 +228,27 @@ export default function ReflectionsSection({
                         className="text-[11px] font-bold text-natural-primary hover:text-natural-dark flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                       >
                         <Share2 className="h-3 w-3" />{' '}
-                        {sharingId === r.id ? 'Sharing...' : 'Share with group'}
+                        {sharingId === r.id ? t('reflect.sharing') : t('reflect.share')}
                       </button>
                     )}
                     {confirmingDelete === r.id ? (
                       <span className="flex items-center gap-2 text-[11px]">
-                        <span className="font-bold text-natural-primary uppercase">Delete?</span>
+                        <span className="font-bold text-natural-primary uppercase">
+                          {t('reflect.deleteQ')}
+                        </span>
                         <button
                           type="button"
                           onClick={() => setConfirmingDelete(null)}
                           className="font-bold text-natural-muted hover:text-natural-text cursor-pointer"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDelete(r)}
                           className="font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-0.5 rounded-md cursor-pointer"
                         >
-                          Yes
+                          {t('reflect.yes')}
                         </button>
                       </span>
                     ) : (
@@ -257,7 +257,7 @@ export default function ReflectionsSection({
                         onClick={() => setConfirmingDelete(r.id)}
                         className="text-[11px] font-bold text-natural-muted hover:text-natural-primary flex items-center gap-1 cursor-pointer"
                       >
-                        <Trash2 className="h-3 w-3" /> Delete
+                        <Trash2 className="h-3 w-3" /> {t('common.delete')}
                       </button>
                     )}
                   </div>

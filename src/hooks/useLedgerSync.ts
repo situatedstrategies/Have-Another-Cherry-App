@@ -8,6 +8,7 @@ import { encryptData, decryptData } from '../lib/crypto';
 import { useGroupLedgerSnapshot } from './useGroupLedgerSnapshot';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -257,10 +258,10 @@ export function useLedgerSync({
 
     if (spawned.length > 0) {
       addToast(
-        'Recurring Logged',
+        t('ledgerHook.recurringLogged'),
         spawned.length === 1
-          ? `"${spawned[0].title}" was auto-logged from your recurring schedule.`
-          : `${spawned.length} recurring expenses were auto-logged.`,
+          ? t('ledgerHook.recurringOne', { title: spawned[0].title })
+          : t('ledgerHook.recurringMany', { count: spawned.length }),
         'success'
       );
     }

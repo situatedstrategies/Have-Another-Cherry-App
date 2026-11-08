@@ -20,6 +20,7 @@ import {
 import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
+import { t } from '../i18n';
 import { SupportError } from '../lib/errors';
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
@@ -287,12 +288,10 @@ export function useGroupMembership({
     const nextActive = remaining[0] || null;
     // The last member out deletes the group and its ledger; say so.
     const lastOne = !!group && joinedUids(group).length <= 1;
-    const afterwards = nextActive
-      ? "You'll be switched to another of your groups. Your account and your other groups stay intact."
-      : "You'll be returned to the group setup screen. Your account stays active and you can create or join another group.";
+    const afterwards = nextActive ? t('groupHook.afterSwitch') : t('groupHook.afterSetup');
     const message = lastOne
-      ? `Leave this group? You're the only member, so leaving deletes the group and its ledger for good. ${afterwards}`
-      : `Leave this group? You'll be removed from its member list. ${afterwards}`;
+      ? t('groupHook.leaveLast', { after: afterwards })
+      : t('groupHook.leave', { after: afterwards });
     if (!window.confirm(message)) return;
     try {
       await removeSelfFromGroupById(activeGroupId);
@@ -317,7 +316,7 @@ export function useGroupMembership({
       setSelectedExpense(null);
     } catch (err) {
       console.error('Error leaving group', err);
-      alert('Failed to leave the group. Please try again.');
+      alert(t('groupHook.leaveFailed'));
     }
   };
 
@@ -339,7 +338,8 @@ export function useGroupMembership({
               : currentUser?.displayName) || undefined,
         }),
       });
-      if (res.ok) addToast('Invite Sent', `An invitation has been sent to ${to}.`, 'success');
+      if (res.ok)
+        addToast(t('groupHook.inviteSent'), t('groupHook.inviteSentBody', { to }), 'success');
       else setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
     } catch {
       setSupportError({ error: CHERRY_ERRORS.inviteSend, screen: 'Invite' });
@@ -357,8 +357,8 @@ export function useGroupMembership({
       addedSeats: next.addedSeats,
     });
     addToast(
-      'Seat Added',
-      `${name.trim()} can join with the invite code. Their share comes out of everyone's proportionally.`,
+      t('groupHook.seatAdded'),
+      t('groupHook.seatAddedBody', { name: name.trim() }),
       'success'
     );
     if (email?.trim()) await handleResendInvite(name.trim(), email);
@@ -368,11 +368,7 @@ export function useGroupMembership({
     if (!group) return;
     const seat = pendingSeats(group)[index];
     if (!seat) return;
-    if (
-      !window.confirm(
-        `Remove the pending seat for ${seat.name}? Their ${seat.split}% goes back to everyone else.`
-      )
-    )
+    if (!window.confirm(t('groupHook.removeSeatConfirm', { name: seat.name, pct: seat.split })))
       return;
     try {
       const next = withRemovedSeat(group, index);
@@ -382,10 +378,14 @@ export function useGroupMembership({
         targetNumPeople: next.targetNumPeople,
         addedSeats: next.addedSeats,
       });
-      addToast('Seat Removed', `${seat.name} is no longer pending.`, 'success');
+      addToast(
+        t('groupHook.seatRemoved'),
+        t('groupHook.seatRemovedBody', { name: seat.name }),
+        'success'
+      );
     } catch (e) {
       console.error('Failed to remove seat', e);
-      addToast('Error', 'Could not remove that seat. Please try again.', 'error');
+      addToast(t('groupHook.error'), t('groupHook.removeSeatFailed'), 'error');
     }
   };
 
@@ -402,18 +402,20 @@ export function useGroupMembership({
       const raw = String(groupUsers[uid]?.income ?? '').replace(/[$,\s]/g, '');
       const n = raw === '' ? NaN : Number(raw);
       const income = Number.isFinite(n) ? n : null;
-      incomesByName[groupUsers[uid]?.name || 'Someone'] = income;
+      incomesByName[groupUsers[uid]?.name || t('common.someone')] = income;
       if (income != null) incomes[uid] = income;
     }
     const blocker = incomeRecalcBlocker(incomesByName);
     if (blocker) {
-      addToast('Cannot Recalculate', blocker, 'error');
+      addToast(t('groupHook.cannotRecalc'), blocker, 'error');
       return;
     }
     const reserved = pendingSeats(group).reduce((t, s) => t + s.split, 0);
     const defaultSplit = incomeRecalculatedShares(incomes, reserved);
     const summary = uids
-      .map((uid) => `${groupUsers[uid]?.name || 'Someone'} ${Math.round(defaultSplit[uid])}%`)
+      .map(
+        (uid) => `${groupUsers[uid]?.name || t('common.someone')} ${Math.round(defaultSplit[uid])}%`
+      )
       .join(' / ');
     try {
       await updateDoc(doc(db, 'groups', group.id), {
@@ -421,13 +423,13 @@ export function useGroupMembership({
         splitChange: splitChangeStamp(defaultSplit, group.availableSplits),
       });
       addToast(
-        'Split Updated',
-        `${summary}, from reported incomes. Applies to what you log from now on; past expenses keep their shares.`,
+        t('groupHook.splitUpdated'),
+        t('groupHook.splitFromIncomes', { summary }),
         'success'
       );
     } catch (e) {
       console.error('Failed to recalculate split', e);
-      addToast('Error', 'Could not update the split. Please try again.', 'error');
+      addToast(t('groupHook.error'), t('groupHook.splitUpdateFailed'), 'error');
     }
   };
 
@@ -464,14 +466,14 @@ export function useGroupMembership({
     if (!group || !activeGroupId) return false;
     const values = [...Object.values(joined), ...ghostSplits];
     if (values.some((v) => !Number.isFinite(v) || v < 0)) {
-      addToast('Check the split', 'Every share needs to be a number of at least 0%.', 'error');
+      addToast(t('groupHook.checkSplit'), t('groupHook.sharesNonNegative'), 'error');
       return false;
     }
     const total = values.reduce((t, v) => t + v, 0);
     if (Math.abs(total - 100) > 0.05) {
       addToast(
-        'Check the split',
-        `The shares add up to ${total.toFixed(1)}% — the household ratio has to cover exactly 100%.`,
+        t('groupHook.checkSplit'),
+        t('groupHook.sharesTotal', { total: total.toFixed(1) }),
         'error'
       );
       return false;
@@ -486,11 +488,11 @@ export function useGroupMembership({
         ...(nextAvailable.length ? { availableSplits: nextAvailable } : {}),
         splitChange: splitChangeStamp(joined, nextAvailable),
       });
-      addToast('Split Updated', 'The new ratio now applies to everything you log.', 'success');
+      addToast(t('groupHook.splitUpdated'), t('groupHook.newRatioApplies'), 'success');
       return true;
     } catch (e) {
       console.error('Failed to save default split', e);
-      addToast('Error', 'Could not update the split. Please try again.', 'error');
+      addToast(t('groupHook.error'), t('groupHook.splitUpdateFailed'), 'error');
       return false;
     }
   };

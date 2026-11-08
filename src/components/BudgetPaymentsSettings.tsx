@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wallet } from 'lucide-react';
 import { labelClass } from '../lib/ui';
 
@@ -35,14 +36,15 @@ export default function BudgetPaymentsSettings({
   savingHandles,
   handleSavePaymentHandles,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className={labelClass}>Budget & Payments</h3>
+        <h3 className={labelClass}>{t('budget.title')}</h3>
         <button
           onClick={() => setShowCherryPlus(true)}
           className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
-          title="About Cherry +"
+          title={t('form.aboutPlus')}
         >
           Cherry +
         </button>
@@ -50,17 +52,14 @@ export default function BudgetPaymentsSettings({
       <div className="bg-natural-sage/20 p-4 rounded-xl border border-natural-primary/20 space-y-4">
         <div>
           <label className={`${labelClass} block mb-1 flex items-center gap-2`}>
-            Spending threshold
+            {t('budget.threshold')}
             {!isPlus && (
               <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
                 Cherry +
               </span>
             )}
           </label>
-          <p className="text-xs text-natural-muted mb-2">
-            The most you want to owe on a single shared expense. Everyone on the expense gets a
-            heads-up when a split goes over it.
-          </p>
+          <p className="text-xs text-natural-muted mb-2">{t('budget.thresholdBody')}</p>
           {isPlus ? (
             <div>
               <div className="flex items-center gap-2">
@@ -73,7 +72,7 @@ export default function BudgetPaymentsSettings({
                     min="0"
                     value={thresholdInput}
                     onChange={(e) => setThresholdInput(e.target.value)}
-                    placeholder="Amount"
+                    placeholder={t('form.amountPlaceholder')}
                     className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
                   />
                 </div>
@@ -82,10 +81,10 @@ export default function BudgetPaymentsSettings({
                   disabled={savingThreshold}
                   className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg shrink-0 disabled:opacity-60"
                 >
-                  {savingThreshold ? 'Saving...' : 'Save'}
+                  {savingThreshold ? t('common.saving') : t('common.save')}
                 </button>
               </div>
-              <p className="text-xs text-natural-muted mt-1.5">0 turns it off.</p>
+              <p className="text-xs text-natural-muted mt-1.5">{t('budget.zeroOff')}</p>
             </div>
           ) : (
             <button
@@ -95,19 +94,16 @@ export default function BudgetPaymentsSettings({
               }}
               className="w-full py-2 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 rounded-lg transition-colors"
             >
-              Unlock with Cherry +
+              {t('budget.unlock')}
             </button>
           )}
         </div>
 
         <div className="border-t border-natural-primary/10 pt-3">
           <label className={`${labelClass} block mb-1 flex items-center gap-1.5`}>
-            <Wallet size={12} /> How people pay you
+            <Wallet size={12} /> {t('budget.howPeoplePay')}
           </label>
-          <p className="text-xs text-natural-muted mb-2">
-            Add your handles and group members get a one-tap way into Venmo or Zelle when they
-            settle up with you.
-          </p>
+          <p className="text-xs text-natural-muted mb-2">{t('budget.howPeoplePayBody')}</p>
           <div className="space-y-2">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -117,7 +113,7 @@ export default function BudgetPaymentsSettings({
                 type="text"
                 value={venmoInput}
                 onChange={(e) => setVenmoInput(e.target.value)}
-                placeholder="Venmo username"
+                placeholder={t('budget.venmoUsername')}
                 className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
               />
             </div>
@@ -125,7 +121,7 @@ export default function BudgetPaymentsSettings({
               type="text"
               value={zelleInput}
               onChange={(e) => setZelleInput(e.target.value)}
-              placeholder="Zelle email or phone"
+              placeholder={t('budget.zelleHandle')}
               className="w-full px-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
             />
             <button
@@ -133,7 +129,7 @@ export default function BudgetPaymentsSettings({
               disabled={savingHandles}
               className="w-full text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-4 py-2 rounded-lg disabled:opacity-60"
             >
-              {savingHandles ? 'Saving...' : 'Save Payment Info'}
+              {savingHandles ? t('common.saving') : t('budget.savePaymentInfo')}
             </button>
           </div>
         </div>

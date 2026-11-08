@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
+import { intlLocale, t as tr } from '../i18n';
 import { Sparkles, MessageCircleHeart, RefreshCcw } from 'lucide-react';
 import Modal from './Modal';
 import { authHeader } from '../firebase';
@@ -16,7 +18,7 @@ interface Props {
 const currency = (value: unknown): string | null => {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(intlLocale(), {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
@@ -25,13 +27,9 @@ const currency = (value: unknown): string | null => {
 
 // Reasonable openers if the AI call fails - picked by how large the gap is.
 const fallbackStarter = (severityPct: number) => {
-  if (severityPct >= 50) {
-    return 'It looks like the numbers you each had in mind are pretty far apart - that usually just means you haven\'t had the full conversation yet. Maybe start with: "What does a fair split feel like to you, and what would you want me to know about your situation?"';
-  }
-  if (severityPct >= 25) {
-    return 'The income estimates don\'t quite line up. A gentle way in: "I think I have been guessing at your numbers. Can we compare notes so the split feels fair to everyone?"';
-  }
-  return 'You\'re close, but not quite in sync on the numbers. Try: "Quick money check-in - want to make sure our split still matches reality?"';
+  if (severityPct >= 50) return tr('align.fallbackHigh');
+  if (severityPct >= 25) return tr('align.fallbackMid');
+  return tr('align.fallbackLow');
 };
 
 /**
@@ -46,6 +44,7 @@ export default function FinancialAlignmentModal({
   severityPct,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const [starter, setStarter] = useState<string | null>(null);
   const [loadingStarter, setLoadingStarter] = useState(true);
 
@@ -59,7 +58,7 @@ export default function FinancialAlignmentModal({
           body: JSON.stringify({
             severityPct: Math.round(severityPct),
             styles: members.map((m) => ({
-              name: m.name || 'Someone',
+              name: m.name || t('common.someone'),
               type: m.financialProfile?.type || '',
               communicationStyle: m.financialProfile?.communicationStyle || '',
             })),
@@ -81,14 +80,14 @@ export default function FinancialAlignmentModal({
   return (
     <Modal
       onClose={onClose}
-      title="Financial Alignment"
+      title={t('align.title')}
       icon={<Sparkles className="h-5 w-5 text-natural-primary" />}
       size="lg"
     >
       <div className="space-y-6">
         {/* Narrative profiles only - no scores, no quiz answers. */}
         <section>
-          <h3 className={`${labelClass} mb-2`}>Your Financial Styles</h3>
+          <h3 className={`${labelClass} mb-2`}>{t('align.yourStyles')}</h3>
           <div className="space-y-3">
             {members.map((m) => (
               <div
@@ -97,7 +96,7 @@ export default function FinancialAlignmentModal({
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-bold text-natural-text capitalize">
-                    {m.uid === activeUser ? 'You' : m.name || 'Someone'}
+                    {m.uid === activeUser ? t('common.you') : m.name || t('common.someone')}
                   </span>
                   {m.financialProfile?.type && (
                     <span className="text-xs font-semibold text-natural-primary text-right">
@@ -111,12 +110,12 @@ export default function FinancialAlignmentModal({
                   </p>
                 ) : (
                   <p className="text-sm text-natural-muted mt-1.5 italic">
-                    Hasn't finished the profile quiz yet.
+                    {t('align.notFinished')}
                   </p>
                 )}
                 {m.financialProfile?.communicationStyle && (
                   <p className="text-xs text-natural-muted mt-2 border-t border-natural-border/50 pt-2">
-                    <span className="font-semibold">Talking about money:</span>{' '}
+                    <span className="font-semibold">{t('align.talkingAboutMoney')}</span>{' '}
                     {m.financialProfile.communicationStyle}
                   </p>
                 )}
@@ -127,12 +126,12 @@ export default function FinancialAlignmentModal({
 
         {/* The raw numbers, side by side. */}
         <section>
-          <h3 className={`${labelClass} mb-2`}>What You Each Reported</h3>
+          <h3 className={`${labelClass} mb-2`}>{t('align.whatReported')}</h3>
           <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-xl p-4 space-y-3">
             {members.map((m) => {
               const own = currency(m.income);
               const estimate = currency(m.partnerIncome);
-              const label = m.uid === activeUser ? 'You' : m.name || 'Someone';
+              const label = m.uid === activeUser ? t('common.you') : m.name || t('common.someone');
               return (
                 <div
                   key={m.uid}
@@ -141,19 +140,17 @@ export default function FinancialAlignmentModal({
                   <span className="font-semibold text-natural-text capitalize">{label}</span>
                   <div className="mt-0.5 space-y-0.5">
                     <div className="flex justify-between text-natural-muted">
-                      <span>Reported own income</span>
+                      <span>{t('align.reportedOwn')}</span>
                       <span className="font-mono font-semibold text-natural-text">
-                        {own || 'Not shared'}
+                        {own || t('align.notShared')}
                       </span>
                     </div>
                     <div className="flex justify-between text-natural-muted">
                       <span>
-                        {members.length <= 2
-                          ? "Estimate of the other person's income"
-                          : "Estimate of others' income"}
+                        {members.length <= 2 ? t('align.estimateOther') : t('align.estimateOthers')}
                       </span>
                       <span className="font-mono font-semibold text-natural-text">
-                        {estimate || 'No estimate'}
+                        {estimate || t('align.noEstimate')}
                       </span>
                     </div>
                   </div>
@@ -161,21 +158,23 @@ export default function FinancialAlignmentModal({
               );
             })}
             <p className="text-xs text-natural-muted pt-1">
-              These differ by up to{' '}
-              <span className="font-mono font-bold">{Math.round(severityPct)}%</span> - that gap is
-              what triggered this check-in.
+              <Trans
+                i18nKey="align.differBy"
+                values={{ pct: Math.round(severityPct) }}
+                components={{ 1: <span className="font-mono font-bold" /> }}
+              />
             </p>
           </div>
         </section>
 
         {/* AI conversation starter, tuned to severity + styles. */}
         <section>
-          <h3 className={`${labelClass} mb-2`}>A Way to Start the Conversation</h3>
+          <h3 className={`${labelClass} mb-2`}>{t('align.wayToStart')}</h3>
           <div className="bg-white border border-natural-border rounded-xl p-4 flex gap-3 items-start shadow-sm">
             <MessageCircleHeart className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
             {loadingStarter ? (
               <div className="flex items-center gap-2 text-sm text-natural-muted">
-                <RefreshCcw className="h-4 w-4 animate-spin" /> Writing a starter for you...
+                <RefreshCcw className="h-4 w-4 animate-spin" /> {t('align.writing')}
               </div>
             ) : (
               <p className="text-sm text-natural-text leading-relaxed italic">{starter}</p>

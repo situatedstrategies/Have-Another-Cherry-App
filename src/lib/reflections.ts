@@ -17,17 +17,24 @@
 import { collection, doc, getDocs, query, where, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from './crypto';
+import { t } from '../i18n';
 
 export type ReflectionMood = 'sweet' | 'ripe' | 'mixed' | 'tart' | 'pit';
 
 // The cherry scale. Plain words, no scores: this is a journal, not a rating.
-export const REFLECTION_MOODS: { key: ReflectionMood; label: string; hint: string }[] = [
-  { key: 'sweet', label: 'Sweet', hint: 'Felt good' },
-  { key: 'ripe', label: 'Ripe', hint: 'Fair and easy' },
-  { key: 'mixed', label: 'Mixed', hint: 'A bit of both' },
-  { key: 'tart', label: 'Tart', hint: 'A little sore' },
-  { key: 'pit', label: 'Pit', hint: 'That one was hard' },
-];
+export const REFLECTION_MOODS: {
+  key: ReflectionMood;
+  readonly label: string;
+  readonly hint: string;
+}[] = (['sweet', 'ripe', 'mixed', 'tart', 'pit'] as const).map((key) => ({
+  key,
+  get label() {
+    return t(`reflect.mood.${key}`);
+  },
+  get hint() {
+    return t(`reflect.mood.${key}Hint`);
+  },
+}));
 
 export interface Reflection {
   id: string;
