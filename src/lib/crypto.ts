@@ -5,8 +5,29 @@ export async function hashString(str: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Derive an AES-GCM key from a password (e.g. group invite code)
-async function getEncryptionKey(password: string): Promise<CryptoKey> {
+// Derive an AES-GCM key from a password (e.g. group invite code).
+//
+// The derivation runs 100,000 rounds of PBKDF2, which costs tens of
+// milliseconds on a laptop and well over 100 ms on a mid-range phone. A group
+// load decrypts the current ledger, one archive document per month of history,
+// every queued transfer and each member's payment handles, and before this
+// cache every one of those calls derived the same key again from the same
+// password. The derived keys are kept in memory only, keyed by the password
+// text, so the same inputs give the same key with none of the repeat cost.
+const keyCache = new Map<string, Promise<CryptoKey>>();
+
+function getEncryptionKey(password: string): Promise<CryptoKey> {
+  let pending = keyCache.get(password);
+  if (!pending) {
+    pending = deriveEncryptionKey(password);
+    keyCache.set(password, pending);
+    // A failed derivation must not poison every later call.
+    pending.catch(() => keyCache.delete(password));
+  }
+  return pending;
+}
+
+async function deriveEncryptionKey(password: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',

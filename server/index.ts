@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createHash } from 'crypto';
 import express from 'express';
+import { existsSync } from 'fs';
 import path from 'path';
 import cors from 'cors';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -291,6 +292,40 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    // Serve the pre-compressed twin (scripts/precompress.mjs writes a .br and
+    // a .gz next to every bundle at build time) when the browser accepts it.
+    // App Hosting forwards bytes as sent, so without this every visitor
+    // downloaded the 3.4 MB bundle uncompressed before the sign-in form could
+    // appear. The Content-Type stays that of the original file; Vary tells
+    // caches the body depends on Accept-Encoding.
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      const accept = String(req.headers['accept-encoding'] || '');
+      const encoding = /\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null;
+      if (!encoding) return next();
+      const rel = path.normalize(decodeURIComponent(req.path));
+      if (rel.includes('..') || !/\.(js|mjs|css|svg|json|txt|xml|webmanifest|map)$/i.test(rel))
+        return next();
+      const ext = encoding === 'br' ? '.br' : '.gz';
+      const compressed = path.join(distPath, rel + ext);
+      if (!compressed.startsWith(distPath) || !existsSync(compressed)) return next();
+      const type = express.static.mime.lookup(rel);
+      res.setHeader(
+        'Content-Type',
+        type.startsWith('text/') || /javascript|json|xml|svg/.test(type)
+          ? `${type}; charset=UTF-8`
+          : type
+      );
+      res.setHeader('Content-Encoding', encoding);
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.setHeader(
+        'Cache-Control',
+        rel.includes('/assets/')
+          ? 'public, max-age=31536000, immutable'
+          : 'public, max-age=3600, must-revalidate'
+      );
+      res.sendFile(compressed);
+    });
     app.use(
       express.static(distPath, {
         setHeaders: (res, filePath) => {

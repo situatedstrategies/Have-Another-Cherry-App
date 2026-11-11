@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { formatCurrency } from './lib/format';
@@ -30,7 +30,6 @@ import ExpenseList from './components/ExpenseList';
 import AuthScreen from './components/AuthScreen';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
-import MonthlyComparisonChart from './components/MonthlyComparisonChart';
 import GroupSetup from './components/GroupSetup';
 import LegalModal, { LegalDoc } from './components/LegalModal';
 import SettingsModal from './components/SettingsModal';
@@ -46,6 +45,10 @@ import OrchardMode from './components/OrchardMode';
 import CherryPlusModal from './components/CherryPlusModal';
 import OwedBreakdownModal from './components/OwedBreakdownModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
+
+// The chart pulls in recharts (about 240 KB gzipped), which only the signed-in
+// dashboard uses, so it loads after sign-in instead of before the sign-in form.
+const MonthlyComparisonChart = lazy(() => import('./components/MonthlyComparisonChart'));
 import {
   Plus,
   Sparkles,
@@ -674,10 +677,12 @@ export default function App() {
               {/* Gated: month-over-month is on the paywall as "Insights and monthly trends". */}
               {isPlus && (
                 <ModuleBoundary label={t('app.monthlyTrends')}>
-                  <MonthlyComparisonChart
-                    expenses={statsVisibleExpenses}
-                    members={getFullMembers(group)}
-                  />
+                  <Suspense fallback={null}>
+                    <MonthlyComparisonChart
+                      expenses={statsVisibleExpenses}
+                      members={getFullMembers(group)}
+                    />
+                  </Suspense>
                 </ModuleBoundary>
               )}
             </div>
