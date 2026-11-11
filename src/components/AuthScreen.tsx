@@ -16,7 +16,7 @@ import { analytics } from '@heycatch/sdk';
 import { Trans, useTranslation } from 'react-i18next';
 import { t } from '../i18n';
 import LanguageSelect from './LanguageSelect';
-import { auth, db, applyKeepSignedIn } from '../firebase';
+import { auth, db, applyKeepSignedIn, ensureAppCheck } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -304,6 +304,14 @@ export default function AuthScreen() {
       // Long timeout: the user may legitimately spend time in the popup. If the
       // popup completes but can never message back (blocked cross-site storage),
       // this unfreezes the UI with an actionable error instead of hanging.
+      //
+      // App Check was held back for this click (see firebase.ts) so the
+      // window could open at once. Start it as soon as the window has
+      // focus, which is after it opened, so the token is fetched while the
+      // user is choosing an account rather than after they come back. The
+      // timer covers a browser that opens the window without moving focus.
+      window.addEventListener('blur', ensureAppCheck, { once: true });
+      setTimeout(ensureAppCheck, 3_000);
       const result = await withTimeout(signInWithPopup(auth, provider), 90_000);
       // Record consent for brand-new accounts (the provider already verified
       // the email address).
@@ -756,6 +764,7 @@ export default function AuthScreen() {
                   <div className="sm:pt-1">
                     <button
                       onClick={handleAppleAuth}
+                      data-defer-appcheck
                       type="button"
                       disabled={loading}
                       className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-black/85 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed text-sm mb-3"
@@ -771,6 +780,7 @@ export default function AuthScreen() {
 
                     <button
                       onClick={handleGoogleAuth}
+                      data-defer-appcheck
                       type="button"
                       disabled={loading}
                       className="w-full bg-white border border-natural-border text-natural-text font-medium py-2 px-4 rounded-md hover:bg-natural-sidebar transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed text-sm"

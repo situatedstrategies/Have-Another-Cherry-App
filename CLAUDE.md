@@ -188,3 +188,4 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Never commit secrets. Secrets go in Secret Manager and are referenced from `apphosting.yaml`.
 - Don't hardcode a Gemini API key. Use Vertex + ADC.
 - Keep `PORT` as `Number(process.env.PORT) || 3000` in `server/index.ts`.
+- App Check is not enforced on Firebase Authentication (checked November 11th 2026). The Google and Apple buttons (`data-defer-appcheck` in `AuthScreen.tsx`) therefore do not start App Check: Firebase waits for an App Check token before opening the sign-in window, and that wait froze the buttons on "Waiting for Google" behind reCAPTCHA. If App Check enforcement is ever turned on for Authentication, remove that exception in `src/firebase.ts` first, or Google and Apple sign-in will be refused.

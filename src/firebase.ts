@@ -83,7 +83,20 @@ function sessionLikelyRestoring(): boolean {
 if (import.meta.env.DEV || appCheckDebugToken || sessionLikelyRestoring()) {
   ensureAppCheck();
 } else if (typeof window !== 'undefined') {
-  const start = () => {
+  const start = (event: Event) => {
+    // Not from the Google and Apple buttons. Firebase builds the sign-in
+    // window's address with an App Check token, so once App Check has
+    // started, the window waits for reCAPTCHA to score the visitor (and for
+    // any puzzle it shows) before it can open. Started by the button press
+    // itself, that wait sat on "Waiting for Google..." for seconds, and the
+    // window then opened too long after the click for the browser to allow
+    // it. Sign-in does not enforce App Check (checked November 11th 2026:
+    // Firebase signs in with no token), so these buttons leave App Check to
+    // start once the user is signed in, below, before any Firestore read.
+    // If App Check enforcement is ever turned on for Authentication, remove
+    // this exception, or Google and Apple sign-in will be refused.
+    const target = event.target;
+    if (target instanceof Element && target.closest('[data-defer-appcheck]')) return;
     ensureAppCheck();
     for (const type of ['pointerdown', 'keydown', 'focusin'] as const) {
       window.removeEventListener(type, start, true);
