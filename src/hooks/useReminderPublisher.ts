@@ -36,6 +36,10 @@ export function useReminderPublisher({
   useEffect(() => {
     if (!groupId || !isPlus) return;
     const unsub = onSnapshot(doc(db, 'group_vault', groupId), async (snap) => {
+      // Publish from the server's copy only. The offline cache can hold a
+      // vault from an earlier visit, and publishing from it would rewrite the
+      // reminder index with old bills until the server answered.
+      if (snap.metadata.fromCache) return;
       try {
         const payload = snap.data()?.payload;
         const decrypted = payload ? await decryptData(payload, groupId) : null;

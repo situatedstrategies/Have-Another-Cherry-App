@@ -57,8 +57,8 @@ export function useProfileSettings({
   const [savingHandles, setSavingHandles] = useState(false);
 
   // The profile is a LIVE listener, not a one-shot read, so entitlement
-  // writes that land after sign-in — the RevenueCat webhook, plus-promo-sync,
-  // a purchase made on another device or platform — reach this session
+  // writes that land after sign-in: the RevenueCat webhook, plus-promo-sync,
+  // a purchase made on another device or platform. They reach this session
   // immediately. Cherry+ follows the account, whichever group is active.
   const profileBackfilledRef = useRef<string | null>(null);
   useEffect(() => {
@@ -68,11 +68,16 @@ export function useProfileSettings({
     const unsubscribe = onSnapshot(
       doc(db, 'users', currentUser.uid),
       (userDoc) => {
+        // Read before exists(): that guard narrows the snapshot type.
+        const fromCache = userDoc.metadata.fromCache;
         if (userDoc.exists()) {
           const profile = userDoc.data() as any;
           // One-time backfills per sign-in; the writes echo back through this
           // same listener, so guard against re-running them on every snapshot.
-          if (profileBackfilledRef.current !== currentUser.uid) {
+          // Only on a snapshot the server confirmed: a copy from the offline
+          // cache can be from an earlier visit, and migrating from it could
+          // write old group ids over newer ones.
+          if (!fromCache && profileBackfilledRef.current !== currentUser.uid) {
             profileBackfilledRef.current = currentUser.uid;
             // Backfill a missing name from the sign-in display name.
             if (
@@ -104,6 +109,11 @@ export function useProfileSettings({
           }
           setUserProfile(profile);
         } else {
+          // A miss served from cache is not a missing profile: the server has
+          // not answered yet (first visit with the offline cache, or offline).
+          // Treating it as one would put an existing user on the profile setup
+          // screen, and saving that screen would overwrite their profile.
+          if (fromCache) return;
           setUserProfile({}); // Setup required
         }
         setIsLoading(false);

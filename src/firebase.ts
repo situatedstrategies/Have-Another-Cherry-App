@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import {
   initializeAuth,
   setPersistence,
@@ -65,7 +70,8 @@ function sessionLikelyRestoring(): boolean {
     for (const store of [sessionStorage, localStorage]) {
       for (let i = 0; i < store.length; i++) {
         const key = store.key(i) || '';
-        if (key.startsWith('firebase:authUser:') || key.startsWith('firebase:pendingRedirect')) return true;
+        if (key.startsWith('firebase:authUser:') || key.startsWith('firebase:pendingRedirect'))
+          return true;
       }
     }
   } catch {
@@ -88,14 +94,12 @@ if (import.meta.env.DEV || appCheckDebugToken || sessionLikelyRestoring()) {
   }
 }
 
-// Initialize Firestore with the custom database ID as the third argument
-export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId);
-
 // Staying signed in across visits is opt-in, not the default. Firebase's
 // default (local) persistence silently restored the previous Google or email
 // session on every visit, which read as "the app logged me in without asking".
 // Now a session only survives the browser tab unless the user ticked "keep me
 // signed in" at login; that choice is remembered here and cleared on sign-out.
+// Defined above Firestore because the cache choice below depends on it.
 const KEEP_SIGNED_IN_KEY = 'hac:keepSignedIn';
 
 export function getKeepSignedIn(): boolean {
@@ -105,6 +109,50 @@ export function getKeepSignedIn(): boolean {
     return false;
   }
 }
+
+// Offline cache. With "keep me signed in" on, Firestore keeps a copy of the
+// documents this browser has read in IndexedDB, so a repeat visit shows the
+// profile and the household straight from disk while the server confirms in
+// the background, instead of waiting on a round trip for each one. Without
+// it the cache stays in memory, as before: someone who did not ask to be
+// remembered on this browser leaves nothing behind on its disk.
+//
+// The two must never disagree, so the cache follows the sign-in choice as it
+// stood when the page loaded. Ticking the box at sign-in takes effect on the
+// next visit; signing out wipes the disk copy (see below).
+export const offlineCacheEnabled = getKeepSignedIn() && typeof indexedDB !== 'undefined';
+
+// Initialize Firestore with the custom database ID as the third argument
+export const db = initializeFirestore(
+  app,
+  {
+    localCache: offlineCacheEnabled
+      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      : memoryLocalCache(),
+  },
+  firebaseConfig.firestoreDatabaseId
+);
+
+// A page that loads without the disk cache deletes any copy a kept session
+// left behind (the user signed out, or the session ended). Done directly on
+// IndexedDB, not with Firestore's clearIndexedDbPersistence: that runs on
+// Firestore's own work queue, so a delete held up by another open tab would
+// stall every read behind it. Here a held-up delete just waits on its own.
+// Only Firestore's databases are touched (their names start "firestore/"),
+// never Auth's, App Check's or anything else's.
+async function removeLeftoverFirestoreCache(): Promise<void> {
+  try {
+    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return;
+    for (const { name } of await indexedDB.databases()) {
+      if (name && name.startsWith('firestore/') && name.includes(firebaseConfig.projectId)) {
+        indexedDB.deleteDatabase(name);
+      }
+    }
+  } catch {
+    // Nothing to clean up, or no access to IndexedDB: either way, carry on.
+  }
+}
+if (!offlineCacheEnabled) void removeLeftoverFirestoreCache();
 
 // Record the user's choice and apply it to future sign-ins in this page load.
 // Called right before a sign-in attempt (email or Google), and before the
@@ -150,6 +198,26 @@ export const auth = initializeAuth(app, {
 onAuthStateChanged(auth, (user) => {
   if (user) ensureAppCheck();
 });
+
+// Leaving a kept session reloads the page. Every way out counts (sign out,
+// account deletion, a session that expired, or signing out in another tab,
+// which signs this one out too), so the flag is cleared here as well, and the
+// reload comes back without the disk cache and deletes the copy (above).
+// Reloading also matters for other open tabs: deleting the cache shuts down
+// any Firestore client still using it, and a tab left on the login screen
+// with a shut-down client could not sign in again until it was reloaded.
+if (offlineCacheEnabled && typeof window !== 'undefined') {
+  let hadUser = false;
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      hadUser = true;
+      return;
+    }
+    if (!hadUser) return;
+    forgetKeepSignedIn();
+    window.location.reload();
+  });
+}
 
 // Build the Authorization header for calls to our authenticated API endpoints.
 // Returns {} when signed out so callers degrade gracefully.

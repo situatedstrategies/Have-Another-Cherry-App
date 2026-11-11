@@ -32,7 +32,6 @@ import CherryLogo from './CherryLogo';
 // Eligibility is 13+ (parent or guardian permission under 18) and signup records an age attestation.
 const TERMS_VERSION = '2026-09-02';
 
-
 // Firebase folds an unknown address and a wrong password into one error, so a
 // failed sign-in asks the server whether the address has an account and which
 // sign-in methods it has. Null means the check itself failed.
@@ -100,16 +99,52 @@ function friendlyAuthError(err: any): string {
   }
 }
 
+// True while a reCAPTCHA image challenge is open on the page. App Check's
+// reCAPTCHA Enterprise key can answer a low score with a puzzle, and every
+// sign-in request waits for App Check, so it waits on the puzzle too. The
+// challenge lives in a "bframe" iframe that reCAPTCHA keeps in the page,
+// hidden, between challenges; it counts only while it is visible.
+function recaptchaChallengeOpen(): boolean {
+  try {
+    return Array.from(document.querySelectorAll('iframe')).some((frame) => {
+      if (!/recaptcha/.test(frame.src) || !/bframe/.test(frame.src)) return false;
+      const box = frame.getBoundingClientRect();
+      return (
+        getComputedStyle(frame).visibility === 'visible' &&
+        box.width > 0 &&
+        box.height > 0 &&
+        box.bottom > 0 &&
+        box.top < window.innerHeight
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+// The longest a puzzle can hold the timeout open. reCAPTCHA expires a
+// challenge after two minutes, so this only stops a page that was left open.
+const CHALLENGE_GRACE_MS = 5 * 60_000;
+
 // Rejects if the auth call neither resolves nor rejects within `ms`, so the UI
 // can recover instead of sitting on "Please wait..." forever. If the underlying
 // sign-in still completes later, onAuthStateChanged picks it up regardless.
+// The clock pauses while a reCAPTCHA puzzle is open: before, someone still
+// working through one was told the server could not be reached.
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
+    const giveUpAt = Date.now() + ms + CHALLENGE_GRACE_MS;
+    let timer: ReturnType<typeof setTimeout>;
+    const expire = () => {
+      if (recaptchaChallengeOpen() && Date.now() < giveUpAt) {
+        timer = setTimeout(expire, 5_000);
+        return;
+      }
       const err: any = new Error('Sign-in timed out');
       err.code = 'auth/ui-timeout';
       reject(err);
-    }, ms);
+    };
+    timer = setTimeout(expire, ms);
     promise.then(
       (v) => {
         clearTimeout(timer);
@@ -127,7 +162,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // Sign-up goes straight from the browser to Firebase Auth with no server
 // route of ours in the path, so the client is the only side that knows.
 // Identify first so the event attaches to the person, not an anonymous one.
-function reportSignupCompleted(user: { uid: string; email: string | null; displayName: string | null }) {
+function reportSignupCompleted(user: {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}) {
   analytics.setIdentity(user.uid, {
     ...(user.email ? { email: user.email } : {}),
     ...(user.displayName ? { name: user.displayName } : {}),
@@ -488,7 +527,9 @@ export default function AuthScreen() {
               button meant hunting for the form you had already asked for. */}
                 {isReset ? (
                   <div className="text-center mb-6">
-                    <h2 className="text-sm font-medium text-natural-muted">{t('auth.resetYourPassword')}</h2>
+                    <h2 className="text-sm font-medium text-natural-muted">
+                      {t('auth.resetYourPassword')}
+                    </h2>
                   </div>
                 ) : (
                   <div
@@ -538,9 +579,7 @@ export default function AuthScreen() {
 
                 <form onSubmit={handleEmailAuth} className="space-y-4 mb-6 sm:mb-0">
                   {isReset && (
-                    <p className="text-sm text-natural-muted -mt-1">
-                      {t('auth.resetExplainer')}
-                    </p>
+                    <p className="text-sm text-natural-muted -mt-1">{t('auth.resetExplainer')}</p>
                   )}
 
                   {!isLogin && !isReset && (
@@ -708,7 +747,9 @@ export default function AuthScreen() {
                       <div className="w-full border-t border-natural-border sm:w-px sm:border-t-0 sm:border-l"></div>
                     </div>
                     <div className="relative flex justify-center text-xs sm:items-center sm:h-full">
-                      <span className="px-2 bg-white text-natural-muted sm:py-2">{t('common.or')}</span>
+                      <span className="px-2 bg-white text-natural-muted sm:py-2">
+                        {t('common.or')}
+                      </span>
                     </div>
                   </div>
 
