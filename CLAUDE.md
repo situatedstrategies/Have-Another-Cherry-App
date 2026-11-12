@@ -124,7 +124,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 
 - Fonts: Inter (body), Lora (serif, used for display/headings via `font-display`), JetBrains Mono (numbers/code).
 - Palette (Tailwind `natural-*` tokens defined in `src/index.css`): cherry red `#C41200` (primary accent), text `#18181B`, background `#F4F4F5`, borders `#D4D4D8`, muted `#52525B`. Aesthetic: minimal, high-contrast.
-- Logo: the Two Cherries two-cherry mark. `/logo.svg` (an SVG wrapping the transparent PNG, used by `CherryLogo`), `/icon.svg` (the cream icon tile, favicon), `/cherry2transparent.png` (200px transparent mark for emails and the gate page), all in `public/`. The old single-cherry files and the Squarespace logo URL are dead - do not use them.
+- Logo: the full Two Cherries app icon tile with rounded corners (the owner asked for the full icon, not the cut-out mark, November 12th 2026). `/logo.svg` (SVG wrapping the 400px tile, used by `CherryLogo`), `/icon.svg` (256px tile, favicon), `/cherry2transparent.png` (200px tile for emails and the gate page), all in `public/`. The old single-cherry files and the Squarespace logo URL are dead - do not use them.
 
 ## Deploy flow
 

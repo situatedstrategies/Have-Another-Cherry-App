@@ -1,4 +1,4 @@
-// Brand logo: the Two Cherries mark (public/logo.svg wraps the transparent PNG). The email
+// Brand logo: the full Two Cherries icon tile (public/logo.svg wraps the rounded PNG). The email
 // templates keep the PNG mark for email-client support.
 import { useTranslation } from 'react-i18next';
 
