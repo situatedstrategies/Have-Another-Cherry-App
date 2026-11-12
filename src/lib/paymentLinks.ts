@@ -25,7 +25,7 @@ export function venmoTarget(username: string, amount: number, note: string): Pay
     audience: 'private',
     recipients: handle,
     amount: sanitizeAmount(amount),
-    note: note.slice(0, 140) || 'Have Another Cherry settle-up',
+    note: note.slice(0, 140) || 'Two Cherries settle-up',
   });
   return {
     method: 'venmo',

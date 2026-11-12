@@ -1,6 +1,6 @@
 {
-  "name": "Have Another Cherry",
-  "short_name": "Cherry",
+  "name": "Two Cherries",
+  "short_name": "Two Cherries",
   "description": "Split shared household expenses, sweetly.",
   "start_url": "/",
   "scope": "/",

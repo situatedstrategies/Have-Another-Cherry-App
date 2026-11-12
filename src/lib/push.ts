@@ -79,7 +79,7 @@ export async function listenForegroundPush(
   try {
     return onMessage(getMessaging(app), (payload) => {
       const n = payload.notification;
-      if (n?.title || n?.body) cb(n?.title || 'Have Another Cherry', n?.body || '');
+      if (n?.title || n?.body) cb(n?.title || 'Two Cherries', n?.body || '');
     });
   } catch {
     return () => {};

@@ -262,8 +262,7 @@ router.post(
 // the push body is fixed. "Tomorrow" is computed in REMINDER_TZ_OFFSET_HOURS
 // for everyone: per-household zones would mean the server learning where
 // people live.
-const REMINDER_BODY =
-  'A household bill is due tomorrow. Open Have Another Cherry to see the details.';
+const REMINDER_BODY = 'A household bill is due tomorrow. Open Two Cherries to see the details.';
 
 router.post(
   '/api/send-bill-reminders',

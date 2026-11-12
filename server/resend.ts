@@ -10,7 +10,7 @@ const EMAIL_COMPLIANCE_FOOTER = `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
   <tr><td align="center" style="padding:18px 24px 30px 24px;font-family:'Inter',Helvetica,Arial,sans-serif;">
     <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
-      You're receiving this because you use Have Another Cherry, or someone invited you.
+      You're receiving this because you use Two Cherries, or someone invited you.
       We save your email address to service your account and nothing more: we never sell it or share it.
     </p>
     <p style="margin:0 0 6px 0;font-size:11px;color:#71717A;line-height:1.6;">
@@ -126,9 +126,9 @@ export async function sendInviteEmail(
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
     replyTo: REPLY_TO_HELP,
-    from: 'Have Another Cherry <poolside@haveanothercherry.com>',
+    from: 'Two Cherries <poolside@haveanothercherry.com>',
     to: [email],
-    subject: safeFrom + ' invited you to ' + groupName + ' on Have Another Cherry',
+    subject: safeFrom + ' invited you to ' + groupName + ' on Two Cherries',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -176,9 +176,9 @@ export async function sendVerificationEmail(
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
     replyTo: REPLY_TO_HELP,
-    from: 'Have Another Cherry <verify@haveanothercherry.com>',
+    from: 'Two Cherries <verify@haveanothercherry.com>',
     to: [email],
-    subject: 'Confirm your email for Have Another Cherry',
+    subject: 'Confirm your email for Two Cherries',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -221,9 +221,9 @@ export async function sendResetEmail(email: string, resetLink: string, recipient
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
     replyTo: REPLY_TO_HELP,
-    from: 'Have Another Cherry <reset@haveanothercherry.com>',
+    from: 'Two Cherries <reset@haveanothercherry.com>',
     to: [email],
-    subject: 'Reset your Have Another Cherry password',
+    subject: 'Reset your Two Cherries password',
     html: withComplianceFooter(htmlContent),
   });
 
@@ -250,7 +250,7 @@ export async function sendWaitlistNotification(subscriberEmail: string) {
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
     replyTo: REPLY_TO_HELP,
-    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    from: 'Two Cherries <notifications@haveanothercherry.com>',
     to: 'poolside@haveanothercherry.com',
     subject: 'Cherry + waitlist signup',
     text:
@@ -285,7 +285,7 @@ export async function sendBetaSignupNotification(signup: {
 
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
-    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    from: 'Two Cherries <notifications@haveanothercherry.com>',
     to: 'poolside@haveanothercherry.com',
     replyTo: signup.email,
     subject: `Beta signup: ${signup.name || signup.email}`,
@@ -333,7 +333,7 @@ export async function sendReminderEmail(
     <div style="max-width:520px; margin:0 auto; background:#FFFFFF; border:1px solid #D4D4D8; border-radius:16px; padding:32px;">
       <h1 style="font-family: Georgia, serif; font-size:22px; color:#18181B; margin:0 0 16px;">A gentle nudge from ${groupName}</h1>
       <p style="color:#52525B; font-size:14.5px; line-height:1.6; margin:0 0 16px;">
-        Hi ${toName || 'there'}, ${fromName} sent a friendly reminder from Have Another Cherry.
+        Hi ${toName || 'there'}, ${fromName} sent a friendly reminder from Two Cherries.
         There's an open balance waiting for you in ${groupName}. No rush and no pressure:
         this is just the app doing the asking so nobody has to.
       </p>
@@ -341,18 +341,18 @@ export async function sendReminderEmail(
         For your privacy, this email never includes amounts or expense details.
         Open the app to see exactly what's open and settle in a tap.
       </p>
-      <a href="https://app.haveanothercherry.com" style="display:inline-block; background:#C41200; color:#ffffff; font-size:14px; font-weight:bold; padding:12px 24px; border-radius:999px; text-decoration:none;">Open Have Another Cherry</a>
+      <a href="https://app.haveanothercherry.com" style="display:inline-block; background:#C41200; color:#ffffff; font-size:14px; font-weight:bold; padding:12px 24px; border-radius:999px; text-decoration:none;">Open Two Cherries</a>
       <p style="color:#71717A; font-size:11.5px; line-height:1.6; margin:20px 0 0;">
         Pay what you can, when you can. If you've already settled up, you can ignore this note: balances update as soon as payments are confirmed.
       </p>
     </div>
-    <p style="text-align:center; color:#71717A; font-size:11px; margin:16px 0 0;">Have Another Cherry. Split fairly. Settle easily.</p>
+    <p style="text-align:center; color:#71717A; font-size:11px; margin:16px 0 0;">Two Cherries. Split fairly. Settle easily.</p>
   </div>`;
 
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
     replyTo: REPLY_TO_HELP,
-    from: 'Have Another Cherry <tartcherry@haveanothercherry.com>',
+    from: 'Two Cherries <tartcherry@haveanothercherry.com>',
     to: toEmail,
     subject: `A gentle reminder from ${fromName} (${groupName})`,
     html: withComplianceFooter(html),
@@ -391,7 +391,7 @@ export async function sendSupportRequest(request: {
 
   const { data, error } = await resend.emails.send({
     headers: DELIVERABILITY_HEADERS,
-    from: 'Have Another Cherry <notifications@haveanothercherry.com>',
+    from: 'Two Cherries <notifications@haveanothercherry.com>',
     to: 'help@haveanothercherry.com',
     replyTo: request.fromEmail,
     subject: `[Support] ${request.fromEmail}`,

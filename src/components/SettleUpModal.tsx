@@ -99,9 +99,7 @@ export default function SettleUpModal({
       const min = expense.blindMin || 0.01;
       const max = expense.blindMax || Number.MAX_SAFE_INTEGER;
       if (amount < min || amount > max) {
-        setError(
-          t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) })
-        );
+        setError(t('settle.darkRange', { min: formatCurrency(min), max: formatCurrency(max) }));
         return;
       }
     } else {
@@ -127,7 +125,7 @@ export default function SettleUpModal({
   // handle, Venmo opens prefilled; otherwise the button still gets them there.
   const recipientHandles = paymentHandlesByUid?.[expense.paidBy] || {};
   const payAmount = roundCurrency(Number(amountToPay) || 0);
-  const payNote = `Have Another Cherry: ${expense.title}`.slice(0, 140);
+  const payNote = `Two Cherries: ${expense.title}`.slice(0, 140);
   const venmo = recipientHandles.venmo
     ? venmoTarget(recipientHandles.venmo, payAmount, payNote)
     : null;
@@ -315,9 +313,7 @@ export default function SettleUpModal({
                     />
                   </>
                 ) : (
-                  <>
-                    {t('settle.venmoNoHandle')}
-                  </>
+                  <>{t('settle.venmoNoHandle')}</>
                 )}
               </p>
               <a
@@ -352,9 +348,7 @@ export default function SettleUpModal({
                   </button>
                 </div>
               ) : (
-                <p className="text-xs text-natural-muted">
-                  {t('settle.zelleNoHandle')}
-                </p>
+                <p className="text-xs text-natural-muted">{t('settle.zelleNoHandle')}</p>
               )}
               <a
                 href="https://www.zellepay.com/"

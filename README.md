@@ -1,4 +1,4 @@
-# Have Another Cherry
+# Two Cherries
 
 The app that makes sharing expenses sweeter. A household expense-splitter: create a group, set a percentage split, log shared expenses, settle up. Includes AI receipt scanning and a financial-profile quiz.
 

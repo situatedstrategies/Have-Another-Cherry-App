@@ -106,7 +106,7 @@ router.post('/api/assessment', requireAuth, rateLimit('assessment', 10), async (
   try {
     const { ai, Type } = await getVertexClient();
     const prompt =
-      'You are a warm, non-judgmental analyst for "Have Another Cherry", an app for people who ' +
+      'You are a warm, non-judgmental analyst for "Two Cherries", an app for people who ' +
       'share expenses without sharing money. Read these setup quiz answers as a whole and write a ' +
       `short assessment in ${LANGUAGE_NAMES[language]}, in the second person.\n\n` +
       'Quiz answers (JSON, option values):\n' +
@@ -115,7 +115,7 @@ router.post('/api/assessment', requireAuth, rateLimit('assessment', 10), async (
       (groupsExpected ? `\nGroups they expect to share money with: ${groupsExpected}` : '') +
       (troubles ? `\nWhat usually goes wrong for them, in their words: ${troubles}` : '') +
       '\n\nRules: never give investment, credit, tax or legal advice; never mention amounts of ' +
-      'money; keep the brand names Have Another Cherry, Cherry +, Dark Cherry and Household Vault ' +
+      'money; keep the brand names Two Cherries, Cherry +, Dark Cherry and Household Vault ' +
       'in English; use no em dashes or en dashes anywhere. Return ONLY valid JSON with: ' +
       'style (a 2 to 4 word name for how this person handles shared money), ' +
       'summary (three or four sentences), strengths (2 to 4 short phrases), ' +
@@ -154,7 +154,14 @@ router.post('/api/assessment', requireAuth, rateLimit('assessment', 10), async (
             reminderCadence: { type: Type.STRING },
             conversationOpeners: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ['style', 'summary', 'strengths', 'watchFor', 'suggestedSplit', 'reminderCadence'],
+          required: [
+            'style',
+            'summary',
+            'strengths',
+            'watchFor',
+            'suggestedSplit',
+            'reminderCadence',
+          ],
         },
       },
     });
