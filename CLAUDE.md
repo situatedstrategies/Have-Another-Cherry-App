@@ -1,10 +1,10 @@
-# CLAUDE.md - Have Another Cherry
+# CLAUDE.md - Two Cherries
 
 Project context for Claude Code. Read this first before making changes.
 
 ## What this is
 
-A household expense-splitter web app ("Have Another Cherry"). Users create a group, set a percentage split between members, log shared expenses, and settle up. There's also AI receipt scanning and a financial-profile quiz.
+A household expense-splitter web app ("Two Cherries"). Users create a group, set a percentage split between members, log shared expenses, and settle up. There's also AI receipt scanning and a financial-profile quiz.
 
 ## Stack
 
@@ -118,7 +118,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - i18next + react-i18next. Strings live in `src/locales/{en,ru,es}/translation.json` (one namespace, nested keys such as `settings.signOut`). Components use `useTranslation()` and `<Trans>`; non-React helpers import `t` from `src/i18n.ts`. Never hard-code user-visible English in `src/`; add a key to all three files instead.
 - Language follows `navigator.languages` unless picked in Settings or on the sign-in screen (`LanguageSelect`), remembered in localStorage under `hac_locale` and written to `users/{uid}.locale`. English is the fallback. `src/i18n.ts` sets `<html lang>`.
 - Numbers, currency and dates go through `src/lib/format.ts` (`formatCurrency`, `formatAmount`, `formatDate`, `formatDateWith`, ...), which read the active locale. Do not call `toLocaleString('en-US')` directly.
-- Russian needs the `_one/_few/_many/_other` plural forms; Spanish and English use `_one/_other`. Brand names (Have Another Cherry, Cherry +, Dark Cherry, Household Vault, Venmo, Zelle) stay untranslated. Server emails are not localized yet; the `locale` field on the profile is there for when they are.
+- Russian needs the `_one/_few/_many/_other` plural forms; Spanish and English use `_one/_other`. Brand names (Two Cherries, Cherry +, Dark Cherry, Household Vault, Venmo, Zelle) stay untranslated. Server emails are not localized yet; the `locale` field on the profile is there for when they are.
 
 ## Design system (match this for UI work)
 

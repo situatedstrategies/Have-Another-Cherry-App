@@ -65,7 +65,7 @@ export const CHERRY_ERRORS: Record<ErrorName, CherryError> = {
  *  browser - plus a describe-what-happened prompt. */
 export function supportMailto(error?: CherryError, screen?: string, detail?: string): string {
   const lines = [
-    'Hi Have Another Cherry team,',
+    'Hi Two Cherries team,',
     '',
     "Something went wrong and I'd like help.",
     '',
@@ -80,7 +80,7 @@ export function supportMailto(error?: CherryError, screen?: string, detail?: str
   ];
   if (detail) lines.push(`Detail: ${detail}`);
   const params = new URLSearchParams({
-    subject: `[Have Another Cherry] ${error?.code ?? t('errors.supportSubject')}`,
+    subject: `[Two Cherries] ${error?.code ?? t('errors.supportSubject')}`,
     body: lines.join('\n'),
   });
   return `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`;

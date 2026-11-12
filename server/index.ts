@@ -107,7 +107,7 @@ async function startServer() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Have Another Cherry</title>
+<title>Two Cherries</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -141,9 +141,9 @@ async function startServer() {
 </head>
 <body>
   <div class="card">
-    <img src="/cherry2transparent.png" alt="Have Another Cherry">
+    <img src="/cherry2transparent.png" alt="Two Cherries">
     <h1>You're early. Sweet.</h1>
-    <p>Have Another Cherry isn't open to everyone just yet. If you have the site password, come on in.</p>
+    <p>Two Cherries isn't open to everyone just yet. If you have the site password, come on in.</p>
     ${wrongPassword ? '<p class="err">That password is not correct. Try again.</p>' : ''}
     <form method="POST" action="/gate/unlock">
       <input type="password" name="password" placeholder="Site password" autofocus required autocomplete="current-password">

@@ -55,11 +55,13 @@ const appendGeneratedProfile = async (profile: Record<string, unknown>) => {
   try {
     await ensureAdminApp();
     const { getFirestore } = await import('firebase-admin/firestore');
-    await getFirestore().collection('profile_log').add({
-      ...profile,
-      createdAt: new Date().toISOString(),
-      source: 'ai',
-    });
+    await getFirestore()
+      .collection('profile_log')
+      .add({
+        ...profile,
+        createdAt: new Date().toISOString(),
+        source: 'ai',
+      });
   } catch (e: any) {
     // Profile generation should still succeed if catalog logging is unavailable.
     console.error('profile_log append failed:', e?.message || e);
@@ -308,7 +310,7 @@ router.post('/api/generate-profile', requireAuth, rateLimit('profile', 30), asyn
     const { ai, Type } = await getVertexClient();
 
     const prompt =
-      'You are a behavioral-economics-informed relationship finance analyst for "Have Another Cherry", ' +
+      'You are a behavioral-economics-informed relationship finance analyst for "Two Cherries", ' +
       'a warm, non-judgmental household expense-splitting app.\n\n' +
       "Analyze these quiz answers HOLISTICALLY and as an INTERCONNECTED whole - for example, how the person's " +
       'credit-card and cash habits relate to how they feel about money, and to how they prefer to talk about it. ' +
@@ -405,7 +407,7 @@ router.post('/api/generate-greeting', requireAuth, rateLimit('greeting', 60), as
           : `a household of ${count} people sharing together`;
 
     const prompt =
-      'Write a VERY short greeting for the home screen of "Have Another Cherry", a warm household ' +
+      'Write a VERY short greeting for the home screen of "Two Cherries", a warm household ' +
       'expense-sharing app. Requirements:\n' +
       '- 1 to 2 lines, roughly 20 words maximum.\n' +
       '- Positive and relationship-focused, about sharing/fairness/togetherness.\n' +
@@ -484,7 +486,7 @@ router.post(
         .join('\n');
 
       const prompt =
-        'You write conversation starters for "Have Another Cherry", a warm, non-judgmental household ' +
+        'You write conversation starters for "Two Cherries", a warm, non-judgmental household ' +
         "expense-splitting app. A household's members reported their own incomes and estimated each " +
         "other's, and the numbers disagree.\n\n" +
         `Gap severity: ${severityPct}% - ${severityBand}.\n\n` +

@@ -401,7 +401,7 @@ export default function App() {
               <CherryLogo className="h-9 w-9 sm:h-14 sm:w-14" />
             </div>
             <h1 className="text-xl sm:text-4xl font-display font-semibold tracking-tight text-natural-text leading-tight">
-              Have Another Cherry
+              Two Cherries
             </h1>
           </div>
 
@@ -611,7 +611,9 @@ export default function App() {
                     <Trans
                       i18nKey="app.splitUpdatedBody"
                       values={{ summary: group.splitChange.summary }}
-                      components={{ 1: <span className="font-mono font-semibold text-natural-text" /> }}
+                      components={{
+                        1: <span className="font-mono font-semibold text-natural-text" />,
+                      }}
                     />
                   </p>
                 </div>
