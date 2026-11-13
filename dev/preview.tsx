@@ -19,6 +19,9 @@ import CherryPlusModal from '../src/components/CherryPlusModal';
 import SettleUpModal from '../src/components/SettleUpModal';
 import { toLocalIso, todayLocal } from '../src/lib/recurring';
 import { Budget, Goal, PlanPayload, PlanScope, monthOf, planStatuses } from '../src/lib/plan';
+import RuleNudge from '../src/components/RuleNudge';
+import MonthCloseCard from '../src/components/MonthCloseCard';
+import { closedMonthFor, monthCloseSummary } from '../src/lib/monthClose';
 import { t } from '../src/i18n';
 
 const A = 'olivia';
@@ -216,6 +219,21 @@ const householdPlan: PlanPayload = {
       doneAt: `${d(1, 1)}T12:00:00.000Z`,
     },
   ],
+  rules: [
+    {
+      id: 'r1',
+      contains: 'trader joe',
+      category: 'Groceries',
+      createdAt: `${d(1, 3)}T12:00:00.000Z`,
+    },
+    { id: 'r2', contains: 'con ed', category: 'Utilities', createdAt: `${d(1, 9)}T12:00:00.000Z` },
+    {
+      id: 'r3',
+      contains: 'corner shop',
+      category: 'Dining',
+      createdAt: `${d(0, 2)}T12:00:00.000Z`,
+    },
+  ],
 };
 const personalPlan: PlanPayload = {
   budgets: [
@@ -232,6 +250,7 @@ const personalPlan: PlanPayload = {
       createdAt: `${d(0, 1)}T12:00:00.000Z`,
     },
   ],
+  rules: [],
 };
 
 const members = group.members;
@@ -240,6 +259,68 @@ const params = new URLSearchParams(window.location.search);
 const which = params.get('view') || 'home';
 const plus = params.get('plus') !== '0';
 const goalForm = params.get('goal') === '1';
+// The moment after a save: the form has closed and the rule nudge is up.
+const ruleNudge = params.get('rule') === '1';
+const rulesOpen = params.get('rules') === '1';
+// The "make it recurring" card on Home, for the top candidate.
+const candidate = params.get('candidate') === '1';
+// The month close card at the top of Home (last month).
+const close = params.get('close') === '1';
+// "All my groups": a second household (Olivia and Riley, 50/50) as a preset ledger.
+const scopeAll = params.get('scope') === 'all';
+const R = 'riley';
+const otherGroupId = 'river-road';
+const otherLine = (
+  title: string,
+  amount: number,
+  date: string,
+  category: string,
+  paidBy = R
+): Expense => ({
+  id: `o${++n}`,
+  groupId: otherGroupId,
+  title,
+  amount,
+  date,
+  category,
+  paidBy,
+  contributions: [{ userId: paidBy, amount, instrumentType: 'CREDIT' }],
+  splitType: 'household_default',
+  shares: {
+    [A]: Math.round(amount * 50) / 100,
+    [R]: Math.round(amount * 100) / 100 - Math.round(amount * 50) / 100,
+  },
+  status: 'OPEN',
+  createdAt: `${date}T12:00:00.000Z`,
+});
+const otherExpenses: Expense[] = [
+  otherLine('Rent', 1800, d(0, 1), 'Rent'),
+  otherLine('Rent', 1800, d(1, 1), 'Rent'),
+  otherLine('Rent', 1800, d(2, 1), 'Rent'),
+  otherLine('Groceries', 64.2, d(0, 4), 'Groceries', A),
+  otherLine('Groceries', 71, d(1, 12), 'Groceries'),
+  otherLine('Water bill', 38, d(1, 6), 'Utilities'),
+  otherLine('Takeout', 29.5, d(0, 2), 'Dining', A),
+];
+const presetOthers = scopeAll
+  ? {
+      ledgers: { [otherGroupId]: otherExpenses },
+      names: { [R]: 'Riley' },
+      memberIds: { [otherGroupId]: [A, R] },
+      loading: false,
+    }
+  : undefined;
+if (scopeAll) {
+  try {
+    localStorage.setItem(
+      `reports_filters_${group.id}`,
+      JSON.stringify({ view: 'all', period: '3m' })
+    );
+    localStorage.setItem(`plan_view_${group.id}`, 'all');
+  } catch {
+    /* ignore */
+  }
+}
 
 function Preview() {
   const initialSheet = which === 'sheet';
@@ -329,6 +410,38 @@ function Preview() {
               onOpenReports={() => setView('reports')}
               budgets={budgetStatuses}
               onOpenPlan={() => setView('plan')}
+              monthClose={
+                close && (
+                  <MonthCloseCard
+                    summary={monthCloseSummary(
+                      expenses,
+                      householdPlan.budgets,
+                      householdPlan.goals,
+                      closedMonthFor(todayLocal()),
+                      'household',
+                      A
+                    )}
+                    showBudgets={plus}
+                    onSettle={noop}
+                    onReport={() => setView('reports')}
+                    onDismiss={noop}
+                  />
+                )
+              }
+              candidate={
+                candidate
+                  ? {
+                      title: 'Groceries',
+                      interval: '1_months',
+                      anchorDay: 3,
+                      latestId: expenses[0].id,
+                      count: 3,
+                      medianAmount: 86.4,
+                    }
+                  : null
+              }
+              onMakeRecurring={noop}
+              onDismissCandidate={noop}
               aside={
                 <MonthAheadCard
                   expenses={expenses.filter((e) => e.splitType !== 'deposit')}
@@ -363,6 +476,8 @@ function Preview() {
               onOpenExpense={noop}
               onOpenLedger={() => setView('ledger')}
               initialTab={which === 'grid' ? 'grid' : 'charts'}
+              otherGroupIds={scopeAll ? [otherGroupId] : []}
+              presetOtherLedgers={presetOthers}
             />
           ) : (
             <PlanView
@@ -378,11 +493,22 @@ function Preview() {
               onContribute={noop}
               onPlanPurchase={noop}
               onLogDeposit={noop}
+              initialRulesOpen={rulesOpen}
+              otherGroupIds={scopeAll ? [otherGroupId] : []}
+              presetOtherLedgers={presetOthers}
             />
           )}
         </main>
       </div>
-      {which === 'log' && (
+      {which === 'log' && ruleNudge && (
+        <RuleNudge
+          suggestion={{ contains: 'corner shop', category: 'Dining' }}
+          title="Corner shop"
+          onYes={noop}
+          onNotNow={noop}
+        />
+      )}
+      {which === 'log' && !ruleNudge && (
         <ExpenseForm
           group={group}
           activeUser={A}
@@ -392,6 +518,7 @@ function Preview() {
           goal={goalForm ? { id: goal.id, name: goal.name } : null}
           budgets={plus ? [...householdPlan.budgets, ...personalPlan.budgets] : undefined}
           expenses={expenses}
+          rules={plans.household.rules}
           isPlus={plus}
           prefill={
             goalForm

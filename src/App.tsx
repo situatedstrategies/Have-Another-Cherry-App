@@ -29,7 +29,15 @@ import ReportsView from './components/ReportsView';
 import PlanView from './components/PlanView';
 import { usePlan } from './hooks/usePlan';
 import { todayLocal } from './lib/recurring';
-import { Goal, planStatuses, monthOf } from './lib/plan';
+import { Goal, planStatuses, monthOf, goalFunded, goalProjection } from './lib/plan';
+import { budgetAlerts, goalAlerts } from './lib/alerts';
+import { RuleSuggestion, ruleFrom, suggestRule } from './lib/rules';
+import { isGoalContribution } from './lib/money';
+import RuleNudge from './components/RuleNudge';
+import { detectRecurringCandidates, makeRecurring } from './lib/recurringDetect';
+import { closedMonthFor, monthCloseSummary, shouldShowMonthClose } from './lib/monthClose';
+import MonthCloseCard from './components/MonthCloseCard';
+import type { PeriodKey } from './lib/reports';
 import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -79,6 +87,24 @@ export default function App() {
   const [view, setView] = useState<View>('home');
   // Set when the ledger's "By category and month" chip sends us to the grid.
   const [reportsTab, setReportsTab] = useState<'charts' | 'grid' | undefined>(undefined);
+  // Set when the month close card sends us to last month's report.
+  const [reportsPeriod, setReportsPeriod] = useState<PeriodKey | undefined>(undefined);
+  // The last month this device showed the month close card for (lib/monthClose).
+  const [monthCloseShown, setMonthCloseShown] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('month_close_shown');
+    } catch {
+      return null;
+    }
+  });
+  const dismissMonthClose = (month: string) => {
+    setMonthCloseShown(month);
+    try {
+      localStorage.setItem('month_close_shown', month);
+    } catch {
+      /* per-device convenience only */
+    }
+  };
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
@@ -100,6 +126,29 @@ export default function App() {
   // The one error dialog, set from any failure point.
   const [supportError, setSupportError] = useState<SupportError | null>(null);
   const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
+  // Titles the person said "Not this one" to on the recurring card, per device.
+  const [dismissedRecurring, setDismissedRecurring] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('recurring_dismissed');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  const dismissRecurring = (title: string) => {
+    const next = [...dismissedRecurring, title];
+    setDismissedRecurring(next);
+    try {
+      localStorage.setItem('recurring_dismissed', JSON.stringify(next));
+    } catch {
+      /* per-device convenience only */
+    }
+  };
+  // "Always use <Category> for '<title>'?" after a save (lib/rules).
+  const [ruleNudge, setRuleNudge] = useState<{ title: string; suggestion: RuleSuggestion } | null>(
+    null
+  );
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   // Which split change (by its timestamp) this device has acknowledged. In
   // localStorage so the banner doesn't come back on every reload, but a NEW
@@ -267,6 +316,40 @@ export default function App() {
     notifyLedgerEvent,
     addToast,
     setSupportError,
+    onExpenseSaved: (saved, before) => {
+      // Rules are part of Plan (Cherry +); deposits and goal contributions
+      // have no category of their own to learn from.
+      if (!(hasPlus(userProfile) || rcPlus)) return;
+      if (isDeposit(saved)) return;
+      if (!isGoalContribution(saved)) {
+        const s = suggestRule(saved.title, saved.category, before, plan.household.rules);
+        setRuleNudge(s ? { title: saved.title, suggestion: s } : null);
+      }
+      // Household budget and goal crossings go to the other members as
+      // contentless pushes (lib/alerts); personal ones stay on this screen.
+      const after = [saved, ...before];
+      const today = todayLocal();
+      const month = monthOf(today);
+      const hb = plan.household.budgets;
+      for (const a of budgetAlerts(
+        planStatuses(before, hb, month, 'household', activeUser),
+        planStatuses(after, hb, month, 'household', activeUser)
+      )) {
+        notifyLedgerEvent(a.kind, a.budgetId);
+      }
+      for (const g of plan.household.goals) {
+        if (g.doneAt) continue;
+        for (const a of goalAlerts(
+          goalFunded(before, g, 'household', activeUser),
+          goalFunded(after, g, 'household', activeUser),
+          g,
+          goalProjection(before, g, today),
+          goalProjection(after, g, today)
+        )) {
+          notifyLedgerEvent(a.kind, a.goalId);
+        }
+      }
+    },
   });
 
   const { handleSettleUpProposal, handleConfirmSettleReceipt, handleVoidSettlement } =
@@ -425,6 +508,28 @@ export default function App() {
     );
   })();
 
+  // The month close card: last month, once per device, when it had anything in it.
+  const monthClose = (() => {
+    const today = todayLocal();
+    if (!shouldShowMonthClose(today, monthCloseShown)) return null;
+    const month = closedMonthFor(today);
+    const useHousehold = plan.household.budgets.length > 0;
+    const summary = monthCloseSummary(
+      expenses,
+      isPlus ? (useHousehold ? plan.household.budgets : plan.personal.budgets) : [],
+      isPlus ? plan.household.goals : [],
+      month,
+      useHousehold ? 'household' : 'personal',
+      activeUser
+    );
+    if (summary.total <= 0 && summary.openCount === 0) return null;
+    return summary;
+  })();
+
+  // The one "make it recurring" card on Home: the best candidate not dismissed.
+  const recurringCandidate =
+    detectRecurringCandidates(expenses, todayLocal(), dismissedRecurring)[0] ?? null;
+
   // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
   Object.entries(groupUsers).forEach(([uid, u]: any) => {
@@ -540,7 +645,10 @@ export default function App() {
               openPlusFor(v);
               return;
             }
-            if (v !== 'reports') setReportsTab(undefined);
+            if (v !== 'reports') {
+              setReportsTab(undefined);
+              setReportsPeriod(undefined);
+            }
             setView(v);
           }}
           onSettings={() => setShowSettings(true)}
@@ -705,6 +813,44 @@ export default function App() {
               onOpenReports={() => (isPlus ? setView('reports') : openPlusFor('reports'))}
               budgets={isPlus ? budgetStatuses : null}
               onOpenPlan={() => (isPlus ? setView('plan') : openPlusFor('plan'))}
+              monthClose={
+                monthClose && (
+                  <MonthCloseCard
+                    summary={monthClose}
+                    showBudgets={isPlus}
+                    onSettle={() => setOwedModal('you_owe')}
+                    onReport={() => {
+                      dismissMonthClose(monthClose.month);
+                      if (!isPlus) {
+                        openPlusFor('reports');
+                        return;
+                      }
+                      setReportsPeriod('last_month');
+                      setView('reports');
+                    }}
+                    onDismiss={() => dismissMonthClose(monthClose.month)}
+                  />
+                )
+              }
+              candidate={recurringCandidate}
+              onDismissCandidate={(c) => dismissRecurring(c.title)}
+              onMakeRecurring={(c) => {
+                const latest = expenses.find((e) => e.id === c.latestId);
+                if (!latest) return;
+                syncExpenseUpdate({
+                  ...latest,
+                  ...makeRecurring(latest, c.interval, c.anchorDay),
+                  editedAt: new Date().toISOString(),
+                })
+                  .then(() =>
+                    addToast(
+                      t('home.madeRecurring'),
+                      t('home.madeRecurringBody', { title: c.title }),
+                      'success'
+                    )
+                  )
+                  .catch((e) => console.error('Make recurring failed', e));
+              }}
               aside={
                 <ModuleBoundary label={t('app.myMonthAhead')}>
                   <MonthAheadCard
@@ -748,6 +894,8 @@ export default function App() {
               onOpenExpense={(exp) => setSelectedExpense(exp)}
               onOpenLedger={() => setView('ledger')}
               initialTab={reportsTab}
+              initialPeriod={reportsPeriod}
+              otherGroupIds={groupIds.filter((gid) => gid !== group.id)}
             >
               {plusExtras}
             </ReportsView>
@@ -767,6 +915,7 @@ export default function App() {
               onContribute={(g) => openForm('goal', g)}
               onPlanPurchase={() => setShowPlanPurchase(true)}
               onLogDeposit={() => openForm('deposit')}
+              otherGroupIds={groupIds.filter((gid) => gid !== group.id)}
             />
           )}
 
@@ -1006,6 +1155,7 @@ export default function App() {
           goal={formGoal}
           budgets={isPlus ? [...plan.household.budgets, ...plan.personal.budgets] : undefined}
           expenses={expenses}
+          rules={plan.household.rules}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}
@@ -1045,6 +1195,29 @@ export default function App() {
           paymentHandlesByUid={paymentHandlesByUid}
           onClose={() => setShowSettleModal(false)}
           onSubmit={handleSettleUpProposal}
+        />
+      )}
+
+      {ruleNudge && !showForm && (
+        <RuleNudge
+          suggestion={ruleNudge.suggestion}
+          title={ruleNudge.title}
+          onNotNow={() => setRuleNudge(null)}
+          onYes={async () => {
+            const s = ruleNudge.suggestion;
+            setRuleNudge(null);
+            const ok = await plan.save('household', {
+              ...plan.household,
+              rules: [...plan.household.rules, ruleFrom(s)],
+            });
+            if (ok) {
+              addToast(
+                t('rules.saved'),
+                t('rules.savedBody', { title: s.contains, category: s.category }),
+                'success'
+              );
+            }
+          }}
         />
       )}
 

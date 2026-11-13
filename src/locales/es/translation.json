@@ -1551,7 +1551,22 @@
     "overBy": "{{category}} se pasa por <m>{{amount}}</m>.",
     "nearLimit": "{{category}} está cerca de su límite.",
     "alertOver": "se pasa de su presupuesto por <m>{{amount}}</m>",
-    "alertNear": "cerca de su presupuesto, quedan <m>{{amount}}</m>"
+    "alertNear": "cerca de su presupuesto, quedan <m>{{amount}}</m>",
+    "candidateLine": "<q>{{title}}</q> parece {{interval}} <r></r>. ¿Hacerlo recurrente?",
+    "makeRecurring": "Hacerlo recurrente",
+    "notThisOne": "Este no",
+    "madeRecurring": "Ahora es recurrente",
+    "madeRecurringBody": "{{title}} se registrará solo a partir de ahora.",
+    "monthClosed": "{{month}} está cerrado",
+    "vsMonth": "frente a {{month}}",
+    "noMonthBefore": "primer mes",
+    "budgetsHeld": "Todos los presupuestos aguantaron.",
+    "budgetsResult": "Presupuestos: <m>{{under}}</m> por debajo, <o>{{over}}</o> por encima.",
+    "stillOpen_one": "<m>{{count}}</m> gasto sigue abierto, <m>{{amount}}</m> sin saldar.",
+    "stillOpen_other": "<m>{{count}}</m> gastos siguen abiertos, <m>{{amount}}</m> sin saldar.",
+    "allSettledMonth": "Todo lo de ese mes está saldado.",
+    "seeReport": "Ver el informe",
+    "dismissMonthClose": "Cerrar el resumen del mes"
   },
   "sheet": {
     "cards": "Tarjetas",
@@ -1587,7 +1602,8 @@
     "viewAria": "Personal u hogar",
     "view": {
       "personal": "Personal",
-      "household": "Hogar"
+      "household": "Hogar",
+      "all": "Todos mis grupos"
     },
     "period": {
       "this_month": "Este mes",
@@ -1651,7 +1667,10 @@
     "sourcesCount_one": "{{count}} fuente",
     "sourcesCount_other": "{{count}} fuentes",
     "itemsCount_one": "{{count}} partida",
-    "itemsCount_other": "{{count}} partidas"
+    "itemsCount_other": "{{count}} partidas",
+    "loadingGroups": "Cargando tus otros grupos...",
+    "groupsCount_one": "{{count}} grupo",
+    "groupsCount_other": "{{count}} grupos"
   },
   "planView": {
     "subtitle": "Planea una compra juntos y ten a la vista la cuenta de la casa.",
@@ -1787,6 +1806,28 @@
     "anotherCategory": "Otra categoría",
     "add": "Añadir",
     "savesToHousehold": "Se guarda en el plan del hogar, para todos.",
-    "savesToPersonal": "Se guarda en tu propio plan, para tu parte."
+    "savesToPersonal": "Se guarda en tu propio plan, para tu parte.",
+    "allGroupsNote": "Tu plan personal, con tu parte en todos los grupos a los que perteneces."
+  },
+  "rules": {
+    "title": "Reglas",
+    "subtitle": "Cuando un título contiene una palabra, el formulario usa esta categoría. Todos los miembros la ven.",
+    "nudge": "¿Usar siempre <c></c> para <q>'{{title}}'</q>?",
+    "yes": "Sí",
+    "notNow": "Ahora no",
+    "empty": "Aún no hay reglas. Da a un título la misma categoría dos veces y el formulario te propondrá una.",
+    "addTitle": "Añadir una regla",
+    "contains": "El título contiene",
+    "containsPlaceholder": "El título contiene",
+    "category": "Categoría",
+    "add": "Añadir",
+    "delete": "Eliminar regla",
+    "deleteAria": "Eliminar la regla para \"{{contains}}\"",
+    "saved": "Regla guardada",
+    "savedBody": "Los títulos que contengan \"{{title}}\" irán a {{category}}.",
+    "err": {
+      "both": "Escribe una palabra y una categoría.",
+      "duplicate": "Ya hay una regla para esa palabra."
+    }
   }
 }

@@ -5,7 +5,17 @@
 //
 // Run with: npm run test:parity
 
-import { reminderTargetDate, reminderPayload } from '../server/reminders';
+import {
+  reminderTargetDate,
+  reminderRunDate,
+  reminderPayload,
+  monthClosedBy,
+  monthClosePayload,
+  planAlertPayload,
+  PLAN_ALERT_TYPES,
+  isPlanAlertType,
+} from '../server/reminders';
+import { PLAN_ALERT_KINDS } from '../src/lib/alerts';
 
 let failures = 0;
 const check = (name: string, actual: unknown, expected: unknown) => {
@@ -104,6 +114,77 @@ check(
     'and it carries only the four agreed keys',
     Object.keys(payload).sort(),
     ['dueDate', 'groupId', 'id', 'target', 'type'].sort()
+  );
+}
+
+console.log('--- which day a run happens on, and what it closes -----------------');
+
+check(
+  'the run date is the day before the target',
+  reminderRunDate(new Date('2026-09-05T21:00:00Z')),
+  '2026-09-05'
+);
+check(
+  'an evening run in a western zone is still that day there',
+  reminderRunDate(new Date('2026-09-06T01:00:00Z'), -4),
+  '2026-09-05'
+);
+check('the 1st closes the month before', monthClosedBy('2026-11-01'), '2026-10');
+check('January closes December of the year before', monthClosedBy('2027-01-01'), '2026-12');
+check('any other day closes nothing', monthClosedBy('2026-11-02'), null);
+check('nonsense closes nothing', monthClosedBy('yesterday'), null);
+
+console.log('--- plan alerts and the month close -------------------------------');
+
+// The same four kinds on both sides of the wire: the client (lib/alerts)
+// posts them, the server (reminders) accepts and relays them.
+check(
+  'the plan alert kinds agree between client and server',
+  [...PLAN_ALERT_TYPES],
+  [...PLAN_ALERT_KINDS]
+);
+check(
+  'only those four are plan alerts',
+  ['budget_near', 'goal_off_track', 'expense_logged', 'month_close', 42].map(isPlanAlertType),
+  [true, true, false, false, false]
+);
+check(
+  'a plan alert carries the kind, the group and the id, and nothing else',
+  planAlertPayload('budget_over', 'ABC123', 'b_groceries'),
+  { type: 'budget_over', groupId: 'ABC123', id: 'b_groceries' }
+);
+check(
+  'a missing id degrades to an empty string rather than a non-string',
+  planAlertPayload('goal_milestone', 'ABC123', undefined),
+  { type: 'goal_milestone', groupId: 'ABC123', id: '' }
+);
+check('the month close carries the type and the group only', monthClosePayload('ABC123'), {
+  type: 'month_close',
+  groupId: 'ABC123',
+});
+{
+  // What the Flutter app's routeForPush must do with each type (its
+  // test/push_route_test.dart carries the same table).
+  const routes: Record<string, string> = {
+    bill_reminder: '/vault?day=<dueDate>',
+    budget_near: '/?tab=plan',
+    budget_over: '/?tab=plan',
+    goal_milestone: '/?tab=plan',
+    goal_off_track: '/?tab=plan',
+    month_close: '/',
+  };
+  check(
+    'every type the server sends has a route in the contract table',
+    ['bill_reminder', ...PLAN_ALERT_TYPES, 'month_close'].every((t) => t in routes),
+    true
+  );
+  check(
+    'every value of every payload is a string',
+    [
+      ...Object.values(planAlertPayload('budget_near', 'G', 7)),
+      ...Object.values(monthClosePayload('G')),
+    ].every((v) => typeof v === 'string'),
+    true
   );
 }
 

@@ -6,6 +6,9 @@ import { getRemainingSettlementAmount } from '../lib/money';
 import { encryptData } from '../lib/crypto';
 import { Expense, Group } from '../types';
 import { t } from '../i18n';
+import type { PlanAlertKind } from '../lib/alerts';
+
+export type LedgerEventKind = 'expense_logged' | 'payment_logged' | PlanAlertKind;
 
 type AddToast = (title: string, message: string, type?: 'info' | 'success' | 'error') => void;
 
@@ -70,7 +73,8 @@ export function useNotifications({
 
   // Best effort: a failed notification must never fail the write it follows.
   // The server enforces membership and the push carries no amounts or titles.
-  const notifyLedgerEvent = (kind: 'expense_logged' | 'payment_logged') => {
+  // A plan alert (lib/alerts) names the budget or goal by id and nothing else.
+  const notifyLedgerEvent = (kind: LedgerEventKind, id?: string) => {
     const gid = group?.id;
     if (!gid) return;
     (async () => {
@@ -78,7 +82,7 @@ export function useNotifications({
         await fetch('/api/notify-ledger-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-          body: JSON.stringify({ groupId: gid, kind }),
+          body: JSON.stringify({ groupId: gid, kind, ...(id ? { id } : {}) }),
         });
       } catch {
         /* best effort */
