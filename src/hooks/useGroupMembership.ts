@@ -456,7 +456,7 @@ export function useGroupMembership({
   };
 
   // Direct edit of the standing household ratio from Settings. The ratio must
-  // still cover exactly 100% — it is the default applied to every expense, so
+  // still cover exactly 100%: it is the default applied to every expense, so
   // anything else would orphan or invent money on every log. Ghost (pending)
   // seats are edited alongside joined members.
   const handleSaveDefaultSplit = async (

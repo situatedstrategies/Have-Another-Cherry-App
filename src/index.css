@@ -103,6 +103,16 @@
   min-height: 2.75rem;
 }
 
+/* Filter chips and segmented switches keep the compact height of the design
+   under a pointer and grow to a thumb-sized 44px where the pointer is a
+   finger, so the same markup serves both without stretching desktop rows. */
+@media (pointer: coarse) {
+  .chip,
+  [role='tablist'] > [role='tab'] {
+    min-height: 2.75rem;
+  }
+}
+
 /* Custom styles for professional scrollbars and subtle animations */
 ::-webkit-scrollbar {
   width: 6px;
@@ -121,4 +131,6 @@
 
 /* reCAPTCHA's floating badge covered the sign up form on phones. Google allows
    hiding it when its notice is shown in the page instead; AuthScreen does. */
-.grecaptcha-badge { visibility: hidden !important; }
+.grecaptcha-badge {
+  visibility: hidden !important;
+}

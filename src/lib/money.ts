@@ -23,6 +23,12 @@ export const isUnclaimed = (expense: Expense): boolean => !(expense.paidBy || ''
 
 export const isDarkCherry = (expense: Expense): boolean => expense.splitType === 'dark_cherry';
 
+/** A payment into the house account. It sits in the ledger (encrypted,
+ *  exportable, visible in the sheet) but is never spending and never a debt,
+ *  so every spending figure skips it. Mirrors isDeposit in the Flutter
+ *  client's domain/ledger/money.dart. */
+export const isDeposit = (expense: Expense): boolean => expense.splitType === 'deposit';
+
 export const getDarkCherryPotTotal = (expense: Expense, includePending = true): number =>
   roundCurrency(
     (expense.settlements || [])

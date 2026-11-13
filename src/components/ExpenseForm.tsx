@@ -55,6 +55,10 @@ interface ExpenseFormProps {
   paymentHandlesByUid?: Record<string, { venmo?: string; zelle?: string }>;
   /** Seed a new expense from the purchase planner. Ignored when editing. */
   prefill?: { title: string; amount: number; paidBy: string; splitType: SplitType } | null;
+  /** 'deposit': a payment into the house account. Amount, date, who, how and
+   *  a note; no category, no split, nothing owed. Editing a deposit line
+   *  reopens in this mode on its own. */
+  mode?: 'expense' | 'deposit';
 }
 
 export default function ExpenseForm({
@@ -67,13 +71,17 @@ export default function ExpenseForm({
   isPlus,
   paymentHandlesByUid,
   prefill,
+  mode,
 }: ExpenseFormProps) {
   const { t } = useTranslation();
+  const deposit = mode === 'deposit' || editingExpense?.splitType === 'deposit';
   const seed = editingExpense ? null : prefill;
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
 
-  const [title, setTitle] = useState(editingExpense?.title || seed?.title || '');
+  const [title, setTitle] = useState(
+    editingExpense?.title || seed?.title || (deposit ? t('house.depositTitle') : '')
+  );
   const [amount, setAmount] = useState(
     editingExpense?.amount?.toString() || (seed && seed.amount > 0 ? String(seed.amount) : '')
   );
@@ -89,7 +97,7 @@ export default function ExpenseForm({
     editingExpense?.paidBy || seed?.paidBy || activeUser
   );
   const [instrumentType, setInstrumentType] = useState<PaymentInstrument | undefined>(
-    editingExpense?.contributions?.[0]?.instrumentType
+    editingExpense?.contributions?.[0]?.instrumentType || (deposit ? 'TRANSFER' : undefined)
   );
   const [instrumentLabel, setInstrumentLabel] = useState<string>(
     editingExpense?.contributions?.[0]?.label || ''
@@ -124,7 +132,7 @@ export default function ExpenseForm({
       .filter(Boolean) as { uid: string; name: string; text: string }[];
   }, [instrumentType, members, activeUser, paymentHandlesByUid]);
   const [splitType, setSplitType] = useState<SplitType>(
-    editingExpense?.splitType || seed?.splitType || 'household_default'
+    editingExpense?.splitType || seed?.splitType || (deposit ? 'deposit' : 'household_default')
   );
 
   // Dark Cherry (blind split): per-payment bounds + the first-use explainer.
@@ -328,7 +336,7 @@ export default function ExpenseForm({
   // Suggest a category/split from the title, but only while the user hasn't
   // chosen a category yet (and never when editing) - so we don't override them.
   useEffect(() => {
-    if (editingExpense || category) return;
+    if (editingExpense || category || deposit) return;
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes('rent')) {
       setCategory('Rent');
@@ -361,7 +369,7 @@ export default function ExpenseForm({
       setCategory('Dining Out');
       setSplitType('equal');
     }
-  }, [title, category, editingExpense]);
+  }, [title, category, editingExpense, deposit]);
 
   const numericAmount = parseFloat(amount) || 0;
 
@@ -437,7 +445,7 @@ export default function ExpenseForm({
     }
 
     // Heads-up if a debtor's share exceeds their spending threshold.
-    if (thresholdWarnings.length > 0) {
+    if (!deposit && thresholdWarnings.length > 0) {
       const names = thresholdWarnings.map((m) => m.name).join(', ');
       const ok = window.confirm(t('form.confirmThreshold', { names }));
       if (!ok) return;
@@ -605,7 +613,9 @@ export default function ExpenseForm({
       });
     }
 
-    const finalCategory = category.trim();
+    // A deposit has no category of its own and no split: every deposit is
+    // filed under the house account so the sheet and the export group them.
+    const finalCategory = deposit ? t('house.depositCategory') : category.trim();
     if (!finalCategory) {
       setError(t('form.err.category'));
       return;
@@ -638,8 +648,8 @@ export default function ExpenseForm({
           ...(instrumentLabel.trim() ? { label: instrumentLabel.trim() } : {}),
         },
       ],
-      splitType,
-      shares: splitType === 'dark_cherry' ? {} : finalShares,
+      splitType: deposit ? 'deposit' : splitType,
+      shares: deposit || splitType === 'dark_cherry' ? {} : finalShares,
       blindMin: splitType === 'dark_cherry' ? blindMinNum : null,
       blindMax: splitType === 'dark_cherry' ? blindMaxNum : null,
       thirdPersonName: splitType === 'third_party' ? thirdPersonName.trim() || null : null,
@@ -647,12 +657,12 @@ export default function ExpenseForm({
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
       extraParticipants: splitType === 'custom_percentage' ? finalExtraParticipants || null : null,
       notes: notes.trim() || null,
-      isRecurring,
-      ...(isRecurring
+      isRecurring: deposit ? false : isRecurring,
+      ...(isRecurring && !deposit
         ? { recurringInterval, nextRecurringDate: nextRecurDate }
         : { recurringInterval: null, nextRecurringDate: null }),
       // Quick settle: only meaningful when creating a new expense.
-      quickSettle: !editingExpense && alreadySettled,
+      quickSettle: !editingExpense && !deposit && alreadySettled,
     };
 
     // Remove any strictly undefined values just in case, though we used null
@@ -665,7 +675,15 @@ export default function ExpenseForm({
     <Modal
       onClose={onClose}
       size="lg"
-      title={editingExpense ? t('form.editTitle') : t('form.newTitle')}
+      title={
+        deposit
+          ? editingExpense
+            ? t('house.editDeposit')
+            : t('house.logDeposit')
+          : editingExpense
+            ? t('form.editTitle')
+            : t('form.newTitle')
+      }
       bodyClassName=""
       footer={
         <div className="flex items-center justify-end gap-3">
@@ -681,7 +699,13 @@ export default function ExpenseForm({
             form="expense-form"
             className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            {editingExpense ? t('form.update') : t('form.save')}
+            {deposit
+              ? editingExpense
+                ? t('house.updateDeposit')
+                : t('house.saveDeposit')
+              : editingExpense
+                ? t('form.update')
+                : t('form.save')}
           </button>
         </div>
       }
@@ -697,31 +721,39 @@ export default function ExpenseForm({
           </div>
         )}
 
+        {deposit && (
+          <p className="text-xs text-natural-muted" id="deposit-intro">
+            {t('house.formIntro')}
+          </p>
+        )}
+
         {/* AI Smart Scan Placeholder */}
-        <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
-              <Sparkles size={16} className="text-natural-primary" /> {t('form.smartScan')}
-            </h3>
-            <p className="text-xs text-natural-muted mt-1">{t('form.smartScanBody')}</p>
+        {!deposit && (
+          <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
+                <Sparkles size={16} className="text-natural-primary" /> {t('form.smartScan')}
+              </h3>
+              <p className="text-xs text-natural-muted mt-1">{t('form.smartScanBody')}</p>
+            </div>
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleScanFile}
+            />
+            <button
+              type="button"
+              onClick={() => scanInputRef.current?.click()}
+              disabled={scanning}
+              className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+            >
+              <Camera size={16} /> {scanning ? t('form.scanning') : t('form.scanReceipt')}
+            </button>
           </div>
-          <input
-            ref={scanInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleScanFile}
-          />
-          <button
-            type="button"
-            onClick={() => scanInputRef.current?.click()}
-            disabled={scanning}
-            className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-natural-sage/50 text-natural-primary border border-natural-primary/30 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
-          >
-            <Camera size={16} /> {scanning ? t('form.scanning') : t('form.scanReceipt')}
-          </button>
-        </div>
+        )}
 
         {/* Itemized split: assign scanned line items to people */}
         {scannedItems.length > 0 && (
@@ -786,7 +818,7 @@ export default function ExpenseForm({
         )}
 
         {/* Spending threshold heads-up */}
-        {thresholdWarnings.length > 0 && numericAmount > 0 && (
+        {!deposit && thresholdWarnings.length > 0 && numericAmount > 0 && (
           <div className="flex items-start gap-2 p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl">
             <span className="text-natural-primary shrink-0 font-bold">!</span>
             <p className="text-xs text-natural-text leading-relaxed">
@@ -863,72 +895,74 @@ export default function ExpenseForm({
             </div>
 
             {/* Recurring Toggle */}
-            <div className="mt-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isRecurring}
-                  onChange={(e) => setIsRecurring(e.target.checked)}
-                  className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
-                />
-                <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5">
-                  <Repeat size={14} className="text-natural-muted" /> {t('form.recurring')}
-                </span>
-              </label>
+            {!deposit && (
+              <div className="mt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
+                  />
+                  <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5">
+                    <Repeat size={14} className="text-natural-muted" /> {t('form.recurring')}
+                  </span>
+                </label>
 
-              {isRecurring && (
-                // Weeks and months are asked separately, matching the mobile
-                // form: every 4 weeks is not the same as the 1st of every
-                // month, and one merged list hides that difference at exactly
-                // the moment someone is choosing.
-                <div className="mt-3 pl-6 space-y-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
-                      {t('form.everyWeeks')}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {RECURRING_WEEKS.map((w) => (
-                        <button
-                          key={`w${w}`}
-                          type="button"
-                          onClick={() => setRecurringInterval(`${w}_weeks`)}
-                          aria-pressed={recurringInterval === `${w}_weeks`}
-                          className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                            recurringInterval === `${w}_weeks`
-                              ? 'bg-natural-primary text-white border-natural-primary'
-                              : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
-                          }`}
-                        >
-                          {w}
-                        </button>
-                      ))}
+                {isRecurring && (
+                  // Weeks and months are asked separately, matching the mobile
+                  // form: every 4 weeks is not the same as the 1st of every
+                  // month, and one merged list hides that difference at exactly
+                  // the moment someone is choosing.
+                  <div className="mt-3 pl-6 space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
+                        {t('form.everyWeeks')}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {RECURRING_WEEKS.map((w) => (
+                          <button
+                            key={`w${w}`}
+                            type="button"
+                            onClick={() => setRecurringInterval(`${w}_weeks`)}
+                            aria-pressed={recurringInterval === `${w}_weeks`}
+                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                              recurringInterval === `${w}_weeks`
+                                ? 'bg-natural-primary text-white border-natural-primary'
+                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                            }`}
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
+                        {t('form.everyMonths')}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {RECURRING_MONTHS.map((m) => (
+                          <button
+                            key={`m${m}`}
+                            type="button"
+                            onClick={() => setRecurringInterval(`${m}_months`)}
+                            aria-pressed={recurringInterval === `${m}_months`}
+                            className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                              recurringInterval === `${m}_months`
+                                ? 'bg-natural-primary text-white border-natural-primary'
+                                : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
+                            }`}
+                          >
+                            {m === 12 ? t('form.year') : m}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-natural-muted mb-1.5">
-                      {t('form.everyMonths')}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {RECURRING_MONTHS.map((m) => (
-                        <button
-                          key={`m${m}`}
-                          type="button"
-                          onClick={() => setRecurringInterval(`${m}_months`)}
-                          aria-pressed={recurringInterval === `${m}_months`}
-                          className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                            recurringInterval === `${m}_months`
-                              ? 'bg-natural-primary text-white border-natural-primary'
-                              : 'bg-natural-bg/50 text-natural-text border-natural-border hover:bg-natural-bg'
-                          }`}
-                        >
-                          {m === 12 ? t('form.year') : m}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1002,31 +1036,33 @@ export default function ExpenseForm({
 
         {/* Category & Payer Grid */}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-              {t('form.category')}
-            </label>
-            <div className="relative">
-              <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
-              <input
-                ref={categoryInputRef}
-                type="text"
-                value={category}
-                onChange={handleCategoryChange}
-                placeholder={t('form.category')}
-                list="category-options"
-                className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
-                id="expense-category-input"
-                autoComplete="off"
-              />
-              <datalist id="category-options">
-                {categories.map((c, i) => (
-                  <option key={`${c}-${i}`} value={c} />
-                ))}
-              </datalist>
+        <div className={`grid gap-4 ${deposit ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {!deposit && (
+            <div>
+              <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+                {t('form.category')}
+              </label>
+              <div className="relative">
+                <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4" />
+                <input
+                  ref={categoryInputRef}
+                  type="text"
+                  value={category}
+                  onChange={handleCategoryChange}
+                  placeholder={t('form.category')}
+                  list="category-options"
+                  className="w-full pl-10 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-sm outline-none transition-all"
+                  id="expense-category-input"
+                  autoComplete="off"
+                />
+                <datalist id="category-options">
+                  {categories.map((c, i) => (
+                    <option key={`${c}-${i}`} value={c} />
+                  ))}
+                </datalist>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
@@ -1053,132 +1089,16 @@ export default function ExpenseForm({
         </div>
 
         {/* Split Rule Selector */}
-        <div>
-          <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
-            {t('form.splitRules')}
-          </label>
-          <div className="space-y-2" id="split-rules-group">
-            {/* Default split option */}
-            <label
-              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'household_default'
-                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
-                  : 'border-natural-border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="splitType"
-                  checked={splitType === 'household_default'}
-                  onChange={() => setSplitType('household_default')}
-                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                  id="rule-default"
-                />
-                <div>
-                  <span className="block text-sm font-semibold text-natural-text">
-                    {t('form.standardSplit')}
-                  </span>
-                  <span className="block text-xs text-natural-muted">{t('form.defaultSplit')}</span>
-                </div>
-              </div>
-              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
-                <Scale className="w-4 h-4 transform -rotate-12" />
-              </span>
+        {!deposit && (
+          <div>
+            <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
+              {t('form.splitRules')}
             </label>
-
-            {/* Equal split option */}
-            <label
-              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'equal'
-                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
-                  : 'border-natural-border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="splitType"
-                  checked={splitType === 'equal'}
-                  onChange={() => setSplitType('equal')}
-                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                  id="rule-5050"
-                />
-                <div>
-                  <span className="block text-sm font-semibold text-natural-text">
-                    {t('form.evenSplit')}
-                  </span>
-                  <span className="block text-xs text-natural-muted">{t('form.evenSplitBody')}</span>
-                </div>
-              </div>
-              <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
-                =
-              </span>
-            </label>
-
-            {/* Custom Percentage split option */}
-            <label
-              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'custom_percentage'
-                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
-                  : 'border-natural-border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="splitType"
-                  checked={splitType === 'custom_percentage'}
-                  onChange={() => setSplitType('custom_percentage')}
-                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                  id="rule-custom-pct"
-                />
-                <div>
-                  <span className="block text-sm font-semibold text-natural-text">
-                    {t('form.customPct')}
-                  </span>
-                  <span className="block text-xs text-natural-muted">{t('form.customPctBody')}</span>
-                </div>
-              </div>
-              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
-                <Percent className="w-4 h-4" />
-              </span>
-            </label>
-
-            {/* Custom Amount split option */}
-            <label
-              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'custom_amount'
-                  ? 'border-natural-border bg-natural-sidebar/40 font-medium'
-                  : 'border-natural-border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="splitType"
-                  checked={splitType === 'custom_amount'}
-                  onChange={() => setSplitType('custom_amount')}
-                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                  id="rule-custom-amt"
-                />
-                <div>
-                  <span className="block text-sm font-semibold text-natural-text">
-                    {t('form.customAmt')}
-                  </span>
-                  <span className="block text-xs text-natural-muted">{t('form.customAmtBody')}</span>
-                </div>
-              </div>
-              <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
-                <DollarSign className="w-4 h-4" />
-              </span>
-            </label>
-
-            {/* Third Party split option */}
-            {members.length === 2 && (
+            <div className="space-y-2" id="split-rules-group">
+              {/* Default split option */}
               <label
                 className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                  splitType === 'third_party'
+                  splitType === 'household_default'
                     ? 'border-natural-border bg-natural-sidebar/40 font-medium'
                     : 'border-natural-border'
                 }`}
@@ -1187,80 +1107,206 @@ export default function ExpenseForm({
                   <input
                     type="radio"
                     name="splitType"
-                    checked={splitType === 'third_party'}
-                    onChange={() => setSplitType('third_party')}
+                    checked={splitType === 'household_default'}
+                    onChange={() => setSplitType('household_default')}
                     className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                    id="rule-third-party"
+                    id="rule-default"
                   />
                   <div>
                     <span className="block text-sm font-semibold text-natural-text">
-                      {t('form.addThird')}
+                      {t('form.standardSplit')}
                     </span>
                     <span className="block text-xs text-natural-muted">
-                      {t('form.addThirdBody')}
+                      {t('form.defaultSplit')}
                     </span>
                   </div>
                 </div>
                 <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
-                  <Plus className="w-4 h-4" />
+                  <Scale className="w-4 h-4 transform -rotate-12" />
                 </span>
               </label>
-            )}
 
-            {/* Dark Cherry (blind split) option - Plus feature */}
-            <label
-              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
-                splitType === 'dark_cherry'
-                  ? 'border-natural-primary bg-natural-primary/5 font-medium'
-                  : 'border-natural-border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  type="radio"
-                  name="splitType"
-                  checked={splitType === 'dark_cherry'}
-                  onChange={selectDarkCherry}
-                  className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
-                  id="rule-dark-cherry"
-                />
-                <div>
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
-                    Dark Cherry
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowCherryPlus(true);
-                      }}
-                      className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
-                      title={t('form.aboutPlus')}
-                    >
-                      Cherry +
-                    </button>
-                  </span>
-                  <span className="block text-xs text-natural-muted">
-                    {t('form.darkBody')}{' '}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setShowDarkIntro(true);
-                      }}
-                      className="text-natural-primary font-semibold hover:underline"
-                    >
-                      {t('form.whatsThis')}
-                    </button>
-                  </span>
+              {/* Equal split option */}
+              <label
+                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                  splitType === 'equal'
+                    ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                    : 'border-natural-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'equal'}
+                    onChange={() => setSplitType('equal')}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-5050"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-natural-text">
+                      {t('form.evenSplit')}
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      {t('form.evenSplitBody')}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <span className="w-8 h-8 text-natural-text bg-natural-dark/90 text-white rounded-lg flex items-center justify-center">
-                <EyeOff className="w-4 h-4" />
-              </span>
-            </label>
+                <span className="w-8 h-8 text-sm font-bold font-mono text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                  =
+                </span>
+              </label>
+
+              {/* Custom Percentage split option */}
+              <label
+                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                  splitType === 'custom_percentage'
+                    ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                    : 'border-natural-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'custom_percentage'}
+                    onChange={() => setSplitType('custom_percentage')}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-custom-pct"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-natural-text">
+                      {t('form.customPct')}
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      {t('form.customPctBody')}
+                    </span>
+                  </div>
+                </div>
+                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                  <Percent className="w-4 h-4" />
+                </span>
+              </label>
+
+              {/* Custom Amount split option */}
+              <label
+                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                  splitType === 'custom_amount'
+                    ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                    : 'border-natural-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'custom_amount'}
+                    onChange={() => setSplitType('custom_amount')}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-custom-amt"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-natural-text">
+                      {t('form.customAmt')}
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      {t('form.customAmtBody')}
+                    </span>
+                  </div>
+                </div>
+                <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
+                </span>
+              </label>
+
+              {/* Third Party split option */}
+              {members.length === 2 && (
+                <label
+                  className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                    splitType === 'third_party'
+                      ? 'border-natural-border bg-natural-sidebar/40 font-medium'
+                      : 'border-natural-border'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="splitType"
+                      checked={splitType === 'third_party'}
+                      onChange={() => setSplitType('third_party')}
+                      className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                      id="rule-third-party"
+                    />
+                    <div>
+                      <span className="block text-sm font-semibold text-natural-text">
+                        {t('form.addThird')}
+                      </span>
+                      <span className="block text-xs text-natural-muted">
+                        {t('form.addThirdBody')}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="w-8 h-8 text-natural-text bg-natural-sidebar rounded-lg flex items-center justify-center">
+                    <Plus className="w-4 h-4" />
+                  </span>
+                </label>
+              )}
+
+              {/* Dark Cherry (blind split) option - Plus feature */}
+              <label
+                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer hover:bg-natural-sidebar/20 transition-all ${
+                  splitType === 'dark_cherry'
+                    ? 'border-natural-primary bg-natural-primary/5 font-medium'
+                    : 'border-natural-border'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    checked={splitType === 'dark_cherry'}
+                    onChange={selectDarkCherry}
+                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    id="rule-dark-cherry"
+                  />
+                  <div>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-natural-text">
+                      Dark Cherry
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowCherryPlus(true);
+                        }}
+                        className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
+                        title={t('form.aboutPlus')}
+                      >
+                        Cherry +
+                      </button>
+                    </span>
+                    <span className="block text-xs text-natural-muted">
+                      {t('form.darkBody')}{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setShowDarkIntro(true);
+                        }}
+                        className="text-natural-primary font-semibold hover:underline"
+                      >
+                        {t('form.whatsThis')}
+                      </button>
+                    </span>
+                  </div>
+                </div>
+                <span className="w-8 h-8 text-natural-text bg-natural-dark/90 text-white rounded-lg flex items-center justify-center">
+                  <EyeOff className="w-4 h-4" />
+                </span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Dark Cherry bounds (Conditional) */}
         {splitType === 'dark_cherry' && (
@@ -1391,7 +1437,9 @@ export default function ExpenseForm({
                           onClick={() => removeGuest(g.id)}
                           className="text-natural-muted hover:text-natural-primary p-1.5 shrink-0"
                           title={t('settings.remove')}
-                          aria-label={t('form.removeGuest', { name: g.name.trim() || t('form.thisGuest') })}
+                          aria-label={t('form.removeGuest', {
+                            name: g.name.trim() || t('form.thisGuest'),
+                          })}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1411,7 +1459,8 @@ export default function ExpenseForm({
                   <span
                     className={`text-xs font-bold font-mono ${balanced ? 'text-natural-primary' : 'text-natural-muted'}`}
                   >
-                    {t('form.total', { total: pctTotal.toFixed(1) })}{balanced ? ' ✓' : ' / 100%'}
+                    {t('form.total', { total: pctTotal.toFixed(1) })}
+                    {balanced ? ' ✓' : ' / 100%'}
                   </span>
                 </div>
               </div>
@@ -1547,7 +1596,7 @@ export default function ExpenseForm({
         )}
 
         {/* Split Detail Preview Box (not for Dark Cherry - there are no shares) */}
-        {numericAmount > 0 && splitType !== 'dark_cherry' && (
+        {numericAmount > 0 && !deposit && splitType !== 'dark_cherry' && (
           <div
             className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2"
             id="split-preview"
@@ -1596,7 +1645,7 @@ export default function ExpenseForm({
         )}
 
         {/* Quick settle (new expenses only) */}
-        {!editingExpense && (
+        {!editingExpense && !deposit && (
           <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
             <input
               type="checkbox"
