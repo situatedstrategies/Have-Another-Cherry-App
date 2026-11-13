@@ -3,8 +3,8 @@ import { useTranslation, Trans } from 'react-i18next';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { formatCurrency } from './lib/format';
 import { db, authHeader } from './firebase';
-import { getFullMembers } from './lib/members';
-import { isDarkCherry } from './lib/money';
+import { getFullMembers, joinedUids, nameOf as rosterName } from './lib/members';
+import { isDarkCherry, isDeposit, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
 import { hasPlus } from './lib/entitlements';
 import { useReminderPublisher } from './hooks/useReminderPublisher';
 import { computeIncomeDiscrepancy } from './lib/incomeDiscrepancy';
@@ -18,15 +18,19 @@ import { useNotifications } from './hooks/useNotifications';
 import { useExpenseMutations } from './hooks/useExpenseMutations';
 import { useSettlements } from './hooks/useSettlements';
 import ErrorSupportModal from './components/ErrorSupportModal';
-import CherryLogo from './components/CherryLogo';
 import ModuleBoundary from './components/ModuleBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import BudgetPaymentsSettings from './components/BudgetPaymentsSettings';
-import StatsSection from './components/StatsSection';
 import ExpenseForm from './components/ExpenseForm';
+import Sidebar, { View } from './components/Sidebar';
+import HomeView from './components/HomeView';
+import LedgerView from './components/LedgerView';
+import ReportsView from './components/ReportsView';
+import PlanView from './components/PlanView';
+import ExportPanel from './components/ExportPanel';
+import Modal from './components/Modal';
 import ExpenseDetail from './components/ExpenseDetail';
 import SettleUpModal from './components/SettleUpModal';
-import ExpenseList from './components/ExpenseList';
 import AuthScreen from './components/AuthScreen';
 import ProfileSetup from './components/ProfileSetup';
 import BackupModal from './components/BackupModal';
@@ -49,18 +53,7 @@ import { ToastContainer, ToastMessage } from './components/Toast';
 // The chart pulls in recharts (about 240 KB gzipped), which only the signed-in
 // dashboard uses, so it loads after sign-in instead of before the sign-in form.
 const MonthlyComparisonChart = lazy(() => import('./components/MonthlyComparisonChart'));
-import {
-  Plus,
-  Sparkles,
-  Settings,
-  X,
-  AlertCircle,
-  Check,
-  ChevronDown,
-  TrendingUp,
-  Vault as VaultIcon,
-  Cherry as CherryIcon,
-} from 'lucide-react';
+import { Sparkles, X, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const { t } = useTranslation();
@@ -74,6 +67,12 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [showForm, setShowForm] = useState(false);
+  // 'deposit' opens the form as "Log a deposit" (house account).
+  const [formMode, setFormMode] = useState<'expense' | 'deposit'>('expense');
+  const [view, setView] = useState<View>('home');
+  // Set when the ledger's "By category and month" chip sends us to the grid.
+  const [reportsTab, setReportsTab] = useState<'charts' | 'grid' | undefined>(undefined);
+  const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
@@ -328,7 +327,65 @@ export default function App() {
 
   // Dark Cherry amounts are hidden from everyone but their creator, so a
   // group total that included one would let members back the number out.
-  const statsVisibleExpenses = expenses.filter((e) => !isDarkCherry(e) || e.paidBy === activeUser);
+  // House account deposits are not spending, so no statistic counts them.
+  const statsVisibleExpenses = expenses.filter(
+    (e) => !isDeposit(e) && (!isDarkCherry(e) || e.paidBy === activeUser)
+  );
+  const spendingExpenses = expenses.filter((e) => !isDeposit(e));
+  const members = getFullMembers(group);
+
+  // The sheet's in-place amount edit: the total changes and every share
+  // scales with it, the way a rounded amount is scaled on save.
+  const handleEditAmount = (target: Expense, amount: number) => {
+    const latest = expenses.find((e) => e.id === target.id) || target;
+    if (latest.amount <= 0 || amount <= 0) return;
+    const scale = amount / latest.amount;
+    const scaled = (v: number) => roundCurrency(v * scale);
+    const next: Expense = {
+      ...latest,
+      amount,
+      shares: Object.fromEntries(
+        Object.entries(latest.shares || {}).map(([uid, v]) => [uid, scaled(Number(v))])
+      ),
+      ...(latest.thirdPersonShare != null
+        ? { thirdPersonShare: scaled(Number(latest.thirdPersonShare)) }
+        : {}),
+      ...(latest.extraParticipants
+        ? {
+            extraParticipants: latest.extraParticipants.map((g) => ({
+              ...g,
+              share: scaled(g.share),
+            })),
+          }
+        : {}),
+      contributions: (latest.contributions || []).map((c) =>
+        c.userId === latest.paidBy ? { ...c, amount } : c
+      ),
+      editedAt: new Date().toISOString(),
+    };
+    next.status = getNormalizedExpenseStatus(next);
+    syncExpenseUpdate(next).catch((e) => console.error('Amount edit failed', e));
+  };
+
+  const openForm = (mode: 'expense' | 'deposit' = 'expense') => {
+    setEditingExpense(null);
+    setFormMode(mode);
+    setShowForm(true);
+  };
+
+  // "60 / 40 with Sam": the standing split, the viewer first.
+  const splitLine = (() => {
+    const ids = joinedUids(group);
+    const ordered = [activeUser, ...ids.filter((id) => id !== activeUser)].filter((id) =>
+      ids.includes(id)
+    );
+    const split = ordered
+      .map((id) => Math.round(Number(group.defaultSplit?.[id]) || 0))
+      .join(' / ');
+    const others = ordered.filter((id) => id !== activeUser).map((id) => rosterName(id, members));
+    if (others.length === 0) return t('nav.justYou');
+    return t('nav.splitWith', { split, names: others.join(`, `) });
+  })();
 
   // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
   const isPlus = hasPlus(userProfile) || rcPlus;
@@ -363,193 +420,129 @@ export default function App() {
     0
   );
 
+  const unlock = () => setShowCherryPlus(true);
+  const plusExtras = (
+    <div className="flex flex-col gap-5 pt-2" id="reports-more">
+      {isPlus && (
+        <ModuleBoundary label={t('app.monthlyTrends')}>
+          <Suspense fallback={null}>
+            <MonthlyComparisonChart expenses={statsVisibleExpenses} members={members} />
+          </Suspense>
+        </ModuleBoundary>
+      )}
+      <div className="grid gap-5 lg:grid-cols-2 items-start">
+        {isPlus ? (
+          <>
+            <ModuleBoundary label={t('app.insights')}>
+              <InsightsSection
+                expenses={statsVisibleExpenses}
+                members={members}
+                activeUser={activeUser}
+              />
+            </ModuleBoundary>
+            <div className="flex flex-col gap-5">
+              <ModuleBoundary label={t('app.whosCarrying')}>
+                <CarryingCard
+                  expenses={statsVisibleExpenses}
+                  members={members}
+                  activeUser={activeUser}
+                />
+              </ModuleBoundary>
+              <ModuleBoundary label={t('app.rhythm')}>
+                <RhythmCard expenses={spendingExpenses} locked={false} onUnlock={unlock} />
+              </ModuleBoundary>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={unlock}
+              className="w-full text-left bg-white border border-natural-border rounded-3xl p-5 shadow-sm hover:border-natural-primary/40 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
+                  {t('app.insights')}
+                </span>
+                <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
+                  Cherry +
+                </span>
+              </div>
+              <p className="mt-2 font-display text-lg font-semibold text-natural-text">
+                {t('app.insightsTeaserTitle')}
+              </p>
+              <p className="mt-1 text-sm text-natural-muted">{t('app.insightsTeaserBody')}</p>
+              <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
+                {t('app.seeCherryPlus')}
+              </span>
+            </button>
+            <ModuleBoundary label={t('app.rhythm')}>
+              <RhythmCard expenses={spendingExpenses} locked onUnlock={unlock} />
+            </ModuleBoundary>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div
-      className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased pb-12 animate-in fade-in duration-300"
-      style={{
-        background:
-          'radial-gradient(60% 40% at 78% 0%, rgba(196,18,0,.05), transparent 60%), #F4F4F5',
-        backgroundRepeat: 'no-repeat',
-      }}
+      className="min-h-screen bg-natural-bg text-natural-text font-sans antialiased animate-in fade-in duration-300"
       id="app-root"
     >
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <div className="h-px bg-natural-sidebar w-full" />
 
-      <main className="max-w-6xl lg:max-w-7xl 2xl:max-w-[100rem] mx-auto px-4 sm:px-8 pt-6 sm:pt-10">
-        {hasIncomeDiscrepancy && (
-          <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
-            <div className="flex gap-3 items-start">
-              <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-bold text-natural-text">{t('app.alignmentTitle')}</h3>
-                <p className="text-sm text-natural-muted mt-1">{t('app.alignmentBody')}</p>
-                <button
-                  onClick={() => setShowAlignmentModal(true)}
-                  className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline"
-                >
-                  {t('app.reviewProfiles')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex flex-col md:flex-row md:items-stretch min-h-screen">
+        <Sidebar
+          view={view}
+          onNavigate={(v) => {
+            if (v === 'vault') {
+              if (isPlus) setShowVault(true);
+              else setShowCherryPlus(true);
+              return;
+            }
+            if (v !== 'reports') setReportsTab(undefined);
+            setView(v);
+          }}
+          onSettings={() => setShowSettings(true)}
+          groupName={group.name || t('app.unnamedGroup')}
+          groupDetail={splitLine}
+          groups={groupIds.map((gid) => ({
+            id: gid,
+            name:
+              gid === group.id
+                ? group.name || t('app.unnamedGroup')
+                : groupSummaries[gid]?.name || t('app.unnamedGroup'),
+            active: gid === activeGroupId,
+          }))}
+          showGroupMenu={showGroupMenu}
+          setShowGroupMenu={setShowGroupMenu}
+          onSwitchGroup={handleSwitchGroup}
+          onAddGroup={() => setShowAddGroup(true)}
+          vaultLocked={!isPlus}
+        />
 
-        <header
-          className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8"
-          id="app-header"
+        <main
+          className="flex-1 min-w-0 px-4 sm:px-[max(16px,3vw)] pt-6 md:pt-7 pb-12 flex flex-col gap-5"
+          id="main-content"
         >
-          <div className="flex items-center gap-3 sm:gap-4 relative">
-            <div className="shrink-0 p-1 bg-white border border-natural-border rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300">
-              <CherryLogo className="h-9 w-9 sm:h-14 sm:w-14" />
-            </div>
-            <h1 className="text-xl sm:text-4xl font-display font-semibold tracking-tight text-natural-text leading-tight">
-              Two Cherries
-            </h1>
-          </div>
-
-          {/* Three equal columns on phones; natural size in a row from sm up. */}
-          <div
-            className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-3"
-            id="header-controls"
-          >
-            <button
-              onClick={() => (isPlus ? setShowVault(true) : setShowCherryPlus(true))}
-              className="min-w-0 w-full sm:w-auto bg-white border border-natural-border text-natural-text hover:border-natural-primary hover:text-natural-primary font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title={t('app.vaultTitle')}
-            >
-              <VaultIcon className="h-4 w-4 shrink-0" /> {t('app.vault')}
-              {!isPlus && (
-                <span className="hidden sm:inline text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                  Cherry +
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowPlanPurchase(true)}
-              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title={t('app.planTitle')}
-            >
-              <TrendingUp className="h-4 w-4 shrink-0" />
-              <span className="sm:hidden">{t('app.planShort')}</span>
-              <span className="hidden sm:inline">{t('app.planPurchase')}</span>
-            </button>
-            <button
-              onClick={() => setShowOrchard(true)}
-              className="min-w-0 w-full sm:w-auto bg-white border border-natural-primary/30 text-natural-primary hover:bg-natural-sage/40 font-semibold text-xs sm:text-xs px-2.5 sm:px-4 py-2.5 rounded-full shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-              title={t('app.cherryPickTitle')}
-            >
-              <CherryIcon className="h-4 w-4 shrink-0" /> {t('app.cherryPick')}
-            </button>
-            <button
-              onClick={() => {
-                setEditingExpense(null);
-                setShowForm(true);
-              }}
-              className="min-w-0 w-full sm:w-auto bg-natural-primary hover:bg-natural-primary-ink text-white font-semibold text-xs sm:text-xs px-2.5 sm:px-5 py-2.5 rounded-full shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span className="sm:hidden">{t('app.logShort')}</span>
-              <span className="hidden sm:inline">{t('app.logExpense')}</span>
-            </button>
-          </div>
-        </header>
-
-        <div className="space-y-6" id="dashboard-content">
-          <div
-            className="bg-white border border-natural-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-            id="welcome-banner"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-natural-sage text-natural-primary rounded-xl">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-natural-text">
-                  <Trans
-                    i18nKey="app.welcomeBack"
-                    values={{
-                      name: userProfile?.name || currentUser?.displayName || t('common.friend'),
-                    }}
-                    components={{ 1: <span className="capitalize" /> }}
-                  />
-                </h3>
-                {userProfile?.weeklyGreeting?.text && (
-                  <p className="text-xs text-natural-primary font-medium mt-1 italic leading-snug max-w-md">
-                    {userProfile.weeklyGreeting.text}
-                  </p>
-                )}
-                <div className="relative mt-0.5">
+          {hasIncomeDiscrepancy && (
+            <div className="mb-6 bg-natural-sidebar border-l-4 border-natural-primary p-4 rounded-r-xl shadow-sm animate-in fade-in slide-in-from-top-2">
+              <div className="flex gap-3 items-start">
+                <Sparkles className="h-5 w-5 text-natural-primary shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-natural-text">{t('app.alignmentTitle')}</h3>
+                  <p className="text-sm text-natural-muted mt-1">{t('app.alignmentBody')}</p>
                   <button
-                    onClick={() => setShowGroupMenu((v) => !v)}
-                    className="text-xs text-natural-muted hover:text-natural-primary flex items-center gap-1 transition-colors"
-                    title={t('app.switchGroup')}
+                    onClick={() => setShowAlignmentModal(true)}
+                    className="mt-2 text-xs font-medium text-natural-primary cursor-pointer hover:underline"
                   >
-                    {t('app.groupLabel')}{' '}
-                    <strong className="text-natural-text">
-                      {group.name || t('app.unnamedGroup')}
-                    </strong>
-                    <ChevronDown
-                      size={12}
-                      className={`transition-transform ${showGroupMenu ? 'rotate-180' : ''}`}
-                    />
+                    {t('app.reviewProfiles')}
                   </button>
-                  {showGroupMenu && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
-                      <div className="absolute left-0 mt-1 z-20 w-64 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
-                        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-natural-muted">
-                          {t('app.yourGroups')}
-                        </p>
-                        {groupIds.map((gid) => {
-                          const isActive = gid === activeGroupId;
-                          const name =
-                            gid === group.id
-                              ? group.name || t('app.unnamedGroup')
-                              : groupSummaries[gid]?.name || t('app.unnamedGroup');
-                          return (
-                            <button
-                              key={gid}
-                              onClick={() => handleSwitchGroup(gid)}
-                              disabled={isActive}
-                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${isActive ? 'font-bold text-natural-primary bg-natural-sage/20 cursor-default' : 'text-natural-text hover:bg-natural-bg'}`}
-                            >
-                              <span className="truncate">{name}</span>
-                              {isActive && (
-                                <Check size={14} className="text-natural-primary shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })}
-                        <div className="border-t border-natural-border my-1" />
-                        <button
-                          onClick={() => {
-                            setShowGroupMenu(false);
-                            setShowAddGroup(true);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
-                        >
-                          <Plus size={14} /> {t('app.joinOrCreateAnother')}
-                        </button>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowSettings(true)}
-                className="text-natural-muted hover:text-natural-primary flex items-center gap-1.5 transition-colors bg-white px-3 py-1.5 border border-natural-border rounded-md shadow-sm"
-                title={t('app.accountSettings')}
-              >
-                <Settings size={14} />
-                <span className="text-xs font-semibold uppercase tracking-widest">
-                  {t('app.settings')}
-                </span>
-              </button>
-            </div>
-          </div>
+          )}
 
           {pendingConfirmCount > 0 && (
             <div className="bg-natural-primary/5 border border-natural-primary/30 rounded-xl p-4 shadow-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -600,7 +593,7 @@ export default function App() {
           )}
 
           {/* Someone changed the standing split: a banner at the top of every
-              other member's dashboard, dismissed per change (keyed on `at`). */}
+            other member's dashboard, dismissed per change (keyed on `at`). */}
           {group.splitChange &&
             group.splitChange.by !== activeUser &&
             dismissedSplitChangeAt !== group.splitChange.at && (
@@ -658,118 +651,103 @@ export default function App() {
             </div>
           )}
 
-          {/* Balances are a sticky right rail on large screens and a band above the ledger on phones. */}
-          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-            <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
-                    {t('app.sharedLedger')}
-                  </h3>
-                </div>
-                <ModuleBoundary label={t('app.sharedLedger')}>
-                  <ExpenseList
-                    expenses={expenses}
-                    group={group}
+          {view === 'home' && (
+            <HomeView
+              expenses={expenses}
+              activeUser={activeUser}
+              members={members}
+              userName={userProfile?.name || currentUser?.displayName || t('common.friend')}
+              greetingNote={userProfile?.weeklyGreeting?.text}
+              onLogExpense={() => openForm()}
+              onScanReceipt={() => openForm()}
+              onOpenExpense={(exp) => setSelectedExpense(exp)}
+              onSettle={() => setOwedModal('you_owe')}
+              onOpenLedger={() => setView('ledger')}
+              onOpenReports={() => setView('reports')}
+              aside={
+                <ModuleBoundary label={t('app.myMonthAhead')}>
+                  <MonthAheadCard
+                    expenses={statsVisibleExpenses}
                     activeUser={activeUser}
-                    onExpenseClick={(exp) => setSelectedExpense(exp)}
+                    locked={!isPlus}
+                    onUnlock={unlock}
                   />
                 </ModuleBoundary>
-              </div>
-              {/* Gated: month-over-month is on the paywall as "Insights and monthly trends". */}
-              {isPlus && (
-                <ModuleBoundary label={t('app.monthlyTrends')}>
-                  <Suspense fallback={null}>
-                    <MonthlyComparisonChart
-                      expenses={statsVisibleExpenses}
-                      members={getFullMembers(group)}
-                    />
-                  </Suspense>
-                </ModuleBoundary>
-              )}
-            </div>
+              }
+            />
+          )}
 
-            <div className="order-1 lg:order-2 lg:w-80 xl:w-96 shrink-0 lg:sticky lg:top-6 space-y-6">
-              {/* Balances are the free splitter itself, never gated. */}
-              <ModuleBoundary label={t('app.balances')}>
-                <StatsSection
-                  expenses={statsVisibleExpenses}
-                  group={group}
-                  activeUser={activeUser}
-                  orientation="rail"
-                  onCardClick={(card) => setOwedModal(card)}
-                />
-              </ModuleBoundary>
-              {/* Cherry +: the member's share of the month, dated, before it comes due. */}
-              <ModuleBoundary label={t('app.myMonthAhead')}>
-                <MonthAheadCard
-                  expenses={statsVisibleExpenses}
-                  activeUser={activeUser}
-                  locked={!isPlus}
-                  onUnlock={() => setShowCherryPlus(true)}
-                />
-              </ModuleBoundary>
-              {isPlus && (
-                <>
-                  <ModuleBoundary label={t('app.insights')}>
-                    <InsightsSection
-                      expenses={statsVisibleExpenses}
-                      members={getFullMembers(group)}
-                      activeUser={activeUser}
-                    />
-                  </ModuleBoundary>
-                  {/* The free Insights teaser below already names this one. */}
-                  <ModuleBoundary label={t('app.whosCarrying')}>
-                    <CarryingCard
-                      expenses={statsVisibleExpenses}
-                      members={getFullMembers(group)}
-                      activeUser={activeUser}
-                    />
-                  </ModuleBoundary>
-                </>
-              )}
-              {!isPlus && (
-                <button
-                  type="button"
-                  onClick={() => setShowCherryPlus(true)}
-                  className="w-full text-left bg-white border border-natural-border rounded-2xl p-5 shadow-sm hover:border-natural-primary/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
-                      {t('app.insights')}
-                    </span>
-                    <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                      Cherry +
-                    </span>
-                  </div>
-                  <p className="mt-2 font-display text-lg font-semibold text-natural-text">
-                    {t('app.insightsTeaserTitle')}
-                  </p>
-                  <p className="mt-1 text-sm text-natural-muted">{t('app.insightsTeaserBody')}</p>
-                  <span className="mt-3 inline-block text-sm font-semibold text-natural-primary">
-                    {t('app.seeCherryPlus')}
-                  </span>
-                </button>
-              )}
-              <ModuleBoundary label={t('app.rhythm')}>
-                <RhythmCard
-                  expenses={expenses}
-                  locked={!isPlus}
-                  onUnlock={() => setShowCherryPlus(true)}
-                />
-              </ModuleBoundary>
-            </div>
-          </div>
-        </div>
+          {view === 'ledger' && (
+            <LedgerView
+              expenses={expenses}
+              group={group}
+              activeUser={activeUser}
+              members={members}
+              onOpenExpense={(exp) => setSelectedExpense(exp)}
+              onEditAmount={handleEditAmount}
+              onLogExpense={() => openForm()}
+              onExport={() => (isPlus ? setShowExport(true) : setShowCherryPlus(true))}
+              onCherryPick={() => setShowOrchard(true)}
+              onOpenGrid={() => {
+                setReportsTab('grid');
+                setView('reports');
+              }}
+              onOpenHouseAccount={() => setView('plan')}
+            />
+          )}
 
-        <footer
-          className="text-center text-xs text-natural-muted mt-12 pb-6 scroll-end-safe space-y-1"
-          id="app-footer"
+          {view === 'reports' && (
+            <ReportsView
+              expenses={expenses}
+              group={group}
+              activeUser={activeUser}
+              members={members}
+              locked={!isPlus}
+              onUnlock={unlock}
+              onOpenExpense={(exp) => setSelectedExpense(exp)}
+              onOpenLedger={() => setView('ledger')}
+              initialTab={reportsTab}
+            >
+              {plusExtras}
+            </ReportsView>
+          )}
+
+          {view === 'plan' && (
+            <PlanView
+              expenses={expenses}
+              group={group}
+              activeUser={activeUser}
+              members={members}
+              onPlanPurchase={() => setShowPlanPurchase(true)}
+              onLogDeposit={() => openForm('deposit')}
+            />
+          )}
+
+          <footer
+            className="text-center text-xs text-natural-muted mt-auto pt-8 pb-2 scroll-end-safe space-y-1"
+            id="app-footer"
+          >
+            <p>{t('app.footerTagline')}</p>
+            <p className="font-mono">{t('app.footerSync')}</p>
+          </footer>
+        </main>
+      </div>
+
+      {showExport && isPlus && (
+        <Modal
+          onClose={() => setShowExport(false)}
+          title={t('export.title')}
+          bodyClassName="p-4 sm:p-5"
         >
-          <p>{t('app.footerTagline')}</p>
-          <p className="font-mono">{t('app.footerSync')}</p>
-        </footer>
-      </main>
+          <ExportPanel
+            expenses={expenses}
+            activeUser={activeUser}
+            nameOf={(uid) => rosterName(uid, members, activeUser)}
+            groupName={group.name}
+            onDone={() => setShowExport(false)}
+          />
+        </Modal>
+      )}
 
       {showAddGroup && (
         <div className="fixed inset-0 z-50 overflow-auto animate-in fade-in duration-200">
@@ -904,7 +882,7 @@ export default function App() {
 
       {showOrchard && (
         <OrchardMode
-          expenses={expenses}
+          expenses={spendingExpenses}
           group={group}
           activeUser={activeUser}
           onSettle={(e) => {
@@ -968,9 +946,11 @@ export default function App() {
             setShowForm(false);
             setEditingExpense(null);
             setPlanPrefill(null);
+            setFormMode('expense');
           }}
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
+          mode={formMode}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}

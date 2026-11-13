@@ -111,6 +111,11 @@ into a shared account by week or month.
 
 ## Phase 2: Goals and budgets
 
+Owner decision, November 13th 2026: the whole Plan tab (budgets, goals and
+rollover) is Cherry +. Free members see the locked panel on the tab; the
+budget hint on the Log form ("Groceries budget: ... left this month after
+this") is hidden for them.
+
 - **Budget**: per period, per category limit, with a rollover switch per
   category and three groupings the way Monarch groups them: fixed, flexible
   and non-monthly. Household budgets live on the group; personal budgets on
@@ -144,6 +149,23 @@ into a shared account by week or month.
 - **Cross-group personal view**: the member's share across every group,
   loading the other groups' ledgers on demand.
 
+## Cherry + gating of whole tabs (owner, November 13th 2026)
+
+- Reports, Plan and Checkbook are Cherry + tabs. For a free member, selecting
+  the tab opens the paywall (web: `CherryPlusModal`; mobile: the paywall
+  screen) straight away, with the tab's own name and one-line pitch at the top.
+  Closing the paywall returns to the previous tab; the locked panel is the
+  fallback behind it, not the first thing seen.
+- The Balance mark (Log form, Settle) and the budget hint on the Log form are
+  hidden for free members rather than shown locked.
+- RevenueCat must be updated to match, by the owner in the dashboard, before
+  this ships: the paywall's feature list and the offering description for
+  `have_another_cherry` gain Plan (budgets and goals) and Checkbook; the App
+  Store and Google Play in-app purchase descriptions say the same; prices
+  stay where they are and never appear in code. The web paywall reads its
+  feature list from `CherryPlusModal`, so that list changes in the same
+  commit as the gate.
+
 ## What is deferred, and why
 
 - Bank linking: cost per connected account, review and privacy implications,
@@ -160,3 +182,48 @@ Insights and trends are Cherry + on both clients today, so Reports mounts
 behind the same gate until the owner decides otherwise. The web repo's
 CLAUDE.md still says every feature is free; the code and the Flutter docs
 disagree with it, and that contradiction is flagged separately.
+
+## Phase 4: Checkbook (approved by the owner, November 13th 2026; Cherry +)
+
+A private register per bank account, for the person who keeps a paper checkbook
+and does the arithmetic by hand. Nothing in it is shared with the group. The
+whole feature sits behind Cherry + (`hasPlus`): the Checkbook tab shows the
+locked panel for free members, and the Balance mark on the Log form and on
+Settle is hidden for them, so nothing can post to a checkbook they cannot open.
+
+- Accounts: up to 3 checking and 2 savings per user, each with a name, a
+  starting balance and the date it was taken. `checkbooks/{uid}/accounts/{id}`.
+  The house account (Phase 1b) can be linked as a destination for transfers.
+- Entries: `checkbooks/{uid}/entries/{id}` with `accountId`, `date`, `title`,
+  `category`, `amount` (signed: money out negative, money in positive),
+  `cleared` (bool), `source` (`{kind: 'expense'|'settlement'|'deposit'|'bill'|
+  'manual', id}`) and `createdAt`. Balance = starting + sum(amount) in date
+  order; the running balance on each row is derived, never stored.
+- Posting rule (hard): nothing posts on its own. An expense, settlement, house
+  deposit or scheduled bill reaches the register only when the user ticks the
+  mark called "Balance" (a checkbox on the Log form, on each bill row and on
+  Settle). The amount posted for a shared expense is the user's share, not the
+  total. Removing the source entry asks before deleting the register row.
+- Disclaimer (owner, November 13th 2026): the checkbook never connects to a
+  bank. The first open shows a notice, repeated in Settings, that only what
+  the user marks Balance lands in it and that keeping it straight is the
+  user's own responsibility. The wording stays plain and never discourages;
+  the point is that the person watches their own spending.
+- Bills: `checkbooks/{uid}/bills/{id}` with `title`, `amount`, `dueDay`,
+  `accountId`, `recurring`. They show under "Bills to take out" with the
+  recurring mark and count toward "After bills" (balance minus unposted bills
+  due before the next deposit) but never post until added.
+- Clearing: a tick per row. "Cleared" balance = starting + cleared entries.
+  Reconcile = enter the statement balance; the app lists uncleared rows and
+  the difference, the same arithmetic as the back of a paper register.
+- Card payments and transfers are plain entries with a `kind` of `card_payment`
+  or `transfer` (a transfer to a linked account writes both sides).
+- Reports that this unlocks: cash flow (money in vs out by month), balance
+  over time per account, bills calendar, "safe to spend" (balance minus bills
+  before the next deposit).
+- Privacy: checkbook data lives under the user's own document, encrypted like
+  the ledger, and is never read by group reports or exports unless the user
+  includes the "Checkbook" sheet in their own export.
+- Navigation (open decision for the owner): the bottom tab bar has five slots.
+  The canvas shows Checkbook taking the fifth slot and the Vault moving to
+  Home and Settings. The alternative is Checkbook under Plan.

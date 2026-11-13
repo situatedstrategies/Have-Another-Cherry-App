@@ -109,7 +109,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 ## Monetisation (owner decision, November 8th 2026)
 
 - The free tier shows no ads and never will. No AdSense code, ad script or publisher tag (`ca-pub-...`, `google-adsense-account`) may exist anywhere in this repo.
-- Cherry + is the paid tier: the `have_another_cherry` entitlement, read only through `lib/entitlements.hasPlus` (never `isPlus` directly). It gates the Household Vault, monthly trends, Insights, My month ahead, Who's carrying what, Rhythm, Backups and export, creating a Dark Cherry, the spending threshold and Send reminder. Everything else is free.
+- Cherry + is the paid tier: the `have_another_cherry` entitlement, read only through `lib/entitlements.hasPlus` (never `isPlus` directly). It gates the Household Vault, monthly trends, Insights, My month ahead, Who's carrying what, Rhythm, Backups and export, creating a Dark Cherry, the spending threshold and Send reminder, the Plan tab (budgets and goals, including the budget hint on the Log form) and the Checkbook (the whole tab, plus the Balance mark on the Log form and on Settle). The last two are owner decisions of November 13th 2026. Everything else is free.
 - Cherry + is sold as a monthly or yearly subscription or a one-time lifetime purchase, all through RevenueCat: on the web via `CherryPlusModal` and `lib/billing.ts` (Stripe through RevenueCat Web Billing), in the apps through the App Store and Google Play. Prices live in RevenueCat and the stores, never in code or in this file.
 - The November 2nd 2026 ad-supported model (every feature free, one AdSense ad, a one-time Remove ads purchase) is retired and must not be reintroduced.
 

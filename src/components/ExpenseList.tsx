@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { intervalLabel } from '../lib/recurring';
 import { formatCurrency, formatDate } from '../lib/format';
+import CategoryChip from './CategoryChip';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -93,11 +94,6 @@ export default function ExpenseList({
       setSortField(field);
       setSortOrder('desc');
     }
-  };
-
-  const getCategoryColor = (_category: string) => {
-    // Brand system: one hue only. Category chips are uniform neutral zinc.
-    return 'text-natural-muted bg-natural-sidebar border-natural-border';
   };
 
   return (
@@ -258,7 +254,9 @@ export default function ExpenseList({
               }
             } else if (isPayerActive) {
               if (totalRemainingToPayer > 0.01) {
-                balanceText = t('list.othersOweYou', { amount: formatCurrency(totalRemainingToPayer) });
+                balanceText = t('list.othersOweYou', {
+                  amount: formatCurrency(totalRemainingToPayer),
+                });
                 balanceStyle =
                   'text-natural-primary bg-natural-sidebar border-natural-border font-semibold';
               } else {
@@ -325,11 +323,7 @@ export default function ExpenseList({
                       <span className="text-sm font-semibold text-natural-text group-hover:text-natural-dark truncate max-w-full">
                         {exp.title}
                       </span>
-                      <span
-                        className={`text-[10px] font-bold border px-2 py-0.5 rounded-md uppercase tracking-wider ${getCategoryColor(exp.category)}`}
-                      >
-                        {exp.category}
-                      </span>
+                      <CategoryChip name={exp.category} />
                       {exp.isRecurring && (
                         <span
                           role="img"

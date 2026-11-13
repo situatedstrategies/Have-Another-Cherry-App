@@ -8,7 +8,8 @@
 // Dates are the ledger's local YYYY-MM-DD strings, compared as strings. Weeks
 // start on Monday, like the spending thresholds.
 import { Expense } from '../types';
-import { roundCurrency, isDarkCherry, getNormalizedExpenseStatus } from './money';
+import { roundCurrency, isDarkCherry, isDeposit, getNormalizedExpenseStatus } from './money';
+import { getInstrumentClass } from './mismatch';
 import { instrumentOf } from './insights';
 import { parseLocalDate, toLocalIso } from './recurring';
 
@@ -42,7 +43,11 @@ const pad = (n: number): string => String(n).padStart(2, '0');
 const lastDayOfMonth = (year: number, monthIndex: number): number =>
   new Date(year, monthIndex + 1, 0).getDate();
 
-const addMonths = (year: number, monthIndex: number, delta: number): { year: number; monthIndex: number } => {
+const addMonths = (
+  year: number,
+  monthIndex: number,
+  delta: number
+): { year: number; monthIndex: number } => {
   const total = year * 12 + monthIndex + delta;
   return { year: Math.floor(total / 12), monthIndex: ((total % 12) + 12) % 12 };
 };
@@ -128,12 +133,15 @@ export const reportAmount = (e: Expense, filter: Pick<ReportFilter, 'view' | 'ui
   filter.view === 'household' ? e.amount : (e.shares?.[filter.uid] ?? 0);
 
 /** The lines a report runs over: in the period, visible to the viewer, and
- *  matching every optional filter. The date range is the only required one. */
+ *  matching every optional filter. The date range is the only required one.
+ *  House account deposits are never spending, so they are left out here and
+ *  therefore out of every report built on this. */
 export const applyFilter = (expenses: Expense[], filter: ReportFilter): Expense[] => {
   const cats = filter.categories && filter.categories.length ? new Set(filter.categories) : null;
   const payers = filter.payers && filter.payers.length ? new Set(filter.payers) : null;
   return expenses.filter((e) => {
     if (!e.date || e.date < filter.start || e.date > filter.end) return false;
+    if (isDeposit(e)) return false;
     if (isDarkCherry(e) && e.paidBy !== filter.uid) return false;
     if (cats && !cats.has(e.category)) return false;
     if (payers && !payers.has(e.paidBy)) return false;
@@ -166,11 +174,7 @@ export interface Totals {
 
 /** Totals for the filtered period, against the same filter run over the
  *  previous period of the same length. [today] clamps the day count. */
-export const totals = (
-  expenses: Expense[],
-  filter: ReportFilter,
-  today: string
-): Totals => {
+export const totals = (expenses: Expense[], filter: ReportFilter, today: string): Totals => {
   const current = applyFilter(expenses, filter);
   const prev = previousPeriod({ start: filter.start, end: filter.end });
   const previous = applyFilter(expenses, { ...filter, start: prev.start, end: prev.end });
@@ -290,7 +294,9 @@ export const overTime = (
 ): TimePoint[] => {
   const period = { start: filter.start, end: filter.end };
   const prev = previousPeriod(period);
-  const current = groupBy(applyFilter(expenses, filter), filter, (e) => bucketOf(e.date, granularity));
+  const current = groupBy(applyFilter(expenses, filter), filter, (e) =>
+    bucketOf(e.date, granularity)
+  );
   const previous = groupBy(
     applyFilter(expenses, { ...filter, start: prev.start, end: prev.end }),
     filter,
@@ -356,7 +362,11 @@ export interface PersonRow {
 
 /** Household view: who paid how much and who was responsible for how much.
  *  Personal view: how much of the viewer's share each other member fronted. */
-export const byPerson = (expenses: Expense[], filter: ReportFilter, memberIds: string[]): PersonRow[] => {
+export const byPerson = (
+  expenses: Expense[],
+  filter: ReportFilter,
+  memberIds: string[]
+): PersonRow[] => {
   const lines = applyFilter(expenses, filter);
   const paid: Record<string, number> = {};
   const responsible: Record<string, number> = {};
@@ -401,14 +411,20 @@ export const recurringSplit = (expenses: Expense[], filter: ReportFilter): Recur
       oneOff += v;
     }
   }
-  return { recurring: roundCurrency(recurring), oneOff: roundCurrency(oneOff), sources: sources.size };
+  return {
+    recurring: roundCurrency(recurring),
+    oneOff: roundCurrency(oneOff),
+    sources: sources.size,
+  };
 };
 
 /** The largest lines in the period, in the chosen view. */
 export const topExpenses = (expenses: Expense[], filter: ReportFilter, limit = 10): Expense[] =>
   applyFilter(expenses, filter)
     .slice()
-    .sort((a, b) => reportAmount(b, filter) - reportAmount(a, filter) || a.date.localeCompare(b.date))
+    .sort(
+      (a, b) => reportAmount(b, filter) - reportAmount(a, filter) || a.date.localeCompare(b.date)
+    )
     .slice(0, limit);
 
 export interface PivotRow {
@@ -426,7 +442,11 @@ export interface Pivot {
 
 /** Categories down, time buckets across, totals both ways: the sheet view of
  *  a report, and the shape the workbook export writes. */
-export const pivot = (expenses: Expense[], filter: ReportFilter, granularity: Granularity = 'month'): Pivot => {
+export const pivot = (
+  expenses: Expense[],
+  filter: ReportFilter,
+  granularity: Granularity = 'month'
+): Pivot => {
   const columns = bucketsFor({ start: filter.start, end: filter.end }, granularity);
   const rowsByKey: Record<string, PivotRow> = {};
   const columnTotals: Record<string, number> = {};
@@ -442,7 +462,9 @@ export const pivot = (expenses: Expense[], filter: ReportFilter, granularity: Gr
     columnTotals[col] = roundCurrency((columnTotals[col] ?? 0) + v);
     grandTotal = roundCurrency(grandTotal + v);
   }
-  const rows = Object.values(rowsByKey).sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
+  const rows = Object.values(rowsByKey).sort(
+    (a, b) => b.total - a.total || a.key.localeCompare(b.key)
+  );
   return { columns, rows, columnTotals, grandTotal };
 };
 
@@ -480,3 +502,81 @@ export const exportRows = (
       status: statusLabel(e),
       recurring: isRecurringLine(e),
     }));
+
+export interface FrontedRow {
+  uid: string;
+  /** Fronted on a credit card, still being carried until the statement. */
+  credit: number;
+  /** Fronted with money already gone: cash, debit, a transfer, Venmo, Zelle. */
+  ownMoney: number;
+  /** 'OTHER' or never recorded. */
+  unknown: number;
+  total: number;
+}
+
+/** Who fronted what, split by how: in Household view each payer's whole
+ *  amounts, in Personal view the viewer's share of what each other member
+ *  fronted. Members with nothing fronted stay in the list at zero so the
+ *  bars line up with the roster. */
+export const frontedBy = (
+  expenses: Expense[],
+  filter: ReportFilter,
+  memberIds: string[]
+): FrontedRow[] => {
+  const rows: Record<string, FrontedRow> = {};
+  const rowFor = (uid: string) =>
+    (rows[uid] ||= { uid, credit: 0, ownMoney: 0, unknown: 0, total: 0 });
+  for (const uid of memberIds) if (uid) rowFor(uid);
+  for (const e of applyFilter(expenses, filter)) {
+    if (!e.paidBy) continue;
+    if (filter.view === 'personal' && e.paidBy === filter.uid) continue;
+    const v = reportAmount(e, filter);
+    if (v <= 0) continue;
+    const row = rowFor(e.paidBy);
+    const instrument = instrumentOf(e);
+    const cls =
+      instrument === 'UNKNOWN'
+        ? null
+        : getInstrumentClass(instrument as Parameters<typeof getInstrumentClass>[0]);
+    if (cls === 'DEFERRED') row.credit = roundCurrency(row.credit + v);
+    else if (cls === 'IMMEDIATE') row.ownMoney = roundCurrency(row.ownMoney + v);
+    else row.unknown = roundCurrency(row.unknown + v);
+    row.total = roundCurrency(row.total + v);
+  }
+  return Object.values(rows)
+    .filter((r) => filter.view === 'household' || r.uid !== filter.uid)
+    .sort((a, b) => b.total - a.total || a.uid.localeCompare(b.uid));
+};
+
+/** The percent change of each pivot column against the one before it, as a
+ *  whole number; null for the first column and where the previous column was
+ *  zero. The grid's "Change" row. */
+export const columnChanges = (p: Pivot): (number | null)[] =>
+  p.columns.map((col, i) => {
+    if (i === 0) return null;
+    const prev = p.columnTotals[p.columns[i - 1]] ?? 0;
+    if (prev <= 0) return null;
+    return Math.round((((p.columnTotals[col] ?? 0) - prev) / prev) * 100);
+  });
+
+export interface MonthlyStats {
+  months: number;
+  perMonth: number;
+  high: number;
+  low: number;
+}
+
+/** The average, highest and lowest whole month over the period, for the
+ *  totals strip. Months with nothing count as zero, like the chart shows. */
+export const monthlyStats = (expenses: Expense[], filter: ReportFilter): MonthlyStats => {
+  const points = overTime(expenses, filter, 'month');
+  const values = points.map((p) => p.total);
+  const total = roundCurrency(values.reduce((t, v) => t + v, 0));
+  const months = Math.max(1, values.length);
+  return {
+    months,
+    perMonth: roundCurrency(total / months),
+    high: values.length ? Math.max(...values) : 0,
+    low: values.length ? Math.min(...values) : 0,
+  };
+};

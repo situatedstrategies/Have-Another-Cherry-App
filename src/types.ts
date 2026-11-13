@@ -92,13 +92,17 @@ export interface Group {
 // 'dark_cherry' is the blind split (a Plus feature): the creator sets the pot
 // target (the expense amount) plus a min/max per logged payment; everyone else
 // only ever sees the allowed payment range, never the total or what remains.
+// 'deposit' is a payment into the house account: `paidBy` is the depositor,
+// `shares` is empty, so nothing is owed to anyone and spending reports leave
+// it out (lib/money.isDeposit, lib/deposits). Same value in the Flutter app.
 export type SplitType =
   | 'household_default'
   | 'equal'
   | 'custom_percentage'
   | 'custom_amount'
   | 'third_party'
-  | 'dark_cherry';
+  | 'dark_cherry'
+  | 'deposit';
 
 // 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
 // their own instruments so the settle flow can hand the payer into those apps.
