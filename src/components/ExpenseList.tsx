@@ -18,12 +18,11 @@ import {
   Clock,
   CheckCircle2,
   RefreshCw,
-  Repeat,
   Cherry,
 } from 'lucide-react';
-import { intervalLabel } from '../lib/recurring';
 import { formatCurrency, formatDate } from '../lib/format';
 import CategoryChip from './CategoryChip';
+import RecurringMark from './RecurringMark';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -324,19 +323,8 @@ export default function ExpenseList({
                         {exp.title}
                       </span>
                       <CategoryChip name={exp.category} />
-                      {exp.isRecurring && (
-                        <span
-                          role="img"
-                          aria-label={t('list.recurringLabel', {
-                            label: intervalLabel(exp.recurringInterval || ''),
-                          })}
-                          className="text-xs font-bold text-natural-primary bg-natural-primary/10 border border-natural-primary/20 px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                          title={t('list.recurringLabel', {
-                            label: intervalLabel(exp.recurringInterval || ''),
-                          })}
-                        >
-                          <Repeat size={10} />
-                        </span>
+                      {(exp.isRecurring || exp.recurringSourceId) && (
+                        <RecurringMark interval={exp.recurringInterval} />
                       )}
                     </div>
 

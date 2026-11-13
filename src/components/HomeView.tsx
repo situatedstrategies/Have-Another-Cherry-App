@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Camera, Plus, ArrowRight } from 'lucide-react';
 import { Expense } from '../types';
 import {
@@ -11,15 +11,17 @@ import {
   isUnclaimed,
   roundCurrency,
 } from '../lib/money';
-import { formatAmount, formatDateWith, formatShortDate } from '../lib/format';
+import { formatAmount, formatCurrency, formatDateWith, formatShortDate } from '../lib/format';
 import { nameOf as rosterName } from '../lib/members';
-import { todayLocal, parseLocalDate, intervalLabel } from '../lib/recurring';
+import { todayLocal, parseLocalDate } from '../lib/recurring';
 import { periodBounds, totals, byCategory, isRecurringLine } from '../lib/reports';
 import { forecastMonth } from '../lib/forecast';
 import { instrumentShortLabel } from '../lib/instruments';
 import { instrumentOf, UNKNOWN_INSTRUMENT } from '../lib/insights';
 import { categoryColor } from '../lib/ui';
+import { BudgetStatus, budgetPace, budgetAlertLevel, budgetToWatch } from '../lib/plan';
 import CategoryChip from './CategoryChip';
+import RecurringMark from './RecurringMark';
 import { panel, label, Chip, GhostButton, PrimaryButton, StatusPill, PageHeader } from './Controls';
 
 interface Props {
@@ -36,6 +38,10 @@ interface Props {
   onOpenReports: () => void;
   /** Rendered in the right column under the three cards (My month ahead). */
   aside?: React.ReactNode;
+  /** This month's budget statuses (lib/plan) for the budget tile and the
+   *  nudges; null for a free member, [] when nothing is budgeted. */
+  budgets?: BudgetStatus[] | null;
+  onOpenPlan?: () => void;
 }
 
 type LedgerFilter = 'all' | 'open' | 'settled' | 'recurring';
@@ -59,6 +65,8 @@ export default function HomeView({
   onOpenLedger,
   onOpenReports,
   aside,
+  budgets,
+  onOpenPlan,
 }: Props) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>('all');
@@ -121,6 +129,21 @@ export default function HomeView({
   );
   const catMax = categories[0]?.total || 1;
 
+  // The budget tile: everything budgeted this month against its limits, and
+  // the alerts-on budgets that have crossed 80% or 100% for "Up next".
+  const budget = useMemo(() => {
+    if (!budgets || budgets.length === 0) return null;
+    const limit = budgets.reduce((s, b) => s + b.limit, 0);
+    const spent = budgets.reduce((s, b) => s + b.spent, 0);
+    const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+    const pace = budgetPace({ spent }, today.slice(0, 7), today);
+    const watch = budgetToWatch(budgets);
+    const alerts = budgets
+      .map((b) => ({ status: b, level: budgetAlertLevel(b) }))
+      .filter((a): a is { status: BudgetStatus; level: 'over' | 'near' } => a.level !== null);
+    return { limit, spent, pct, onPace: pace.projected <= limit, watch, alerts };
+  }, [budgets, today]);
+
   const comingUp = useMemo(() => {
     const items: { id: string; title: string; date: string; note: string }[] = [];
     for (const offset of [0, 1]) {
@@ -133,7 +156,7 @@ export default function HomeView({
           id: i.id,
           title: i.title,
           date: i.date,
-          note: def?.recurringInterval ? intervalLabel(def.recurringInterval) : '',
+          note: def?.recurringInterval || '',
         });
       }
     }
@@ -165,12 +188,23 @@ export default function HomeView({
     month: 'long',
   });
   const monthName = formatDateWith(now, { month: 'long' });
+  const mono = { m: <span className="font-mono text-natural-text" /> };
   const changeLine =
-    household.changePct === null
-      ? t('home.noPreviousMonth')
-      : household.changePct < 0
-        ? t('home.downOn', { pct: Math.abs(household.changePct), month: prevMonthName })
-        : t('home.upOn', { pct: household.changePct, month: prevMonthName });
+    household.changePct === null ? (
+      t('home.noPreviousMonth')
+    ) : household.changePct < 0 ? (
+      <Trans
+        i18nKey="home.downOn"
+        values={{ pct: Math.abs(household.changePct), month: prevMonthName }}
+        components={mono}
+      />
+    ) : (
+      <Trans
+        i18nKey="home.upOn"
+        values={{ pct: household.changePct, month: prevMonthName }}
+        components={mono}
+      />
+    );
 
   const tile = `${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2 min-w-0`;
   const big = 'font-mono text-[32px] leading-9 font-medium tracking-tight';
@@ -182,8 +216,13 @@ export default function HomeView({
         subtitle={
           <>
             {formatDateWith(now, { weekday: 'long', month: 'long', day: 'numeric' })}.{' '}
-            {t('home.openCount', { count: openCount })}
-            {balances.waiting > 0 && `, ${t('home.waitingCount', { count: balances.waiting })}`}.
+            <Trans i18nKey="home.openCount" count={openCount} components={mono} />
+            {balances.waiting > 0 && (
+              <>
+                , <Trans i18nKey="home.waitingCount" count={balances.waiting} components={mono} />
+              </>
+            )}
+            .
             {greetingNote && (
               <span className="block text-natural-primary italic mt-0.5">{greetingNote}</span>
             )}
@@ -215,35 +254,95 @@ export default function HomeView({
             {formatAmount(balances.youOwe)}
           </span>
           <span className="text-[13px] leading-[18px] text-natural-muted">
-            {balances.top
-              ? t('home.itemsTo', { count: balances.youOweCount, name: nameOf(balances.top[0]) }) +
-                (balances.oldestDays !== null
-                  ? `, ${t('home.oldestDays', { count: balances.oldestDays })}`
-                  : '')
-              : t('home.nothingOwed')}
+            {balances.top ? (
+              <>
+                <Trans
+                  i18nKey="home.itemsTo"
+                  count={balances.youOweCount}
+                  values={{ name: nameOf(balances.top[0]) }}
+                  components={mono}
+                />
+                {balances.oldestDays !== null && (
+                  <>
+                    ,{' '}
+                    <Trans
+                      i18nKey="home.oldestDays"
+                      count={balances.oldestDays}
+                      components={mono}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
+              t('home.nothingOwed')
+            )}
           </span>
         </section>
         <section className={tile} id="tile-owed-to-you">
           <span className={label}>{t('home.owedToYou')}</span>
           <span className={big}>{formatAmount(balances.owedToYou)}</span>
           <span className="text-[13px] leading-[18px] text-natural-muted">
-            {balances.owedCount > 0
-              ? t('home.itemsOwed', { count: balances.owedCount })
-              : t('home.nobodyOwesYou')}
+            {balances.owedCount > 0 ? (
+              <Trans i18nKey="home.itemsOwed" count={balances.owedCount} components={mono} />
+            ) : (
+              t('home.nobodyOwesYou')
+            )}
           </span>
         </section>
-        <section className={tile} id="tile-budget">
-          <span className={label}>{t('home.budget')}</span>
-          <span className="font-display text-2xl leading-9 font-semibold text-natural-muted">
-            {t('home.comingSoon')}
+        <button
+          type="button"
+          onClick={onOpenPlan}
+          className={`${tile} text-left cursor-pointer hover:border-natural-primary/40 transition-colors`}
+          id="tile-budget"
+        >
+          <span className={`${label} flex items-center justify-between gap-2`}>
+            {t('home.budget')}
+            {budgets === null && (
+              <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded normal-case">
+                Cherry +
+              </span>
+            )}
           </span>
-          <span className="h-1.5 rounded-full bg-natural-sidebar overflow-hidden block">
-            <span className="block h-full w-0 bg-natural-dark rounded-full" />
-          </span>
-          <span className="text-[13px] leading-[18px] text-natural-muted">
-            {t('home.budgetBody')}
-          </span>
-        </section>
+          {budget ? (
+            <>
+              <span className={big}>{budget.pct}%</span>
+              <span className="h-1.5 rounded-full bg-natural-sidebar overflow-hidden block">
+                <span
+                  className={`block h-full rounded-full ${budget.spent > budget.limit ? 'bg-natural-primary' : 'bg-natural-dark'}`}
+                  style={{ width: `${Math.min(100, budget.pct)}%` }}
+                />
+              </span>
+              <span className="text-[13px] leading-[18px] text-natural-muted">
+                {budget.onPace ? t('home.onPace') : t('home.offPace')}{' '}
+                {budget.watch &&
+                  (budget.watch.over ? (
+                    <Trans
+                      i18nKey="home.overBy"
+                      values={{
+                        category: budget.watch.category,
+                        amount: formatCurrency(Math.abs(budget.watch.left), 0),
+                      }}
+                      components={{ m: <span className="font-mono text-natural-primary" /> }}
+                    />
+                  ) : (
+                    t('home.nearLimit', { category: budget.watch.category })
+                  ))}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-display text-2xl leading-9 font-semibold text-natural-muted">
+                {budgets === null ? t('home.budgetLocked') : t('home.noBudgets')}
+              </span>
+              <span className="h-1.5 rounded-full bg-natural-sidebar overflow-hidden block">
+                <span className="block h-full w-0 bg-natural-dark rounded-full" />
+              </span>
+              <span className="text-[13px] leading-[18px] text-natural-muted">
+                {t('home.budgetBody')}
+              </span>
+            </>
+          )}
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-4 items-start">
@@ -303,12 +402,12 @@ export default function HomeView({
                       aria-label={t('list.openAria', { title: e.title })}
                     >
                       <td className="px-5 py-3 font-medium">
-                        <span className="block truncate max-w-[16rem]">{e.title}</span>
+                        <span className="flex items-center gap-1.5 max-w-[16rem]">
+                          <span className="truncate">{e.title}</span>
+                          {isRecurringLine(e) && <RecurringMark interval={e.recurringInterval} />}
+                        </span>
                         <span className="block text-xs text-natural-muted font-normal">
                           {formatShortDate(e.date)}
-                          {isRecurringLine(e) && e.recurringInterval
-                            ? `, ${intervalLabel(e.recurringInterval).toLowerCase()}`
-                            : ''}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -369,6 +468,35 @@ export default function HomeView({
             id="up-next"
           >
             <span className={`${label} text-natural-primary`}>{t('home.upNext')}</span>
+            {budget && budget.alerts.length > 0 && (
+              <div className="flex flex-col gap-1.5" id="budget-alerts">
+                {budget.alerts.map(({ status, level }) => (
+                  <button
+                    key={status.id}
+                    type="button"
+                    onClick={onOpenPlan}
+                    className="flex items-center gap-2 text-[13px] leading-[18px] text-left cursor-pointer hover:text-natural-primary"
+                  >
+                    <CategoryChip name={status.category} />
+                    <span className="min-w-0">
+                      {level === 'over' ? (
+                        <Trans
+                          i18nKey="home.alertOver"
+                          values={{ amount: formatCurrency(Math.abs(status.left), 0) }}
+                          components={{ m: <span className="font-mono text-natural-primary" /> }}
+                        />
+                      ) : (
+                        <Trans
+                          i18nKey="home.alertNear"
+                          values={{ amount: formatCurrency(status.left, 0) }}
+                          components={mono}
+                        />
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             {balances.top ? (
               <>
                 <span className="text-[15px] leading-5 font-medium">
@@ -376,7 +504,7 @@ export default function HomeView({
                   <span className="font-mono">{formatAmount(balances.top[1])}</span>
                 </span>
                 <span className="text-[13px] leading-[18px] text-natural-muted">
-                  {t('home.settleBody', { count: balances.youOweCount })}
+                  <Trans i18nKey="home.settleBody" count={balances.youOweCount} components={mono} />
                 </span>
                 <button
                   type="button"
@@ -443,11 +571,9 @@ export default function HomeView({
               <div className="flex flex-col gap-2 text-[13px] leading-[18px]">
                 {comingUp.map((i) => (
                   <div key={i.id} className="flex justify-between gap-3">
-                    <span className="truncate">
-                      {i.title}
-                      {i.note && (
-                        <span className="text-natural-muted">, {i.note.toLowerCase()}</span>
-                      )}
+                    <span className="truncate flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{i.title}</span>
+                      {i.note && <RecurringMark interval={i.note} />}
                     </span>
                     <span className="font-mono text-natural-muted shrink-0">
                       {formatShortDate(i.date)}

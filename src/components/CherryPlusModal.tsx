@@ -22,10 +22,14 @@ export default function CherryPlusModal({
   onClose,
   customerEmail,
   onPurchased,
+  intro,
 }: {
   onClose: () => void;
   customerEmail?: string;
   onPurchased?: () => void;
+  /** The tab that opened the page (Reports, Plan) and its one-line pitch,
+   *  shown at the top so the page says why it is here. */
+  intro?: { title: string; pitch: string } | null;
 }) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
@@ -107,6 +111,20 @@ export default function CherryPlusModal({
       icon={<Cherry className="h-5 w-5 text-natural-primary" />}
     >
       <div className="space-y-5 text-center">
+        {intro && purchaseState !== 'purchased' && (
+          <div
+            className="text-left bg-natural-bg border border-natural-border rounded-2xl px-4 py-3"
+            id="plus-intro"
+          >
+            <p className="flex items-center gap-2 font-display text-lg font-semibold text-natural-text">
+              {intro.title}
+              <span className="text-[10px] font-sans font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
+                Cherry +
+              </span>
+            </p>
+            <p className="mt-0.5 text-sm text-natural-muted">{intro.pitch}</p>
+          </div>
+        )}
         <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full">
           <Cherry className="h-10 w-10 text-natural-primary" />
         </div>
@@ -174,13 +192,9 @@ export default function CherryPlusModal({
               </a>
             )}
             {isSandboxBilling && (
-              <p className="text-[10px] text-natural-muted">
-                {t('plus.sandbox')}
-              </p>
+              <p className="text-[10px] text-natural-muted">{t('plus.sandbox')}</p>
             )}
-            <p className="text-[10px] text-natural-muted max-w-sm mx-auto">
-              {t('plus.fineprint')}
-            </p>
+            <p className="text-[10px] text-natural-muted max-w-sm mx-auto">{t('plus.fineprint')}</p>
           </div>
         ) : plans === null ? (
           <p className="text-sm text-natural-muted">{t('common.loading')}</p>
@@ -229,17 +243,13 @@ export default function CherryPlusModal({
                     {t('plus.couldNotSave')}
                   </p>
                 )}
-                <p className="text-xs text-natural-muted">
-                  {t('plus.justLaunchNews')}
-                </p>
+                <p className="text-xs text-natural-muted">{t('plus.justLaunchNews')}</p>
               </form>
             )}
 
             <div className="flex items-start gap-3 text-left bg-natural-pebble/60 border border-natural-border rounded-xl p-3.5 max-w-sm mx-auto">
               <Smartphone className="h-4 w-4 text-natural-primary shrink-0 mt-0.5" />
-              <p className="text-xs text-natural-muted leading-relaxed">
-                {t('plus.buyInApps')}
-              </p>
+              <p className="text-xs text-natural-muted leading-relaxed">{t('plus.buyInApps')}</p>
             </div>
           </>
         )}

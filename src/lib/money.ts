@@ -29,6 +29,11 @@ export const isDarkCherry = (expense: Expense): boolean => expense.splitType ===
  *  client's domain/ledger/money.dart. */
 export const isDeposit = (expense: Expense): boolean => expense.splitType === 'deposit';
 
+/** A contribution to a plan goal (lib/plan). In the ledger like a deposit,
+ *  never spending and never a debt: the contributor's own share equals the
+ *  amount. Mirrors isGoalContribution in the Flutter client. */
+export const isGoalContribution = (expense: Expense): boolean => expense.splitType === 'goal';
+
 export const getDarkCherryPotTotal = (expense: Expense, includePending = true): number =>
   roundCurrency(
     (expense.settlements || [])

@@ -18,6 +18,7 @@
   --color-natural-muted: #52525b;
   --color-natural-sage: #e4e4e7;
   --color-natural-dark: #18181b;
+  --color-natural-teal: #0f766e; /* funded, under budget, the good news colour */
 
   /* Pebble.
      Every neutral above sits at hue 240 and about 5% saturation, which is

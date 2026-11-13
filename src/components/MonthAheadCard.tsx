@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CalendarRange, Sparkles, Repeat } from 'lucide-react';
+import { CalendarRange, Sparkles } from 'lucide-react';
+import RecurringMark from './RecurringMark';
 import { Expense } from '../types';
 import { forecastMonth } from '../lib/forecast';
 import { todayLocal, parseLocalDate } from '../lib/recurring';
@@ -148,14 +149,15 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
               {shown.map((i) => (
                 <li key={i.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                   <div className="min-w-0">
-                    <span className="block truncate font-medium text-natural-text">{i.title}</span>
+                    <span className="flex items-center gap-1.5 font-medium text-natural-text">
+                      <span className="truncate">{i.title}</span>
+                      {i.kind === 'projected' && <RecurringMark />}
+                    </span>
                     <span className="font-mono text-[10px] text-natural-muted flex items-center gap-1">
                       {formatShortDate(i.date)}
                       {i.kind === 'projected' && (
                         <>
-                          <span aria-hidden="true">·</span>
-                          <Repeat className="h-2.5 w-2.5" aria-hidden="true" />{' '}
-                          {t('monthAhead.expected')}
+                          <span aria-hidden="true">·</span> {t('monthAhead.expected')}
                         </>
                       )}
                     </span>

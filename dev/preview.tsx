@@ -14,7 +14,12 @@ import ReportsView from '../src/components/ReportsView';
 import PlanView from '../src/components/PlanView';
 import ExportPanel from '../src/components/ExportPanel';
 import MonthAheadCard from '../src/components/MonthAheadCard';
-import { toLocalIso } from '../src/lib/recurring';
+import ExpenseForm from '../src/components/ExpenseForm';
+import CherryPlusModal from '../src/components/CherryPlusModal';
+import SettleUpModal from '../src/components/SettleUpModal';
+import { toLocalIso, todayLocal } from '../src/lib/recurring';
+import { Budget, Goal, PlanPayload, PlanScope, monthOf, planStatuses } from '../src/lib/plan';
+import { t } from '../src/i18n';
 
 const A = 'olivia';
 const B = 'sam';
@@ -54,6 +59,7 @@ const line = (
     recurring?: string;
     sourceId?: string;
     deposit?: boolean;
+    goal?: string;
   } = {}
 ): Expense => {
   const paidBy = o.paidBy ?? A;
@@ -72,8 +78,9 @@ const line = (
     contributions: [
       { userId: paidBy, amount, instrumentType: (o.instrument ?? 'CREDIT') as 'CREDIT' },
     ],
-    splitType: o.deposit ? 'deposit' : 'household_default',
-    shares: o.deposit ? {} : { [A]: aShare, [B]: bShare },
+    splitType: o.deposit ? 'deposit' : o.goal ? 'goal' : 'household_default',
+    shares: o.deposit ? {} : o.goal ? { [paidBy]: amount } : { [A]: aShare, [B]: bShare },
+    ...(o.goal ? { goalId: o.goal } : {}),
     status: 'OPEN',
     createdAt: `${date}T12:00:00.000Z`,
     ...(o.recurring ? { isRecurring: true, recurringInterval: o.recurring } : {}),
@@ -143,13 +150,96 @@ const expenses: Expense[] = [
     instrument: 'TRANSFER',
     deposit: true,
   }),
+  // Goal contributions: in the ledger, never spending.
+  line('Couch fund', 120, d(3, 20), 'Couch fund', { instrument: 'TRANSFER', goal: 'couch' }),
+  line('Couch fund', 100, d(2, 20), 'Couch fund', {
+    paidBy: B,
+    instrument: 'TRANSFER',
+    goal: 'couch',
+  }),
+  line('Couch fund', 120, d(1, 20), 'Couch fund', { instrument: 'TRANSFER', goal: 'couch' }),
+  line('Couch fund', 300, d(0, 2), 'Couch fund', {
+    paidBy: B,
+    instrument: 'TRANSFER',
+    goal: 'couch',
+  }),
+  line('Deposit buffer', 2000, d(4, 1), 'Deposit buffer', {
+    instrument: 'TRANSFER',
+    goal: 'buffer',
+  }),
 ];
+
+const thisMonth = monthOf(todayLocal());
+const startMonth = d(2, 1).slice(0, 7);
+const budget = (id: string, category: string, limit: number, o: Partial<Budget> = {}): Budget => ({
+  id,
+  category,
+  limit,
+  group: 'flexible',
+  rollover: false,
+  alerts: true,
+  startMonth,
+  scope: 'household',
+  ...o,
+});
+const householdPlan: PlanPayload = {
+  budgets: [
+    budget('groceries', 'Groceries', 320),
+    budget('dining', 'Dining', 60),
+    budget('household', 'Household', 40, { rollover: true }),
+    budget('utilities', 'Utilities', 240, { group: 'fixed', alerts: false }),
+    budget('transport', 'Transport', 200, { group: 'fixed', alerts: false }),
+    budget('insurance', 'Insurance', 90, { group: 'nonMonthly', rollover: true }),
+  ],
+  goals: [
+    {
+      id: 'couch',
+      name: 'Couch fund',
+      target: 1200,
+      dueDate: `${thisMonth.slice(0, 4)}-12-01`,
+      scope: 'household',
+      createdAt: `${d(3, 1)}T12:00:00.000Z`,
+    },
+    {
+      id: 'buffer',
+      name: 'Deposit buffer',
+      target: 2000,
+      scope: 'household',
+      createdAt: `${d(4, 1)}T12:00:00.000Z`,
+    },
+    {
+      id: 'trip',
+      name: 'Spring trip',
+      target: 600,
+      scope: 'household',
+      createdAt: `${d(5, 1)}T12:00:00.000Z`,
+      doneAt: `${d(1, 1)}T12:00:00.000Z`,
+    },
+  ],
+};
+const personalPlan: PlanPayload = {
+  budgets: [
+    budget('p-groceries', 'Groceries', 180, { scope: 'personal' }),
+    budget('p-dining', 'Dining', 50, { scope: 'personal', rollover: true }),
+  ],
+  goals: [
+    {
+      id: 'bike',
+      name: 'Bike',
+      target: 500,
+      dueDate: `${Number(thisMonth.slice(0, 4)) + 1}-06-01`,
+      scope: 'personal',
+      createdAt: `${d(0, 1)}T12:00:00.000Z`,
+    },
+  ],
+};
 
 const members = group.members;
 const noop = () => {};
 const params = new URLSearchParams(window.location.search);
 const which = params.get('view') || 'home';
 const plus = params.get('plus') !== '0';
+const goalForm = params.get('goal') === '1';
 
 function Preview() {
   const initialSheet = which === 'sheet';
@@ -176,6 +266,16 @@ function Preview() {
           : 'home'
   );
   const [menu, setMenu] = useState(false);
+  const [plans, setPlans] = useState({ household: householdPlan, personal: personalPlan });
+  const [showPlus, setShowPlus] = useState(which === 'plan' && !plus);
+  const savePlan = async (scope: PlanScope, next: PlanPayload) => {
+    setPlans((p) => ({ ...p, [scope]: next }));
+    return true;
+  };
+  const budgetStatuses = plus
+    ? planStatuses(expenses, householdPlan.budgets, thisMonth, 'household', A)
+    : null;
+  const goal: Goal = householdPlan.goals[0];
 
   return (
     <div
@@ -185,7 +285,14 @@ function Preview() {
       <div className="flex flex-col md:flex-row md:items-stretch min-h-screen">
         <Sidebar
           view={view}
-          onNavigate={(v) => v !== 'vault' && setView(v)}
+          onNavigate={(v) => {
+            if (v === 'vault') return;
+            if ((v === 'reports' || v === 'plan') && !plus) {
+              setShowPlus(true);
+              return;
+            }
+            setView(v);
+          }}
           onSettings={noop}
           groupName="Maple Street"
           groupDetail="60 / 40 with Sam"
@@ -220,6 +327,8 @@ function Preview() {
               onSettle={noop}
               onOpenLedger={() => setView('ledger')}
               onOpenReports={() => setView('reports')}
+              budgets={budgetStatuses}
+              onOpenPlan={() => setView('plan')}
               aside={
                 <MonthAheadCard
                   expenses={expenses.filter((e) => e.splitType !== 'deposit')}
@@ -261,12 +370,55 @@ function Preview() {
               group={group}
               activeUser={A}
               members={members}
+              locked={!plus}
+              onUnlock={() => setShowPlus(true)}
+              household={plans.household}
+              personal={plans.personal}
+              onSave={savePlan}
+              onContribute={noop}
               onPlanPurchase={noop}
               onLogDeposit={noop}
             />
           )}
         </main>
       </div>
+      {which === 'log' && (
+        <ExpenseForm
+          group={group}
+          activeUser={A}
+          onClose={noop}
+          onSubmit={noop}
+          mode={goalForm ? 'goal' : 'expense'}
+          goal={goalForm ? { id: goal.id, name: goal.name } : null}
+          budgets={plus ? [...householdPlan.budgets, ...personalPlan.budgets] : undefined}
+          expenses={expenses}
+          isPlus={plus}
+          prefill={
+            goalForm
+              ? null
+              : { title: 'Groceries', amount: 86.4, paidBy: A, splitType: 'household_default' }
+          }
+        />
+      )}
+      {which === 'settle' && (
+        <SettleUpModal
+          expense={expenses[1]}
+          group={group}
+          activeUser={A}
+          paymentHandlesByUid={{ [B]: { venmo: 'sam-maple' } }}
+          onClose={noop}
+          onSubmit={noop}
+        />
+      )}
+      {showPlus && (
+        <CherryPlusModal
+          onClose={() => setShowPlus(false)}
+          intro={{
+            title: t(which === 'reports' ? 'nav.reports' : 'nav.plan'),
+            pitch: t(which === 'reports' ? 'plus.pitchReports' : 'plus.pitchPlan'),
+          }}
+        />
+      )}
     </div>
   );
 }

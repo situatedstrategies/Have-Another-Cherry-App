@@ -140,6 +140,13 @@ service cloud.firestore {
           request.auth.uid == userId
           || sharesVerifiedActiveGroup(userId)
         );
+
+      // The member's own private documents: the personal plan (budgets and
+      // goals, encrypted with the uid key). Never readable by another member.
+      match /private/{docId} {
+        allow read, create, update, delete:
+          if signedIn() && request.auth.uid == userId;
+      }
     }
 
     match /groups/{groupId} {
@@ -197,6 +204,14 @@ service cloud.firestore {
         allow read, create, update, delete:
           if isGroupMember(groupId);
       }
+    }
+
+    // Plans: budgets and goals, one encrypted payload per group under the
+    // group key (lib/plan, hooks/usePlan), stored and guarded exactly like
+    // the vault. Goal contributions themselves are ledger lines.
+    match /group_plans/{groupId} {
+      allow read, create, update, delete:
+        if isGroupMember(groupId);
     }
 
     // Reminder schedules: the only household data that is deliberately NOT

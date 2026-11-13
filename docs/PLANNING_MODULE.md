@@ -185,6 +185,11 @@ disagree with it, and that contradiction is flagged separately.
 
 ## Phase 4: Checkbook (approved by the owner, November 13th 2026; Cherry +)
 
+Mobile only (owner, November 13th 2026). The Checkbook ships in the iOS and
+Android apps and does not exist on the web: no tab, no route, no Balance mark on
+the web Log form or Settle, and the web export never carries a Checkbook sheet.
+The web paywall copy does not mention it.
+
 A private register per bank account, for the person who keeps a paper checkbook
 and does the arithmetic by hand. Nothing in it is shared with the group. The
 whole feature sits behind Cherry + (`hasPlus`): the Checkbook tab shows the

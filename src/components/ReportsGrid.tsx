@@ -9,12 +9,14 @@ import {
   bucketOf,
   reportAmount,
   monthKey,
+  isRecurringLine,
 } from '../lib/reports';
 import { formatAmount, formatDateWith, formatShortDate } from '../lib/format';
 import { parseLocalDate } from '../lib/recurring';
 import { instrumentOf, UNKNOWN_INSTRUMENT } from '../lib/insights';
 import { instrumentShortLabel } from '../lib/instruments';
 import CategoryChip from './CategoryChip';
+import RecurringMark from './RecurringMark';
 import { panel, label } from './Controls';
 
 interface Props {
@@ -185,7 +187,14 @@ export default function ReportsGrid({ expenses, filter, today, onOpenExpense }: 
                     className="w-full flex justify-between gap-3 py-2.5 text-sm text-left hover:text-natural-primary cursor-pointer min-h-[44px] items-center"
                   >
                     <span className="truncate">
-                      {e.title}, {formatShortDate(e.date)}
+                      {e.title}
+                      {isRecurringLine(e) && (
+                        <>
+                          {' '}
+                          <RecurringMark interval={e.recurringInterval} />
+                        </>
+                      )}
+                      , {formatShortDate(e.date)}
                       {inst !== UNKNOWN_INSTRUMENT && (
                         <span className="text-natural-muted">
                           , {instrumentShortLabel(inst).toLowerCase()}
