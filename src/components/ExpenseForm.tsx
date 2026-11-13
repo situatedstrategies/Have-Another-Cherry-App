@@ -28,6 +28,7 @@ import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
 import { roundCurrency } from '../lib/money';
 import { Budget, budgetStatus, monthOf } from '../lib/plan';
+import { CategoryRule, categoryFor } from '../lib/rules';
 import {
   advanceIntervalStr,
   parseLocalDate,
@@ -68,8 +69,11 @@ interface ExpenseFormProps {
    *  household's and the member's own; the household one wins for a category
    *  that has both. */
   budgets?: Budget[];
-  /** The ledger the hint measures the month's spending from. */
+  /** The ledger the hint measures the month's spending from, and the history
+   *  the category guess reads. */
   expenses?: Expense[];
+  /** The household's category rules (lib/rules): a match preselects the category. */
+  rules?: CategoryRule[];
 }
 
 export default function ExpenseForm({
@@ -86,6 +90,7 @@ export default function ExpenseForm({
   goal,
   budgets,
   expenses,
+  rules,
 }: ExpenseFormProps) {
   const { t } = useTranslation();
   const deposit = mode === 'deposit' || editingExpense?.splitType === 'deposit';
@@ -355,43 +360,16 @@ export default function ExpenseForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingExpense?.id]);
 
-  // Suggest a category/split from the title, but only while the user hasn't
-  // chosen a category yet (and never when editing) - so we don't override them.
+  // Preselect a category from the title while the person has not typed one
+  // (and never when editing): a household rule first, then what this group
+  // called the same title before, then plain keywords (lib/rules.categoryFor).
   useEffect(() => {
     if (editingExpense || category || simple) return;
-    const lowerTitle = title.toLowerCase();
-    if (lowerTitle.includes('rent')) {
-      setCategory('Rent');
-      setSplitType('household_default');
-    } else if (lowerTitle.includes('internet') || lowerTitle.includes('wifi')) {
-      setCategory('Internet');
-      setSplitType('household_default');
-    } else if (
-      lowerTitle.includes('power') ||
-      lowerTitle.includes('water') ||
-      lowerTitle.includes('utility') ||
-      lowerTitle.includes('gas') ||
-      lowerTitle.includes('electric')
-    ) {
-      setCategory('Utilities');
-      setSplitType('household_default');
-    } else if (
-      lowerTitle.includes('grocery') ||
-      lowerTitle.includes('groceries') ||
-      lowerTitle.includes('food')
-    ) {
-      setCategory('Groceries');
-      setSplitType('equal');
-    } else if (
-      lowerTitle.includes('dinner') ||
-      lowerTitle.includes('restaurant') ||
-      lowerTitle.includes('lunch') ||
-      lowerTitle.includes('cafe')
-    ) {
-      setCategory('Dining Out');
-      setSplitType('equal');
-    }
-  }, [title, category, editingExpense, simple]);
+    const guess = categoryFor(title, rules || [], expenses || [], categories);
+    if (guess) setCategory(guess);
+    // Only the title should trigger a new guess; `category` is the guard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, editingExpense, simple]);
 
   const numericAmount = parseFloat(amount) || 0;
 

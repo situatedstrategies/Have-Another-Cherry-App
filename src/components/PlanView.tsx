@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Target, TrendingUp, ArrowRight, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
+import {
+  Target,
+  TrendingUp,
+  ArrowRight,
+  Plus,
+  SlidersHorizontal,
+  Sparkles,
+  Tag,
+} from 'lucide-react';
 import { Expense, Group } from '../types';
 import {
   Budget,
@@ -19,6 +27,8 @@ import {
   monthOf,
 } from '../lib/plan';
 import { ReportView } from '../lib/reports';
+import { mergePersonalAcrossGroups } from '../lib/crossGroup';
+import { useOtherLedgers, OtherLedgers } from '../hooks/useOtherLedgers';
 import { todayLocal, parseLocalDate } from '../lib/recurring';
 import { formatCurrency, formatDateWith } from '../lib/format';
 import { categoryColor } from '../lib/ui';
@@ -27,6 +37,7 @@ import ModuleBoundary from './ModuleBoundary';
 import CategoryChip from './CategoryChip';
 import BudgetEditor from './BudgetEditor';
 import GoalSheet from './GoalSheet';
+import RulesSheet from './RulesSheet';
 import { panel, label, PageHeader, Segmented, GhostButton } from './Controls';
 
 interface Props {
@@ -44,7 +55,17 @@ interface Props {
   onContribute: (goal: Goal) => void;
   onPlanPurchase: () => void;
   onLogDeposit: () => void;
+  /** Open the Rules sheet on mount (the dev preview uses this). */
+  initialRulesOpen?: boolean;
+  /** The member's other groups; with any, the view offers "All my groups":
+   *  the personal plan with actuals summed across every group. */
+  otherGroupIds?: string[];
+  /** Dev harness only: the other ledgers without Firebase. */
+  presetOtherLedgers?: OtherLedgers;
 }
+
+/** Household, Personal, or the personal plan across every group. */
+type PlanMode = ReportView | 'all';
 
 const storageKey = (gid: string) => `plan_view_${gid}`;
 
@@ -69,12 +90,16 @@ export default function PlanView({
   onContribute,
   onPlanPurchase,
   onLogDeposit,
+  initialRulesOpen,
+  otherGroupIds = [],
+  presetOtherLedgers,
 }: Props) {
   const { t, i18n } = useTranslation();
-  const [view, setView] = useState<ReportView>(() => {
+  const [view, setView] = useState<PlanMode>(() => {
     try {
       const v = localStorage.getItem(storageKey(group.id));
-      return v === 'personal' ? 'personal' : 'household';
+      if (v === 'all' && otherGroupIds.length > 0) return 'all';
+      return v === 'personal' || v === 'all' ? 'personal' : 'household';
     } catch {
       return 'household';
     }
@@ -87,17 +112,31 @@ export default function PlanView({
     }
   }, [view, group.id]);
   const [editing, setEditing] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(!!initialRulesOpen);
   const [goalOpen, setGoalOpen] = useState<Goal | 'new' | null>(null);
   const [showDone, setShowDone] = useState(false);
 
   const today = todayLocal();
   const month = monthOf(today);
-  const scope: PlanScope = view;
-  const plan = view === 'household' ? household : personal;
+  // "All my groups" is the personal plan over the member's share everywhere;
+  // the other ledgers load only while it is chosen and are dropped after.
+  const all = view === 'all' && otherGroupIds.length > 0;
+  const loaded = useOtherLedgers(otherGroupIds, all && !presetOtherLedgers);
+  const others = presetOtherLedgers ?? loaded;
+  const data = useMemo(
+    () =>
+      all
+        ? mergePersonalAcrossGroups({ [group.id]: expenses, ...others.ledgers }, activeUser)
+        : expenses,
+    [all, group.id, expenses, others.ledgers, activeUser]
+  );
+  const reportView: ReportView = view === 'household' ? 'household' : 'personal';
+  const scope: PlanScope = reportView;
+  const plan = scope === 'household' ? household : personal;
 
   const statuses = useMemo(
-    () => planStatuses(expenses, plan.budgets, month, view, activeUser),
-    [expenses, plan.budgets, month, view, activeUser]
+    () => planStatuses(data, plan.budgets, month, reportView, activeUser),
+    [data, plan.budgets, month, reportView, activeUser]
   );
   const totals = useMemo(() => groupTotals(statuses), [statuses]);
   const totalLimit = statuses.reduce((s, b) => s + b.limit, 0);
@@ -111,11 +150,11 @@ export default function PlanView({
     const done = plan.goals.filter((g) => !!g.doneAt);
     const describe = (g: Goal) => ({
       goal: g,
-      funded: goalFunded(expenses, g, view, activeUser),
-      projection: goalProjection(expenses, g, today),
+      funded: goalFunded(data, g, reportView, activeUser),
+      projection: goalProjection(data, g, today),
     });
     return { open: open.map(describe), done: done.map(describe) };
-  }, [plan.goals, expenses, view, activeUser, today]);
+  }, [plan.goals, data, reportView, activeUser, today]);
 
   const monthLabel = (iso: string) =>
     formatDateWith(parseLocalDate(iso), {
@@ -129,7 +168,23 @@ export default function PlanView({
   const saveGoals = (next: Goal[]) => onSave(scope, { ...plan, goals: next });
 
   const header = (
-    <PageHeader title={t('nav.plan')} subtitle={t('planTab.subtitle')}>
+    <PageHeader
+      title={t('nav.plan')}
+      subtitle={
+        all ? (
+          <>
+            {t('planTab.allGroupsNote')}{' '}
+            <span className="font-mono text-natural-text" id="plan-groups-caption">
+              {others.loading
+                ? t('reports.loadingGroups')
+                : t('reports.groupsCount', { count: otherGroupIds.length + 1 })}
+            </span>
+          </>
+        ) : (
+          t('planTab.subtitle')
+        )
+      }
+    >
       <Segmented
         value={view}
         onChange={setView}
@@ -137,12 +192,22 @@ export default function PlanView({
         options={[
           { value: 'household', label: t('reports.view.household') },
           { value: 'personal', label: t('reports.view.personal') },
+          ...(otherGroupIds.length > 0
+            ? [{ value: 'all' as PlanMode, label: t('reports.view.all') }]
+            : []),
         ]}
       />
       {!locked && (
-        <GhostButton onClick={() => setEditing(true)} id="plan-edit-budgets">
-          <SlidersHorizontal className="h-4 w-4" /> {t('planTab.editBudgets')}
-        </GhostButton>
+        <>
+          <GhostButton onClick={() => setEditing(true)} id="plan-edit-budgets">
+            <SlidersHorizontal className="h-4 w-4" /> {t('planTab.editBudgets')}
+          </GhostButton>
+          {!all && (
+            <GhostButton onClick={() => setRulesOpen(true)} id="plan-rules">
+              <Tag className="h-4 w-4" /> {t('rules.title')}
+            </GhostButton>
+          )}
+        </>
       )}
     </PageHeader>
   );
@@ -449,33 +514,37 @@ export default function PlanView({
         )}
       </section>
 
-      <button
-        type="button"
-        onClick={onPlanPurchase}
-        className={`${panel} rounded-[20px] px-5 py-[18px] text-left flex items-center justify-between gap-4 hover:border-natural-primary/40 transition-colors cursor-pointer`}
-        id="plan-purchase-card"
-      >
-        <div className="min-w-0">
-          <span className={`${label} flex items-center gap-1.5`}>
-            <TrendingUp className="h-3.5 w-3.5 text-natural-primary" /> {t('app.planPurchase')}
-          </span>
-          <p className="mt-1.5 font-display text-lg font-semibold text-natural-text">
-            {t('planView.purchaseTitle')}
-          </p>
-          <p className="mt-1 text-sm text-natural-muted">{t('planView.purchaseBody')}</p>
-        </div>
-        <ArrowRight className="h-5 w-5 text-natural-muted shrink-0" />
-      </button>
+      {!all && (
+        <button
+          type="button"
+          onClick={onPlanPurchase}
+          className={`${panel} rounded-[20px] px-5 py-[18px] text-left flex items-center justify-between gap-4 hover:border-natural-primary/40 transition-colors cursor-pointer`}
+          id="plan-purchase-card"
+        >
+          <div className="min-w-0">
+            <span className={`${label} flex items-center gap-1.5`}>
+              <TrendingUp className="h-3.5 w-3.5 text-natural-primary" /> {t('app.planPurchase')}
+            </span>
+            <p className="mt-1.5 font-display text-lg font-semibold text-natural-text">
+              {t('planView.purchaseTitle')}
+            </p>
+            <p className="mt-1 text-sm text-natural-muted">{t('planView.purchaseBody')}</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-natural-muted shrink-0" />
+        </button>
+      )}
 
-      <ModuleBoundary label={t('house.title')}>
-        <HouseAccount
-          expenses={expenses}
-          group={group}
-          activeUser={activeUser}
-          members={members}
-          onLogDeposit={onLogDeposit}
-        />
-      </ModuleBoundary>
+      {!all && (
+        <ModuleBoundary label={t('house.title')}>
+          <HouseAccount
+            expenses={expenses}
+            group={group}
+            activeUser={activeUser}
+            members={members}
+            onLogDeposit={onLogDeposit}
+          />
+        </ModuleBoundary>
+      )}
 
       {editing && (
         <BudgetEditor
@@ -492,6 +561,18 @@ export default function PlanView({
             return ok;
           }}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {rulesOpen && (
+        <RulesSheet
+          rules={household.rules}
+          categories={[
+            ...(group.categories || []),
+            ...expenses.map((e) => (e.category || '').trim()),
+          ]}
+          onSave={(rules) => onSave('household', { ...household, rules })}
+          onClose={() => setRulesOpen(false)}
         />
       )}
 

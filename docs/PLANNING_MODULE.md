@@ -178,10 +178,9 @@ this") is hidden for them.
 
 ## Tier
 
-Insights and trends are Cherry + on both clients today, so Reports mounts
-behind the same gate until the owner decides otherwise. The web repo's
-CLAUDE.md still says every feature is free; the code and the Flutter docs
-disagree with it, and that contradiction is flagged separately.
+Reports, Plan and (on mobile) the Checkbook are Cherry + tabs; see "Cherry +
+gating of whole tabs" above. The web repo's CLAUDE.md, the Flutter docs and the
+code agree since November 13th 2026.
 
 ## Phase 4: Checkbook (approved by the owner, November 13th 2026; Cherry +)
 

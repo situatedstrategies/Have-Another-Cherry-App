@@ -1563,7 +1563,24 @@
     "overBy": "{{category}}: перерасход <m>{{amount}}</m>.",
     "nearLimit": "{{category}} близко к лимиту.",
     "alertOver": "перерасход бюджета на <m>{{amount}}</m>",
-    "alertNear": "близко к бюджету, осталось <m>{{amount}}</m>"
+    "alertNear": "близко к бюджету, осталось <m>{{amount}}</m>",
+    "candidateLine": "<q>{{title}}</q> похоже на регулярный расход ({{interval}}) <r></r>. Сделать повторяющимся?",
+    "makeRecurring": "Сделать повторяющимся",
+    "notThisOne": "Не этот",
+    "madeRecurring": "Теперь повторяется",
+    "madeRecurringBody": "{{title}} теперь будет записываться сам.",
+    "monthClosed": "{{month}}: месяц закрыт",
+    "vsMonth": "к {{month}}",
+    "noMonthBefore": "первый месяц",
+    "budgetsHeld": "Все бюджеты выдержаны.",
+    "budgetsResult": "Бюджеты: <m>{{under}}</m> в рамках, <o>{{over}}</o> превышено.",
+    "stillOpen_one": "<m>{{count}}</m> запись ещё открыта, <m>{{amount}}</m> не погашено.",
+    "stillOpen_few": "<m>{{count}}</m> записи ещё открыты, <m>{{amount}}</m> не погашено.",
+    "stillOpen_many": "<m>{{count}}</m> записей ещё открыто, <m>{{amount}}</m> не погашено.",
+    "stillOpen_other": "<m>{{count}}</m> записей ещё открыто, <m>{{amount}}</m> не погашено.",
+    "allSettledMonth": "Всё за тот месяц погашено.",
+    "seeReport": "Открыть отчёт",
+    "dismissMonthClose": "Скрыть итоги месяца"
   },
   "sheet": {
     "cards": "Карточки",
@@ -1601,7 +1618,8 @@
     "viewAria": "Личное или дом",
     "view": {
       "personal": "Личное",
-      "household": "Дом"
+      "household": "Дом",
+      "all": "Все мои группы"
     },
     "period": {
       "this_month": "Этот месяц",
@@ -1683,7 +1701,12 @@
     "itemsCount_one": "{{count}} запись",
     "itemsCount_few": "{{count}} записи",
     "itemsCount_many": "{{count}} записей",
-    "itemsCount_other": "{{count}} записи"
+    "itemsCount_other": "{{count}} записи",
+    "loadingGroups": "Загружаем другие группы...",
+    "groupsCount_one": "{{count}} группа",
+    "groupsCount_few": "{{count}} группы",
+    "groupsCount_many": "{{count}} групп",
+    "groupsCount_other": "{{count}} групп"
   },
   "planView": {
     "subtitle": "Планируйте покупку вместе и следите за общим счётом.",
@@ -1827,6 +1850,28 @@
     "anotherCategory": "Другая категория",
     "add": "Добавить",
     "savesToHousehold": "Сохраняется в план дома, для всех.",
-    "savesToPersonal": "Сохраняется в ваш личный план, для вашей доли."
+    "savesToPersonal": "Сохраняется в ваш личный план, для вашей доли.",
+    "allGroupsNote": "Ваш личный план с вашей долей по всем группам, где вы участвуете."
+  },
+  "rules": {
+    "title": "Правила",
+    "subtitle": "Если в названии есть это слово, форма подставит эту категорию. Правила видят все участники.",
+    "nudge": "Всегда использовать <c></c> для <q>'{{title}}'</q>?",
+    "yes": "Да",
+    "notNow": "Не сейчас",
+    "empty": "Правил пока нет. Дайте одному названию одну и ту же категорию дважды, и форма предложит правило.",
+    "addTitle": "Добавить правило",
+    "contains": "Название содержит",
+    "containsPlaceholder": "Название содержит",
+    "category": "Категория",
+    "add": "Добавить",
+    "delete": "Удалить правило",
+    "deleteAria": "Удалить правило для \"{{contains}}\"",
+    "saved": "Правило сохранено",
+    "savedBody": "Названия со словом \"{{title}}\" будут попадать в {{category}}.",
+    "err": {
+      "both": "Введите слово и категорию.",
+      "duplicate": "Для этого слова правило уже есть."
+    }
   }
 }

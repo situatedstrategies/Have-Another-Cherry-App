@@ -1551,7 +1551,22 @@
     "overBy": "{{category}} is over by <m>{{amount}}</m>.",
     "nearLimit": "{{category}} is close to its limit.",
     "alertOver": "over its budget by <m>{{amount}}</m>",
-    "alertNear": "close to its budget, <m>{{amount}}</m> left"
+    "alertNear": "close to its budget, <m>{{amount}}</m> left",
+    "candidateLine": "<q>{{title}}</q> looks {{interval}} <r></r>. Make it recurring?",
+    "makeRecurring": "Make it recurring",
+    "notThisOne": "Not this one",
+    "madeRecurring": "Now recurring",
+    "madeRecurringBody": "{{title}} will be logged on its own from now on.",
+    "monthClosed": "{{month}} is closed",
+    "vsMonth": "vs {{month}}",
+    "noMonthBefore": "first month",
+    "budgetsHeld": "Every budget held.",
+    "budgetsResult": "Budgets: <m>{{under}}</m> under, <o>{{over}}</o> over.",
+    "stillOpen_one": "<m>{{count}}</m> item still open, <m>{{amount}}</m> unsettled.",
+    "stillOpen_other": "<m>{{count}}</m> items still open, <m>{{amount}}</m> unsettled.",
+    "allSettledMonth": "Everything from that month is settled.",
+    "seeReport": "See the report",
+    "dismissMonthClose": "Dismiss the month summary"
   },
   "sheet": {
     "cards": "Cards",
@@ -1587,7 +1602,8 @@
     "viewAria": "Personal or household",
     "view": {
       "personal": "Personal",
-      "household": "Household"
+      "household": "Household",
+      "all": "All my groups"
     },
     "period": {
       "this_month": "This month",
@@ -1651,7 +1667,10 @@
     "sourcesCount_one": "{{count}} source",
     "sourcesCount_other": "{{count}} sources",
     "itemsCount_one": "{{count}} item",
-    "itemsCount_other": "{{count}} items"
+    "itemsCount_other": "{{count}} items",
+    "loadingGroups": "Loading your other groups...",
+    "groupsCount_one": "{{count}} group",
+    "groupsCount_other": "{{count}} groups"
   },
   "planView": {
     "subtitle": "Plan a purchase together, and keep the house account in view.",
@@ -1787,6 +1806,28 @@
     "anotherCategory": "Another category",
     "add": "Add",
     "savesToHousehold": "Saved to the household plan, for everyone.",
-    "savesToPersonal": "Saved to your own plan, for your share."
+    "savesToPersonal": "Saved to your own plan, for your share.",
+    "allGroupsNote": "Your personal plan, with your share across every group you are in."
+  },
+  "rules": {
+    "title": "Rules",
+    "subtitle": "When a title contains a word, the Log form uses this category. Every member's form reads these.",
+    "nudge": "Always use <c></c> for <q>'{{title}}'</q>?",
+    "yes": "Yes",
+    "notNow": "Not now",
+    "empty": "No rules yet. Give a title the same category twice and the Log form offers one.",
+    "addTitle": "Add a rule",
+    "contains": "Title contains",
+    "containsPlaceholder": "Title contains",
+    "category": "Category",
+    "add": "Add",
+    "delete": "Delete rule",
+    "deleteAria": "Delete the rule for \"{{contains}}\"",
+    "saved": "Rule saved",
+    "savedBody": "Titles containing \"{{title}}\" will be filed under {{category}}.",
+    "err": {
+      "both": "Enter a word and a category.",
+      "duplicate": "There is already a rule for that word."
+    }
   }
 }

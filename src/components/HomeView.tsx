@@ -20,6 +20,8 @@ import { instrumentShortLabel } from '../lib/instruments';
 import { instrumentOf, UNKNOWN_INSTRUMENT } from '../lib/insights';
 import { categoryColor } from '../lib/ui';
 import { BudgetStatus, budgetPace, budgetAlertLevel, budgetToWatch } from '../lib/plan';
+import { RecurringCandidate } from '../lib/recurringDetect';
+import { intervalLabel } from '../lib/recurring';
 import CategoryChip from './CategoryChip';
 import RecurringMark from './RecurringMark';
 import { panel, label, Chip, GhostButton, PrimaryButton, StatusPill, PageHeader } from './Controls';
@@ -42,6 +44,12 @@ interface Props {
    *  nudges; null for a free member, [] when nothing is budgeted. */
   budgets?: BudgetStatus[] | null;
   onOpenPlan?: () => void;
+  /** The top "make it recurring" candidate (lib/recurringDetect), if any. */
+  candidate?: RecurringCandidate | null;
+  onMakeRecurring?: (c: RecurringCandidate) => void;
+  onDismissCandidate?: (c: RecurringCandidate) => void;
+  /** The month close card, rendered first, on the first open of a month. */
+  monthClose?: React.ReactNode;
 }
 
 type LedgerFilter = 'all' | 'open' | 'settled' | 'recurring';
@@ -67,6 +75,10 @@ export default function HomeView({
   aside,
   budgets,
   onOpenPlan,
+  candidate,
+  onMakeRecurring,
+  onDismissCandidate,
+  monthClose,
 }: Props) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<LedgerFilter>('all');
@@ -236,6 +248,8 @@ export default function HomeView({
           <Plus className="h-4 w-4" /> {t('home.logExpense')}
         </PrimaryButton>
       </PageHeader>
+
+      {monthClose}
 
       {/* Summary tiles */}
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
@@ -495,6 +509,44 @@ export default function HomeView({
                     </span>
                   </button>
                 ))}
+              </div>
+            )}
+            {candidate && (
+              <div
+                className="flex flex-col gap-2 rounded-2xl border border-natural-border bg-natural-bg/60 px-3.5 py-3"
+                id="recurring-candidate"
+              >
+                <span className="text-[13px] leading-[18px]">
+                  <Trans
+                    i18nKey="home.candidateLine"
+                    values={{
+                      title: candidate.title,
+                      interval: intervalLabel(candidate.interval).toLocaleLowerCase(),
+                    }}
+                    components={{
+                      q: <span className="font-medium" />,
+                      r: <RecurringMark interval={candidate.interval} className="mx-0.5" />,
+                    }}
+                  />
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onMakeRecurring?.(candidate)}
+                    className="h-8 px-3.5 rounded-full bg-natural-dark hover:bg-black text-white text-[13px] font-semibold cursor-pointer whitespace-nowrap"
+                    id="candidate-make"
+                  >
+                    {t('home.makeRecurring')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDismissCandidate?.(candidate)}
+                    className="h-8 px-3 rounded-full text-[13px] font-semibold text-natural-muted hover:text-natural-text cursor-pointer whitespace-nowrap"
+                    id="candidate-dismiss"
+                  >
+                    {t('home.notThisOne')}
+                  </button>
+                </div>
               </div>
             )}
             {balances.top ? (

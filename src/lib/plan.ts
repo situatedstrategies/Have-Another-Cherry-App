@@ -15,6 +15,7 @@ import { Expense, Group } from '../types';
 import { roundCurrency, isGoalContribution } from './money';
 import { applyFilter, reportAmount, ReportView } from './reports';
 import { parseLocalDate } from './recurring';
+import type { CategoryRule } from './rules';
 
 export type BudgetGroup = 'fixed' | 'flexible' | 'nonMonthly';
 export type PlanScope = 'household' | 'personal';
@@ -45,10 +46,12 @@ export interface Goal {
   doneAt?: string;
 }
 
-/** One encrypted document per scope. */
+/** One encrypted document per scope. Rules (lib/rules) are household only;
+ *  the personal payload carries an empty list. */
 export interface PlanPayload {
   budgets: Budget[];
   goals: Goal[];
+  rules: CategoryRule[];
 }
 
 export const BUDGET_GROUPS: BudgetGroup[] = ['flexible', 'fixed', 'nonMonthly'];

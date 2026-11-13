@@ -7,6 +7,7 @@ import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
 import { t } from '../i18n';
+import type { LedgerEventKind } from './useNotifications';
 import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
 
@@ -26,6 +27,7 @@ export function useExpenseMutations({
   notifyLedgerEvent,
   addToast,
   setSupportError,
+  onExpenseSaved,
 }: {
   activeUser: any;
   group: Group | null;
@@ -36,9 +38,12 @@ export function useExpenseMutations({
   setShowForm: Setter<boolean>;
   setSelectedExpense: Setter<Expense | null>;
   broadcastToMembers: (action: 'UPSERT' | 'DELETE', payloadObject: unknown) => Promise<void>;
-  notifyLedgerEvent: (kind: 'expense_logged' | 'payment_logged') => void;
+  notifyLedgerEvent: (kind: LedgerEventKind, id?: string) => void;
   addToast: AddToast;
   setSupportError: Setter<SupportError | null>;
+  /** After a NEW expense lands: the saved line and the ledger as it was
+   *  before it (the category rule nudge and the plan alerts read both). */
+  onExpenseSaved?: (saved: Expense, before: Expense[]) => void;
 }) {
   const handleAddComment = async (expenseId: string, text: string) => {
     if (!group) return;
@@ -177,7 +182,10 @@ export function useExpenseMutations({
       await broadcastToMembers('UPSERT', finalExpense);
 
       // New expenses only: edits would be noisy.
-      if (!editingExpense) notifyLedgerEvent('expense_logged');
+      if (!editingExpense) {
+        notifyLedgerEvent('expense_logged');
+        onExpenseSaved?.(finalExpense, expenses);
+      }
     } catch (e: any) {
       console.error(e);
       setSupportError({

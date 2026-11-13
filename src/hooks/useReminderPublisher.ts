@@ -88,14 +88,22 @@ export function useReminderPublisher({
     // Sorted unique due dates, denormalised so the daily job can ask
     // where('dueDates', array-contains, tomorrow).
     const dueDates = Array.from(new Set(entries.map((e) => e.dueDate))).sort();
-    await setDoc(ref, {
-      groupId,
-      entries,
-      dueDates,
-      signature,
-      updatedAt: new Date().toISOString(),
-      updatedBy: uid,
-    }).catch(() => {});
+    // Merge, never replace: the daily job keeps its "already sent" marks
+    // (lastRemindedFor, lastMonthClosedFor) on this same document, and a
+    // plain set here wiped them, so a republished index on the day of a
+    // retry let the same reminder go out twice.
+    await setDoc(
+      ref,
+      {
+        groupId,
+        entries,
+        dueDates,
+        signature,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      },
+      { merge: true }
+    ).catch(() => {});
     published.current[groupId] = signature;
   };
 

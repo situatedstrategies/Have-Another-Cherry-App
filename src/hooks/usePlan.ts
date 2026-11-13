@@ -3,10 +3,11 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { encryptData, decryptData } from '../lib/crypto';
 import { Budget, Goal, PlanPayload, PlanScope, monthOf, thresholdsAsBudgets } from '../lib/plan';
+import type { CategoryRule } from '../lib/rules';
 import { Group } from '../types';
 import { todayLocal } from '../lib/recurring';
 
-const EMPTY: PlanPayload = { budgets: [], goals: [] };
+const EMPTY: PlanPayload = { budgets: [], goals: [], rules: [] };
 
 const parsePayload = (raw: unknown): PlanPayload | null => {
   if (!raw || typeof raw !== 'object') return null;
@@ -14,6 +15,7 @@ const parsePayload = (raw: unknown): PlanPayload | null => {
   return {
     budgets: Array.isArray(o.budgets) ? (o.budgets as Budget[]) : [],
     goals: Array.isArray(o.goals) ? (o.goals as Goal[]) : [],
+    rules: Array.isArray(o.rules) ? (o.rules as CategoryRule[]) : [],
   };
 };
 
@@ -95,7 +97,7 @@ export function usePlan(group: Group | null, uid: string | undefined, enabled: b
   const householdView = useMemo<PlanPayload>(() => {
     if (household) return household;
     const migrated = thresholdsAsBudgets({ spendingThresholds: thresholds }, monthOf(todayLocal()));
-    return migrated.length ? { budgets: migrated, goals: [] } : EMPTY;
+    return migrated.length ? { budgets: migrated, goals: [], rules: [] } : EMPTY;
   }, [household, thresholds]);
 
   const save = useCallback(

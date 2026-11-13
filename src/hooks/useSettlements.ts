@@ -14,6 +14,7 @@ import { CHERRY_ERRORS } from '../lib/errors';
 import type { Dispatch, SetStateAction } from 'react';
 import { Expense, Group } from '../types';
 import { t } from '../i18n';
+import type { LedgerEventKind } from './useNotifications';
 import { formatCurrency } from '../lib/format';
 import { SupportError } from '../lib/errors';
 
@@ -37,7 +38,7 @@ export function useSettlements({
   selectedExpense: Expense | null;
   setShowSettleModal: Setter<boolean>;
   syncExpenseUpdate: (updatedExpense: Expense) => Promise<void>;
-  notifyLedgerEvent: (kind: 'expense_logged' | 'payment_logged') => void;
+  notifyLedgerEvent: (kind: LedgerEventKind, id?: string) => void;
   addToast: AddToast;
   setSupportError: Setter<SupportError | null>;
 }) {

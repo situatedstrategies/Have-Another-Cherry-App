@@ -3,7 +3,15 @@ import { rateLimit, requireAuth, requireGroupMember, requireSecret } from '../mi
 import type { GroupInfo, GroupLoader } from '../middleware';
 import { ensureAdminApp } from '../shared';
 import { sendReminderEmail } from '../resend';
-import { reminderPayload, reminderTargetDate } from '../reminders';
+import {
+  reminderPayload,
+  reminderTargetDate,
+  reminderRunDate,
+  monthClosedBy,
+  monthClosePayload,
+  planAlertPayload,
+  isPlanAlertType,
+} from '../reminders';
 import { hasPlus } from '../../src/lib/entitlements';
 
 const router = express.Router();
@@ -148,6 +156,31 @@ const LEDGER_PUSH_COPY: Record<
   ],
 };
 
+// Plan alerts (lib/alerts): one fixed line each. The push says a budget or a
+// goal in the group moved, never which one or by how much; the data payload
+// carries the id so the app can open the right row.
+const PLAN_ALERT_COPY: Record<string, (group: string) => { title: string; body: string }> = {
+  budget_near: (g) => ({
+    title: 'Close to a budget',
+    body: `A budget in ${g} is close to its limit for the month.`,
+  }),
+  budget_over: (g) => ({
+    title: 'Over a budget',
+    body: `A budget in ${g} went over its limit for the month.`,
+  }),
+  goal_milestone: (g) => ({
+    title: 'Goal milestone',
+    body: `A goal in ${g} just passed a milestone. Nice.`,
+  }),
+  goal_off_track: (g) => ({
+    title: 'Goal check-in',
+    body: `A goal in ${g} has slipped off track at the current pace.`,
+  }),
+};
+
+const MONTH_CLOSE_BODY =
+  'Last month is closed. Open Two Cherries for the summary and to settle up.';
+
 const NUDGE_PUSH_COPY: ((name: string, group: string) => { title: string; body: string })[] = [
   (n, g) => ({
     title: 'A gentle nudge',
@@ -184,8 +217,18 @@ router.post(
   requireAuth,
   rateLimit('notify', 60),
   (req, res, next) => {
-    const { groupId, kind } = req.body || {};
-    if (typeof groupId !== 'string' || !Object.hasOwn(LEDGER_PUSH_COPY, String(kind))) {
+    const { groupId, kind, id } = req.body || {};
+    if (typeof groupId !== 'string') {
+      return res.status(400).json({ error: 'Missing group or unknown event kind.' });
+    }
+    if (isPlanAlertType(kind)) {
+      // A plan alert points at one budget or goal; the id is opaque to us.
+      if (typeof id !== 'string' || !id.trim() || id.length > 64) {
+        return res.status(400).json({ error: 'A plan alert needs the budget or goal id.' });
+      }
+      return next();
+    }
+    if (!Object.hasOwn(LEDGER_PUSH_COPY, String(kind))) {
       return res.status(400).json({ error: 'Missing group or unknown event kind.' });
     }
     next();
@@ -197,10 +240,20 @@ router.post(
   async (req, res) => {
     try {
       const callerUid = (req as any).uid as string;
-      const { kind } = req.body || {};
+      const { kind, id, groupId } = req.body || {};
       const groupInfo = (req as any).groupInfo as GroupInfo;
 
-      const recipients = groupInfo.memberIds.filter((id) => id !== callerUid);
+      const recipients = groupInfo.memberIds.filter((uid) => uid !== callerUid);
+      if (isPlanAlertType(kind)) {
+        const { title, body } = PLAN_ALERT_COPY[kind](groupInfo.groupName);
+        const sent = await sendPushToUsers(
+          recipients,
+          title,
+          body,
+          planAlertPayload(kind, String(groupId), String(id).trim())
+        );
+        return res.status(200).json({ success: true, sent });
+      }
       const { title, body } = pick(LEDGER_PUSH_COPY[kind])(
         groupInfo.callerName,
         groupInfo.groupName
@@ -279,10 +332,16 @@ router.post(
       const { getFirestore } = await import('firebase-admin/firestore');
       const fs = getFirestore();
 
-      const target = reminderTargetDate(
-        new Date(),
-        Number(process.env.REMINDER_TZ_OFFSET_HOURS || 0)
-      );
+      const now = new Date();
+      const offset = Number(process.env.REMINDER_TZ_OFFSET_HOURS || 0);
+      const target = reminderTargetDate(now, offset);
+      const runDate = reminderRunDate(now, offset);
+
+      const memberIdsOf = async (groupId: string): Promise<string[]> => {
+        const groupSnap = await fs.collection('groups').doc(groupId).get();
+        const ids = groupSnap.data()?.memberIds;
+        return Array.isArray(ids) ? ids.filter((u: unknown) => typeof u === 'string') : [];
+      };
 
       // Single-field, so no composite index to deploy.
       const due = await fs
@@ -294,13 +353,12 @@ router.post(
       let sent = 0;
       for (const snap of due.docs) {
         const data = snap.data() || {};
-        // Idempotent across Cloud Scheduler retries.
+        // Idempotent per group per day, across Cloud Scheduler retries and a
+        // second manual run. The mark lives on the index document the client
+        // writes with merge, so a republished index keeps it.
         if (data.lastRemindedFor === target) continue;
 
-        const groupSnap = await fs.collection('groups').doc(snap.id).get();
-        const memberIds: string[] = Array.isArray(groupSnap.data()?.memberIds)
-          ? groupSnap.data()!.memberIds
-          : [];
+        const memberIds = await memberIdsOf(snap.id);
         if (!memberIds.length) continue;
 
         const entries: any[] = Array.isArray(data.entries) ? data.entries : [];
@@ -315,12 +373,56 @@ router.post(
           reminderPayload(snap.id, target, dueTomorrow)
         );
 
-        await snap.ref.update({ lastRemindedFor: target });
+        await snap.ref.set(
+          { lastRemindedFor: target, lastRemindedAt: now.toISOString() },
+          { merge: true }
+        );
         groups++;
         sent += count;
       }
 
-      return res.status(200).json({ success: true, date: target, groups, sent });
+      // The first of the month also closes the month before: a contentless
+      // nudge to every household that publishes a reminder index (the one
+      // sign that someone there has the app's push permission), once per
+      // month per group.
+      const closed = monthClosedBy(runDate);
+      let closeGroups = 0;
+      let closeSent = 0;
+      if (closed) {
+        const all = await fs.collection('reminder_schedules').get();
+        for (const snap of all.docs) {
+          const data = snap.data() || {};
+          if (data.lastMonthClosedFor === closed) continue;
+          const memberIds = await memberIdsOf(snap.id);
+          if (!memberIds.length) continue;
+          const count = await sendPushToUsers(
+            memberIds,
+            'The month is closed',
+            MONTH_CLOSE_BODY,
+            monthClosePayload(snap.id)
+          );
+          await snap.ref.set(
+            { lastMonthClosedFor: closed, lastMonthClosedAt: now.toISOString() },
+            { merge: true }
+          );
+          closeGroups++;
+          closeSent += count;
+        }
+      }
+
+      // The one line to look for in the Cloud Run logs (docs/REMINDERS_RUNBOOK.md).
+      console.log(
+        `Bill reminders: run=${runDate} due=${target} groups=${groups} sent=${sent}` +
+          (closed ? ` monthClose=${closed} closeGroups=${closeGroups} closeSent=${closeSent}` : '')
+      );
+
+      return res.status(200).json({
+        success: true,
+        date: target,
+        groups,
+        sent,
+        ...(closed ? { monthClose: closed, closeGroups, closeSent } : {}),
+      });
     } catch (err: any) {
       console.error('Bill reminder error:', err?.message || err);
       return res.status(500).json({ error: 'Could not send reminders.' });

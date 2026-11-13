@@ -10,6 +10,8 @@ import {
   applyFilter,
 } from '../lib/reports';
 import { nameOf as rosterName, joinedUids } from '../lib/members';
+import { mergePersonalAcrossGroups } from '../lib/crossGroup';
+import { useOtherLedgers, OtherLedgers } from '../hooks/useOtherLedgers';
 import { todayLocal, parseLocalDate } from '../lib/recurring';
 import { formatDateWith } from '../lib/format';
 import { labelClass } from '../lib/ui';
@@ -23,6 +25,8 @@ import { panel, Chip, Segmented, PageHeader } from './Controls';
 const ReportsCharts = lazy(() => import('./ReportsCharts'));
 
 type Tab = 'charts' | 'grid';
+/** Personal, Household, or the member's share across every group they are in. */
+type Scope = ReportMode | 'all';
 
 interface Props {
   expenses: Expense[];
@@ -36,13 +40,19 @@ interface Props {
   onOpenLedger: () => void;
   /** Start on the grid (from the ledger's "By category and month" chip). */
   initialTab?: Tab;
+  /** Start on this period (the month close card opens Last month). */
+  initialPeriod?: PeriodKey;
   /** Everything else that lives on the reports page under the reports. */
   children?: React.ReactNode;
+  /** The member's other groups; with any, the view offers "All my groups". */
+  otherGroupIds?: string[];
+  /** Dev harness only: the other ledgers without Firebase. */
+  presetOtherLedgers?: OtherLedgers;
 }
 
 interface Remembered {
   tab: Tab;
-  view: ReportMode;
+  view: Scope;
   period: PeriodKey;
   payer: string;
   categories: string[];
@@ -76,14 +86,22 @@ export default function ReportsView({
   onOpenExpense,
   onOpenLedger,
   initialTab,
+  initialPeriod,
   children,
+  otherGroupIds = [],
+  presetOtherLedgers,
 }: Props) {
   const { t } = useTranslation();
   const remembered = useMemo(() => readRemembered(group.id), [group.id]);
   const [tab, setTab] = useState<Tab>(initialTab ?? remembered.tab ?? 'charts');
-  const [view, setView] = useState<ReportMode>(remembered.view ?? 'personal');
+  const [view, setView] = useState<Scope>(
+    remembered.view === 'all' && otherGroupIds.length === 0
+      ? 'personal'
+      : (remembered.view ?? 'personal')
+  );
   const [period, setPeriod] = useState<PeriodKey>(
-    PERIODS.includes(remembered.period as PeriodKey) ? (remembered.period as PeriodKey) : '6m'
+    initialPeriod ??
+      (PERIODS.includes(remembered.period as PeriodKey) ? (remembered.period as PeriodKey) : '6m')
   );
   const [payer, setPayer] = useState<string>(remembered.payer ?? 'all');
   const [categories, setCategories] = useState<string[]>(remembered.categories ?? []);
@@ -92,6 +110,9 @@ export default function ReportsView({
   useEffect(() => {
     if (initialTab) setTab(initialTab);
   }, [initialTab]);
+  useEffect(() => {
+    if (initialPeriod) setPeriod(initialPeriod);
+  }, [initialPeriod]);
 
   useEffect(() => {
     try {
@@ -102,30 +123,54 @@ export default function ReportsView({
     }
   }, [tab, view, period, payer, categories, group.id]);
 
+  // "All my groups": the other ledgers load only while that scope is chosen
+  // and are dropped when it changes; nothing is written anywhere.
+  const all = view === 'all' && otherGroupIds.length > 0;
+  const loaded = useOtherLedgers(otherGroupIds, all && !presetOtherLedgers);
+  const others = presetOtherLedgers ?? loaded;
+  const data = useMemo(
+    () =>
+      all
+        ? mergePersonalAcrossGroups({ [group.id]: expenses, ...others.ledgers }, activeUser)
+        : expenses,
+    [all, group.id, expenses, others.ledgers, activeUser]
+  );
+  const reportView: ReportMode = view === 'household' ? 'household' : 'personal';
+
   const today = todayLocal();
   const bounds = useMemo(() => periodBounds(period, today), [period, today]);
   const filter: ReportFilter = useMemo(
     () => ({
       ...bounds,
-      view,
+      view: reportView,
       uid: activeUser,
       payers: payer === 'all' ? undefined : [payer],
       categories: categories.length ? categories : undefined,
     }),
-    [bounds, view, activeUser, payer, categories]
+    [bounds, reportView, activeUser, payer, categories]
   );
 
-  const memberIds = useMemo(() => joinedUids(group), [group]);
-  const nameOf = (uid: string) => rosterName(uid, members, activeUser);
+  const memberIds = useMemo(() => {
+    const own = joinedUids(group);
+    if (!all) return own;
+    const set = new Set(own);
+    for (const ids of Object.values(others.memberIds)) for (const id of ids) set.add(id);
+    return [...set];
+  }, [group, all, others.memberIds]);
+  const roster = useMemo(
+    () => [...members, ...Object.entries(others.names).map(([uid, name]) => ({ uid, name }))],
+    [members, others.names]
+  );
+  const nameOf = (uid: string) => rosterName(uid, roster, activeUser);
 
   // Every category with a line in the period, for the picker.
   const allCategories = useMemo(() => {
     const set = new Set<string>();
-    for (const e of applyFilter(expenses, { ...bounds, view, uid: activeUser })) {
+    for (const e of applyFilter(data, { ...bounds, view: reportView, uid: activeUser })) {
       set.add((e.category || '').trim());
     }
     return [...set].sort((a, b) => a.localeCompare(b));
-  }, [expenses, bounds, view, activeUser]);
+  }, [data, bounds, reportView, activeUser]);
 
   const periodLabel = (k: PeriodKey) => t(`reports.period.${k}`);
   const rangeLabel = useMemo(() => {
@@ -192,7 +237,21 @@ export default function ReportsView({
     <div className="flex flex-col gap-5" id="reports-view">
       <PageHeader
         title={t('nav.reports')}
-        subtitle={tab === 'grid' ? t(`reports.gridHint.${view}`) : t('reports.subtitle')}
+        subtitle={
+          <>
+            {tab === 'grid' ? t(`reports.gridHint.${reportView}`) : t('reports.subtitle')}
+            {all && (
+              <>
+                {' '}
+                <span className="font-mono text-natural-text" id="reports-groups-caption">
+                  {others.loading
+                    ? t('reports.loadingGroups')
+                    : t('reports.groupsCount', { count: otherGroupIds.length + 1 })}
+                </span>
+              </>
+            )}
+          </>
+        }
       >
         <Segmented
           value={tab}
@@ -210,6 +269,9 @@ export default function ReportsView({
           options={[
             { value: 'personal', label: t('reports.view.personal') },
             { value: 'household', label: t('reports.view.household') },
+            ...(otherGroupIds.length > 0
+              ? [{ value: 'all' as Scope, label: t('reports.view.all') }]
+              : []),
           ]}
         />
       </PageHeader>
@@ -302,7 +364,7 @@ export default function ReportsView({
             }
           >
             <ReportsCharts
-              expenses={expenses}
+              expenses={data}
               filter={filter}
               period={period}
               memberIds={memberIds}
@@ -317,7 +379,7 @@ export default function ReportsView({
           <div className="[flex:999_1_480px] min-w-0">
             <ModuleBoundary label={t('reports.grid')}>
               <ReportsGrid
-                expenses={expenses}
+                expenses={data}
                 filter={filter}
                 today={today}
                 onOpenExpense={onOpenExpense}
@@ -327,7 +389,7 @@ export default function ReportsView({
           <aside className="[flex:1_1_280px] max-w-[360px] min-w-0 flex flex-col gap-4">
             <ModuleBoundary label={t('export.title')}>
               <ExportPanel
-                expenses={expenses}
+                expenses={data}
                 activeUser={activeUser}
                 nameOf={nameOf}
                 currentPeriod={bounds}
