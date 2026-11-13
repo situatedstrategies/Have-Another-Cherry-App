@@ -11,6 +11,7 @@ import {
 } from '../lib/money';
 import { authHeader } from '../firebase';
 import Modal from './Modal';
+import RecurringMark from './RecurringMark';
 import { CreditCard, TrendingUp, ChevronRight, BellRing, Check, RefreshCcw } from 'lucide-react';
 import { labelClass } from '../lib/ui';
 
@@ -199,8 +200,11 @@ export default function OwedBreakdownModal({
                     className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-natural-sidebar/30 transition-colors cursor-pointer group"
                   >
                     <div className="min-w-0">
-                      <span className="text-sm font-semibold text-natural-text truncate block">
-                        {expense.title}
+                      <span className="text-sm font-semibold text-natural-text truncate flex items-center gap-1.5">
+                        <span className="truncate">{expense.title}</span>
+                        {(expense.isRecurring || expense.recurringSourceId) && (
+                          <RecurringMark interval={expense.recurringInterval} />
+                        )}
                       </span>
                       <span className="text-xs text-natural-muted font-mono">
                         {formatShortDate(expense.date)} · {expense.category}

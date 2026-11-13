@@ -20,6 +20,7 @@ import {
   frontedBy,
   columnChanges,
   monthlyStats,
+  averageDaysToSettle,
   ReportFilter,
 } from '../src/lib/reports';
 import type { Expense } from '../src/types';
@@ -46,6 +47,7 @@ const e = (
     sourceId?: string;
     dark?: boolean;
     deposit?: boolean;
+    goal?: string;
   }
 ): Expense => {
   const paidBy = o.paidBy ?? 'a';
@@ -61,8 +63,15 @@ const e = (
     category: o.category ?? 'Groceries',
     paidBy,
     contributions: [{ userId: paidBy, amount: o.amount, instrumentType: o.instrument ?? 'CREDIT' }],
-    splitType: o.dark ? 'dark_cherry' : o.deposit ? 'deposit' : 'household_default',
-    shares: o.deposit ? {} : { a: aShare, b: bShare },
+    splitType: o.dark
+      ? 'dark_cherry'
+      : o.deposit
+        ? 'deposit'
+        : o.goal
+          ? 'goal'
+          : 'household_default',
+    shares: o.deposit ? {} : o.goal ? { [paidBy]: o.amount } : { a: aShare, b: bShare },
+    ...(o.goal ? { goalId: o.goal } : {}),
     status: 'OPEN',
     createdAt: `${o.date}T12:00:00.000Z`,
     isRecurring: o.recurring,
@@ -137,6 +146,15 @@ const ledger: Expense[] = [
     instrument: 'TRANSFER',
     deposit: true,
   }),
+  // A goal contribution: in the ledger, never spending.
+  e('couch-nov', {
+    amount: 100,
+    date: '2026-11-11',
+    category: 'Couch fund',
+    paidBy: 'b',
+    instrument: 'TRANSFER',
+    goal: 'couch',
+  }),
 ];
 
 const today = '2026-11-12';
@@ -191,6 +209,13 @@ check(
   applyFilter(ledger, { ...q })
     .map((x) => x.id)
     .includes('deposit-nov'),
+  false
+);
+check(
+  'applyFilter leaves goal contributions out',
+  applyFilter(ledger, { ...q })
+    .map((x) => x.id)
+    .includes('couch-nov'),
   false
 );
 check(
@@ -313,6 +338,19 @@ check(
   [{ uid: 'b', credit: 32.4, ownMoney: 81.06, unknown: 0, total: 113.46 }]
 );
 check('columnChanges', columnChanges(pv), [null, 407, 3]);
+// Every settled line in the vector was paid the same day it was logged, so
+// the mean is 0; a payment dated later moves it.
+check('averageDaysToSettle same day', averageDaysToSettle(ledger), 0);
+check(
+  'averageDaysToSettle later payment',
+  averageDaysToSettle([
+    { ...ledger[3], settlements: [{ ...ledger[3].settlements![0], paymentDate: '2026-11-05' }] },
+    ledger[4],
+  ]),
+  3
+);
+check('averageDaysToSettle nothing paid', averageDaysToSettle([ledger[0]]), null);
+
 check('monthlyStats quarter', monthlyStats(ledger, q), {
   months: 3,
   perMonth: 173.48,

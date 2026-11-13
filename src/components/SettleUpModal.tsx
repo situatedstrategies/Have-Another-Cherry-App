@@ -131,6 +131,13 @@ export default function SettleUpModal({
     : null;
   const zelle = recipientHandles.zelle ? zelleTarget(recipientHandles.zelle) : null;
   const [copiedZelle, setCopiedZelle] = useState(false);
+  // The app the payer picked, when there is one to open.
+  const appLink =
+    !isCreditor && paymentMethod === 'VENMO'
+      ? { href: venmo?.url || 'https://venmo.com/', label: t('settle.openVenmo') }
+      : !isCreditor && paymentMethod === 'ZELLE'
+        ? { href: 'https://www.zellepay.com/', label: t('settle.openZelle') }
+        : null;
 
   const copyZelleHandle = () => {
     if (!zelle) return;
@@ -316,14 +323,6 @@ export default function SettleUpModal({
                   <>{t('settle.venmoNoHandle')}</>
                 )}
               </p>
-              <a
-                href={venmo?.url || 'https://venmo.com/'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 text-xs font-bold text-white bg-[#008CFF] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
-              >
-                <ExternalLink size={14} /> {t('settle.openVenmo')}
-              </a>
               <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
             </div>
           )}
@@ -350,14 +349,6 @@ export default function SettleUpModal({
               ) : (
                 <p className="text-xs text-natural-muted">{t('settle.zelleNoHandle')}</p>
               )}
-              <a
-                href="https://www.zellepay.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 text-xs font-bold text-white bg-[#6D1ED4] hover:opacity-90 rounded-xl flex items-center justify-center gap-1.5 transition-opacity"
-              >
-                <ExternalLink size={14} /> {t('settle.openZelle')}
-              </a>
               <p className="text-xs text-natural-muted">{t('settle.comeBack')}</p>
             </div>
           )}
@@ -376,22 +367,41 @@ export default function SettleUpModal({
           />
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2.5 text-sm font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
-          >
-            {t('common.cancel')}
-          </button>
+        {/* The one red button opens the chosen app, with no amount on it;
+            "Already settled" logs the payment. Cash and the rest have no app
+            to open, so logging it is the only button. */}
+        <div className="flex flex-col gap-2 pt-2">
+          {appLink && (
+            <a
+              href={appLink.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full h-11 text-sm font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all"
+              id="settle-open-app"
+            >
+              <ExternalLink size={14} /> {appLink.label}
+            </a>
+          )}
           <button
             type="submit"
             disabled={
               !selectedDebtor || (!blindContributor && getRemainingAmount(selectedDebtor) <= 0)
             }
-            className="w-full py-2.5 text-sm font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            className={`w-full h-11 text-sm font-semibold rounded-full flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 ${
+              appLink
+                ? 'text-natural-text bg-white border border-natural-border hover:border-natural-muted'
+                : 'text-white bg-natural-primary hover:bg-natural-primary-ink shadow-md'
+            }`}
+            id="settle-already-settled"
           >
-            <Check className="h-4 w-4" /> {t('settle.logPayment')}
+            <Check className="h-4 w-4" /> {t('settle.alreadySettled')}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2 text-xs font-semibold text-natural-muted hover:text-natural-text cursor-pointer"
+          >
+            {t('common.cancel')}
           </button>
         </div>
       </form>

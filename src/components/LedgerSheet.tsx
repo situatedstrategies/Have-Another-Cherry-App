@@ -14,10 +14,11 @@ import {
 import { formatAmount, formatShortDate, formatDateWith } from '../lib/format';
 import { nameOf as rosterName } from '../lib/members';
 import { parseLocalDate } from '../lib/recurring';
-import { monthKey } from '../lib/reports';
+import { monthKey, isRecurringLine } from '../lib/reports';
 import { instrumentOf, UNKNOWN_INSTRUMENT } from '../lib/insights';
 import { instrumentShortLabel } from '../lib/instruments';
 import CategoryChip from './CategoryChip';
+import RecurringMark from './RecurringMark';
 import { panel, StatusPill } from './Controls';
 
 export type SheetSort = 'date' | 'item' | 'paid' | 'amount' | 'share' | 'status';
@@ -222,6 +223,7 @@ export default function LedgerSheet({
                           aria-label={t('list.openAria', { title: e.title })}
                         >
                           <span>{e.title}</span>
+                          {isRecurringLine(e) && <RecurringMark interval={e.recurringInterval} />}
                           <CategoryChip name={e.category} />
                         </button>
                       </td>

@@ -27,6 +27,9 @@ import HomeView from './components/HomeView';
 import LedgerView from './components/LedgerView';
 import ReportsView from './components/ReportsView';
 import PlanView from './components/PlanView';
+import { usePlan } from './hooks/usePlan';
+import { todayLocal } from './lib/recurring';
+import { Goal, planStatuses, monthOf } from './lib/plan';
 import ExportPanel from './components/ExportPanel';
 import Modal from './components/Modal';
 import ExpenseDetail from './components/ExpenseDetail';
@@ -68,7 +71,11 @@ export default function App() {
 
   const [showForm, setShowForm] = useState(false);
   // 'deposit' opens the form as "Log a deposit" (house account).
-  const [formMode, setFormMode] = useState<'expense' | 'deposit'>('expense');
+  const [formMode, setFormMode] = useState<'expense' | 'deposit' | 'goal'>('expense');
+  // The goal being funded when the form opens in 'goal' mode.
+  const [formGoal, setFormGoal] = useState<Goal | null>(null);
+  // The tab that opened the Cherry + page (Reports, Plan): its name and pitch.
+  const [plusIntro, setPlusIntro] = useState<{ title: string; pitch: string } | null>(null);
   const [view, setView] = useState<View>('home');
   // Set when the ledger's "By category and month" chip sends us to the grid.
   const [reportsTab, setReportsTab] = useState<'charts' | 'grid' | undefined>(undefined);
@@ -182,6 +189,9 @@ export default function App() {
     expenses,
     isPlus: hasPlus(userProfile) || rcPlus,
   });
+  // Budgets and goals: the household's plan on the group, the member's own
+  // under their profile. Cherry + only, so nothing is read for free members.
+  const plan = usePlan(group, activeUser, hasPlus(userProfile) || rcPlus);
 
   const { handleSignOut, handleDeleteAccount } = useAuthSession({
     activeUser,
@@ -367,10 +377,22 @@ export default function App() {
     syncExpenseUpdate(next).catch((e) => console.error('Amount edit failed', e));
   };
 
-  const openForm = (mode: 'expense' | 'deposit' = 'expense') => {
+  const openForm = (mode: 'expense' | 'deposit' | 'goal' = 'expense', goal?: Goal) => {
     setEditingExpense(null);
     setFormMode(mode);
+    setFormGoal(mode === 'goal' ? goal || null : null);
     setShowForm(true);
+  };
+
+  // Reports and Plan are Cherry + tabs: for a free member the sidebar opens
+  // the paywall straight away, headed with the tab's name, and the view does
+  // not change, so closing it lands back where they were.
+  const openPlusFor = (tab: 'reports' | 'plan') => {
+    setPlusIntro({
+      title: t(tab === 'reports' ? 'nav.reports' : 'nav.plan'),
+      pitch: t(tab === 'reports' ? 'plus.pitchReports' : 'plus.pitchPlan'),
+    });
+    setShowCherryPlus(true);
   };
 
   // "60 / 40 with Sam": the standing split, the viewer first.
@@ -389,6 +411,19 @@ export default function App() {
 
   // Gates vault, thresholds, rhythm, insights and Dark Cherry creation.
   const isPlus = hasPlus(userProfile) || rcPlus;
+  // The dashboard's budget tile and nudges read the household plan when it
+  // has budgets, else the member's own.
+  const budgetStatuses = (() => {
+    const useHousehold = plan.household.budgets.length > 0;
+    const budgets = useHousehold ? plan.household.budgets : plan.personal.budgets;
+    return planStatuses(
+      expenses,
+      budgets,
+      monthOf(todayLocal()),
+      useHousehold ? 'household' : 'personal',
+      activeUser
+    );
+  })();
 
   // Each member's spending limit, and this user's shares that exceed their own.
   const memberThresholds: Record<string, number> = {};
@@ -499,6 +534,10 @@ export default function App() {
             if (v === 'vault') {
               if (isPlus) setShowVault(true);
               else setShowCherryPlus(true);
+              return;
+            }
+            if ((v === 'reports' || v === 'plan') && !isPlus) {
+              openPlusFor(v);
               return;
             }
             if (v !== 'reports') setReportsTab(undefined);
@@ -663,7 +702,9 @@ export default function App() {
               onOpenExpense={(exp) => setSelectedExpense(exp)}
               onSettle={() => setOwedModal('you_owe')}
               onOpenLedger={() => setView('ledger')}
-              onOpenReports={() => setView('reports')}
+              onOpenReports={() => (isPlus ? setView('reports') : openPlusFor('reports'))}
+              budgets={isPlus ? budgetStatuses : null}
+              onOpenPlan={() => (isPlus ? setView('plan') : openPlusFor('plan'))}
               aside={
                 <ModuleBoundary label={t('app.myMonthAhead')}>
                   <MonthAheadCard
@@ -718,6 +759,12 @@ export default function App() {
               group={group}
               activeUser={activeUser}
               members={members}
+              locked={!isPlus}
+              onUnlock={() => openPlusFor('plan')}
+              household={plan.household}
+              personal={plan.personal}
+              onSave={plan.save}
+              onContribute={(g) => openForm('goal', g)}
               onPlanPurchase={() => setShowPlanPurchase(true)}
               onLogDeposit={() => openForm('deposit')}
             />
@@ -848,7 +895,11 @@ export default function App() {
 
       {showCherryPlus && (
         <CherryPlusModal
-          onClose={() => setShowCherryPlus(false)}
+          onClose={() => {
+            setShowCherryPlus(false);
+            setPlusIntro(null);
+          }}
+          intro={plusIntro}
           customerEmail={currentUser?.email || userProfile?.email}
           onPurchased={() => {
             // Unlock now. The durable copy on users/{uid} is written by the
@@ -947,10 +998,14 @@ export default function App() {
             setEditingExpense(null);
             setPlanPrefill(null);
             setFormMode('expense');
+            setFormGoal(null);
           }}
           onSubmit={handleAddOrEditExpense}
           editingExpense={editingExpense}
           mode={formMode}
+          goal={formGoal}
+          budgets={isPlus ? [...plan.household.budgets, ...plan.personal.budgets] : undefined}
+          expenses={expenses}
           memberThresholds={memberThresholds}
           isPlus={isPlus}
           paymentHandlesByUid={paymentHandlesByUid}

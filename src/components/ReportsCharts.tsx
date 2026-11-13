@@ -27,13 +27,16 @@ import {
   applyFilter,
   reportAmount,
   bucketOf,
+  averageDaysToSettle,
+  isRecurringLine,
   OTHER_CATEGORY,
 } from '../lib/reports';
-import { instrumentOf, medianDaysToSettle } from '../lib/insights';
+import { instrumentOf } from '../lib/insights';
 import { formatAmount, formatCurrency, formatDateWith, formatShortDate } from '../lib/format';
 import { parseLocalDate } from '../lib/recurring';
 import { colors, categoryColor } from '../lib/ui';
 import CategoryChip from './CategoryChip';
+import RecurringMark from './RecurringMark';
 import { panel, label } from './Controls';
 
 interface Props {
@@ -81,7 +84,7 @@ export default function ReportsCharts({
       fronted: frontedBy(expenses, filter, memberIds),
       biggest: topExpenses(expenses, filter, 5),
       creditTotal: credit.reduce((s, e) => s + reportAmount(e, filter), 0),
-      creditMedianDays: medianDaysToSettle(credit),
+      creditAverageDays: averageDaysToSettle(credit),
       oneOffCount: lines.filter((e) => !e.isRecurring && !e.recurringSourceId).length,
     };
   }, [expenses, filter, today, granularity, memberIds]);
@@ -130,6 +133,7 @@ export default function ReportsCharts({
       : data.totals.changePct < 0
         ? t('reports.downOnBefore', { pct: Math.abs(data.totals.changePct), count: months })
         : t('reports.upOnBefore', { pct: data.totals.changePct, count: months });
+  const bubble = 'inline-block text-[11px] leading-4 font-semibold px-2 py-0.5 rounded-full';
 
   return (
     <div className="flex flex-col gap-4" id="reports-charts">
@@ -139,7 +143,7 @@ export default function ReportsCharts({
           <span className={label}>{t(`reports.totalLabel.${filter.view}`)}</span>
           <span className={big}>{formatAmount(data.totals.total)}</span>
           <span
-            className={`${sub} ${data.totals.changePct !== null && data.totals.changePct < 0 ? 'text-natural-primary' : 'text-natural-muted'}`}
+            className={`${sub} ${data.totals.changePct !== null && data.totals.changePct < 0 ? 'text-natural-teal' : 'text-natural-muted'}`}
           >
             {changeText}
           </span>
@@ -147,11 +151,9 @@ export default function ReportsCharts({
         <section className={tile}>
           <span className={label}>{t('reports.perMonth')}</span>
           <span className={big}>{formatAmount(data.monthly.perMonth)}</span>
-          <span className={`${sub} text-natural-muted`}>
-            {t('reports.highLow', {
-              high: formatCurrency(data.monthly.high, 0),
-              low: formatCurrency(data.monthly.low, 0),
-            })}
+          <span className={`${sub} text-natural-muted flex gap-4`}>
+            <span>{t('reports.high', { amount: formatCurrency(data.monthly.high, 0) })}</span>
+            <span>{t('reports.low', { amount: formatCurrency(data.monthly.low, 0) })}</span>
           </span>
         </section>
         <section className={tile}>
@@ -165,9 +167,9 @@ export default function ReportsCharts({
           <span className={label}>{t('reports.frontedOnCredit')}</span>
           <span className={big}>{formatAmount(data.creditTotal)}</span>
           <span className={`${sub} text-natural-muted`}>
-            {data.creditMedianDays === null
+            {data.creditAverageDays === null
               ? t('reports.nothingSettledYet')
-              : t('reports.medianDays', { count: data.creditMedianDays })}
+              : t('reports.averageDays', { count: data.creditAverageDays })}
           </span>
         </section>
       </div>
@@ -348,7 +350,7 @@ export default function ReportsCharts({
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-1.5 rounded-[3px]" style={{ background: colors.accent }} />
-                {t('reports.ownMoney')}
+                {t('reports.cash')}
               </span>
             </span>
           </div>
@@ -362,9 +364,14 @@ export default function ReportsCharts({
           <span className={label}>{t('reports.biggestLines')}</span>
           <div className="flex flex-col gap-2 text-sm leading-5">
             {data.biggest.map((e) => (
-              <div key={e.id} className="flex justify-between gap-2">
-                <span className="truncate">
-                  {e.title}, {formatShortDate(e.date)}
+              <div key={e.id} className="flex justify-between items-center gap-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  <CategoryChip name={e.category} />
+                  <span className="truncate">{e.title}</span>
+                  {isRecurringLine(e) && <RecurringMark interval={e.recurringInterval} />}
+                  <span className="text-xs text-natural-muted shrink-0">
+                    {formatShortDate(e.date)}
+                  </span>
                 </span>
                 <span className="font-mono font-medium shrink-0">
                   {formatAmount(reportAmount(e, filter))}
@@ -374,21 +381,35 @@ export default function ReportsCharts({
           </div>
         </section>
 
-        {/* Recurring vs one-off */}
+        {/* Payments: recurring against one-off */}
         <section
           className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
           id="reports-recurring"
         >
-          <span className={label}>{t('reports.recurringVsOneOff')}</span>
+          <span className={label}>{t('reports.payments')}</span>
           <div className="flex flex-col gap-2 text-sm leading-5">
-            <div className="flex justify-between gap-2">
-              <span>{t('reports.recurringSources', { count: data.recurring.sources })}</span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="flex items-center gap-2">
+                <span className={`${bubble} text-natural-primary bg-natural-primary-wash`}>
+                  {t('reports.recurring')}
+                </span>
+                <span className="text-natural-muted">
+                  {t('reports.sourcesCount', { count: data.recurring.sources })}
+                </span>
+              </span>
               <span className="font-mono font-medium">
                 {formatAmount(data.recurring.recurring)}
               </span>
             </div>
-            <div className="flex justify-between gap-2">
-              <span>{t('reports.oneOffItems', { count: data.oneOffCount })}</span>
+            <div className="flex justify-between items-center gap-2">
+              <span className="flex items-center gap-2">
+                <span className={`${bubble} text-natural-muted bg-natural-sidebar`}>
+                  {t('reports.oneOff')}
+                </span>
+                <span className="text-natural-muted">
+                  {t('reports.itemsCount', { count: data.oneOffCount })}
+                </span>
+              </span>
               <span className="font-mono font-medium">{formatAmount(data.recurring.oneOff)}</span>
             </div>
             <button

@@ -63,6 +63,13 @@ export interface User {
   locale?: string;
 }
 
+export interface SpendingThreshold {
+  id: string;
+  period: 'week' | 'month';
+  amount: number;
+  category?: string;
+}
+
 export interface Group {
   id: string;
   name?: string;
@@ -76,6 +83,11 @@ export interface Group {
   // lib/members MAX_ADDED_SEATS). Absent on groups that never grew.
   addedSeats?: number;
   categories: string[];
+  // Spending caps written by the mobile app (lib/domain/ledger/thresholds.dart):
+  // "at most this much, on this category, per week or per month". No category
+  // means every category. lib/plan.thresholdsAsBudgets turns them into budget
+  // lines when no plan document exists yet.
+  spendingThresholds?: SpendingThreshold[];
   memberIncomes?: Record<string, string>;
   keyHash?: string; // SHA-256 of the group backup key (never the key itself)
   // Set whenever someone changes the standing split. The group doc streams to
@@ -95,6 +107,9 @@ export interface Group {
 // 'deposit' is a payment into the house account: `paidBy` is the depositor,
 // `shares` is empty, so nothing is owed to anyone and spending reports leave
 // it out (lib/money.isDeposit, lib/deposits). Same value in the Flutter app.
+// 'goal' is a contribution to a plan goal (lib/plan): `paidBy` is the
+// contributor, `goalId` names the goal and `shares` is `{[contributor]: amount}`
+// so nothing is owed to anyone; spending reports and budgets leave it out.
 export type SplitType =
   | 'household_default'
   | 'equal'
@@ -102,7 +117,8 @@ export type SplitType =
   | 'custom_amount'
   | 'third_party'
   | 'dark_cherry'
-  | 'deposit';
+  | 'deposit'
+  | 'goal';
 
 // 'TRANSFER' is the legacy catch-all bank/Venmo value; Venmo and Zelle are now
 // their own instruments so the settle flow can hand the payer into those apps.
@@ -185,6 +201,8 @@ export interface Expense {
   // Per-transaction "cherries" - extra people added to a single expense's split
   // (not permanent group members). Each gets a dollar share of this expense only.
   extraParticipants?: { name: string; share: number }[];
+  // splitType 'goal' only: the plan goal this contribution funds.
+  goalId?: string;
   // Dark Cherry (blind split) only: bounds for a single logged payment. The pot
   // target is `amount`; participants see only these bounds.
   blindMin?: number;

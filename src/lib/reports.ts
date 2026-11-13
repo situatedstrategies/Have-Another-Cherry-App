@@ -8,7 +8,13 @@
 // Dates are the ledger's local YYYY-MM-DD strings, compared as strings. Weeks
 // start on Monday, like the spending thresholds.
 import { Expense } from '../types';
-import { roundCurrency, isDarkCherry, isDeposit, getNormalizedExpenseStatus } from './money';
+import {
+  roundCurrency,
+  isDarkCherry,
+  isDeposit,
+  isGoalContribution,
+  getNormalizedExpenseStatus,
+} from './money';
 import { getInstrumentClass } from './mismatch';
 import { instrumentOf } from './insights';
 import { parseLocalDate, toLocalIso } from './recurring';
@@ -134,14 +140,14 @@ export const reportAmount = (e: Expense, filter: Pick<ReportFilter, 'view' | 'ui
 
 /** The lines a report runs over: in the period, visible to the viewer, and
  *  matching every optional filter. The date range is the only required one.
- *  House account deposits are never spending, so they are left out here and
- *  therefore out of every report built on this. */
+ *  House account deposits and goal contributions are never spending, so they
+ *  are left out here and therefore out of every report built on this. */
 export const applyFilter = (expenses: Expense[], filter: ReportFilter): Expense[] => {
   const cats = filter.categories && filter.categories.length ? new Set(filter.categories) : null;
   const payers = filter.payers && filter.payers.length ? new Set(filter.payers) : null;
   return expenses.filter((e) => {
     if (!e.date || e.date < filter.start || e.date > filter.end) return false;
-    if (isDeposit(e)) return false;
+    if (isDeposit(e) || isGoalContribution(e)) return false;
     if (isDarkCherry(e) && e.paidBy !== filter.uid) return false;
     if (cats && !cats.has(e.category)) return false;
     if (payers && !payers.has(e.paidBy)) return false;
@@ -579,4 +585,26 @@ export const monthlyStats = (expenses: Expense[], filter: ReportFilter): Monthly
     high: values.length ? Math.max(...values) : 0,
     low: values.length ? Math.min(...values) : 0,
   };
+};
+
+/** The mean number of days from an expense's date to each confirmed payment
+ *  on it (the payment date when recorded, else the day it was logged), as a
+ *  whole number; null when nothing has been paid. The "average settlement
+ *  every N days" line. */
+export const averageDaysToSettle = (expenses: Expense[]): number | null => {
+  let total = 0;
+  let n = 0;
+  for (const e of expenses) {
+    if (!e.date) continue;
+    for (const s of e.settlements || []) {
+      if (s.status !== 'confirmed') continue;
+      const paid = s.paymentDate || s.timestamp.slice(0, 10);
+      const days = Math.round(
+        (parseLocalDate(paid).getTime() - parseLocalDate(e.date).getTime()) / 86400000
+      );
+      total += Math.max(0, days);
+      n++;
+    }
+  }
+  return n === 0 ? null : Math.round(total / n);
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { getFullMembers, getFullDefaultSplit } from '../lib/members';
 import { SplitType, Expense, Group, PaymentInstrument } from '../types';
 import {
@@ -27,6 +27,7 @@ import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
 import { roundCurrency } from '../lib/money';
+import { Budget, budgetStatus, monthOf } from '../lib/plan';
 import {
   advanceIntervalStr,
   parseLocalDate,
@@ -57,8 +58,18 @@ interface ExpenseFormProps {
   prefill?: { title: string; amount: number; paidBy: string; splitType: SplitType } | null;
   /** 'deposit': a payment into the house account. Amount, date, who, how and
    *  a note; no category, no split, nothing owed. Editing a deposit line
-   *  reopens in this mode on its own. */
-  mode?: 'expense' | 'deposit';
+   *  reopens in this mode on its own. 'goal': a contribution to a plan goal
+   *  (`goal` names it): the title is the goal's name, the payer is the
+   *  contributor, no split, nothing owed; saved with splitType 'goal'. */
+  mode?: 'expense' | 'deposit' | 'goal';
+  /** The goal being funded in 'goal' mode. */
+  goal?: { id: string; name: string } | null;
+  /** The budgets the hint under the form reads (Cherry + only): the
+   *  household's and the member's own; the household one wins for a category
+   *  that has both. */
+  budgets?: Budget[];
+  /** The ledger the hint measures the month's spending from. */
+  expenses?: Expense[];
 }
 
 export default function ExpenseForm({
@@ -72,15 +83,24 @@ export default function ExpenseForm({
   paymentHandlesByUid,
   prefill,
   mode,
+  goal,
+  budgets,
+  expenses,
 }: ExpenseFormProps) {
   const { t } = useTranslation();
   const deposit = mode === 'deposit' || editingExpense?.splitType === 'deposit';
+  const goalMode = mode === 'goal' || editingExpense?.splitType === 'goal';
+  // Deposits and goal contributions share the short form: no scan, no
+  // category, no split, no recurring, nothing owed.
+  const simple = deposit || goalMode;
   const seed = editingExpense ? null : prefill;
   const categories = group.categories || [];
   const members = useMemo(() => getFullMembers(group), [group]);
 
   const [title, setTitle] = useState(
-    editingExpense?.title || seed?.title || (deposit ? t('house.depositTitle') : '')
+    editingExpense?.title ||
+      seed?.title ||
+      (deposit ? t('house.depositTitle') : goalMode ? goal?.name || '' : '')
   );
   const [amount, setAmount] = useState(
     editingExpense?.amount?.toString() || (seed && seed.amount > 0 ? String(seed.amount) : '')
@@ -132,7 +152,9 @@ export default function ExpenseForm({
       .filter(Boolean) as { uid: string; name: string; text: string }[];
   }, [instrumentType, members, activeUser, paymentHandlesByUid]);
   const [splitType, setSplitType] = useState<SplitType>(
-    editingExpense?.splitType || seed?.splitType || (deposit ? 'deposit' : 'household_default')
+    editingExpense?.splitType ||
+      seed?.splitType ||
+      (deposit ? 'deposit' : goalMode ? 'goal' : 'household_default')
   );
 
   // Dark Cherry (blind split): per-payment bounds + the first-use explainer.
@@ -336,7 +358,7 @@ export default function ExpenseForm({
   // Suggest a category/split from the title, but only while the user hasn't
   // chosen a category yet (and never when editing) - so we don't override them.
   useEffect(() => {
-    if (editingExpense || category || deposit) return;
+    if (editingExpense || category || simple) return;
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes('rent')) {
       setCategory('Rent');
@@ -369,7 +391,7 @@ export default function ExpenseForm({
       setCategory('Dining Out');
       setSplitType('equal');
     }
-  }, [title, category, editingExpense, deposit]);
+  }, [title, category, editingExpense, simple]);
 
   const numericAmount = parseFloat(amount) || 0;
 
@@ -410,6 +432,43 @@ export default function ExpenseForm({
       (previewShares[m.uid] || 0) > (memberThresholds?.[m.uid] || 0)
   );
 
+  // The budget hint: the chosen category's budget this month, less this
+  // expense (the whole amount against a household budget, the member's own
+  // share against a personal one). Editing counts the line once.
+  const budgetHint = useMemo(() => {
+    if (simple || !budgets?.length || numericAmount <= 0) return null;
+    const cat = category.trim();
+    if (!cat) return null;
+    const b =
+      budgets.find((x) => x.scope === 'household' && x.category.trim() === cat) ||
+      budgets.find((x) => x.category.trim() === cat);
+    if (!b) return null;
+    const month = monthOf(todayLocal());
+    const ledger = (expenses || []).filter((e) => e.id !== editingExpense?.id);
+    const view = b.scope === 'household' ? 'household' : 'personal';
+    const status = budgetStatus(ledger, b, month, view, activeUser);
+    const thisOne = view === 'household' ? numericAmount : previewShares[activeUser] || 0;
+    return {
+      category: b.category,
+      available: status.available,
+      left: roundCurrency(status.left - thisOne),
+    };
+    // previewShares is rebuilt every render; its inputs are listed instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    simple,
+    budgets,
+    numericAmount,
+    category,
+    expenses,
+    editingExpense?.id,
+    activeUser,
+    splitType,
+    customPct,
+    customAmt,
+    thirdPartyPct,
+  ]);
+
   const handleCustomPctChange = (uid: string, val: string) => {
     setCustomPct((prev) => ({ ...prev, [uid]: val }));
   };
@@ -445,7 +504,7 @@ export default function ExpenseForm({
     }
 
     // Heads-up if a debtor's share exceeds their spending threshold.
-    if (!deposit && thresholdWarnings.length > 0) {
+    if (!simple && thresholdWarnings.length > 0) {
       const names = thresholdWarnings.map((m) => m.name).join(', ');
       const ok = window.confirm(t('form.confirmThreshold', { names }));
       if (!ok) return;
@@ -615,7 +674,12 @@ export default function ExpenseForm({
 
     // A deposit has no category of its own and no split: every deposit is
     // filed under the house account so the sheet and the export group them.
-    const finalCategory = deposit ? t('house.depositCategory') : category.trim();
+    // A goal contribution is filed under the goal's name.
+    const finalCategory = deposit
+      ? t('house.depositCategory')
+      : goalMode
+        ? title.trim()
+        : category.trim();
     if (!finalCategory) {
       setError(t('form.err.category'));
       return;
@@ -648,8 +712,17 @@ export default function ExpenseForm({
           ...(instrumentLabel.trim() ? { label: instrumentLabel.trim() } : {}),
         },
       ],
-      splitType: deposit ? 'deposit' : splitType,
-      shares: deposit || splitType === 'dark_cherry' ? {} : finalShares,
+      splitType: deposit ? 'deposit' : goalMode ? 'goal' : splitType,
+      // A goal contribution's only share is the contributor's own, so nothing
+      // is owed to anyone and balances skip it.
+      shares: deposit
+        ? {}
+        : goalMode
+          ? { [paidBy]: numericAmount }
+          : splitType === 'dark_cherry'
+            ? {}
+            : finalShares,
+      goalId: goalMode ? editingExpense?.goalId || goal?.id || null : null,
       blindMin: splitType === 'dark_cherry' ? blindMinNum : null,
       blindMax: splitType === 'dark_cherry' ? blindMaxNum : null,
       thirdPersonName: splitType === 'third_party' ? thirdPersonName.trim() || null : null,
@@ -657,12 +730,12 @@ export default function ExpenseForm({
       thirdPersonShare: splitType === 'third_party' ? finalThirdPersonShare : null,
       extraParticipants: splitType === 'custom_percentage' ? finalExtraParticipants || null : null,
       notes: notes.trim() || null,
-      isRecurring: deposit ? false : isRecurring,
-      ...(isRecurring && !deposit
+      isRecurring: simple ? false : isRecurring,
+      ...(isRecurring && !simple
         ? { recurringInterval, nextRecurringDate: nextRecurDate }
         : { recurringInterval: null, nextRecurringDate: null }),
       // Quick settle: only meaningful when creating a new expense.
-      quickSettle: !editingExpense && !deposit && alreadySettled,
+      quickSettle: !editingExpense && !simple && alreadySettled,
     };
 
     // Remove any strictly undefined values just in case, though we used null
@@ -680,9 +753,11 @@ export default function ExpenseForm({
           ? editingExpense
             ? t('house.editDeposit')
             : t('house.logDeposit')
-          : editingExpense
-            ? t('form.editTitle')
-            : t('form.newTitle')
+          : goalMode
+            ? editingExpense?.title || goal?.name || t('planTab.contribute')
+            : editingExpense
+              ? t('form.editTitle')
+              : t('form.newTitle')
       }
       bodyClassName=""
       footer={
@@ -703,9 +778,13 @@ export default function ExpenseForm({
               ? editingExpense
                 ? t('house.updateDeposit')
                 : t('house.saveDeposit')
-              : editingExpense
-                ? t('form.update')
-                : t('form.save')}
+              : goalMode
+                ? editingExpense
+                  ? t('planTab.updateContribution')
+                  : t('planTab.saveContribution')
+                : editingExpense
+                  ? t('form.update')
+                  : t('form.save')}
           </button>
         </div>
       }
@@ -726,9 +805,14 @@ export default function ExpenseForm({
             {t('house.formIntro')}
           </p>
         )}
+        {goalMode && (
+          <p className="text-xs text-natural-muted" id="goal-intro">
+            {t('planTab.contributeIntro')}
+          </p>
+        )}
 
         {/* AI Smart Scan Placeholder */}
-        {!deposit && (
+        {!simple && (
           <div className="bg-natural-sage/20 border border-natural-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4">
             <div className="flex-1">
               <h3 className="text-sm font-bold text-natural-text flex items-center gap-1.5">
@@ -818,7 +902,7 @@ export default function ExpenseForm({
         )}
 
         {/* Spending threshold heads-up */}
-        {!deposit && thresholdWarnings.length > 0 && numericAmount > 0 && (
+        {!simple && thresholdWarnings.length > 0 && numericAmount > 0 && (
           <div className="flex items-start gap-2 p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl">
             <span className="text-natural-primary shrink-0 font-bold">!</span>
             <p className="text-xs text-natural-text leading-relaxed">
@@ -847,7 +931,8 @@ export default function ExpenseForm({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('form.titlePlaceholder')}
-              className="w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all"
+              readOnly={goalMode}
+              className={`w-full pl-3 pr-3 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-sm outline-none transition-all ${goalMode ? 'font-semibold cursor-default' : ''}`}
               id="expense-title-input"
             />
           </div>
@@ -895,7 +980,7 @@ export default function ExpenseForm({
             </div>
 
             {/* Recurring Toggle */}
-            {!deposit && (
+            {!simple && (
               <div className="mt-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1036,8 +1121,8 @@ export default function ExpenseForm({
 
         {/* Category & Payer Grid */}
 
-        <div className={`grid gap-4 ${deposit ? 'grid-cols-1' : 'grid-cols-2'}`}>
-          {!deposit && (
+        <div className={`grid gap-4 ${simple ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {!simple && (
             <div>
               <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
                 {t('form.category')}
@@ -1089,7 +1174,7 @@ export default function ExpenseForm({
         </div>
 
         {/* Split Rule Selector */}
-        {!deposit && (
+        {!simple && (
           <div>
             <label className="block text-xs font-bold text-natural-text uppercase tracking-wider mb-2">
               {t('form.splitRules')}
@@ -1596,7 +1681,7 @@ export default function ExpenseForm({
         )}
 
         {/* Split Detail Preview Box (not for Dark Cherry - there are no shares) */}
-        {numericAmount > 0 && !deposit && splitType !== 'dark_cherry' && (
+        {numericAmount > 0 && !simple && splitType !== 'dark_cherry' && (
           <div
             className="bg-natural-sidebar/30 p-4 border border-dashed border-natural-border rounded-2xl flex flex-col space-y-2"
             id="split-preview"
@@ -1644,8 +1729,32 @@ export default function ExpenseForm({
           </div>
         )}
 
+        {/* Budget hint: what this leaves in the category's budget this month.
+            Cherry + only (the parent passes no budgets otherwise). */}
+        {budgetHint && (
+          <p
+            className={`flex items-start gap-2 text-[13px] leading-[18px] ${budgetHint.left < 0 ? 'text-natural-primary' : 'text-natural-muted'}`}
+            id="budget-hint"
+          >
+            <Check
+              className={`h-4 w-4 shrink-0 mt-px ${budgetHint.left < 0 ? 'text-natural-primary' : 'text-natural-teal'}`}
+            />
+            <span>
+              <Trans
+                i18nKey="planTab.budgetHint"
+                values={{
+                  category: budgetHint.category,
+                  left: formatCurrency(budgetHint.left, 0),
+                  available: formatCurrency(budgetHint.available, 0),
+                }}
+                components={{ m: <span className="font-mono text-natural-text" /> }}
+              />
+            </span>
+          </p>
+        )}
+
         {/* Quick settle (new expenses only) */}
-        {!editingExpense && !deposit && (
+        {!editingExpense && !simple && (
           <label className="flex items-start gap-3 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-2xl cursor-pointer">
             <input
               type="checkbox"
