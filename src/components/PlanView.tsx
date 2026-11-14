@@ -50,7 +50,10 @@ interface Props {
   onUnlock?: () => void;
   household: PlanPayload;
   personal: PlanPayload;
-  onSave: (scope: PlanScope, next: PlanPayload) => Promise<boolean>;
+  /** [change] is applied to the stored plan as it stands at the write. */
+  onSave: (scope: PlanScope, change: (current: PlanPayload) => PlanPayload) => Promise<boolean>;
+  /** The stored plan could not be read; nothing can be saved until it can. */
+  failed?: boolean;
   /** Opens the Log form in goal mode with this goal preselected. */
   onContribute: (goal: Goal) => void;
   onPlanPurchase: () => void;
@@ -87,6 +90,7 @@ export default function PlanView({
   household,
   personal,
   onSave,
+  failed,
   onContribute,
   onPlanPurchase,
   onLogDeposit,
@@ -165,7 +169,8 @@ export default function PlanView({
           : 'numeric',
     });
 
-  const saveGoals = (next: Goal[]) => onSave(scope, { ...plan, goals: next });
+  const saveGoals = (change: (goals: Goal[]) => Goal[]) =>
+    onSave(scope, (p) => ({ ...p, goals: change(p.goals) }));
 
   const header = (
     <PageHeader
@@ -344,6 +349,16 @@ export default function PlanView({
   return (
     <div className="flex flex-col gap-5" id="plan-view">
       {header}
+
+      {failed && (
+        <p
+          role="alert"
+          className="rounded-xl border border-natural-primary/30 bg-natural-primary/5 px-4 py-3 text-sm text-natural-text"
+          id="plan-read-failed"
+        >
+          {t('planTab.readFailed')}
+        </p>
+      )}
 
       {statuses.length === 0 ? (
         <section className={`${panel} rounded-[20px] px-5 py-[18px]`} id="plan-empty">
@@ -556,7 +571,7 @@ export default function PlanView({
             ...expenses.map((e) => (e.category || '').trim()),
           ]}
           onSave={async (budgets: Budget[]) => {
-            const ok = await onSave(scope, { ...plan, budgets });
+            const ok = await onSave(scope, (p) => ({ ...p, budgets }));
             if (ok) setEditing(false);
             return ok;
           }}
@@ -571,7 +586,7 @@ export default function PlanView({
             ...(group.categories || []),
             ...expenses.map((e) => (e.category || '').trim()),
           ]}
-          onSave={(rules) => onSave('household', { ...household, rules })}
+          onSave={(rules) => onSave('household', (p) => ({ ...p, rules }))}
           onClose={() => setRulesOpen(false)}
         />
       )}
@@ -590,14 +605,15 @@ export default function PlanView({
           }
           locale={i18n.language}
           onSave={async (g) => {
-            const exists = plan.goals.some((x) => x.id === g.id);
-            const ok = await saveGoals(
-              exists ? plan.goals.map((x) => (x.id === g.id ? g : x)) : [...plan.goals, g]
+            const ok = await saveGoals((goals) =>
+              goals.some((x) => x.id === g.id)
+                ? goals.map((x) => (x.id === g.id ? g : x))
+                : [...goals, g]
             );
             if (ok) setGoalOpen(null);
           }}
           onDelete={async (g) => {
-            const ok = await saveGoals(plan.goals.filter((x) => x.id !== g.id));
+            const ok = await saveGoals((goals) => goals.filter((x) => x.id !== g.id));
             if (ok) setGoalOpen(null);
           }}
           onContribute={(g) => {

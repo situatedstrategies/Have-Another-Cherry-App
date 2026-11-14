@@ -28,23 +28,36 @@ export interface GoalAlert {
 export const NEAR_RATIO = 0.8;
 export const OVER_RATIO = 1;
 
-/** For each budget in [next] with alerts on: 'budget_over' when its pct
- *  crosses 1.0 upward between [prev] and [next], else 'budget_near' when it
- *  crosses 0.8 upward. A budget missing from [prev] counts as 0 before. One
- *  alert per budget per save, in the order of [next]. */
+/** For each budget in [next] with alerts on: 'budget_over' when it goes
+ *  over between [prev] and [next], else 'budget_near' when it reaches 0.8.
+ *  A budget missing from [prev] counts as 0 before. One alert per budget per
+ *  save, in the order of [next]. */
 export const budgetAlerts = (prev: BudgetStatus[], next: BudgetStatus[]): BudgetAlert[] => {
   const out: BudgetAlert[] = [];
   for (const n of next) {
     if (!n.alerts) continue;
-    const before = prev.find((p) => p.id === n.id)?.pct ?? 0;
-    const after = n.pct;
-    if (before < OVER_RATIO && after >= OVER_RATIO)
-      out.push({ kind: 'budget_over', budgetId: n.id });
-    else if (before < NEAR_RATIO && after >= NEAR_RATIO)
-      out.push({ kind: 'budget_near', budgetId: n.id });
+    const before = alertLevel(prev.find((p) => p.id === n.id));
+    const after = alertLevel(n);
+    if (after === 2 && before < 2) out.push({ kind: 'budget_over', budgetId: n.id });
+    else if (after === 1 && before < 1) out.push({ kind: 'budget_near', budgetId: n.id });
   }
   return out;
 };
+
+/** 2 is over, 1 is near, 0 is neither. "Over" reads the status's own flag as
+ *  well as the ratio: a rollover budget in deficit has nothing available, so
+ *  its pct is 0 while it is over. A budget that was not there counts as 0. */
+export const alertLevel = (s: Pick<BudgetStatus, 'pct' | 'over'> | undefined): 0 | 1 | 2 => {
+  if (!s) return 0;
+  if (s.over || s.pct >= OVER_RATIO) return 2;
+  return s.pct >= NEAR_RATIO ? 1 : 0;
+};
+
+/** The id a budget alert carries to the server. A budget read from a mobile
+ *  spending threshold has its category in its id ('threshold:Groceries'),
+ *  and the event must stay contentless, so those all post as 'threshold'. */
+export const alertId = (budgetId: string): string =>
+  budgetId.startsWith('threshold:') ? 'threshold' : budgetId;
 
 export const GOAL_MILESTONES = [0.25, 0.5, 0.75, 1] as const;
 

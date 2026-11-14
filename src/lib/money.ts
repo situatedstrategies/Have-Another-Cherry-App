@@ -34,6 +34,17 @@ export const isDeposit = (expense: Expense): boolean => expense.splitType === 'd
  *  amount. Mirrors isGoalContribution in the Flutter client. */
 export const isGoalContribution = (expense: Expense): boolean => expense.splitType === 'goal';
 
+/** What a deposit and a goal contribution are filed under, the same words on
+ *  the phone and in every language; screens show the translated label. Never
+ *  added to the group's own category list. */
+export const DEPOSIT_CATEGORY = 'House account';
+export const GOAL_CATEGORY = 'Goal';
+
+/** Money set aside rather than spent: a house account deposit or a goal
+ *  contribution. Never spending and never a debt, in any statistic. */
+export const isSavings = (expense: Expense): boolean =>
+  isDeposit(expense) || isGoalContribution(expense);
+
 export const getDarkCherryPotTotal = (expense: Expense, includePending = true): number =>
   roundCurrency(
     (expense.settlements || [])

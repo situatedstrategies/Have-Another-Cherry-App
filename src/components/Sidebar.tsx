@@ -87,13 +87,11 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="flex flex-wrap md:flex-col gap-1" role="tablist" aria-label={t('nav.main')}>
+      <div className="flex flex-wrap md:flex-col gap-1" role="group" aria-label={t('nav.main')}>
         {items.map(({ key, label, Icon }) => (
           <button
             key={key}
             type="button"
-            role="tab"
-            aria-selected={view === key}
             aria-current={view === key ? 'page' : undefined}
             onClick={() => onNavigate(key)}
             className={itemClass(view === key)}
@@ -112,7 +110,9 @@ export default function Sidebar({
         ))}
       </div>
 
-      <div className="hidden md:flex mt-auto flex-col gap-2.5">
+      {/* The group switcher shows at every width: on a phone it is the only
+          way to another household, or to join or create one. */}
+      <div className="flex mt-2 md:mt-auto flex-col gap-2.5">
         <div className="relative">
           <button
             type="button"
@@ -137,7 +137,7 @@ export default function Sidebar({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
               <div
-                className="absolute left-0 bottom-full mb-1 z-20 w-full min-w-56 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in slide-in-from-bottom-1"
+                className="absolute left-0 top-full mt-1 md:top-auto md:mt-0 md:bottom-full md:mb-1 z-20 w-full min-w-56 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in"
                 role="menu"
               >
                 <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-natural-muted">
@@ -179,7 +179,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onSettings}
-          className={itemClass(false)}
+          className={`${itemClass(false)} max-md:hidden`}
           id="nav-settings"
           title={t('app.accountSettings')}
         >

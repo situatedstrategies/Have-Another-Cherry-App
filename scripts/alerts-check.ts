@@ -1,7 +1,7 @@
 // Alerts (lib/alerts): budget and goal crossings between before and after a
 // save. Mirrors the Flutter test/alerts_test.dart vector for vector. Run with
 // `npm run test:parity`.
-import { budgetAlerts, goalAlerts, PLAN_ALERT_KINDS } from '../src/lib/alerts';
+import { alertId, alertLevel, budgetAlerts, goalAlerts, PLAN_ALERT_KINDS } from '../src/lib/alerts';
 import type { BudgetStatus } from '../src/lib/plan';
 
 let bad = 0;
@@ -98,6 +98,35 @@ check('milestone and off track together, milestone first', goalAlerts(200, 320, 
   { kind: 'goal_off_track', goalId: 'couch' },
 ]);
 check('funded going down is nothing', goalAlerts(600, 500, couch, on, on), []);
+
+console.log('--- over without a ratio, and the id that is posted ---');
+// A rollover budget in deficit: nothing available, so pct is 0 while it is over.
+const deficit = (over: boolean): BudgetStatus => ({ ...st('r', 0), available: -50, over });
+check(
+  'alertLevel reads the over flag',
+  [
+    alertLevel(deficit(true)),
+    alertLevel(st('g', 0.85)),
+    alertLevel(st('g', 0.2)),
+    alertLevel(undefined),
+  ],
+  [2, 1, 0, 0]
+);
+check(
+  'going over with nothing available is over',
+  budgetAlerts([deficit(false)], [deficit(true)]),
+  [{ kind: 'budget_over', budgetId: 'r' }]
+);
+check(
+  'already over with nothing available is nothing',
+  budgetAlerts([deficit(true)], [deficit(true)]),
+  []
+);
+check(
+  'a threshold budget posts no category',
+  [alertId('threshold:Groceries'), alertId('b-123')],
+  ['threshold', 'b-123']
+);
 
 console.log(bad === 0 ? '\nALL ALERTS CHECKS PASSED' : `\n${bad} FAILURE(S)`);
 process.exit(bad === 0 ? 0 : 1);

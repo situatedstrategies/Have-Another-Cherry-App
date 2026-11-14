@@ -4,6 +4,7 @@
 // (exportRows, pivot) and the house account grouping, so the file and the
 // screen never disagree; lib/exportDownload.ts turns them into .xlsx or .csv
 // in the browser. Pure, checked by scripts/export-check.ts.
+import { settlementDay } from './recurring';
 import { Expense } from '../types';
 import { ReportFilter, exportRows, pivot, Granularity } from './reports';
 import { depositsOf } from './deposits';
@@ -147,7 +148,7 @@ export const settlementsSheet = (input: ExportInput): Sheet => {
     if (e.splitType === 'dark_cherry' && e.paidBy !== uid) continue;
     for (const s of e.settlements || []) {
       if (s.status === 'voided') continue;
-      const date = (s.paymentDate || s.timestamp || '').slice(0, 10);
+      const date = settlementDay(s);
       if (!date || date < start || date > end) continue;
       rows.push({
         date,
@@ -196,7 +197,10 @@ const csvCell = (v: SheetCell): string => {
   if (v === null || v === undefined) return '';
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
   if (typeof v === 'number') return String(v);
-  return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // A title beginning with =, +, - or @ would run as a formula when the file
+  // is opened in a spreadsheet; a leading apostrophe makes it plain text.
+  const text = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 /** One sheet as CSV text: the header row, then one line per row. Several

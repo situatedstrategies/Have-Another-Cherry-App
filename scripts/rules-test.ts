@@ -23,6 +23,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -240,6 +241,108 @@ async function main() {
         payload: 'x',
       })
     )
+  );
+
+  // --- plans: members only, the envelope and nothing else --------------------
+  const stranger = env.authenticatedContext(STRANGER).firestore();
+  const planDoc = (uid: string, extra: Record<string, unknown> = {}) => ({
+    groupId: CODE,
+    payload: 'iv:cipher',
+    updatedAt: '2026-11-14T00:00:00.000Z',
+    updatedBy: uid,
+    ...extra,
+  });
+  await check('a member CAN create the household plan', () =>
+    assertSucceeds(setDoc(doc(owner, 'group_plans', CODE), planDoc(OWNER), { merge: true }))
+  );
+  await check('a member CAN read the household plan', () =>
+    assertSucceeds(getDoc(doc(owner, 'group_plans', CODE)))
+  );
+  await check('a member CAN update the household plan', () =>
+    assertSucceeds(
+      setDoc(doc(owner, 'group_plans', CODE), planDoc(OWNER, { payload: 'iv:next' }), {
+        merge: true,
+      })
+    )
+  );
+  await check('a non-member CANNOT read the household plan', () =>
+    assertFails(getDoc(doc(stranger, 'group_plans', CODE)))
+  );
+  await check('a non-member CANNOT write the household plan', () =>
+    assertFails(setDoc(doc(stranger, 'group_plans', CODE), planDoc(STRANGER)))
+  );
+  await check('a signed-out visitor CANNOT read the household plan', () =>
+    assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'group_plans', CODE)))
+  );
+  await check('nobody CAN list plans', () =>
+    assertFails(getDocs(collection(owner, 'group_plans')))
+  );
+  await check('a plan CANNOT be written without a payload', () =>
+    assertFails(
+      setDoc(doc(owner, 'group_plans', CODE), {
+        groupId: CODE,
+        updatedAt: 'x',
+        updatedBy: OWNER,
+      })
+    )
+  );
+  await check('a plan CANNOT carry any other field', () =>
+    assertFails(setDoc(doc(owner, 'group_plans', CODE), planDoc(OWNER, { junk: 'x' })))
+  );
+  await check('a plan payload CANNOT be oversized', () =>
+    assertFails(
+      setDoc(doc(owner, 'group_plans', CODE), planDoc(OWNER, { payload: 'a'.repeat(400001) }))
+    )
+  );
+  await check('a plan CANNOT be signed with somebody else', () =>
+    assertFails(setDoc(doc(owner, 'group_plans', CODE), planDoc(STRANGER)))
+  );
+  await check('a plan CANNOT be filed under another group id', () =>
+    assertFails(setDoc(doc(owner, 'group_plans', CODE), planDoc(OWNER, { groupId: SHARED })))
+  );
+  await check('a member CANNOT delete the household plan', () =>
+    assertFails(deleteDoc(doc(owner, 'group_plans', CODE)))
+  );
+  const personalPlan = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    payload: 'iv:cipher',
+    updatedAt: '2026-11-14T00:00:00.000Z',
+    updatedBy: uid,
+    ...extra,
+  });
+  await check('a member CAN write their own personal plan', () =>
+    assertSucceeds(
+      setDoc(doc(owner, 'users', OWNER, 'private', 'plan'), personalPlan(OWNER), { merge: true })
+    )
+  );
+  await check('a personal plan without the uid field is accepted (mobile writes it so)', () =>
+    assertSucceeds(
+      setDoc(doc(owner, 'users', OWNER, 'private', 'plan'), {
+        payload: 'iv:mobile',
+        updatedAt: '2026-11-14T00:00:00.000Z',
+        updatedBy: OWNER,
+      })
+    )
+  );
+  await check('a member CAN read their own personal plan', () =>
+    assertSucceeds(getDoc(doc(owner, 'users', OWNER, 'private', 'plan')))
+  );
+  await check('nobody else CAN read a personal plan', () =>
+    assertFails(getDoc(doc(stranger, 'users', OWNER, 'private', 'plan')))
+  );
+  await check('nobody else CAN write a personal plan', () =>
+    assertFails(setDoc(doc(stranger, 'users', OWNER, 'private', 'plan'), personalPlan(OWNER)))
+  );
+  await check('a personal plan CANNOT carry any other field', () =>
+    assertFails(
+      setDoc(doc(owner, 'users', OWNER, 'private', 'plan'), personalPlan(OWNER, { junk: 1 }))
+    )
+  );
+  await check("the other private documents are still the owner's to write", () =>
+    assertSucceeds(setDoc(doc(owner, 'users', OWNER, 'private', 'prefs'), { bankApp: 'x' }))
+  );
+  await check('a member CAN delete their own personal plan (account deletion)', () =>
+    assertSucceeds(deleteDoc(doc(owner, 'users', OWNER, 'private', 'plan')))
   );
 
   // --- profile reads must be backed by authoritative group membership ----

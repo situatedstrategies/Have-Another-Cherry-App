@@ -21,10 +21,13 @@ export function reminderTargetDate(now: Date, offsetHours = 0): string {
   return tomorrow.toISOString().slice(0, 10);
 }
 
-/** The month a run on the 1st closes ('YYYY-MM', the month before), else null. */
+/** The month a run closes ('YYYY-MM', the month before): on the 1st, and on
+ *  the 2nd and 3rd as well, so a failed or half-finished run on the 1st is
+ *  caught up. Each group is marked once it is told (lastMonthClosedFor), so
+ *  the later runs reach only the households the first one missed. */
 export function monthClosedBy(runDate: string): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(runDate);
-  if (!m || m[3] !== '01') return null;
+  if (!m || Number(m[3]) > 3) return null;
   const year = Number(m[1]);
   const month = Number(m[2]);
   return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;

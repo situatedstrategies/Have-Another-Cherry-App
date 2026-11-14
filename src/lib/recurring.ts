@@ -44,6 +44,17 @@ export const toLocalIso = (d: Date): string =>
  *  is tomorrow's or yesterday's date for part of every day outside UTC. */
 export const todayLocal = (): string => toLocalIso(new Date());
 
+/** The local calendar day of a settlement: its paymentDate when it has one,
+ *  else the day its timestamp fell on HERE. The first ten characters of an
+ *  ISO timestamp are the UTC day, which is tomorrow for an evening payment
+ *  west of Greenwich. Empty when neither can be read. */
+export const settlementDay = (s: { paymentDate?: string | null; timestamp?: string }): string => {
+  const paid = (s.paymentDate || '').slice(0, 10);
+  if (paid) return paid;
+  const at = s.timestamp ? new Date(s.timestamp) : null;
+  return at && !Number.isNaN(at.getTime()) ? toLocalIso(at) : '';
+};
+
 /** The last day the month containing [d] actually has. */
 const lastDayOf = (year: number, monthIndex: number): number =>
   new Date(year, monthIndex + 1, 0).getDate();

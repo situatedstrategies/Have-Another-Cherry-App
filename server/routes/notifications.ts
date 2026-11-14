@@ -245,6 +245,15 @@ router.post(
 
       const recipients = groupInfo.memberIds.filter((uid) => uid !== callerUid);
       if (isPlanAlertType(kind)) {
+        // Plan is part of Cherry +, and the apps only raise these for a
+        // member who has it; a free member's token must not be able to send
+        // "over a budget" to the household.
+        await ensureAdminApp();
+        const { getFirestore } = await import('firebase-admin/firestore');
+        const callerDoc = await getFirestore().collection('users').doc(callerUid).get();
+        if (!hasPlus(callerDoc.data())) {
+          return res.status(403).json({ error: 'Plan alerts are a Cherry + feature.' });
+        }
         const { title, body } = PLAN_ALERT_COPY[kind](groupInfo.groupName);
         const sent = await sendPushToUsers(
           recipients,

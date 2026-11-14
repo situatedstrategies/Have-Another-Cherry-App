@@ -201,7 +201,7 @@ Settle is hidden for them, so nothing can post to a checkbook they cannot open.
 - Entries: `checkbooks/{uid}/entries/{id}` with `accountId`, `date`, `title`,
   `category`, `amount` (signed: money out negative, money in positive),
   `cleared` (bool), `source` (`{kind: 'expense'|'settlement'|'deposit'|'bill'|
-  'manual', id}`) and `createdAt`. Balance = starting + sum(amount) in date
+'manual', id}`) and `createdAt`. Balance = starting + sum(amount) in date
   order; the running balance on each row is derived, never stored.
 - Posting rule (hard): nothing posts on its own. An expense, settlement, house
   deposit or scheduled bill reaches the register only when the user ticks the
@@ -231,3 +231,45 @@ Settle is hidden for them, so nothing can post to a checkbook they cannot open.
 - Navigation (open decision for the owner): the bottom tab bar has five slots.
   The canvas shows Checkbook taking the fifth slot and the Vault moving to
   Home and Settings. The alternative is Checkbook under Plan.
+
+## Review fixes (November 14th 2026)
+
+Rules both clients follow after the review of the first three phases. Where
+this section and an earlier one disagree, this one holds.
+
+- **Savings lines.** A deposit is stored with the category `House account`, a
+  goal contribution with `Goal`; neither is ever added to the group's own
+  category list, and screens show the translated label. A contribution to a
+  personal goal is titled `Goal`, not the goal's name. Neither kind counts as
+  spending in any statistic, in or out of Reports, and neither can be owed.
+- **Editing.** Editing a deposit or a contribution opens the short form and
+  saves the same shape as a new one. The form's mode never outlives the form.
+- **Plan writes.** A client writes a plan only after it has read the stored
+  one (a document that decrypted, or the server's word that there is none),
+  and applies its change to the stored plan as it stands at the write. A plan
+  that cannot be read is never written over. The rules accept only the
+  envelope (`groupId` or `uid`, `payload`, `updatedAt`, `updatedBy`) and
+  refuse a delete of the household plan. Cherry + is not checked in the
+  rules, because a member who has just paid is unlocked by the store before
+  `users/{uid}.isPlus` is written.
+- **Start months.** A budget whose `startMonth` is not `YYYY-MM` carries
+  nothing. A budget is given the current month when it is new or when its
+  rollover is switched on.
+- **House account.** The agreed part is the member's split over the sum of
+  the listed members' splits (equal parts when there is no split).
+- **Alerts.** A budget is "over" by its own flag as well as its ratio, so a
+  rollover budget in deficit counts. Alerts fire on edits as well as new
+  lines. A threshold budget posts the id `threshold`, never its category.
+  `goal_off_track` is raised when a Cherry + member opens the app and a goal
+  that was on track no longer is; the server requires Cherry + for all four.
+- **Dates.** A settlement with no payment date is dated by the local day of
+  its timestamp. All date stepping is by calendar day, never by 24 hours.
+- **Export.** A CSV cell that would run as a formula gets a leading
+  apostrophe.
+- **Sheet.** Another member's Dark Cherry amount is left out of every total
+  and of the ordering. The in-place amount edit obeys the form's limits and
+  keeps the shares summing to the amount.
+- **Per-group state.** Month close seen, recurring dismissals and report
+  filters are kept per group (and per account on the web).
+- **Month close push.** Sent on the 1st, and on the 2nd and 3rd to any
+  household the first run missed.

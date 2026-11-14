@@ -26,7 +26,7 @@ import DarkCherryInfoModal, {
 import CherryPlusModal from './CherryPlusModal';
 import { authHeader } from '../firebase';
 import { amountError, percentError } from '../lib/limits';
-import { roundCurrency } from '../lib/money';
+import { roundCurrency, DEPOSIT_CATEGORY, GOAL_CATEGORY } from '../lib/money';
 import { Budget, budgetStatus, monthOf } from '../lib/plan';
 import { CategoryRule, categoryFor } from '../lib/rules';
 import {
@@ -64,7 +64,7 @@ interface ExpenseFormProps {
    *  contributor, no split, nothing owed; saved with splitType 'goal'. */
   mode?: 'expense' | 'deposit' | 'goal';
   /** The goal being funded in 'goal' mode. */
-  goal?: { id: string; name: string } | null;
+  goal?: { id: string; name: string; scope?: 'household' | 'personal' } | null;
   /** The budgets the hint under the form reads (Cherry + only): the
    *  household's and the member's own; the household one wins for a category
    *  that has both. */
@@ -363,10 +363,16 @@ export default function ExpenseForm({
   // Preselect a category from the title while the person has not typed one
   // (and never when editing): a household rule first, then what this group
   // called the same title before, then plain keywords (lib/rules.categoryFor).
+  const guessedCategory = useRef('');
   useEffect(() => {
-    if (editingExpense || category || simple) return;
-    const guess = categoryFor(title, rules || [], expenses || [], categories);
-    if (guess) setCategory(guess);
+    if (editingExpense || simple) return;
+    // A category the person chose is theirs; one this effect guessed is
+    // guessed again as the title grows, so "Gas" does not stick to
+    // "Gastropub dinner".
+    if (category && category !== guessedCategory.current) return;
+    const guess = categoryFor(title, rules || [], expenses || [], categories) || '';
+    guessedCategory.current = guess;
+    if (guess !== category) setCategory(guess);
     // Only the title should trigger a new guess; `category` is the guard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, editingExpense, simple]);
@@ -653,11 +659,11 @@ export default function ExpenseForm({
     // A deposit has no category of its own and no split: every deposit is
     // filed under the house account so the sheet and the export group them.
     // A goal contribution is filed under the goal's name.
-    const finalCategory = deposit
-      ? t('house.depositCategory')
-      : goalMode
-        ? title.trim()
-        : category.trim();
+    const finalCategory = deposit ? DEPOSIT_CATEGORY : goalMode ? GOAL_CATEGORY : category.trim();
+    // A personal goal's name is the member's own business, and the ledger
+    // line is read by the whole household, so the line just says "Goal".
+    const finalTitle =
+      goalMode && !editingExpense && goal?.scope === 'personal' ? GOAL_CATEGORY : title.trim();
     if (!finalCategory) {
       setError(t('form.err.category'));
       return;
@@ -677,7 +683,7 @@ export default function ExpenseForm({
     }
 
     const payload: any = {
-      title: title.trim(),
+      title: finalTitle,
       amount: numericAmount,
       date,
       category: finalCategory,

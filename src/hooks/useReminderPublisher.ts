@@ -30,33 +30,46 @@ export function useReminderPublisher({
   const published = useRef<Record<string, string>>({});
   const vaultRef = useRef<VaultData | null>(null);
   const tick = useRef(0);
+  // The group whose vault the server has answered for. Until it has, nothing
+  // is published: an index built without the vault would drop its bills.
+  const vaultReadyFor = useRef<string | null>(null);
 
   // The vault is loaded here rather than borrowed from the modal, because
   // the index has to stay current whether or not the vault is open.
   useEffect(() => {
+    vaultReadyFor.current = null;
+    vaultRef.current = null;
     if (!groupId || !isPlus) return;
-    const unsub = onSnapshot(doc(db, 'group_vault', groupId), async (snap) => {
-      // Publish from the server's copy only. The offline cache can hold a
-      // vault from an earlier visit, and publishing from it would rewrite the
-      // reminder index with old bills until the server answered.
-      if (snap.metadata.fromCache) return;
-      try {
-        const payload = snap.data()?.payload;
-        const decrypted = payload ? await decryptData(payload, groupId) : null;
-        vaultRef.current =
-          decrypted && typeof decrypted === 'object'
-            ? {
-                bills: Array.isArray(decrypted.bills) ? decrypted.bills : [],
-                docs: [],
-                notes: Array.isArray(decrypted.notes) ? decrypted.notes : [],
-              }
-            : { bills: [], docs: [] };
-      } catch {
-        vaultRef.current = { bills: [], docs: [] };
+    // Metadata changes are listened for on purpose: when the server confirms
+    // that the cached vault is current, the data does not change, and without
+    // this no second snapshot would arrive to say so.
+    const unsub = onSnapshot(
+      doc(db, 'group_vault', groupId),
+      { includeMetadataChanges: true },
+      async (snap) => {
+        // Publish from the server's copy only. The offline cache can hold a
+        // vault from an earlier visit, and publishing from it would rewrite the
+        // reminder index with old bills until the server answered.
+        if (snap.metadata.fromCache) return;
+        try {
+          const payload = snap.data()?.payload;
+          const decrypted = payload ? await decryptData(payload, groupId) : null;
+          vaultRef.current =
+            decrypted && typeof decrypted === 'object'
+              ? {
+                  bills: Array.isArray(decrypted.bills) ? decrypted.bills : [],
+                  docs: [],
+                  notes: Array.isArray(decrypted.notes) ? decrypted.notes : [],
+                }
+              : { bills: [], docs: [] };
+        } catch {
+          vaultRef.current = { bills: [], docs: [] };
+        }
+        vaultReadyFor.current = groupId;
+        tick.current++;
+        void publish();
       }
-      tick.current++;
-      void publish();
-    });
+    );
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, isPlus]);
@@ -72,6 +85,7 @@ export function useReminderPublisher({
       }
       return;
     }
+    if (vaultReadyFor.current !== groupId) return;
     const entries = buildReminderIndex(expenses, vaultRef.current);
     const signature = reminderIndexSignature(entries);
     if (!(groupId in published.current)) {

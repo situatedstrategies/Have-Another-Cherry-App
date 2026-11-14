@@ -160,6 +160,19 @@ check('csv quoting and sheet separation', csv.split('\r\n'), [
   '2026-11-02,electric-nov,Olivia,Sam,67.2,venmo,confirmed',
 ]);
 check(
+  'csv neutralises a cell that would run as a formula',
+  toCsv([
+    {
+      name: 'x',
+      columns: [{ header: 'a', type: 'text' }],
+      rows: [['=HYPERLINK("http://x","Rent")'], ['+1'], ['-2'], ['@x'], [-2], ['Rent']],
+    } as any,
+  ])
+    .split('\r\n')
+    .slice(1),
+  [`"'=HYPERLINK(""http://x"",""Rent"")"`, "'+1", "'-2", "'@x", '-2', 'Rent']
+);
+check(
   'csv escapes quotes and commas',
   toCsv([sheets[0]]).split('\r\n')[1].split(',"')[1].split('",')[0],
   'Dining, ""late""'

@@ -1,6 +1,7 @@
+import { useRef } from 'react';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getNormalizedExpenseStatus, roundCurrency } from '../lib/money';
+import { getNormalizedExpenseStatus, isSavings, roundCurrency } from '../lib/money';
 import { mergeExpense } from '../lib/merge';
 import { normalizeAmount } from '../lib/limits';
 import { CHERRY_ERRORS } from '../lib/errors';
@@ -41,9 +42,10 @@ export function useExpenseMutations({
   notifyLedgerEvent: (kind: LedgerEventKind, id?: string) => void;
   addToast: AddToast;
   setSupportError: Setter<SupportError | null>;
-  /** After a NEW expense lands: the saved line and the ledger as it was
-   *  before it (the category rule nudge and the plan alerts read both). */
-  onExpenseSaved?: (saved: Expense, before: Expense[]) => void;
+  /** After an expense lands: the saved line, the ledger as it was before the
+   *  save, and whether it was an edit (the plan alerts fire on both; the
+   *  category rule nudge only on a new line). */
+  onExpenseSaved?: (saved: Expense, before: Expense[], edited: boolean) => void;
 }) {
   const handleAddComment = async (expenseId: string, text: string) => {
     if (!group) return;
@@ -69,7 +71,22 @@ export function useExpenseMutations({
     }
   };
 
+  // One save at a time: a second click while the first is still writing
+  // would log the same line twice.
+  const savingRef = useRef(false);
   const handleAddOrEditExpense = async (
+    formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>
+  ) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      await saveExpense(formData);
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const saveExpense = async (
     formData: Omit<Expense, 'id' | 'createdAt' | 'status' | 'groupId'>
   ) => {
     if (!group) return;
@@ -107,7 +124,9 @@ export function useExpenseMutations({
       );
     }
     try {
-      if (!group.categories?.includes(formData.category)) {
+      // A deposit's or a goal contribution's label is not a spending category,
+      // and the group document is not encrypted, so it never goes there.
+      if (!isSavings(formData as Expense) && !group.categories?.includes(formData.category)) {
         const groupRef = doc(db, 'groups', group.id);
         const newCategories = [...(group.categories || []), formData.category];
         await updateDoc(groupRef, { categories: newCategories });
@@ -182,10 +201,8 @@ export function useExpenseMutations({
       await broadcastToMembers('UPSERT', finalExpense);
 
       // New expenses only: edits would be noisy.
-      if (!editingExpense) {
-        notifyLedgerEvent('expense_logged');
-        onExpenseSaved?.(finalExpense, expenses);
-      }
+      if (!editingExpense) notifyLedgerEvent('expense_logged');
+      onExpenseSaved?.(finalExpense, expenses, !!editingExpense);
     } catch (e: any) {
       console.error(e);
       setSupportError({

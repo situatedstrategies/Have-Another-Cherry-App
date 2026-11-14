@@ -131,7 +131,12 @@ check(
 );
 check('the 1st closes the month before', monthClosedBy('2026-11-01'), '2026-10');
 check('January closes December of the year before', monthClosedBy('2027-01-01'), '2026-12');
-check('any other day closes nothing', monthClosedBy('2026-11-02'), null);
+check(
+  'the 2nd and 3rd catch up a missed run',
+  [monthClosedBy('2026-11-02'), monthClosedBy('2026-11-03')],
+  ['2026-10', '2026-10']
+);
+check('any later day closes nothing', monthClosedBy('2026-11-04'), null);
 check('nonsense closes nothing', monthClosedBy('yesterday'), null);
 
 console.log('--- plan alerts and the month close -------------------------------');

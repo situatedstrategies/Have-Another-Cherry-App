@@ -4,8 +4,15 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { formatCurrency } from './lib/format';
 import { db, authHeader } from './firebase';
 import { getFullMembers, joinedUids, nameOf as rosterName } from './lib/members';
-import { isDarkCherry, isDeposit, getNormalizedExpenseStatus, roundCurrency } from './lib/money';
+import {
+  isDarkCherry,
+  isDeposit,
+  isSavings,
+  getNormalizedExpenseStatus,
+  roundCurrency,
+} from './lib/money';
 import { hasPlus } from './lib/entitlements';
+import { normalizeAmount } from './lib/limits';
 import { useReminderPublisher } from './hooks/useReminderPublisher';
 import { computeIncomeDiscrepancy } from './lib/incomeDiscrepancy';
 import { SupportError } from './lib/errors';
@@ -30,7 +37,7 @@ import PlanView from './components/PlanView';
 import { usePlan } from './hooks/usePlan';
 import { todayLocal } from './lib/recurring';
 import { Goal, planStatuses, monthOf, goalFunded, goalProjection } from './lib/plan';
-import { budgetAlerts, goalAlerts } from './lib/alerts';
+import { alertId, budgetAlerts, goalAlerts } from './lib/alerts';
 import { RuleSuggestion, ruleFrom, suggestRule } from './lib/rules';
 import { isGoalContribution } from './lib/money';
 import RuleNudge from './components/RuleNudge';
@@ -82,6 +89,15 @@ export default function App() {
   const [formMode, setFormMode] = useState<'expense' | 'deposit' | 'goal'>('expense');
   // The goal being funded when the form opens in 'goal' mode.
   const [formGoal, setFormGoal] = useState<Goal | null>(null);
+  // A save closes the form without going through its onClose, so the mode is
+  // put back here: a form left in 'deposit' or 'goal' would turn the next
+  // expense edited into one.
+  useEffect(() => {
+    if (!showForm) {
+      setFormMode('expense');
+      setFormGoal(null);
+    }
+  }, [showForm]);
   // The tab that opened the Cherry + page (Reports, Plan): its name and pitch.
   const [plusIntro, setPlusIntro] = useState<{ title: string; pitch: string } | null>(null);
   const [view, setView] = useState<View>('home');
@@ -90,17 +106,16 @@ export default function App() {
   // Set when the month close card sends us to last month's report.
   const [reportsPeriod, setReportsPeriod] = useState<PeriodKey | undefined>(undefined);
   // The last month this device showed the month close card for (lib/monthClose).
-  const [monthCloseShown, setMonthCloseShown] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('month_close_shown');
-    } catch {
-      return null;
-    }
-  });
+  // Kept per group and per account: closing October for one household says
+  // nothing about another, or about a second person on this browser.
+  const [monthCloseShown, setMonthCloseShown] = useState<string | null>(null);
+  const localKey = (name: string) =>
+    group?.id && activeUser ? `${name}_${group.id}_${activeUser}` : null;
   const dismissMonthClose = (month: string) => {
     setMonthCloseShown(month);
     try {
-      localStorage.setItem('month_close_shown', month);
+      const key = localKey('month_close_shown');
+      if (key) localStorage.setItem(key, month);
     } catch {
       /* per-device convenience only */
     }
@@ -127,20 +142,13 @@ export default function App() {
   const [supportError, setSupportError] = useState<SupportError | null>(null);
   const [owedModal, setOwedModal] = useState<null | 'you_owe' | 'owed_to_you'>(null);
   // Titles the person said "Not this one" to on the recurring card, per device.
-  const [dismissedRecurring, setDismissedRecurring] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('recurring_dismissed');
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
-    } catch {
-      return [];
-    }
-  });
+  const [dismissedRecurring, setDismissedRecurring] = useState<string[]>([]);
   const dismissRecurring = (title: string) => {
     const next = [...dismissedRecurring, title];
     setDismissedRecurring(next);
     try {
-      localStorage.setItem('recurring_dismissed', JSON.stringify(next));
+      const key = localKey('recurring_dismissed');
+      if (key) localStorage.setItem(key, JSON.stringify(next));
     } catch {
       /* per-device convenience only */
     }
@@ -149,6 +157,25 @@ export default function App() {
   const [ruleNudge, setRuleNudge] = useState<{ title: string; suggestion: RuleSuggestion } | null>(
     null
   );
+  const localGroupId = group?.id;
+  useEffect(() => {
+    // A nudge raised in one household must not be answered into another.
+    setRuleNudge(null);
+    let shown: string | null = null;
+    let dismissed: string[] = [];
+    try {
+      if (localGroupId && activeUser) {
+        shown = localStorage.getItem(`month_close_shown_${localGroupId}_${activeUser}`);
+        const raw = localStorage.getItem(`recurring_dismissed_${localGroupId}_${activeUser}`);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) dismissed = parsed.filter((x) => typeof x === 'string');
+      }
+    } catch {
+      /* per-device convenience only */
+    }
+    setMonthCloseShown(shown);
+    setDismissedRecurring(dismissed);
+  }, [localGroupId, activeUser]);
   const [dismissedWaiting, setDismissedWaiting] = useState(false);
   // Which split change (by its timestamp) this device has acknowledged. In
   // localStorage so the banner doesn't come back on every reload, but a NEW
@@ -297,6 +324,39 @@ export default function App() {
     addToast,
   });
 
+  // "Goal off track" cannot come from logging a line (a contribution only
+  // helps); a goal slips when months pass without one. So it is looked at
+  // when a Cherry + member has the app open: the last answer per goal is kept
+  // on this device, and the household is told once when on track turns into
+  // off track. The first sight of a goal only records it. The wait lets the
+  // ledger finish arriving, since a half-loaded one would read as behind.
+  const offTrackGoals = plan.household.goals;
+  const offTrackReady = !plan.loading && !plan.error && expenses.length > 0;
+  const offTrackGroup = group?.id;
+  useEffect(() => {
+    if (!offTrackReady || !offTrackGroup || !(hasPlus(userProfile) || rcPlus)) return;
+    const timer = setTimeout(() => {
+      const today = todayLocal();
+      for (const g of offTrackGoals) {
+        if (g.doneAt || !g.dueDate) continue;
+        const onTrack = goalProjection(expenses, g, today).onTrack;
+        if (onTrack === null) continue;
+        const key = `goal_on_track_${offTrackGroup}_${g.id}`;
+        try {
+          const before = localStorage.getItem(key);
+          const now = onTrack ? '1' : '0';
+          if (before === now) continue;
+          localStorage.setItem(key, now);
+          if (before === '1' && now === '0') notifyLedgerEvent('goal_off_track', g.id);
+        } catch {
+          /* without storage there is no "before", so nothing is sent */
+        }
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offTrackReady, offTrackGroup, offTrackGoals, expenses, rcPlus]);
+
   const {
     handleAddComment,
     handleAddOrEditExpense,
@@ -316,18 +376,20 @@ export default function App() {
     notifyLedgerEvent,
     addToast,
     setSupportError,
-    onExpenseSaved: (saved, before) => {
+    onExpenseSaved: (saved, before, edited) => {
       // Rules are part of Plan (Cherry +); deposits and goal contributions
       // have no category of their own to learn from.
       if (!(hasPlus(userProfile) || rcPlus)) return;
       if (isDeposit(saved)) return;
-      if (!isGoalContribution(saved)) {
+      if (!edited && !isGoalContribution(saved)) {
         const s = suggestRule(saved.title, saved.category, before, plan.household.rules);
         setRuleNudge(s ? { title: saved.title, suggestion: s } : null);
       }
       // Household budget and goal crossings go to the other members as
       // contentless pushes (lib/alerts); personal ones stay on this screen.
-      const after = [saved, ...before];
+      // An edit counts too (the phone does the same): [before] still holds
+      // the old version of the line, [after] holds the new one in its place.
+      const after = [saved, ...before.filter((e) => e.id !== saved.id)];
       const today = todayLocal();
       const month = monthOf(today);
       const hb = plan.household.budgets;
@@ -335,7 +397,7 @@ export default function App() {
         planStatuses(before, hb, month, 'household', activeUser),
         planStatuses(after, hb, month, 'household', activeUser)
       )) {
-        notifyLedgerEvent(a.kind, a.budgetId);
+        notifyLedgerEvent(a.kind, alertId(a.budgetId));
       }
       for (const g of plan.household.goals) {
         if (g.doneAt) continue;
@@ -421,25 +483,63 @@ export default function App() {
   // Dark Cherry amounts are hidden from everyone but their creator, so a
   // group total that included one would let members back the number out.
   // House account deposits are not spending, so no statistic counts them.
+  // Goal contributions are money set aside, not spent, the same as deposits.
   const statsVisibleExpenses = expenses.filter(
-    (e) => !isDeposit(e) && (!isDarkCherry(e) || e.paidBy === activeUser)
+    (e) => !isSavings(e) && (!isDarkCherry(e) || e.paidBy === activeUser)
   );
-  const spendingExpenses = expenses.filter((e) => !isDeposit(e));
+  const spendingExpenses = expenses.filter((e) => !isSavings(e));
   const members = getFullMembers(group);
 
   // The sheet's in-place amount edit: the total changes and every share
   // scales with it, the way a rounded amount is scaled on save.
-  const handleEditAmount = (target: Expense, amount: number) => {
+  const handleEditAmount = (target: Expense, raw: number) => {
     const latest = expenses.find((e) => e.id === target.id) || target;
-    if (latest.amount <= 0 || amount <= 0) return;
+    // The same limits as the form: nothing past the cap, nothing rounded
+    // behind the person's back, and a Dark Cherry pot never below its floor.
+    const normalized = normalizeAmount(roundCurrency(raw));
+    if (latest.amount <= 0 || !normalized || normalized.value <= 0 || normalized.wasRounded) {
+      addToast(t('sheet.amountRejected'), t('sheet.amountRejectedBody'), 'error');
+      return;
+    }
+    const amount = normalized.value;
+    if (isDarkCherry(latest) && amount < Number(latest.blindMin || 0)) {
+      addToast(t('sheet.amountRejected'), t('sheet.amountRejectedBody'), 'error');
+      return;
+    }
+    if (amount === latest.amount) return;
     const scale = amount / latest.amount;
     const scaled = (v: number) => roundCurrency(v * scale);
+    // Each share is scaled and rounded on its own, so the cents can drift;
+    // the payer's share (else the largest) absorbs the difference, the way
+    // the form reconciles a split.
+    const shares: Record<string, number> = Object.fromEntries(
+      Object.entries(latest.shares || {}).map(([uid, v]) => [uid, scaled(Number(v))])
+    );
+    const guests =
+      (latest.thirdPersonShare != null ? scaled(Number(latest.thirdPersonShare)) : 0) +
+      (latest.extraParticipants || []).reduce((s, g) => s + scaled(g.share), 0);
+    const oldTotal =
+      Object.values(latest.shares || {}).reduce((s, v) => s + Number(v), 0) +
+      Number(latest.thirdPersonShare || 0) +
+      (latest.extraParticipants || []).reduce((s, g) => s + g.share, 0);
+    const ids = Object.keys(shares);
+    // Only a split that covered the old amount is held to the new one.
+    if (ids.length && Math.abs(oldTotal - latest.amount) < 0.005) {
+      const drift = roundCurrency(
+        amount - guests - Object.values(shares).reduce((s, v) => s + v, 0)
+      );
+      if (drift !== 0) {
+        const absorb =
+          shares[latest.paidBy] != null
+            ? latest.paidBy
+            : ids.reduce((a, b) => (shares[b] > shares[a] ? b : a));
+        shares[absorb] = roundCurrency(shares[absorb] + drift);
+      }
+    }
     const next: Expense = {
       ...latest,
       amount,
-      shares: Object.fromEntries(
-        Object.entries(latest.shares || {}).map(([uid, v]) => [uid, scaled(Number(v))])
-      ),
+      shares,
       ...(latest.thirdPersonShare != null
         ? { thirdPersonShare: scaled(Number(latest.thirdPersonShare)) }
         : {}),
@@ -458,6 +558,20 @@ export default function App() {
     };
     next.status = getNormalizedExpenseStatus(next);
     syncExpenseUpdate(next).catch((e) => console.error('Amount edit failed', e));
+  };
+
+  // Every plan save goes through here so a refusal is said out loud: the
+  // hook will not write over a plan it has not read yet.
+  const savePlan: typeof plan.save = async (scope, change) => {
+    const ok = await plan.save(scope, change);
+    if (!ok) {
+      addToast(
+        t('planTab.saveFailed'),
+        t(plan.canSave(scope) ? 'planTab.saveFailedBody' : 'planTab.notLoadedBody'),
+        'error'
+      );
+    }
+    return ok;
   };
 
   const openForm = (mode: 'expense' | 'deposit' | 'goal' = 'expense', goal?: Goal) => {
@@ -876,6 +990,10 @@ export default function App() {
               onExport={() => (isPlus ? setShowExport(true) : setShowCherryPlus(true))}
               onCherryPick={() => setShowOrchard(true)}
               onOpenGrid={() => {
+                if (!isPlus) {
+                  openPlusFor('reports');
+                  return;
+                }
                 setReportsTab('grid');
                 setView('reports');
               }}
@@ -891,7 +1009,15 @@ export default function App() {
               members={members}
               locked={!isPlus}
               onUnlock={unlock}
-              onOpenExpense={(exp) => setSelectedExpense(exp)}
+              onOpenExpense={(exp) => {
+                // "All my groups" lists lines from other households, cut down
+                // to this member's share. Only a line of the active group is
+                // opened, and from the ledger itself, so nothing is settled
+                // or edited into the wrong household.
+                const own = expenses.find((e) => e.id === exp.id);
+                if (own) setSelectedExpense(own);
+                else addToast(t('reports.otherGroupLine'), t('reports.otherGroupLineBody'), 'info');
+              }}
               onOpenLedger={() => setView('ledger')}
               initialTab={reportsTab}
               initialPeriod={reportsPeriod}
@@ -911,7 +1037,8 @@ export default function App() {
               onUnlock={() => openPlusFor('plan')}
               household={plan.household}
               personal={plan.personal}
-              onSave={plan.save}
+              onSave={savePlan}
+              failed={plan.error}
               onContribute={(g) => openForm('goal', g)}
               onPlanPurchase={() => setShowPlanPurchase(true)}
               onLogDeposit={() => openForm('deposit')}
@@ -1105,6 +1232,8 @@ export default function App() {
           onLogIt={(prefill) => {
             setShowPlanPurchase(false);
             setEditingExpense(null);
+            setFormMode('expense');
+            setFormGoal(null);
             setPlanPrefill(prefill);
             setShowForm(true);
           }}
@@ -1173,6 +1302,9 @@ export default function App() {
           onEdit={() => {
             setEditingExpense(expenses.find((e) => e.id === selectedExpense.id) || selectedExpense);
             setSelectedExpense(null);
+            // The form reads deposit or goal from the line itself when editing.
+            setFormMode('expense');
+            setFormGoal(null);
             setShowForm(true);
           }}
           onDelete={() => handleDeleteExpense(selectedExpense.id)}
@@ -1206,10 +1338,10 @@ export default function App() {
           onYes={async () => {
             const s = ruleNudge.suggestion;
             setRuleNudge(null);
-            const ok = await plan.save('household', {
-              ...plan.household,
-              rules: [...plan.household.rules, ruleFrom(s)],
-            });
+            const ok = await savePlan('household', (p) => ({
+              ...p,
+              rules: [...p.rules, ruleFrom(s)],
+            }));
             if (ok) {
               addToast(
                 t('rules.saved'),
