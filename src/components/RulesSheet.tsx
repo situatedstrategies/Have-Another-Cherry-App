@@ -102,7 +102,7 @@ export default function RulesSheet({ rules, categories, onSave, onClose }: Props
         className="mt-4 flex flex-col gap-2"
         id="rules-add"
       >
-        <span className="text-xs font-bold text-natural-muted uppercase tracking-widest">
+        <span className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest">
           {t('rules.addTitle')}
         </span>
         <div className="flex flex-wrap items-center gap-2">

@@ -20,7 +20,7 @@ interface Props {
   activeUser: string;
 }
 
-const label = 'text-xs font-bold text-natural-muted uppercase tracking-widest';
+const label = 'text-xs font-bold text-natural-dark-cherry uppercase tracking-widest';
 const panel = 'bg-white border border-natural-border rounded-3xl shadow-sm';
 
 /**

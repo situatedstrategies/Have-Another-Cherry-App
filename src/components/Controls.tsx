@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 
 export const panel = 'bg-white border border-natural-border rounded-3xl shadow-sm';
-export const label = 'text-xs font-bold text-natural-muted uppercase tracking-widest';
+export const label = 'text-xs font-bold text-natural-dark-cherry uppercase tracking-widest';
 
 /** A capsule chip: ink when selected, white with a border when not. 44px tall
  *  on touch, 34px with a pointer, like the mockups. */

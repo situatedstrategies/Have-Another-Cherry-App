@@ -13,6 +13,10 @@
   --color-natural-border: #d4d4d8;
   --color-natural-primary: #c41200; /* bold cherry red */
   --color-natural-primary-ink: #a00e00; /* deep cherry, hover state of solid red buttons */
+  /* Dark cherry, the deep wine of a ripe cherry's skin. Bright cherry says
+     "act on this" (buttons, what you owe); this says "this is ours": section
+     labels, the selected tab, the mono bubbles. Cherry.darkCherry on mobile. */
+  --color-natural-dark-cherry: #6e0f1a;
   --color-natural-primary-wash: #fbeae7; /* pale cherry tint. See the note below. */
   --color-natural-accent: #71717a;
   --color-natural-muted: #52525b;
