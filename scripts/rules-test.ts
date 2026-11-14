@@ -451,6 +451,26 @@ async function main() {
     )
   );
 
+  await check('a user CAN opt out of app notices with a boolean', () =>
+    assertSucceeds(
+      updateDoc(doc(self, 'users', OWNER), {
+        noticesOptOut: true,
+        noticesOptOutAt: '2026-11-14T00:00:00.000Z',
+      })
+    )
+  );
+  await check('a user CAN turn app notices back on', () =>
+    assertSucceeds(
+      updateDoc(doc(self, 'users', OWNER), {
+        noticesOptOut: false,
+        noticesOptInAt: '2026-11-14T00:01:00.000Z',
+      })
+    )
+  );
+  await check('a user CANNOT write noticesOptOut as a string', () =>
+    assertFails(updateDoc(doc(self, 'users', OWNER), { noticesOptOut: 'false' }))
+  );
+
   await check('a user CANNOT write marketingOptIn as a string', () =>
     assertFails(updateDoc(doc(self, 'users', OWNER), { marketingOptIn: 'true' }))
   );

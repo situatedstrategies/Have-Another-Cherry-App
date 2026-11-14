@@ -299,6 +299,7 @@ export default function App() {
     handleSaveName,
     handleSaveIncome,
     handleSaveMarketingOptIn,
+    handleSaveNoticesOptOut,
     handleSaveThreshold,
     handleSavePaymentHandles,
     handleRetakeQuiz,
@@ -1099,6 +1100,7 @@ export default function App() {
           onSaveName={handleSaveName}
           onSaveIncome={handleSaveIncome}
           onSaveMarketingOptIn={handleSaveMarketingOptIn}
+          onSaveNoticesOptOut={handleSaveNoticesOptOut}
           onSaveLocale={(locale) => {
             // Remembered on the profile so server emails can follow it later.
             setUserProfile((prev: any) => ({ ...(prev || {}), locale }));
