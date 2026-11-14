@@ -86,7 +86,7 @@ export default function LedgerView({
     period === 'all' ? t('sheet.allTime', { count: shown.length }) : monthLabel(period, true);
 
   return (
-    <div className="flex flex-col gap-4" id="ledger-view">
+    <div className="flex flex-col gap-6" id="ledger-view">
       <PageHeader
         title={t('nav.ledger')}
         subtitle={mode === 'sheet' ? t('sheet.hint') : t('sheet.cardsHint')}

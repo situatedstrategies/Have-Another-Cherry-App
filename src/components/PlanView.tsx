@@ -179,7 +179,10 @@ export default function PlanView({
         all ? (
           <>
             {t('planTab.allGroupsNote')}{' '}
-            <span className="inline-block align-middle font-mono text-[11.5px] leading-4 font-medium text-natural-dark-cherry bg-natural-primary-wash rounded-full px-2 py-0.5" id="plan-groups-caption">
+            <span
+              className="inline-block align-middle font-mono text-[11.5px] leading-4 font-medium text-natural-dark-cherry bg-natural-primary-wash rounded-full px-2 py-0.5"
+              id="plan-groups-caption"
+            >
               {others.loading
                 ? t('reports.loadingGroups')
                 : t('reports.groupsCount', { count: otherGroupIds.length + 1 })}
@@ -219,7 +222,7 @@ export default function PlanView({
 
   if (locked) {
     return (
-      <div className="flex flex-col gap-5" id="plan-view">
+      <div className="flex flex-col gap-6" id="plan-view">
         {header}
         <button
           type="button"
@@ -329,7 +332,7 @@ export default function PlanView({
     if (rows.length === 0) return null;
     const tot = totals[g];
     return (
-      <section key={g} className="flex flex-col gap-2" id={`plan-group-${g}`}>
+      <section key={g} className="flex flex-col gap-3" id={`plan-group-${g}`}>
         <div className="flex items-baseline justify-between gap-3 px-1">
           <h3 className={label}>{t(`planTab.group.${g}`)}</h3>
           <span className="font-mono text-[13px] text-natural-muted">
@@ -347,7 +350,7 @@ export default function PlanView({
   };
 
   return (
-    <div className="flex flex-col gap-5" id="plan-view">
+    <div className="flex flex-col gap-6" id="plan-view">
       {header}
 
       {failed && (
@@ -378,6 +381,17 @@ export default function PlanView({
         </section>
       ) : (
         <section className="flex flex-col gap-2.5 px-1" id="plan-hero">
+          {/* Whose budget the figures are, said on the figure itself. */}
+          <span
+            className="self-start font-mono text-[11.5px] leading-4 font-medium text-natural-dark-cherry bg-natural-primary-wash rounded-full px-2 py-0.5"
+            id="plan-owner"
+          >
+            {all
+              ? `${t('reports.view.personal')} · ${t('reports.groupsCount', { count: otherGroupIds.length + 1 })}`
+              : scope === 'household'
+                ? [t('reports.view.household'), group.name].filter(Boolean).join(' · ')
+                : t('reports.view.personal')}
+          </span>
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-[17px] text-natural-muted">
               {t('planTab.monthBudget', { month: monthName })}
@@ -420,7 +434,7 @@ export default function PlanView({
       {BUDGET_GROUPS.map(renderGroup)}
 
       {/* Goals */}
-      <section className="flex flex-col gap-2" id="plan-goals">
+      <section className="flex flex-col gap-3" id="plan-goals">
         <div className="flex items-baseline justify-between gap-3 px-1">
           <h3 className={label}>{t('planTab.goals')}</h3>
           <button

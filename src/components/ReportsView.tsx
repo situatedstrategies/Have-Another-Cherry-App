@@ -203,7 +203,7 @@ export default function ReportsView({
 
   if (locked) {
     return (
-      <div className="flex flex-col gap-5" id="reports-view">
+      <div className="flex flex-col gap-6" id="reports-view">
         <PageHeader title={t('nav.reports')} subtitle={t('reports.subtitle')} />
         <button
           type="button"
@@ -249,7 +249,7 @@ export default function ReportsView({
   }
 
   return (
-    <div className="flex flex-col gap-5" id="reports-view">
+    <div className="flex flex-col gap-6" id="reports-view">
       <PageHeader
         title={t('nav.reports')}
         subtitle={

@@ -223,7 +223,7 @@ export default function HomeView({
   const big = 'font-mono text-[32px] leading-9 font-medium tracking-tight';
 
   return (
-    <div className="flex flex-col gap-5" id="home-view">
+    <div className="flex flex-col gap-6" id="home-view">
       <PageHeader
         title={`${greeting}, ${userName}`}
         subtitle={
@@ -429,15 +429,16 @@ export default function HomeView({
                         <CategoryChip name={e.category} />
                       </td>
                       <td className="px-3 py-3 text-natural-muted whitespace-nowrap">
-                        {isUnclaimed(e) ? t('status.needsPayer') : nameOf(e.paidBy)}
-                        {inst !== UNKNOWN_INSTRUMENT && (
-                          <>
-                            ,{' '}
-                            <span className="font-mono text-natural-text">
-                              {instrumentShortLabel(inst)}
-                            </span>
-                          </>
-                        )}
+                        {/* How it was paid, not by whom: the name is on the
+                            Ledger and on the expense itself (owner, November
+                            14th 2026). */}
+                        {isUnclaimed(e) ? (
+                          t('status.needsPayer')
+                        ) : inst !== UNKNOWN_INSTRUMENT ? (
+                          <span className="font-mono text-natural-text">
+                            {instrumentShortLabel(inst)}
+                          </span>
+                        ) : null}
                       </td>
                       <td
                         className={`px-3 py-3 text-right font-mono ${closed ? 'text-natural-muted' : 'font-medium'}`}
@@ -477,7 +478,70 @@ export default function HomeView({
         </section>
 
         <aside className="flex flex-col gap-4 [flex:1_1_280px] min-w-0">
-          {/* Up next */}
+          {/* This month by category */}
+          <section
+            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
+            id="home-categories"
+          >
+            <span className={label}>{t('home.byCategory')}</span>
+            {categories.length === 0 ? (
+              <span className="text-[13px] text-natural-muted">{t('home.nothingThisMonth')}</span>
+            ) : (
+              <div className="flex flex-col gap-2 text-[13px] leading-[18px]">
+                {categories.map((c) => (
+                  <div key={c.category} className="flex items-center gap-2">
+                    <CategoryChip name={c.category} />
+                    <span className="flex-1 h-1.5 rounded-full bg-natural-sidebar overflow-hidden">
+                      <span
+                        className="block h-full rounded-full"
+                        style={{
+                          width: `${Math.round((c.total / catMax) * 100)}%`,
+                          background: categoryColor(c.category),
+                        }}
+                      />
+                    </span>
+                    <span className="font-mono">{formatAmount(c.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onOpenReports}
+              className="text-[13px] font-semibold text-natural-text hover:text-natural-primary text-left cursor-pointer"
+              id="home-open-reports"
+            >
+              {t('home.openReports')}
+            </button>
+          </section>
+
+          {/* Coming up */}
+          <section
+            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
+            id="home-coming-up"
+          >
+            <span className={label}>{t('home.comingUp')}</span>
+            {comingUp.length === 0 ? (
+              <span className="text-[13px] text-natural-muted">{t('home.nothingComingUp')}</span>
+            ) : (
+              <div className="flex flex-col gap-2 text-[13px] leading-[18px]">
+                {comingUp.map((i) => (
+                  <div key={i.id} className="flex justify-between gap-3">
+                    <span className="truncate flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{i.title}</span>
+                      {i.note && <RecurringMark interval={i.note} />}
+                    </span>
+                    <span className="font-mono text-natural-muted shrink-0">
+                      {formatShortDate(i.date)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {aside}
+          {/* Up next: the last card of the board (owner, November 14th 2026) */}
           <section
             className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3`}
             id="up-next"
@@ -574,70 +638,6 @@ export default function HomeView({
               </span>
             )}
           </section>
-
-          {/* This month by category */}
-          <section
-            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
-            id="home-categories"
-          >
-            <span className={label}>{t('home.byCategory')}</span>
-            {categories.length === 0 ? (
-              <span className="text-[13px] text-natural-muted">{t('home.nothingThisMonth')}</span>
-            ) : (
-              <div className="flex flex-col gap-2 text-[13px] leading-[18px]">
-                {categories.map((c) => (
-                  <div key={c.category} className="flex items-center gap-2">
-                    <CategoryChip name={c.category} />
-                    <span className="flex-1 h-1.5 rounded-full bg-natural-sidebar overflow-hidden">
-                      <span
-                        className="block h-full rounded-full"
-                        style={{
-                          width: `${Math.round((c.total / catMax) * 100)}%`,
-                          background: categoryColor(c.category),
-                        }}
-                      />
-                    </span>
-                    <span className="font-mono">{formatAmount(c.total)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onOpenReports}
-              className="text-[13px] font-semibold text-natural-text hover:text-natural-primary text-left cursor-pointer"
-              id="home-open-reports"
-            >
-              {t('home.openReports')}
-            </button>
-          </section>
-
-          {/* Coming up */}
-          <section
-            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
-            id="home-coming-up"
-          >
-            <span className={label}>{t('home.comingUp')}</span>
-            {comingUp.length === 0 ? (
-              <span className="text-[13px] text-natural-muted">{t('home.nothingComingUp')}</span>
-            ) : (
-              <div className="flex flex-col gap-2 text-[13px] leading-[18px]">
-                {comingUp.map((i) => (
-                  <div key={i.id} className="flex justify-between gap-3">
-                    <span className="truncate flex items-center gap-1.5 min-w-0">
-                      <span className="truncate">{i.title}</span>
-                      {i.note && <RecurringMark interval={i.note} />}
-                    </span>
-                    <span className="font-mono text-natural-muted shrink-0">
-                      {formatShortDate(i.date)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {aside}
         </aside>
       </div>
     </div>
