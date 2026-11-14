@@ -132,7 +132,15 @@ service cloud.firestore {
         && (!('marketingOptInAt' in request.resource.data)
               || request.resource.data.marketingOptInAt is string)
         && (!('marketingOptOutAt' in request.resource.data)
-              || request.resource.data.marketingOptOutAt is string);
+              || request.resource.data.marketingOptOutAt is string)
+        // App notices are on from sign-up and noticesOptOut is the way out,
+        // read by the same kind of sender, so the same care with its type.
+        && (!('noticesOptOut' in request.resource.data)
+              || request.resource.data.noticesOptOut is bool)
+        && (!('noticesOptOutAt' in request.resource.data)
+              || request.resource.data.noticesOptOutAt is string)
+        && (!('noticesOptInAt' in request.resource.data)
+              || request.resource.data.noticesOptInAt is string);
     }
 
     match /users/{userId} {

@@ -389,6 +389,24 @@ export function useProfileSettings({
     }
   };
 
+  // App notices are on from sign-up (the Terms say so) and this is the way
+  // out: noticesOptOut true means "do not send". Same writer rules as the
+  // marketing preference above.
+  const handleSaveNoticesOptOut = async (optOut: boolean) => {
+    if (!!userProfile?.noticesOptOut === optOut) return;
+    const at = new Date().toISOString();
+    const patch = optOut
+      ? { noticesOptOut: true, noticesOptOutAt: at }
+      : { noticesOptOut: false, noticesOptInAt: at };
+    try {
+      await updateDoc(doc(db, 'users', activeUser), patch);
+      setUserProfile((prev: any) => ({ ...(prev || {}), ...patch }));
+    } catch (e) {
+      console.error('Failed to save notices preference', e);
+      setSupportError({ error: CHERRY_ERRORS.settingsSave, screen: 'Settings - email' });
+    }
+  };
+
   // Yearly income, editable from the Settings roster. Same writer either
   // client uses (users/{uid}.income as a plain number string); the group can
   // read it - that is its point: the roster shows it, and the income-based
@@ -497,6 +515,7 @@ export function useProfileSettings({
     handleSaveName,
     handleSaveIncome,
     handleSaveMarketingOptIn,
+    handleSaveNoticesOptOut,
     handleSaveThreshold,
     handleSavePaymentHandles,
     handleRetakeQuiz,

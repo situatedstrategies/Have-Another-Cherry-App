@@ -147,7 +147,8 @@
     "appStoreAlt": "Descárgalo en el App Store",
     "playAlt": "Disponible en Google Play",
     "seeHowItWorks": "Ver cómo funciona",
-    "recaptcha": "Este sitio está protegido por reCAPTCHA y se aplican la <1>Política de privacidad</1> y los <3>Términos del servicio</3> de Google."
+    "recaptcha": "Este sitio está protegido por reCAPTCHA y se aplican la <1>Política de privacidad</1> y los <3>Términos del servicio</3> de Google.",
+    "noticesLine": "Te enviaremos por correo avisos ocasionales sobre la app. Puedes darte de baja cuando quieras en Ajustes."
   },
   "legal": {
     "terms": "Términos del servicio",
@@ -189,7 +190,7 @@
   },
   "legalDoc": {
     "effective": "En vigor desde el {{date}}",
-    "effectiveDate": "19 de agosto de 2026",
+    "effectiveDate": "14 de noviembre de 2026",
     "privacy": {
       "overview": "Resumen",
       "overviewBody": "Two Cherries lo ofrece Situated Strategies LLC (\"nosotros\"). Este es un resumen en lenguaje sencillo de nuestra Política de privacidad: qué recopilamos, cómo lo usamos y qué opciones tienes. La política completa, incluidos los derechos del RGPD y de los estados de EE. UU., está en <1>{{site}}/privacy</1> y es la versión oficial. Diseñamos la app para que tus datos financieros sean privados por defecto.",
@@ -207,7 +208,7 @@
       "use": "Cómo usamos tu información",
       "useBody": "Para ofrecer y operar la app: crear tu grupo, dividir gastos, generar tu perfil financiero y las recomendaciones de división, enviar las invitaciones que pides y escanear los recibos que envías. No vendemos tu información personal.",
       "email": "Correo electrónico",
-      "emailBody": "Guardamos tu correo y lo usamos para darte servicio: inicio de sesión, verificación, restablecimiento de contraseña, invitaciones, recordatorios de pago que un miembro del grupo decida enviar y novedades del producto solo si te apuntas. Nunca lo vendemos ni lo compartimos más allá de los proveedores que prestan el servicio. Nuestros correos están escritos para que nunca contengan tus importes, saldos ni detalles de gastos, y todos incluyen una forma de darse de baja. La única excepción son los correos esenciales de la cuenta, como un restablecimiento de contraseña que tú pidas.",
+      "emailBody": "Guardamos tu correo y lo usamos para darte servicio: inicio de sesión, verificación, restablecimiento de contraseña, invitaciones, recordatorios de pago que un miembro del grupo decida enviar avisos ocasionales sobre la propia app (como funciones nuevas, un cambio de nombre o cambios en los términos), que puedes desactivar cuando quieras en Ajustes, y boletines u ofertas solo si te apuntas. Nunca lo vendemos ni lo compartimos más allá de los proveedores que prestan el servicio. Nuestros correos están escritos para que nunca contengan tus importes, saldos ni detalles de gastos, y todos incluyen una forma de darse de baja. La única excepción son los correos esenciales de la cuenta, como un restablecimiento de contraseña que tú pidas.",
       "providers": "Proveedores de servicios",
       "providersBody": "Dependemos de proveedores de confianza para operar la app, entre ellos Google Firebase (autenticación y base de datos), Google Cloud / Vertex AI (escaneo de recibos y generación del perfil) y Resend (entrega de nuestros correos; nuestros mensajes están escritos para que sus registros de entrega nunca contengan detalles de tu registro). Estos proveedores procesan datos en nuestro nombre bajo sus propias condiciones.",
       "choices": "Tus opciones y derechos",
@@ -236,7 +237,7 @@
       "ai": "Funciones de IA",
       "aiBody": "El escaneo de recibos y la generación del perfil usan sistemas de IA automatizados y pueden ser inexactos o incompletos. Revisa siempre los importes y detalles escaneados antes de confiar en ellos.",
       "communications": "Comunicaciones",
-      "communicationsBody": "Al crear una cuenta aceptas recibir correos esenciales del servicio: verificación, restablecimientos de contraseña que pidas, invitaciones y recordatorios de pago que un miembro de tu grupo decida enviar. Las novedades opcionales del producto solo se envían si te apuntas. Todos los correos incluyen una forma de darse de baja y ninguno contiene nunca tus importes, saldos ni detalles de gastos.",
+      "communicationsBody": "Al crear una cuenta aceptas recibir correos esenciales del servicio: verificación, restablecimientos de contraseña que pidas, invitaciones y recordatorios de pago que un miembro de tu grupo decida enviar. También aceptas que te enviemos por correo avisos ocasionales sobre la propia app, como funciones nuevas o cambios en estos términos. Puedes desactivarlos cuando quieras en Ajustes. Los boletines y las ofertas solo se envían si te apuntas. Todos los correos incluyen una forma de darse de baja y ninguno contiene nunca tus importes, saldos ni detalles de gastos.",
       "plans": "Planes y facturación",
       "plansBody": "El plan gratuito es realmente gratis: gastos ilimitados, sin anuncios, sin límites diarios. Cherry + es nuestro nivel premium opcional (el Household Vault, divisiones a ciegas, límites de gasto, ritmo, estadísticas y copias de seguridad), que se vende como suscripción mensual o anual o como compra única de por vida, en la web a través de RevenueCat y Stripe o en las apps a través del App Store y Google Play según las condiciones de esas tiendas. Los planes mensual y anual empiezan con una prueba gratis de 14 días; cancela antes de que termine y no pagas nada. Se aplica a todos los dispositivos en los que inicies sesión.",
       "acceptableUse": "Uso aceptable",
@@ -689,7 +690,9 @@
     "localLedger": "Registro local",
     "backupSync": "Copias de seguridad y sincronización",
     "legalPrivacy": "Legal y privacidad",
-    "dataPrivacySecurity": "Datos, privacidad y seguridad"
+    "dataPrivacySecurity": "Datos, privacidad y seguridad",
+    "notices": "Avisos de la app",
+    "noticesBody": "Correos ocasionales sobre la propia app, como funciones nuevas o un cambio en los términos. Puedes desactivarlos cuando quieras. Los correos de la cuenta, como la verificación y el restablecimiento de contraseña, se envían siempre."
   },
   "members": {
     "personN": "Persona {{n}}",

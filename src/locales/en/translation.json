@@ -147,7 +147,8 @@
     "appStoreAlt": "Download on the App Store",
     "playAlt": "Get it on Google Play",
     "seeHowItWorks": "See how it works",
-    "recaptcha": "This site is protected by reCAPTCHA and the Google <1>Privacy Policy</1> and <3>Terms of Service</3> apply."
+    "recaptcha": "This site is protected by reCAPTCHA and the Google <1>Privacy Policy</1> and <3>Terms of Service</3> apply.",
+    "noticesLine": "We will email you occasional notices about the app. You can opt out at any time in Settings."
   },
   "legal": {
     "terms": "Terms of Service",
@@ -189,7 +190,7 @@
   },
   "legalDoc": {
     "effective": "Effective {{date}}",
-    "effectiveDate": "August 19, 2026",
+    "effectiveDate": "November 14, 2026",
     "privacy": {
       "overview": "Overview",
       "overviewBody": "Two Cherries is provided by Situated Strategies LLC (\"we\", \"us\"). This is a plain-language summary of our Privacy Policy: what we collect, how we use it, and the choices you have. The complete policy, including GDPR and US state privacy rights, lives at <1>{{site}}/privacy</1> and is the authoritative version. We built the app to keep your financial details private by default.",
@@ -207,7 +208,7 @@
       "use": "How We Use Your Information",
       "useBody": "To provide and operate the app: creating your group, splitting expenses, generating your financial profile and split recommendations, sending invite emails you request, and scanning receipts you submit. We do not sell your personal information.",
       "email": "Email",
-      "emailBody": "We save your email address and use it to service you: signing in, verification, password resets, invites, payment reminders a group member chooses to send, and product updates only if you opt in. We never sell it or share it beyond the providers that deliver the service. Our emails are written so they never contain your amounts, balances, or expense details, and every email includes a way to unsubscribe. Essential account emails, like a password reset you request, are the only exception.",
+      "emailBody": "We save your email address and use it to service you: signing in, verification, password resets, invites, payment reminders a group member chooses to send, occasional notices about the app itself (such as new features, a change of name or changes to the terms), which you can turn off at any time in Settings, and newsletters or offers only if you opt in. We never sell it or share it beyond the providers that deliver the service. Our emails are written so they never contain your amounts, balances, or expense details, and every email includes a way to unsubscribe. Essential account emails, like a password reset you request, are the only exception.",
       "providers": "Service Providers",
       "providersBody": "We rely on trusted providers to run the app, including Google Firebase (authentication and database), Google Cloud / Vertex AI (receipt scanning and profile generation), and Resend (delivering our emails; our messages are written so its delivery logs never contain your ledger details). These providers process data on our behalf under their own terms.",
       "choices": "Your Choices and Rights",
@@ -236,7 +237,7 @@
       "ai": "AI Features",
       "aiBody": "Receipt scanning and profile generation use automated AI systems and may be inaccurate or incomplete. Always review scanned amounts and details before relying on them.",
       "communications": "Communications",
-      "communicationsBody": "By creating an account you agree to receive essential service emails: verification, password resets you request, invitations, and payment reminders a member of your group chooses to send. Optional product updates are sent only if you opt in. Every email includes a way to unsubscribe, and none of our emails ever contain your amounts, balances, or expense details.",
+      "communicationsBody": "By creating an account you agree to receive essential service emails: verification, password resets you request, invitations, and payment reminders a member of your group chooses to send. You also agree that we may email you occasional notices about the app itself, such as new features or changes to these terms. You can turn these off at any time in Settings. Newsletters and offers are sent only if you opt in. Every email includes a way to unsubscribe, and none of our emails ever contain your amounts, balances, or expense details.",
       "plans": "Plans and Billing",
       "plansBody": "The free plan is genuinely free: unlimited expenses, no ads, no daily limits. Cherry + is our optional premium tier (the Household Vault, blind splits, spending thresholds, rhythm, insights and backups), sold as a monthly or yearly subscription or a one-time lifetime purchase, on the web through RevenueCat and Stripe or in the apps through the App Store and Google Play under those stores' terms. Monthly and yearly plans start with a 14-day free trial; cancel before it ends and you pay nothing. It applies to every device you sign in on.",
       "acceptableUse": "Acceptable Use",
@@ -689,7 +690,9 @@
     "localLedger": "Local Ledger",
     "backupSync": "Backup and Sync Options",
     "legalPrivacy": "Legal and Privacy",
-    "dataPrivacySecurity": "Data, Privacy and Security"
+    "dataPrivacySecurity": "Data, Privacy and Security",
+    "notices": "App notices",
+    "noticesBody": "Occasional email about the app itself, such as new features or a change to the terms. You can turn this off at any time. Account email like verification and password resets is always sent."
   },
   "members": {
     "personN": "Person {{n}}",

@@ -30,7 +30,7 @@ import {
 import CherryLogo from './CherryLogo';
 
 // Eligibility is 13+ (parent or guardian permission under 18) and signup records an age attestation.
-const TERMS_VERSION = '2026-09-02';
+const TERMS_VERSION = '2026-11-14';
 
 // Firebase folds an unknown address and a wrong password into one error, so a
 // failed sign-in asks the server whether the address has an account and which
@@ -709,6 +709,9 @@ export default function AuthScreen() {
                             ),
                           }}
                         />
+                        <span className="block mt-1.5" id="signup-notices-line">
+                          {t('auth.noticesLine')}
+                        </span>
                       </span>
                     </label>
                   )}
