@@ -23,7 +23,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
         id="rhythm-card-locked"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+          <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest flex items-center gap-1.5">
             <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> {t('rhythm.title')}
           </h3>
           <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
@@ -59,7 +59,7 @@ export default function RhythmCard({ expenses, locked, onUnlock }: RhythmCardPro
       className="bg-white border border-natural-border rounded-3xl p-5 shadow-sm space-y-3"
       id="rhythm-card"
     >
-      <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+      <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest flex items-center gap-1.5">
         <HeartHandshake className="h-3.5 w-3.5 text-natural-primary" /> {t('rhythm.title')}
       </h3>
 

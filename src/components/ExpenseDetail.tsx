@@ -248,7 +248,7 @@ export default function ExpenseDetail({
           {/* Dark Cherry: no cost breakdown - the pot is the whole point. */}
           {isDark ? (
             <div className="space-y-3">
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+              <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest flex items-center gap-1.5">
                 <EyeOff className="h-3.5 w-3.5" /> {t('detail.darkHeading')}
               </h3>
               {isPayerActive ? (
@@ -300,7 +300,7 @@ export default function ExpenseDetail({
             </div>
           ) : (
             <div className="space-y-3">
-              <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
+              <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest">
                 {t('detail.costBreakdown')}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -352,7 +352,7 @@ export default function ExpenseDetail({
 
           {/* Audit Trail Section */}
           <div className="space-y-4 pt-4 border-t border-natural-border">
-            <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
+            <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest">
               {t('detail.auditTrail')}
             </h3>
 
@@ -562,7 +562,7 @@ export default function ExpenseDetail({
 
           {/* Comments Section */}
           <div className="space-y-4 pt-4 border-t border-natural-border">
-            <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest">
+            <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest">
               {t('detail.discussion')}
             </h3>
 

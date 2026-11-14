@@ -61,6 +61,7 @@ export default function HouseAccount({
     <section className="flex flex-col gap-4" id="house-account">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
+          <p className="mb-1 text-xs text-natural-muted">{t('house.eyebrow')}</p>
           <h2 className={`${label} flex items-center gap-1.5`}>
             <Landmark className="h-3.5 w-3.5 text-natural-primary" /> {t('house.title')}
           </h2>

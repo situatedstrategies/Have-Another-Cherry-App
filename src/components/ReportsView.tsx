@@ -203,7 +203,7 @@ export default function ReportsView({
 
   if (locked) {
     return (
-      <div className="flex flex-col gap-5" id="reports-view">
+      <div className="flex flex-col gap-6" id="reports-view">
         <PageHeader title={t('nav.reports')} subtitle={t('reports.subtitle')} />
         <button
           type="button"
@@ -249,7 +249,7 @@ export default function ReportsView({
   }
 
   return (
-    <div className="flex flex-col gap-5" id="reports-view">
+    <div className="flex flex-col gap-6" id="reports-view">
       <PageHeader
         title={t('nav.reports')}
         subtitle={
@@ -258,7 +258,7 @@ export default function ReportsView({
             {all && (
               <>
                 {' '}
-                <span className="font-mono text-natural-text" id="reports-groups-caption">
+                <span className="inline-block align-middle font-mono text-[11.5px] leading-4 font-medium text-natural-dark-cherry bg-natural-primary-wash rounded-full px-2 py-0.5" id="reports-groups-caption">
                   {others.loading
                     ? t('reports.loadingGroups')
                     : t('reports.groupsCount', { count: otherGroupIds.length + 1 })}

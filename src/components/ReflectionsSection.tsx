@@ -116,7 +116,7 @@ export default function ReflectionsSection({
   return (
     <div className="space-y-4 pt-4 border-t border-natural-border" id="reflections-section">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-bold text-natural-muted uppercase tracking-widest flex items-center gap-1.5">
+        <h3 className="text-xs font-bold text-natural-dark-cherry uppercase tracking-widest flex items-center gap-1.5">
           <NotebookPen className="h-3.5 w-3.5" /> {t('reflect.title')}
         </h3>
         <span className="text-[10px] text-natural-muted flex items-center gap-1">

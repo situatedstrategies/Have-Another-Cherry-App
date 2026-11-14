@@ -60,7 +60,7 @@ export default function Sidebar({
   const itemClass = (active: boolean) =>
     `flex items-center gap-2.5 h-11 md:h-10 px-3 rounded-xl text-sm whitespace-nowrap transition-colors cursor-pointer ${
       active
-        ? 'bg-natural-bg text-natural-text font-semibold'
+        ? 'bg-natural-bg text-natural-dark-cherry font-semibold'
         : 'text-natural-muted font-medium hover:text-natural-text hover:bg-natural-bg/60'
     }`;
 
@@ -98,7 +98,7 @@ export default function Sidebar({
             id={`nav-${key}`}
           >
             <Icon
-              className={`h-[18px] w-[18px] shrink-0 ${view === key ? 'text-natural-primary' : ''}`}
+              className={`h-[18px] w-[18px] shrink-0 ${view === key ? 'text-natural-dark-cherry' : ''}`}
             />
             {label}
             {key === 'vault' && vaultLocked && (
