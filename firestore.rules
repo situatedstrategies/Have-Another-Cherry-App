@@ -7,6 +7,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // The plan envelope (hooks/usePlan, and plan_repository.dart on mobile):
+    // { <ownerField>: <owner id>, payload, updatedAt, updatedBy }. The owner
+    // field may be absent (mobile leaves it off the personal plan, whose path
+    // already names the owner), but never wrong.
+    function validPlanEnvelope(ownerField, ownerId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([ownerField, 'payload', 'updatedAt', 'updatedBy'])
+        && (!(ownerField in d) || d[ownerField] == ownerId)
+        && d.payload is string
+        && d.payload.size() > 0
+        && d.payload.size() <= 400000
+        && d.updatedBy == request.auth.uid;
+    }
+
     function groupPath(groupId) {
       return /databases/$(database)/documents/groups/$(groupId);
     }
@@ -144,8 +158,11 @@ service cloud.firestore {
       // The member's own private documents: the personal plan (budgets and
       // goals, encrypted with the uid key). Never readable by another member.
       match /private/{docId} {
-        allow read, create, update, delete:
+        allow read, delete:
           if signedIn() && request.auth.uid == userId;
+        allow create, update:
+          if signedIn() && request.auth.uid == userId
+          && (docId != 'plan' || validPlanEnvelope('uid', userId));
       }
     }
 
@@ -209,9 +226,23 @@ service cloud.firestore {
     // Plans: budgets and goals, one encrypted payload per group under the
     // group key (lib/plan, hooks/usePlan), stored and guarded exactly like
     // the vault. Goal contributions themselves are ledger lines.
+    //
+    // A write has to be the envelope both apps send and nothing else: the
+    // encrypted payload as a string of a sane size, under the group's own
+    // id, signed by the member writing it. A document of any other shape
+    // (no payload, or a megabyte of anything) would break Plan for the whole
+    // household. Nobody deletes a plan: clearing it is a write of an empty
+    // one, and a delete would bring the mobile thresholds back as budgets.
+    //
+    // Cherry + is NOT checked here on purpose. The apps unlock Plan from the
+    // store's own answer as well as from users/{uid}.isPlus, which the
+    // webhook writes a moment later; a rule on isPlus would refuse a member
+    // who has just paid.
     match /group_plans/{groupId} {
-      allow read, create, update, delete:
-        if isGroupMember(groupId);
+      allow read: if isGroupMember(groupId);
+      allow create, update:
+        if isGroupMember(groupId)
+        && validPlanEnvelope('groupId', groupId);
     }
 
     // Reminder schedules: the only household data that is deliberately NOT

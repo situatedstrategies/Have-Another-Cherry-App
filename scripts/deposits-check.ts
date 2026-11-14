@@ -68,6 +68,27 @@ check('summary rows against the 60/40 ratio', summary.rows, [
   { uid: 'b', deposited: 400, actual: 400 / 820, agreed: 0.4, agreedAmount: 328, difference: 72 },
 ]);
 check(
+  'a split that does not come to 100 is normalised over the members listed',
+  depositSummary(ledger, { a: 33, b: 33 }, ['a', 'b']).rows.map((r) => [
+    r.uid,
+    r.agreed,
+    r.agreedAmount,
+    r.difference,
+  ]),
+  [
+    ['a', 0.5, 410, 10],
+    ['b', 0.5, 410, -10],
+  ]
+);
+check(
+  'no split at all is equal parts',
+  depositSummary(ledger, {}, ['a', 'b']).rows.map((r) => [r.uid, r.agreed, r.agreedAmount]),
+  [
+    ['a', 0.5, 410],
+    ['b', 0.5, 410],
+  ]
+);
+check(
   'summary keeps a member with nothing deposited',
   depositSummary(ledger, { a: 50, b: 30, c: 20 }, ['a', 'b', 'c']).rows.map((r) => [
     r.uid,

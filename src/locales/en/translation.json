@@ -1485,7 +1485,8 @@
     "saveToVault": "Save to the vault"
   },
   "category": {
-    "none": "Uncategorised"
+    "none": "Uncategorised",
+    "goal": "Goal"
   },
   "nav": {
     "main": "Main",
@@ -1591,7 +1592,9 @@
     "allTime_one": "{{count}} item, all time",
     "allTime_other": "{{count}} items, all time",
     "byCategoryAndMonth": "By category and month",
-    "cardsHint": "Every shared expense, newest first. Switch to Sheet for columns and totals."
+    "cardsHint": "Every shared expense, newest first. Switch to Sheet for columns and totals.",
+    "amountRejected": "Amount not changed",
+    "amountRejectedBody": "That amount is outside what this line allows. Open the line to edit it in full."
   },
   "reports": {
     "subtitle": "Where the money went, for any period, in your share or the whole household.",
@@ -1670,7 +1673,9 @@
     "itemsCount_other": "{{count}} items",
     "loadingGroups": "Loading your other groups...",
     "groupsCount_one": "{{count}} group",
-    "groupsCount_other": "{{count}} groups"
+    "groupsCount_other": "{{count}} groups",
+    "otherGroupLine": "This line belongs to another group",
+    "otherGroupLineBody": "Switch to that group to open, edit or settle it."
   },
   "planView": {
     "subtitle": "Plan a purchase together, and keep the house account in view.",
@@ -1807,7 +1812,11 @@
     "add": "Add",
     "savesToHousehold": "Saved to the household plan, for everyone.",
     "savesToPersonal": "Saved to your own plan, for your share.",
-    "allGroupsNote": "Your personal plan, with your share across every group you are in."
+    "allGroupsNote": "Your personal plan, with your share across every group you are in.",
+    "saveFailed": "Not saved",
+    "saveFailedBody": "The plan could not be saved. Check your connection and try again.",
+    "notLoadedBody": "The plan has not finished loading, so nothing was changed. Try again in a moment.",
+    "readFailed": "The saved plan could not be read on this device, so it is shown empty and cannot be changed here. Nothing has been lost. Reload the page, and contact support if this stays."
   },
   "rules": {
     "title": "Rules",

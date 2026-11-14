@@ -349,8 +349,8 @@ function Preview() {
   const [menu, setMenu] = useState(false);
   const [plans, setPlans] = useState({ household: householdPlan, personal: personalPlan });
   const [showPlus, setShowPlus] = useState(which === 'plan' && !plus);
-  const savePlan = async (scope: PlanScope, next: PlanPayload) => {
-    setPlans((p) => ({ ...p, [scope]: next }));
+  const savePlan = async (scope: PlanScope, change: (current: PlanPayload) => PlanPayload) => {
+    setPlans((p) => ({ ...p, [scope]: change(p[scope]) }));
     return true;
   };
   const budgetStatuses = plus

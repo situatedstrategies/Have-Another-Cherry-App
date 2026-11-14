@@ -54,6 +54,8 @@ export interface PlanPayload {
   rules: CategoryRule[];
 }
 
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export const BUDGET_GROUPS: BudgetGroup[] = ['flexible', 'fixed', 'nonMonthly'];
 
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -114,6 +116,9 @@ export const budgetCarry = (
   uid: string
 ): number => {
   if (!budget.rollover) return 0;
+  // A start month that is not a real 'YYYY-MM' carries nothing (the same on
+  // the phone); stepping from one would never reach [month].
+  if (!MONTH_KEY.test(budget.startMonth || '') || !MONTH_KEY.test(month)) return 0;
   let carry = 0;
   for (let m = budget.startMonth; m < month; m = nextMonth(m)) {
     carry += budget.limit - budgetSpent(expenses, budget, m, view, uid);
@@ -226,8 +231,11 @@ export const budgetAlertLevel = (status: BudgetStatus): 'over' | 'near' | null =
  *  past 80%; null otherwise. */
 export const budgetToWatch = (statuses: BudgetStatus[]): BudgetStatus | null => {
   let top: BudgetStatus | null = null;
-  for (const s of statuses) if (!top || s.pct > top.pct) top = s;
-  return top && top.pct > 0.8 ? top : null;
+  // A rollover budget in deficit is over with a pct of 0 (nothing is
+  // available), so "over" ranks as at least 1.
+  const rank = (s: BudgetStatus) => (s.over ? Math.max(s.pct, 1) : s.pct);
+  for (const s of statuses) if (!top || rank(s) > rank(top)) top = s;
+  return top && rank(top) > 0.8 ? top : null;
 };
 
 /** The contributions to [goal], oldest first. */

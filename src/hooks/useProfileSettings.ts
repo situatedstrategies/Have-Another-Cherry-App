@@ -67,6 +67,10 @@ export function useProfileSettings({
 
     const unsubscribe = onSnapshot(
       doc(db, 'users', currentUser.uid),
+      // With metadata changes, the server confirming an unchanged cached
+      // profile still arrives as a snapshot, so the backfills below run and
+      // a cached miss is resolved one way or the other.
+      { includeMetadataChanges: true },
       (userDoc) => {
         // Read before exists(): that guard narrows the snapshot type.
         const fromCache = userDoc.metadata.fromCache;

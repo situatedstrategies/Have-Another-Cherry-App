@@ -8,6 +8,7 @@ import {
   getTotalRemainingOwedToPayer,
   isDarkCherry,
   isDeposit,
+  isSavings,
   isUnclaimed,
   roundCurrency,
 } from '../lib/money';
@@ -69,7 +70,12 @@ export default function LedgerSheet({
     }
   };
 
-  const shareOf = (e: Expense) => (isDeposit(e) ? 0 : (e.shares?.[activeUser] ?? 0));
+  // Another member's Dark Cherry amount is hidden in its row, so it stays out
+  // of every figure a member could subtract it back from, and out of the
+  // ordering. Deposits and goal contributions are money set aside, not spent.
+  const hiddenAmount = (e: Expense) => isDarkCherry(e) && e.paidBy !== activeUser;
+  const shareOf = (e: Expense) => (isSavings(e) ? 0 : (e.shares?.[activeUser] ?? 0));
+  const sortAmount = (e: Expense) => (hiddenAmount(e) ? 0 : e.amount);
 
   const sorted = useMemo(() => {
     const m = dir === 'asc' ? 1 : -1;
@@ -80,7 +86,7 @@ export default function LedgerSheet({
         case 'paid':
           return nameOf(a.paidBy).localeCompare(nameOf(b.paidBy));
         case 'amount':
-          return a.amount - b.amount;
+          return sortAmount(a) - sortAmount(b);
         case 'share':
           return shareOf(a) - shareOf(b);
         case 'status':
@@ -108,20 +114,31 @@ export default function LedgerSheet({
 
   const sum = (rows: Expense[], f: (e: Expense) => number) =>
     roundCurrency(rows.reduce((t, e) => t + f(e), 0));
-  const spendAmount = (e: Expense) => (isDeposit(e) ? 0 : e.amount);
+  const spendAmount = (e: Expense) => (isSavings(e) || hiddenAmount(e) ? 0 : e.amount);
   const total = sum(expenses, spendAmount);
   const totalShare = sum(expenses, shareOf);
   const openToMe = sum(expenses, (e) =>
-    isDeposit(e) || isDarkCherry(e) || isUnclaimed(e)
+    isSavings(e) || isDarkCherry(e) || isUnclaimed(e)
       ? 0
       : e.paidBy === activeUser
         ? getTotalRemainingOwedToPayer(e, false)
         : getRemainingSettlementAmount(e, activeUser, false)
   );
 
+  // The edit in progress, read through a ref: Escape and Enter both unmount
+  // the input, which blurs it, and a blur handler holding the old state would
+  // save the cancelled value or save twice.
+  const liveEdit = useRef<{ id: string; value: string } | null>(null);
+  liveEdit.current = editing;
+  const cancelEdit = () => {
+    liveEdit.current = null;
+    setEditing(null);
+  };
   const commit = (e: Expense) => {
-    if (!editing) return;
-    const v = roundCurrency(parseFloat(editing.value));
+    const current = liveEdit.current;
+    if (!current || current.id !== e.id) return;
+    liveEdit.current = null;
+    const v = roundCurrency(parseFloat(current.value));
     setEditing(null);
     if (!Number.isFinite(v) || v <= 0 || Math.abs(v - e.amount) < 0.005) return;
     onEditAmount(e, v);
@@ -256,7 +273,7 @@ export default function LedgerSheet({
                                 commit(e);
                               } else if (ev.key === 'Escape') {
                                 ev.preventDefault();
-                                setEditing(null);
+                                cancelEdit();
                               }
                             }}
                             aria-label={t('sheet.editAmountAria', { title: e.title })}

@@ -1485,7 +1485,8 @@
     "saveToVault": "Guardar en el vault"
   },
   "category": {
-    "none": "Sin categoría"
+    "none": "Sin categoría",
+    "goal": "Meta"
   },
   "nav": {
     "main": "Principal",
@@ -1591,7 +1592,9 @@
     "allTime_one": "{{count}} partida en total",
     "allTime_other": "{{count}} partidas en total",
     "byCategoryAndMonth": "Por categoría y mes",
-    "cardsHint": "Cada gasto compartido, el más reciente primero. Cambia a Hoja para ver columnas y totales."
+    "cardsHint": "Cada gasto compartido, el más reciente primero. Cambia a Hoja para ver columnas y totales.",
+    "amountRejected": "El importe no cambió",
+    "amountRejectedBody": "Ese importe está fuera de lo que admite esta línea. Abre la línea para editarla completa."
   },
   "reports": {
     "subtitle": "A dónde fue el dinero, en cualquier periodo, en tu parte o en todo el hogar.",
@@ -1670,7 +1673,9 @@
     "itemsCount_other": "{{count}} partidas",
     "loadingGroups": "Cargando tus otros grupos...",
     "groupsCount_one": "{{count}} grupo",
-    "groupsCount_other": "{{count}} grupos"
+    "groupsCount_other": "{{count}} grupos",
+    "otherGroupLine": "Esta línea es de otro grupo",
+    "otherGroupLineBody": "Cambia a ese grupo para abrirla, editarla o saldarla."
   },
   "planView": {
     "subtitle": "Planea una compra juntos y ten a la vista la cuenta de la casa.",
@@ -1807,7 +1812,11 @@
     "add": "Añadir",
     "savesToHousehold": "Se guarda en el plan del hogar, para todos.",
     "savesToPersonal": "Se guarda en tu propio plan, para tu parte.",
-    "allGroupsNote": "Tu plan personal, con tu parte en todos los grupos a los que perteneces."
+    "allGroupsNote": "Tu plan personal, con tu parte en todos los grupos a los que perteneces.",
+    "saveFailed": "No se guardó",
+    "saveFailedBody": "No se pudo guardar el plan. Revisa tu conexión e inténtalo de nuevo.",
+    "notLoadedBody": "El plan no ha terminado de cargarse, así que no se cambió nada. Inténtalo de nuevo en un momento.",
+    "readFailed": "El plan guardado no se pudo leer en este dispositivo, así que aparece vacío y no se puede cambiar aquí. No se ha perdido nada. Recarga la página y escribe a soporte si sigue igual."
   },
   "rules": {
     "title": "Reglas",

@@ -351,6 +351,21 @@ check(
 );
 check('budgetToWatch', budgetToWatch(statuses)?.id, 'dining');
 check('budgetToWatch nothing past 80%', budgetToWatch([statuses[1], statuses[2]]), null);
+check(
+  'budgetToWatch sees a budget that is over with nothing available',
+  budgetToWatch([
+    { ...statuses[1], id: 'deficit', available: -50, pct: 0, over: true },
+    statuses[2],
+  ])?.id,
+  'deficit'
+);
+check(
+  'a start month that is not a month carries nothing, and returns',
+  ['', '2026-13', 'soon'].map((startMonth) =>
+    budgetCarry(ledger, { ...household, startMonth }, nov, 'household', 'a')
+  ),
+  [0, 0, 0]
+);
 
 check('goalFunded couch household', goalFunded(ledger, couch, 'household', 'a'), 520);
 check('goalFunded couch personal (a)', goalFunded(ledger, couch, 'personal', 'a'), 340);

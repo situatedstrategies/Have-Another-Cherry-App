@@ -8,6 +8,7 @@ import {
   getNormalizedExpenseStatus,
   isDarkCherry,
   isDeposit,
+  isSavings,
   isUnclaimed,
   roundCurrency,
 } from '../lib/money';
@@ -86,7 +87,7 @@ export default function HomeView({
   const now = useMemo(() => parseLocalDate(today), [today]);
   const nameOf = (uid: string) => rosterName(uid, members, activeUser);
 
-  const spending = useMemo(() => expenses.filter((e) => !isDeposit(e)), [expenses]);
+  const spending = useMemo(() => expenses.filter((e) => !isSavings(e)), [expenses]);
 
   // Balances, the same way the Balances cards count them: confirmed payments
   // only, and never a Dark Cherry pot or an unclaimed line.
@@ -176,7 +177,7 @@ export default function HomeView({
   }, [spending, activeUser, now, today]);
 
   const openCount = spending.filter(
-    (e) => !isDeposit(e) && getNormalizedExpenseStatus(e) !== 'CLOSED'
+    (e) => !isSavings(e) && getNormalizedExpenseStatus(e) !== 'CLOSED'
   ).length;
 
   const rows = useMemo(() => {
@@ -184,8 +185,8 @@ export default function HomeView({
     return visible
       .filter((e) => {
         const closed = getNormalizedExpenseStatus(e) === 'CLOSED';
-        if (filter === 'open') return !closed && !isDeposit(e);
-        if (filter === 'settled') return closed && !isDeposit(e);
+        if (filter === 'open') return !closed && !isSavings(e);
+        if (filter === 'settled') return closed && !isSavings(e);
         if (filter === 'recurring') return isRecurringLine(e);
         return true;
       })

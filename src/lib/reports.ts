@@ -17,7 +17,7 @@ import {
 } from './money';
 import { getInstrumentClass } from './mismatch';
 import { instrumentOf } from './insights';
-import { parseLocalDate, toLocalIso } from './recurring';
+import { parseLocalDate, settlementDay, toLocalIso } from './recurring';
 
 export type ReportView = 'household' | 'personal';
 export type Granularity = 'day' | 'week' | 'month';
@@ -598,7 +598,8 @@ export const averageDaysToSettle = (expenses: Expense[]): number | null => {
     if (!e.date) continue;
     for (const s of e.settlements || []) {
       if (s.status !== 'confirmed') continue;
-      const paid = s.paymentDate || s.timestamp.slice(0, 10);
+      const paid = settlementDay(s);
+      if (!paid) continue;
       const days = Math.round(
         (parseLocalDate(paid).getTime() - parseLocalDate(e.date).getTime()) / 86400000
       );

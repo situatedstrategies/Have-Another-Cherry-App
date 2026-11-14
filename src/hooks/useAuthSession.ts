@@ -165,6 +165,14 @@ export function useAuthSession({
 
       await deleteMyInboundQueue();
 
+      // Deleting a document does not delete what is under it: the private
+      // documents (the personal plan, the assessment, the bank preferences)
+      // go first, by name, while the rules still let their owner at them.
+      for (const name of ['plan', 'assessment', 'prefs']) {
+        await deleteDoc(doc(db, 'users', activeUser, 'private', name)).catch((e) =>
+          console.error('Failed to delete private document', name, e)
+        );
+      }
       await deleteDoc(doc(db, 'users', activeUser));
 
       clearLocalData();

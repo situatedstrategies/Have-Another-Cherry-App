@@ -38,8 +38,9 @@ export interface DepositSummary {
 }
 
 /** Everyone's total against the agreed ratio. [defaultSplit] is uid ->
- *  percentage; members on the roster with nothing deposited still get a row,
- *  and a depositor missing from the split is shown against 0%. */
+ *  percentage, normalised over the members listed; members on the roster with
+ *  nothing deposited still get a row, and a depositor missing from the split
+ *  is shown against 0%. */
 export const depositSummary = (
   expenses: Expense[],
   defaultSplit: Record<string, number>,
@@ -53,9 +54,14 @@ export const depositSummary = (
     total = roundCurrency(total + d.amount);
   }
   const ids = [...new Set([...memberIds.filter(Boolean), ...Object.keys(byMember)])];
+  // The agreed part is each listed member's split over the sum of theirs, so
+  // 33 / 33 / 33, or a split that still names someone who left, comes to the
+  // whole (the phone does the same). With no split at all, equal parts.
+  const splitOf = (uid: string) => Math.max(0, Number(defaultSplit[uid]) || 0);
+  const splitSum = ids.reduce((s, uid) => s + splitOf(uid), 0);
   const rows = ids.map((uid) => {
     const deposited = byMember[uid] ?? 0;
-    const agreed = Math.max(0, Number(defaultSplit[uid]) || 0) / 100;
+    const agreed = splitSum > 0 ? splitOf(uid) / splitSum : ids.length ? 1 / ids.length : 0;
     const agreedAmount = roundCurrency(total * agreed);
     return {
       uid,

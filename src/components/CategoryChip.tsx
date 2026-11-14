@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { categoryColor, tintOf } from '../lib/ui';
+import { DEPOSIT_CATEGORY, GOAL_CATEGORY } from '../lib/money';
 
 /**
  * The category bubble on every ledger row: the name in its category colour on
@@ -16,7 +17,15 @@ export default function CategoryChip({
 }) {
   const { t } = useTranslation();
   const color = categoryColor(name);
-  const text = name.trim() || t('category.none');
+  // Deposits and goal contributions are stored under fixed words (and, before
+  // that, under the translated deposit label); the chip shows the reader's own.
+  const stored = name.trim();
+  const text =
+    stored === DEPOSIT_CATEGORY || stored === 'Cuenta de la casa' || stored === 'Общий счёт'
+      ? t('house.depositCategory')
+      : stored === GOAL_CATEGORY
+        ? t('category.goal')
+        : stored || t('category.none');
   return (
     <span
       className={`inline-block text-[11px] leading-4 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-[12rem] truncate align-middle ${className}`}

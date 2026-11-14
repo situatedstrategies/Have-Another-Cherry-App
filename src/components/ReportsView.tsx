@@ -172,6 +172,21 @@ export default function ReportsView({
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [data, bounds, reportView, activeUser]);
 
+  // A remembered filter the controls no longer offer is dropped, or the
+  // picker would read "Everyone" while the reports stayed filtered to a
+  // member of another group, or to a category with nothing in this period.
+  const stillLoading = all && others.loading;
+  useEffect(() => {
+    if (!stillLoading && payer !== 'all' && !memberIds.includes(payer)) setPayer('all');
+  }, [stillLoading, payer, memberIds]);
+  useEffect(() => {
+    if (stillLoading) return;
+    setCategories((cs) => {
+      const kept = cs.filter((c) => allCategories.includes(c));
+      return kept.length === cs.length ? cs : kept;
+    });
+  }, [stillLoading, allCategories]);
+
   const periodLabel = (k: PeriodKey) => t(`reports.period.${k}`);
   const rangeLabel = useMemo(() => {
     const s = parseLocalDate(bounds.start);

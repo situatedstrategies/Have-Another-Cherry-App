@@ -137,9 +137,10 @@ export default function BudgetEditor({
         scope,
       });
     }
-    const ok = await onSave(next);
+    // The parent closes the sheet when the save sticks; when it does not, the
+    // sheet stays open with every edit intact and the parent says why.
+    await onSave(next);
     setSaving(false);
-    if (!ok) onClose();
   };
 
   const field =

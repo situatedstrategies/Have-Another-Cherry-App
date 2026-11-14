@@ -111,7 +111,7 @@ export default function ReportsGrid({ expenses, filter, today, onOpenExpense }: 
                               : ''
                           }`}
                         >
-                          {v === 0 ? '$0' : formatAmount(v)}
+                          {formatAmount(v)}
                         </button>
                       </td>
                     );

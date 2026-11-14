@@ -292,6 +292,11 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    // The server bundle and its source map are built into dist next to the
+    // site; they are not part of it and are never served.
+    app.use((req, res, next) =>
+      /^\/server\.cjs(\.map)?$/.test(req.path) ? res.status(404).end() : next()
+    );
     // Serve the pre-compressed twin (scripts/precompress.mjs writes a .br and
     // a .gz next to every bundle at build time) when the browser accepts it.
     // App Hosting forwards bytes as sent, so without this every visitor
