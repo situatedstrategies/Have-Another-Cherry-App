@@ -511,6 +511,13 @@ export default function AuthScreen() {
               <h1 className="text-2xl sm:text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 {t('common.brand')}
               </h1>
+              {/* The motto (owner, November 20th 2026), directly under the name
+                  the way the marketing site's footer carries it. It is where
+                  the address haveanothercherry.com comes from, and it is never
+                  the app's name. */}
+              <p className="font-display italic font-medium text-base text-natural-dark-cherry mb-2">
+                {t('common.motto')}
+              </p>
               {/* The category line the marketing homepage carries above its
                   tagline (owner, November 8th 2026), so someone who lands here
                   first still learns what the app is. */}
@@ -836,7 +843,9 @@ export default function AuthScreen() {
                   <p className="text-center font-mono text-xs leading-relaxed text-natural-accent mt-6">
                     {t('auth.freeNoCard')}
                   </p>
-                  <div className="mt-4 flex items-center justify-center gap-2.5">
+                  {/* The badges sit in one quiet card, like the store card on
+                      the marketing homepage. The artwork itself is untouched. */}
+                  <div className="mt-4 flex items-center justify-center gap-2.5 rounded-2xl border border-natural-border bg-natural-bg px-4 py-3">
                     <a
                       href="https://apps.apple.com/us/app/have-another-cherry/id6807625462"
                       target="_blank"
