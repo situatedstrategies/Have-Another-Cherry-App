@@ -28,6 +28,7 @@ import {
   passwordRequirementLabel,
 } from '../lib/password';
 import CherryLogo from './CherryLogo';
+import { trackAuthFollowUp } from '../lib/authFollowUp';
 
 // Eligibility is 13+ (parent or guardian permission under 18) and signup records an age attestation.
 const TERMS_VERSION = '2026-11-14';
@@ -242,21 +243,23 @@ export default function AuthScreen() {
   // Success swaps this screen out through onAuthStateChanged; this hook only
   // needs to record consent for brand-new accounts and surface failures.
   useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
+    // Tracked (see authFollowUp.ts) so the funnel sign-in page can wait for a
+    // new account's consent record before it navigates away.
+    trackAuthFollowUp(
+      getRedirectResult(auth).then((result) => {
         if (result && getAdditionalUserInfo(result)?.isNewUser) {
           reportSignupCompleted(result.user);
           return recordTermsAcceptance(result.user.uid);
         }
       })
-      .catch((err) => {
-        // This check runs on every load, usually with no redirect pending, so a
-        // network hiccup here is not worth alarming the user over. Real sign-in
-        // attempts report their own network failures.
-        if (err?.code !== 'auth/network-request-failed') {
-          setError(friendlyAuthError(err));
-        }
-      });
+    ).catch((err) => {
+      // This check runs on every load, usually with no redirect pending, so a
+      // network hiccup here is not worth alarming the user over. Real sign-in
+      // attempts report their own network failures.
+      if (err?.code !== 'auth/network-request-failed') {
+        setError(friendlyAuthError(err));
+      }
+    });
   }, []);
 
   // Switch between Log in / Sign up / Reset views, clearing any messages.
@@ -337,7 +340,9 @@ export default function AuthScreen() {
     }
   };
 
-  const handleGoogleAuth = () => handleProviderAuth(new GoogleAuthProvider(), setGoogleLoading);
+  // Tracked from the click through the new-account follow-ups (see authFollowUp.ts).
+  const handleGoogleAuth = () =>
+    trackAuthFollowUp(handleProviderAuth(new GoogleAuthProvider(), setGoogleLoading));
 
   const handleAppleAuth = () => {
     const provider = new OAuthProvider('apple.com');
@@ -345,7 +350,7 @@ export default function AuthScreen() {
     // only when asked; Firebase fills displayName from it for new accounts.
     provider.addScope('email');
     provider.addScope('name');
-    return handleProviderAuth(provider, setAppleLoading);
+    return trackAuthFollowUp(handleProviderAuth(provider, setAppleLoading));
   };
 
   // Request a password reset email. This hits our server endpoint, which mints a
@@ -459,7 +464,7 @@ export default function AuthScreen() {
         // screen out the moment the account exists, so there is nothing left to
         // show a result on, and a slow or failed email must never be what stops
         // someone getting into the app they just signed up for.
-        void sendVerificationEmail(userCred.user, name.trim());
+        void trackAuthFollowUp(sendVerificationEmail(userCred.user, name.trim()));
       }
     } catch (err: any) {
       let message = friendlyAuthError(err);
@@ -647,7 +652,10 @@ export default function AuthScreen() {
                   </div>
                 )}
 
-                <form onSubmit={handleEmailAuth} className="space-y-4">
+                <form
+                  onSubmit={(e) => void trackAuthFollowUp(handleEmailAuth(e))}
+                  className="space-y-4"
+                >
                   {isReset && (
                     <p className="text-sm text-natural-muted -mt-1">{t('auth.resetExplainer')}</p>
                   )}

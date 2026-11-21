@@ -118,6 +118,13 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - Cherry + is sold as a monthly or yearly subscription or a one-time lifetime purchase, all through RevenueCat: on the web via `CherryPlusModal` and `lib/billing.ts` (Stripe through RevenueCat Web Billing), in the apps through the App Store and Google Play. Prices live in RevenueCat and the stores, never in code or in this file.
 - The November 2nd 2026 ad-supported model (every feature free, one AdSense ad, a one-time Remove ads purchase) is retired and must not be reintroduced.
 
+## Web funnel sign-in (`/funnel/login`)
+
+- The RevenueCat web funnel (hosted on signup.cat) sends visitors to `https://app.haveanothercherry.com/funnel/login` through its External authentication step, so they can sign in or sign up with any provider the app has (Apple, Google, email). `src/main.tsx` mounts `FunnelLogin` for that path instead of `App`, the same way it does for `/auth/action`.
+- Once signed in, the visitor is sent back to the funnel's callback with exactly two parameters: the `state` value byte for byte as it arrived, and the Firebase uid as `app_user_id`. That uid is the id `lib/billing.ts` and the mobile apps give RevenueCat, so the funnel purchase lands on the same customer. Never add an email, a name or anything else to that URL.
+- `src/lib/funnelLogin.ts` holds the link checks and is the security control: `redirect_uri` must be `https://signup.cat/funnel/callback`. If a custom funnel domain is configured in RevenueCat, add its host to `ALLOWED_CALLBACK_HOSTS` in the same change. `test/funnel-login.logic.ts` covers it and runs in `npm test`.
+- Someone who arrives already signed in is asked to confirm before anything is sent; someone who signs in on the page goes straight back. `FunnelLogin` waits on `lib/authFollowUp.ts` first, because leaving the page cancels a new account's consent write and verification email.
+
 ## Localization (English, Russian, Spanish)
 
 - i18next + react-i18next. Strings live in `src/locales/{en,ru,es}/translation.json` (one namespace, nested keys such as `settings.signOut`). Components use `useTranslation()` and `<Trans>`; non-React helpers import `t` from `src/i18n.ts`. Never hard-code user-visible English in `src/`; add a key to all three files instead.

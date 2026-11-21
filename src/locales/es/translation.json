@@ -189,6 +189,15 @@
       "tooMany": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."
     }
   },
+  "funnelLogin": {
+    "invalidTitle": "Este enlace de inicio de sesión no funcionó",
+    "invalidBody": "El enlace que te trajo aquí está incompleto o caducado. Vuelve a la página anterior e inténtalo de nuevo.",
+    "confirmTitle": "Continúa donde lo dejaste",
+    "signedInAs": "Has iniciado sesión como {{email}}.",
+    "signedIn": "Has iniciado sesión.",
+    "otherAccount": "Usar otra cuenta",
+    "returning": "Te llevamos de vuelta..."
+  },
   "legalDoc": {
     "effective": "En vigor desde el {{date}}",
     "effectiveDate": "14 de noviembre de 2026",
