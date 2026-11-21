@@ -189,6 +189,15 @@
       "tooMany": "Too many attempts. Please wait a few minutes and try again."
     }
   },
+  "funnelLogin": {
+    "invalidTitle": "This sign-in link did not work",
+    "invalidBody": "The link that brought you here is incomplete or out of date. Go back to the page you came from and try again.",
+    "confirmTitle": "Continue where you left off",
+    "signedInAs": "You are signed in as {{email}}.",
+    "signedIn": "You are signed in.",
+    "otherAccount": "Use a different account",
+    "returning": "Taking you back..."
+  },
   "legalDoc": {
     "effective": "Effective {{date}}",
     "effectiveDate": "November 14, 2026",
