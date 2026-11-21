@@ -106,6 +106,11 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 - `Group.defaultSplit: Record<uid, number>` (percentages). `Group.availableSplits: {name, split}[]` holds the non-creator members' names + percentages. Together these are the configured split shown in the invite email.
 - Seats: `Group.targetNumPeople` is the join capacity. A group can be created with up to 5 people and grown by up to 2 more from Settings ("Add a Person"), tracked in `Group.addedSeats`. All of that math lives in `src/lib/members.ts` (checked by `scripts/seats-check.ts`) and is mirrored in the Flutter app's `lib/domain/group/seats.dart`; change them together.
 
+## Name and motto (owner decision, November 20th 2026)
+
+- The app is **Two Cherries**. Its motto is "Go ahead. Have another cherry.", written exactly like that, and it is where the domain haveanothercherry.com comes from. The app is never called Have Another Cherry.
+- The motto is `common.motto` in all three locale files and stays in English in each, like the brand names. `AuthScreen.tsx` shows it directly under the name; the Flutter app's sign-in screen does the same (`cherryMotto` in `lib/features/auth/auth_screen.dart`), and the marketing site carries it with its store links and in every footer. Change the three together.
+
 ## Monetisation (owner decision, November 8th 2026)
 
 - The free tier shows no ads and never will. No AdSense code, ad script or publisher tag (`ca-pub-...`, `google-adsense-account`) may exist anywhere in this repo.
