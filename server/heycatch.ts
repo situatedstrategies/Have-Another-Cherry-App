@@ -6,6 +6,6 @@ import { analytics } from '@heycatch/sdk';
 // Server calls send immediately and never throw; every one needs the user id
 // (the Firebase uid, the same id the browser passes), because there is no
 // ambient person in a webhook. The key is publishable.
-analytics.init({ projectKey: 'hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK' });
+analytics.init({ projectKey: 'hck_pk_dr8gyLZqcQklfG3B004CnERGNHCwyM8M' });
 
 export { analytics };

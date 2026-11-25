@@ -178,7 +178,7 @@ This project's Google Cloud org blocks standalone Gemini API keys (they must be 
 ## Product analytics (HeyCatch)
 
 - `@heycatch/sdk` (latest stable, never a `-dev.N` prerelease), installed per
-  https://heycatch.ai/agents.md. Project key `hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK`
+  https://heycatch.ai/agents.md. Project key `hck_pk_dr8gyLZqcQklfG3B004CnERGNHCwyM8M`
   is publishable and inlined. Browser init lives in `src/main.tsx` (static
   import, module scope); server init in `server/heycatch.ts`.
 - Autocapture covers pageviews, clicks and view changes: never hand-instrument

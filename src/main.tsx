@@ -15,7 +15,7 @@ import './index.css';
 // purchase; the name is kept for continuity) in AuthScreen and the server's
 // RevenueCat webhook. The key is publishable, so it is inlined on purpose.
 analytics.init({
-  projectKey: 'hck_pk_X3i5WmitT5F42yX_weMf1PIith45MDeK',
+  projectKey: 'hck_pk_dr8gyLZqcQklfG3B004CnERGNHCwyM8M',
   install: {
     framework: 'vite-react',
     frameworkVersion: '6',
