@@ -358,7 +358,7 @@ export default function SettingsModal({
       footer={
         <button
           onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-primary/5 border border-natural-primary/25 py-2.5 rounded-xl transition-colors shadow-sm"
+          className="btn-secondary w-full text-natural-primary hover:text-natural-primary-ink hover:bg-natural-primary-wash/50 hover:border-natural-primary/30"
         >
           <LogOut size={16} /> {t('settings.signOut')}
         </button>
@@ -370,8 +370,8 @@ export default function SettingsModal({
       {pushState !== 'unavailable' && (
         <div>
           <h3 className={`${labelClass} mb-2`}>{t('settings.notifications')}</h3>
-          <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
+          <div className="bg-natural-bg/50 p-4 rounded-xl border border-natural-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <Bell className="h-4 w-4 text-natural-primary mt-0.5 shrink-0" />
               <p className="text-xs text-natural-muted leading-relaxed">
                 {t('settings.notificationsBody')}
@@ -382,14 +382,14 @@ export default function SettingsModal({
                 <Check className="h-3.5 w-3.5" /> {t('settings.on')}
               </span>
             ) : pushState === 'denied' ? (
-              <span className="shrink-0 text-xs font-semibold text-natural-muted text-right">
+              <span className="shrink-0 sm:max-w-[40%] pl-[26px] sm:pl-0 text-xs font-semibold text-natural-muted sm:text-right leading-snug">
                 {t('settings.blockedInBrowser')}
               </span>
             ) : (
               <button
                 onClick={handleEnablePush}
                 disabled={enablingPush}
-                className="shrink-0 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-full shadow-sm transition-colors disabled:opacity-60"
+                className="shrink-0 self-start sm:self-auto ml-[26px] sm:ml-0 h-9 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3.5 rounded-full shadow-sm transition-colors disabled:opacity-60 cursor-pointer"
               >
                 {enablingPush ? t('settings.asking') : t('settings.turnOn')}
               </button>

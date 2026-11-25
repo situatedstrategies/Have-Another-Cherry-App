@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Bell } from 'lucide-react';
+import { X, Bell, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export type ToastMessage = {
@@ -51,22 +51,37 @@ function ToastItem({
       initial={{ opacity: 0, y: -20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-      className="bg-white rounded-xl shadow-lg border border-natural-border p-4 pr-10 relative overflow-hidden"
+      className="bg-white rounded-2xl shadow-lg border border-natural-border p-4 pr-12 relative overflow-hidden"
     >
-      <div className="absolute top-0 left-0 bottom-0 w-1 bg-natural-primary" />
+      {/* The kind of news shows in the glyph: a check for success, an alert
+          for an error, the bell for everything else. */}
       <div className="flex items-start gap-3">
-        <div className="bg-natural-sage/30 p-2 rounded-full text-natural-primary mt-0.5">
-          <Bell size={16} />
+        <div
+          className={`p-2 rounded-full mt-0.5 shrink-0 ${
+            toast.type === 'error'
+              ? 'bg-natural-primary-wash text-natural-primary'
+              : toast.type === 'success'
+                ? 'bg-natural-teal/10 text-natural-teal'
+                : 'bg-natural-pebble text-natural-primary'
+          }`}
+        >
+          {toast.type === 'error' ? (
+            <AlertCircle size={16} />
+          ) : toast.type === 'success' ? (
+            <CheckCircle2 size={16} />
+          ) : (
+            <Bell size={16} />
+          )}
         </div>
         <div>
-          <h4 className="text-sm font-bold text-natural-text">{toast.title}</h4>
-          <p className="text-xs text-natural-muted mt-1">{toast.message}</p>
+          <h4 className="text-sm font-semibold text-natural-text leading-snug">{toast.title}</h4>
+          <p className="text-xs text-natural-muted mt-1 leading-relaxed">{toast.message}</p>
         </div>
       </div>
       <button
         onClick={() => removeToast(toast.id)}
         aria-label={t('common.dismissNotification')}
-        className="absolute top-3 right-3 text-natural-muted hover:text-natural-text transition-colors"
+        className="absolute top-1 right-1 tap-target flex items-center justify-center rounded-full text-natural-muted hover:text-natural-text transition-colors cursor-pointer"
       >
         <X size={16} />
       </button>

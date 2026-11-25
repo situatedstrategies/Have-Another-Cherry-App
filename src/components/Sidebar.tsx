@@ -137,7 +137,7 @@ export default function Sidebar({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowGroupMenu(false)} />
               <div
-                className="absolute left-0 top-full mt-1 md:top-auto md:mt-0 md:bottom-full md:mb-1 z-20 w-full min-w-56 bg-white border border-natural-border rounded-xl shadow-lg py-1 animate-in fade-in"
+                className="absolute left-0 top-full mt-1 md:top-auto md:mt-0 md:bottom-full md:mb-1 z-20 w-full min-w-56 bg-white border border-natural-border rounded-2xl shadow-lg py-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-2"
                 role="menu"
               >
                 <p className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-natural-muted">
@@ -150,14 +150,14 @@ export default function Sidebar({
                     role="menuitem"
                     onClick={() => onSwitchGroup(g.id)}
                     disabled={g.active}
-                    className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                    className={`w-full text-left px-3 min-h-11 md:min-h-9 text-[13px] flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                       g.active
-                        ? 'font-bold text-natural-primary bg-natural-sage/20 cursor-default'
-                        : 'text-natural-text hover:bg-natural-bg'
+                        ? 'font-semibold text-natural-text bg-natural-bg cursor-default'
+                        : 'text-natural-text hover:bg-natural-bg/60'
                     }`}
                   >
                     <span className="truncate">{g.name}</span>
-                    {g.active && <Check size={14} className="text-natural-primary shrink-0" />}
+                    {g.active && <Check size={14} className="text-natural-dark-cherry shrink-0" />}
                   </button>
                 ))}
                 <div className="border-t border-natural-border my-1" />
@@ -168,7 +168,7 @@ export default function Sidebar({
                     setShowGroupMenu(false);
                     onAddGroup();
                   }}
-                  className="w-full text-left px-3 py-2 text-xs font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors"
+                  className="w-full text-left px-3 min-h-11 md:min-h-9 text-[13px] font-semibold text-natural-primary hover:bg-natural-bg flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Plus size={14} /> {t('app.joinOrCreateAnother')}
                 </button>

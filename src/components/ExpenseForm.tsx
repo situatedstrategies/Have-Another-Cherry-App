@@ -1046,7 +1046,7 @@ export default function ExpenseForm({
                 key={inst}
                 type="button"
                 onClick={() => setInstrumentType(inst)}
-                className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-full border transition-all cursor-pointer ${
+                className={`chip flex-1 py-1.5 px-3 text-xs font-semibold rounded-full border transition-all cursor-pointer ${
                   instrumentType === inst
                     ? 'bg-natural-primary border-natural-primary text-white shadow-sm'
                     : 'bg-white border-natural-border text-natural-muted hover:bg-natural-sidebar'

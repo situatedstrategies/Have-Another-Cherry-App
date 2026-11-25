@@ -18,7 +18,7 @@ export default function LanguageSelect({
   const value = currentLocale();
   return (
     <label className={`inline-flex items-center gap-1.5 text-xs text-natural-muted ${className}`}>
-      <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+      <Globe className="h-4 w-4" aria-hidden="true" />
       {!compact && <span className="sr-only">{t('common.language')}</span>}
       <select
         aria-label={t('common.language')}
@@ -29,7 +29,7 @@ export default function LanguageSelect({
           await setLocale(next);
           onChange?.(next);
         }}
-        className="bg-transparent border border-natural-border rounded-md px-2 py-1 text-xs text-natural-text outline-none focus:border-natural-primary"
+        className="chip h-9 bg-white border border-natural-border rounded-full pl-3 pr-2 text-xs font-medium text-natural-text outline-none hover:border-natural-muted focus:border-natural-primary transition-colors cursor-pointer"
       >
         {SUPPORTED_LOCALES.map((code) => (
           <option key={code} value={code}>

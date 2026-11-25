@@ -296,7 +296,7 @@ export default function SettleUpModal({
                 key={m.value}
                 type="button"
                 onClick={() => setPaymentMethod(m.value)}
-                className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all cursor-pointer ${
+                className={`chip min-h-10 py-2 px-3 text-xs font-semibold rounded-full border text-center transition-all cursor-pointer ${
                   paymentMethod === m.value
                     ? 'bg-natural-primary border-natural-primary text-white font-bold shadow-md'
                     : 'bg-white border-natural-border text-natural-muted hover:border-natural-muted hover:bg-natural-sidebar'
@@ -396,11 +396,7 @@ export default function SettleUpModal({
           >
             <Check className="h-4 w-4" /> {t('settle.alreadySettled')}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2 text-xs font-semibold text-natural-muted hover:text-natural-text cursor-pointer"
-          >
+          <button type="button" onClick={onClose} className="btn-quiet w-full text-xs">
             {t('common.cancel')}
           </button>
         </div>
