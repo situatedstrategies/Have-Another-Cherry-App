@@ -17,10 +17,7 @@
 export const PLUS_ENTITLEMENT_ID = 'have_another_cherry';
 
 export type EntitlementSource =
-  | 'revenuecat_ios'
-  | 'revenuecat_android'
-  | 'revenuecat_web'
-  | 'promo';
+  'revenuecat_ios' | 'revenuecat_android' | 'revenuecat_web' | 'promo';
 
 export interface RcEntitlementState {
   active: boolean;
@@ -87,12 +84,19 @@ export async function fetchRevenueCatEntitlement(uid: string): Promise<RcEntitle
   const key = apiKey();
   if (!key || !uid) return null;
   try {
-    const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(uid)}`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    });
+    const res = await fetch(
+      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(uid)}`,
+      {
+        headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
     if (!res.ok) {
-      console.error('RevenueCat subscriber lookup failed:', res.status, await res.text().catch(() => ''));
+      console.error(
+        'RevenueCat subscriber lookup failed:',
+        res.status,
+        await res.text().catch(() => '')
+      );
       return null;
     }
     return entitlementFromSubscriber(await res.json());

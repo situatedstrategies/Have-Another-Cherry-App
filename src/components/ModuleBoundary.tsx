@@ -49,9 +49,7 @@ export default class ModuleBoundary extends React.Component<Props, State> {
             <p className="font-semibold text-natural-text">
               {t('module.couldNotShow', { label: this.props.label })}
             </p>
-            <p className="text-natural-muted mt-1 leading-relaxed">
-              {t('module.restFine')}
-            </p>
+            <p className="text-natural-muted mt-1 leading-relaxed">{t('module.restFine')}</p>
             <button
               type="button"
               onClick={() => this.setState({ error: null })}

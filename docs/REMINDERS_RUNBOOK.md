@@ -28,10 +28,10 @@ Only then add the block to `apphosting.yaml` (declaring a secret that does not e
 fails the whole rollout, as the comment there explains) and push to `main`:
 
 ```yaml
-  - variable: REMINDER_CRON_SECRET
-    secret: REMINDER_CRON_SECRET
-    availability:
-      - RUNTIME
+- variable: REMINDER_CRON_SECRET
+  secret: REMINDER_CRON_SECRET
+  availability:
+    - RUNTIME
 ```
 
 Check the rollout the way CLAUDE.md says to, by querying it, not by assuming:

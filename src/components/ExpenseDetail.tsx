@@ -214,7 +214,8 @@ export default function ExpenseDetail({
                       <div className="text-xs">
                         <p className="font-bold text-natural-text capitalize">
                           {t('detail.someonePaid', {
-                            name: members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
+                            name:
+                              members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
                             amount: formatCurrency(s.amount),
                           })}
                         </p>
@@ -287,7 +288,9 @@ export default function ExpenseDetail({
                 </div>
               ) : (
                 <div className="bg-natural-dark/5 border border-natural-dark/20 rounded-2xl p-4">
-                  <p className="text-sm text-natural-text leading-relaxed">{t('detail.blindBody')}</p>
+                  <p className="text-sm text-natural-text leading-relaxed">
+                    {t('detail.blindBody')}
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowDarkIntro(true)}
@@ -370,7 +373,9 @@ export default function ExpenseDetail({
                     <Trans
                       i18nKey="detail.loggedBy"
                       values={{ name: payerName }}
-                      components={{ 1: <span className="font-semibold capitalize text-natural-text" /> }}
+                      components={{
+                        1: <span className="font-semibold capitalize text-natural-text" />,
+                      }}
                     />
                   </p>
                   <span className="text-xs text-natural-muted font-mono mt-1 block">
@@ -425,18 +430,28 @@ export default function ExpenseDetail({
                         <Trans
                           i18nKey="detail.paidTo"
                           values={{
-                            payer: members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
+                            payer:
+                              members.find((m) => m.uid === s.paidBy)?.name || t('common.someone'),
                             amount:
                               maskNumbers && s.paidBy !== activeUser
                                 ? t('detail.aContribution')
                                 : formatCurrency(s.amount),
-                            receiver: members.find((m) => m.uid === s.receivedBy)?.name || payerName,
+                            receiver:
+                              members.find((m) => m.uid === s.receivedBy)?.name || payerName,
                             method: instrumentLabel(s.instrumentType),
                           }}
                           components={{
-                            1: <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`} />,
+                            1: (
+                              <strong
+                                className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}
+                              />
+                            ),
                             3: <strong />,
-                            5: <strong className={`capitalize ${isVoided ? '' : 'text-natural-text'}`} />,
+                            5: (
+                              <strong
+                                className={`capitalize ${isVoided ? '' : 'text-natural-text'}`}
+                              />
+                            ),
                           }}
                         />
                       </p>
@@ -451,8 +466,10 @@ export default function ExpenseDetail({
                           ) : (
                             t('detail.removed')
                           )}
-                          {s.voidedAt ? t('detail.onDate', { date: formatDateTime(s.voidedAt) }) : ''}.{' '}
-                          {t('detail.noLongerCounts')}
+                          {s.voidedAt
+                            ? t('detail.onDate', { date: formatDateTime(s.voidedAt) })
+                            : ''}
+                          . {t('detail.noLongerCounts')}
                         </p>
                       )}
                       <span className="text-xs text-natural-muted font-mono mt-1 block">
@@ -505,12 +522,16 @@ export default function ExpenseDetail({
                           </span>
                         </div>
                         <div className="pt-1.5 border-t border-natural-border/50">
-                          <span className="text-natural-muted block mb-0.5">{t('detail.note')}</span>
+                          <span className="text-natural-muted block mb-0.5">
+                            {t('detail.note')}
+                          </span>
                           <span className="text-natural-text">
                             {s.label ? (
                               s.label
                             ) : (
-                              <span className="italic text-natural-muted">{t('detail.noNote')}</span>
+                              <span className="italic text-natural-muted">
+                                {t('detail.noNote')}
+                              </span>
                             )}
                           </span>
                         </div>
@@ -678,7 +699,9 @@ export default function ExpenseDetail({
                     onClick={() => onClaim?.(m.uid)}
                     className="w-full px-4 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-xl transition-colors cursor-pointer"
                   >
-                    {m.uid === activeUser ? t('detail.iPaid') : t('detail.theyPaid', { name: m.name })}
+                    {m.uid === activeUser
+                      ? t('detail.iPaid')
+                      : t('detail.theyPaid', { name: m.name })}
                   </button>
                 ))}
               </div>
@@ -732,7 +755,8 @@ export default function ExpenseDetail({
                     title={t('detail.remindTitle')}
                     className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <BellRing className="h-4 w-4" /> {nudging ? t('detail.nudging') : t('detail.gentlyRemind')}
+                    <BellRing className="h-4 w-4" />{' '}
+                    {nudging ? t('detail.nudging') : t('detail.gentlyRemind')}
                   </button>
                 )}
                 <button

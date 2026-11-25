@@ -45,18 +45,25 @@ router.post('/api/plus-promo-sync', requireAuth, rateLimit('plus-promo', 20), as
     const data = snap.data() || {};
     const current = data.plusEntitlement || {};
     const heldByPromo = current.source === 'promo' && current.productId === PROMO_PRODUCT;
-    const heldByStore = typeof current.source === 'string' && current.source.startsWith('revenuecat_');
+    const heldByStore =
+      typeof current.source === 'string' && current.source.startsWith('revenuecat_');
     const now = new Date().toISOString();
 
     // 1. Allowlist.
     if (listed) {
       if (!data.isPlus || heldByPromo) {
         await ref.set(
-          { isPlus: true, plusEntitlement: { source: 'promo', productId: PROMO_PRODUCT, updatedAt: now } },
+          {
+            isPlus: true,
+            plusEntitlement: { source: 'promo', productId: PROMO_PRODUCT, updatedAt: now },
+          },
           { merge: true }
         );
       }
-      return res.json({ isPlus: true, source: data.isPlus && !heldByPromo ? current.source : 'promo' });
+      return res.json({
+        isPlus: true,
+        source: data.isPlus && !heldByPromo ? current.source : 'promo',
+      });
     }
 
     // 2. RevenueCat.

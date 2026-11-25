@@ -44,7 +44,9 @@ export const nameOf = (
   members: { uid: string; name?: string }[],
   selfUid?: string
 ): string =>
-  uid === selfUid ? t('common.you') : members.find((m) => m.uid === uid)?.name || t('common.someone');
+  uid === selfUid
+    ? t('common.you')
+    : members.find((m) => m.uid === uid)?.name || t('common.someone');
 
 export const getFullDefaultSplit = (group: any) => {
   if (!group) return {};
@@ -62,7 +64,10 @@ export const pendingSeats = (group: Partial<Group> | null | undefined): PendingS
   const raw: any[] = Array.isArray(group?.availableSplits) ? (group!.availableSplits as any[]) : [];
   return raw.map((s, idx) => {
     if (s && typeof s === 'object') {
-      return { name: String(s.name || t('members.personN', { n: idx + 2 })), split: Number(s.split) || 0 };
+      return {
+        name: String(s.name || t('members.personN', { n: idx + 2 })),
+        split: Number(s.split) || 0,
+      };
     }
     if (typeof s === 'number') return { name: t('members.personN', { n: idx + 2 }), split: s };
     return { name: String(s || t('members.personN', { n: idx + 2 })), split: 0 };

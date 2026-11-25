@@ -91,7 +91,9 @@ export default function PrivacyModal({
       </section>
 
       <section>
-        <h3 className="text-sm font-bold text-natural-text mb-3">{t('privacyModal.dataControls')}</h3>
+        <h3 className="text-sm font-bold text-natural-text mb-3">
+          {t('privacyModal.dataControls')}
+        </h3>
         <div className="bg-white p-4 rounded-2xl border border-natural-border space-y-3">
           <button
             onClick={onExportData}
