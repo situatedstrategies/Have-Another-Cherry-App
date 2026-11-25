@@ -5,7 +5,17 @@ import { signOut } from 'firebase/auth';
 import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
-import { Users, Key, Plus, ArrowRight, ArrowLeft, Copy, Check, Send } from 'lucide-react';
+import {
+  Users,
+  Key,
+  Plus,
+  ArrowRight,
+  ArrowLeft,
+  Copy,
+  Check,
+  Send,
+  AlertCircle,
+} from 'lucide-react';
 import CherryLogo from './CherryLogo';
 import { labelClass } from '../lib/ui';
 import { useTranslation } from 'react-i18next';
@@ -121,7 +131,9 @@ export default function GroupSetup({
           inviteCode: createdGroupInfo.inviteCode,
           recipientName: inviteName,
           fromName:
-            auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || t('group.aFriend'),
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email?.split('@')[0] ||
+            t('group.aFriend'),
           // A solo group has no split to show yet: the creator holds 100%
           // until someone joins, so the email uses its "set up together" row.
           split:
@@ -179,7 +191,8 @@ export default function GroupSetup({
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
+        name:
+          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
@@ -198,8 +211,7 @@ export default function GroupSetup({
         if (!existing.exists()) break;
         newInviteCode = generateInviteCode();
         groupId = newInviteCode;
-        if (attempt === 5)
-          throw new Error(t('group.couldNotGenerateCode'));
+        if (attempt === 5) throw new Error(t('group.couldNotGenerateCode'));
       }
 
       const totalSplit = splits.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
@@ -275,7 +287,8 @@ export default function GroupSetup({
 
       const currentUser: User = {
         uid: auth.currentUser.uid,
-        name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
+        name:
+          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || t('group.user'),
         email: auth.currentUser.email || '',
       };
 
@@ -417,33 +430,30 @@ export default function GroupSetup({
   if (createdGroupInfo) {
     return (
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-        <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative">
-          <div className="p-8">
+        <div className="entry-card max-w-md overflow-hidden relative">
+          <div className="p-6 sm:p-8">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
-                <Users className="h-12 w-12 text-natural-primary" />
+              <div className="inline-flex items-center justify-center p-4 bg-natural-pebble rounded-full mb-4">
+                <Users className="h-10 w-10 text-natural-primary" />
               </div>
               <h1 className="text-3xl font-semibold font-display text-natural-text mb-2 tracking-tight">
                 {t('group.created')}
               </h1>
-              <p className="text-natural-muted font-medium">
+              <p className="text-sm leading-relaxed text-natural-muted">
                 {createdGroupInfo.numCodes > 0
                   ? t('group.canInvite', { count: createdGroupInfo.numCodes })
                   : t('group.shareCodeWhenever')}
               </p>
             </div>
 
-            <div className="bg-natural-bg rounded-xl p-6 mb-8 text-center border border-natural-border">
+            <div className="bg-natural-bg/50 rounded-2xl p-6 mb-6 text-center border border-natural-border">
               <p className={`${labelClass} mb-3`}>{t('group.inviteCode')}</p>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-2xl sm:text-4xl font-mono font-bold text-natural-text tracking-[0.15em] sm:tracking-[0.2em] break-all">
                   {createdGroupInfo.inviteCode}
                 </span>
               </div>
-              <button
-                onClick={copyToClipboard}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-natural-primary hover:text-natural-dark transition-colors"
-              >
+              <button onClick={copyToClipboard} className="mt-3 btn-secondary h-10 text-xs">
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied ? t('group.copied') : t('group.copyToClipboard')}
               </button>
@@ -451,16 +461,18 @@ export default function GroupSetup({
 
             <form
               onSubmit={handleSendInvite}
-              className="mb-8 p-6 bg-natural-sage/20 border border-natural-sage/30 rounded-xl"
+              className="mb-6 p-5 bg-natural-bg/50 border border-natural-border rounded-2xl"
             >
-              <p className="text-sm font-bold text-natural-text mb-3">{t('group.sendInviteEmail')}</p>
+              <p className="text-sm font-bold text-natural-text mb-3">
+                {t('group.sendInviteEmail')}
+              </p>
               <input
                 type="text"
                 required
                 placeholder={t('group.theirName')}
                 value={inviteName}
                 onChange={(e) => setInviteName(e.target.value)}
-                className="w-full mb-2 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
+                className="field mb-2"
               />
               <div className="flex gap-2">
                 <input
@@ -469,13 +481,13 @@ export default function GroupSetup({
                   placeholder={t('auth.email')}
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none transition-all placeholder-natural-muted/60"
+                  className="field flex-1 min-w-0"
                 />
                 <button
                   type="submit"
                   disabled={inviteStatus === 'sending'}
                   aria-label={t('group.sendInvite')}
-                  className="bg-natural-primary text-white p-2 rounded-lg hover:bg-natural-primary-ink transition-colors disabled:opacity-50"
+                  className="btn-primary h-11 w-11 px-0 shrink-0"
                 >
                   {inviteStatus === 'sending' ? (
                     <span className="animate-spin inline-block">◌</span>
@@ -485,7 +497,9 @@ export default function GroupSetup({
                 </button>
               </div>
               {inviteStatus === 'success' && (
-                <p className="text-xs text-natural-primary font-medium mt-2">{t('group.inviteSent')}</p>
+                <p className="text-xs text-natural-primary font-medium mt-2">
+                  {t('group.inviteSent')}
+                </p>
               )}
               {inviteStatus === 'error' && (
                 <p className="text-xs text-natural-primary font-medium mt-2">
@@ -496,7 +510,7 @@ export default function GroupSetup({
 
             <button
               onClick={() => onComplete(createdGroupInfo.groupId)}
-              className="w-full bg-natural-primary text-white font-bold py-4 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm"
+              className="btn-primary w-full"
             >
               {t('group.doneDashboard')}
             </button>
@@ -509,39 +523,37 @@ export default function GroupSetup({
   if (mode === 'choose') {
     return (
       <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-        <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative">
-          <div className="p-8">
+        <div className="entry-card max-w-md overflow-hidden relative">
+          <div className="p-6 sm:p-8">
             <button
               onClick={() => (onCancel ? onCancel() : (forgetKeepSignedIn(), signOut(auth)))}
-              className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
+              className={`${labelClass} hover:text-natural-primary mb-5 -ml-1 inline-flex items-center gap-1 min-h-9 px-1 rounded-full transition-colors cursor-pointer`}
             >
               <ArrowLeft size={16} /> {onCancel ? t('common.cancel') : t('common.back')}
             </button>
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center p-4 bg-natural-sage rounded-full mb-4">
-                <CherryLogo className="h-12 w-12" />
+              <div className="inline-flex items-center justify-center mb-4">
+                <CherryLogo className="h-14 w-14" />
               </div>
               <h1 className="text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 {t('group.welcome')}
               </h1>
-              <p className="text-natural-accent font-medium text-sm uppercase tracking-widest">
+              <p className="text-natural-muted font-mono text-xs tracking-wide">
                 {t('group.tagline')}
               </p>
             </div>
 
             <div className="text-center mb-6">
-              <p className="text-natural-muted font-medium">
-                {t('group.getStarted')}
-              </p>
+              <p className="text-sm leading-relaxed text-natural-muted">{t('group.getStarted')}</p>
             </div>
 
             <div className="space-y-4">
               <button
                 onClick={() => setMode('create')}
-                className="w-full flex items-center justify-between p-4 border border-natural-border rounded-xl hover:border-natural-primary hover:bg-natural-sage/30 transition-colors group"
+                className="w-full flex items-center justify-between gap-3 p-4 border border-natural-border rounded-2xl bg-white hover:border-natural-muted hover:bg-natural-bg/60 transition-colors group cursor-pointer"
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-natural-sage text-natural-primary rounded-lg group-hover:bg-natural-primary group-hover:text-white transition-colors">
+                  <div className="p-3 bg-natural-pebble text-natural-primary rounded-xl shrink-0 transition-colors">
                     <Plus size={24} />
                   </div>
                   <div className="text-left">
@@ -550,26 +562,28 @@ export default function GroupSetup({
                   </div>
                 </div>
                 <ArrowRight
-                  className="text-natural-muted group-hover:text-natural-primary"
+                  className="text-natural-muted group-hover:text-natural-text shrink-0 transition-colors"
                   size={20}
                 />
               </button>
 
               <button
                 onClick={() => setMode('join')}
-                className="w-full flex items-center justify-between p-4 border border-natural-border rounded-xl hover:border-natural-primary hover:bg-natural-sage/30 transition-colors group"
+                className="w-full flex items-center justify-between gap-3 p-4 border border-natural-border rounded-2xl bg-white hover:border-natural-muted hover:bg-natural-bg/60 transition-colors group cursor-pointer"
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-natural-sage text-natural-primary rounded-lg group-hover:bg-natural-primary group-hover:text-white transition-colors">
+                  <div className="p-3 bg-natural-pebble text-natural-primary rounded-xl shrink-0 transition-colors">
                     <Key size={24} />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-bold text-natural-text text-sm">{t('group.joinExisting')}</h3>
+                    <h3 className="font-bold text-natural-text text-sm">
+                      {t('group.joinExisting')}
+                    </h3>
                     <p className="text-xs text-natural-muted">{t('group.joinExistingSub')}</p>
                   </div>
                 </div>
                 <ArrowRight
-                  className="text-natural-muted group-hover:text-natural-primary"
+                  className="text-natural-muted group-hover:text-natural-text shrink-0 transition-colors"
                   size={20}
                 />
               </button>
@@ -582,24 +596,24 @@ export default function GroupSetup({
 
   return (
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative">
-        <div className="p-8">
+      <div className="entry-card max-w-md overflow-hidden relative">
+        <div className="p-6 sm:p-8">
           <button
             onClick={() => setMode('choose')}
-            className={`${labelClass} hover:text-natural-primary mb-6 flex items-center gap-1 transition-colors`}
+            className={`${labelClass} hover:text-natural-primary mb-5 -ml-1 inline-flex items-center gap-1 min-h-9 px-1 rounded-full transition-colors cursor-pointer`}
           >
             <ArrowLeft size={16} /> {t('common.back')}
           </button>
 
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-semibold font-display text-natural-text">
+            <h2 className="text-2xl font-semibold font-display text-natural-text tracking-tight">
               {mode === 'create' ? t('group.createTitle') : t('group.joinTitle')}
             </h2>
           </div>
 
           {error && (
-            <div className="bg-natural-sidebar text-natural-text p-4 rounded-xl mb-6 text-sm font-medium border border-natural-border/20 flex items-start gap-2">
-              <span className="shrink-0">⚠️</span>
+            <div className="notice notice-error mb-6" role="alert">
+              <AlertCircle aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
@@ -613,18 +627,18 @@ export default function GroupSetup({
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder={t('group.groupNamePlaceholder')}
-                  className="w-full px-4 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text text-sm outline-none transition-all mb-4"
+                  className="field"
                   required
                 />
               </div>
 
               <div>
-                <label className={`${labelClass} block mb-1.5`}>
-                  {t('group.howMany')}
-                </label>
-                <p className="text-xs text-natural-muted mb-4 font-medium">{t('group.howManyHelp')}</p>
+                <label className={`${labelClass} block mb-1.5`}>{t('group.howMany')}</label>
+                <p className="text-xs leading-relaxed text-natural-muted mb-3">
+                  {t('group.howManyHelp')}
+                </p>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-2 gap-2 mb-6">
                   {[1, 2, 3, 4, 5].map((num) => (
                     <button
                       key={num}
@@ -636,10 +650,11 @@ export default function GroupSetup({
                         newSplits[num - 1] = String(100 - equal * (num - 1));
                         setSplits(newSplits);
                       }}
-                      className={`py-3 rounded-xl border-2 font-bold transition-all ${
+                      aria-pressed={numPeople === num}
+                      className={`h-11 px-3 rounded-full border text-sm font-semibold transition-colors cursor-pointer ${
                         numPeople === num
-                          ? 'border-natural-primary bg-natural-sage text-natural-primary'
-                          : 'border-natural-border text-natural-muted hover:border-natural-primary/50 hover:bg-natural-bg'
+                          ? 'bg-natural-dark border-natural-dark text-white'
+                          : 'bg-white border-natural-border text-natural-muted hover:text-natural-text hover:border-natural-muted'
                       }`}
                     >
                       {num === 1 ? t('group.justMe') : t('group.youPlusOthers', { count: num - 1 })}
@@ -649,9 +664,11 @@ export default function GroupSetup({
               </div>
 
               <div>
-                <label className={`${labelClass} block mb-1.5`}>{t('group.splitPercentages')}</label>
+                <label className={`${labelClass} block mb-1.5`}>
+                  {t('group.splitPercentages')}
+                </label>
                 {numPeople === 2 && (
-                  <div className="mb-4 p-4 bg-natural-sage/20 border border-natural-primary/20 rounded-xl space-y-3">
+                  <div className="mb-4 p-4 bg-natural-bg/50 border border-natural-border rounded-2xl space-y-3">
                     <p className="text-sm font-medium text-natural-text">
                       {t('group.wantRecommendation')}
                     </p>
@@ -674,7 +691,7 @@ export default function GroupSetup({
                               setRecMessage('');
                             }}
                             placeholder={t('group.amount')}
-                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                            className="field pl-7"
                           />
                         </div>
                       </div>
@@ -697,16 +714,12 @@ export default function GroupSetup({
                               setRecMessage('');
                             }}
                             placeholder={t('group.amount')}
-                            className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-lg text-sm outline-none focus:border-natural-primary"
+                            className="field pl-7"
                           />
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={recommendSplit}
-                      className="w-full bg-natural-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-natural-primary/90"
-                    >
+                    <button type="button" onClick={recommendSplit} className="btn-secondary w-full">
                       {t('group.calculateSplit')}
                     </button>
                     {recMessage && (
@@ -746,7 +759,7 @@ export default function GroupSetup({
                             newSplits[idx] = e.target.value;
                             setSplits(newSplits);
                           }}
-                          className="w-full pl-4 pr-10 py-2.5 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-mono text-sm outline-none transition-all"
+                          className="field pl-4 pr-10 font-mono"
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-natural-muted font-mono text-sm">
                           %
@@ -776,7 +789,7 @@ export default function GroupSetup({
               <button
                 type="submit"
                 disabled={loading || !splitBalanced}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                className="btn-primary w-full mt-2"
               >
                 {loading ? t('group.creating') : t('group.createAndGetCode')}
               </button>
@@ -796,16 +809,12 @@ export default function GroupSetup({
                     }
                     setInviteCode(val);
                   }}
-                  className="w-full px-4 py-3 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-mono text-center text-xl uppercase tracking-widest outline-none transition-all placeholder-natural-muted/60"
+                  className="field h-14 font-mono text-center text-xl uppercase tracking-widest"
                   placeholder="XXXXXX-XXXXXX"
                   maxLength={13}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-natural-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-natural-primary-ink transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-              >
+              <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
                 {loading ? t('group.joining') : t('group.joinGroup')}
               </button>
             </form>

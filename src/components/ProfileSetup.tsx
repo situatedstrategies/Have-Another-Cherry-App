@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { db, authHeader } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +33,11 @@ const STEPS: Step[] = [
     questions: [
       { key: 'income', type: 'number', hasPlaceholder: true },
       { key: 'partnerIncome', type: 'number', hasPlaceholder: true, optional: true, hasHelp: true },
-      { key: 'spendingStyle', type: 'select', options: ['saver', 'spender', 'balanced', 'depends'] },
+      {
+        key: 'spendingStyle',
+        type: 'select',
+        options: ['saver', 'spender', 'balanced', 'depends'],
+      },
     ],
   },
   {
@@ -49,20 +54,36 @@ const STEPS: Step[] = [
         type: 'select',
         options: ['pay_in_full', 'carry_sometimes', 'carry_often', 'avoid_credit'],
       },
-      { key: 'cashVsCredit', type: 'select', options: ['credit_points', 'debit', 'cash', 'whatever'] },
+      {
+        key: 'cashVsCredit',
+        type: 'select',
+        options: ['credit_points', 'debit', 'cash', 'whatever'],
+      },
     ],
   },
   {
     questions: [
       { key: 'lowOnCash', type: 'select', options: ['me', 'partner', 'fluctuates'] },
       { key: 'groceries', type: 'select', options: ['me', 'partner', 'split', 'together'] },
-      { key: 'paybackPreference', type: 'select', options: ['cash', 'goods', 'services', 'doesnt_matter'] },
+      {
+        key: 'paybackPreference',
+        type: 'select',
+        options: ['cash', 'goods', 'services', 'doesnt_matter'],
+      },
     ],
   },
   {
     questions: [
-      { key: 'moneyFeeling', type: 'select', options: ['security', 'freedom', 'stress', 'status', 'tool'] },
-      { key: 'moneyTalkComfort', type: 'select', options: ['love', 'comfortable', 'awkward', 'avoid'] },
+      {
+        key: 'moneyFeeling',
+        type: 'select',
+        options: ['security', 'freedom', 'stress', 'status', 'tool'],
+      },
+      {
+        key: 'moneyTalkComfort',
+        type: 'select',
+        options: ['love', 'comfortable', 'awkward', 'avoid'],
+      },
     ],
   },
   {
@@ -72,7 +93,11 @@ const STEPS: Step[] = [
         type: 'select',
         options: ['direct', 'scheduled', 'casual', 'written', 'avoid'],
       },
-      { key: 'conflictStyle', type: 'select', options: ['compromise', 'data', 'defer', 'pause', 'avoid'] },
+      {
+        key: 'conflictStyle',
+        type: 'select',
+        options: ['compromise', 'data', 'defer', 'pause', 'avoid'],
+      },
       {
         key: 'appGoal',
         type: 'select',
@@ -184,7 +209,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
 
   return (
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-md overflow-hidden relative p-8">
+      <div className="entry-card max-w-md overflow-hidden relative p-6 sm:p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-display font-semibold text-natural-text mb-1">
             {t('quiz.title')}
@@ -202,13 +227,17 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
             ))}
           </div>
           <p className="text-[11px] font-bold text-natural-muted uppercase tracking-wider mt-3">
-            {t('quiz.stepOf', { step: step + 1, total: STEPS.length, title: t(`quiz.steps.${step}.title`) })}
+            {t('quiz.stepOf', {
+              step: step + 1,
+              total: STEPS.length,
+              title: t(`quiz.steps.${step}.title`),
+            })}
           </p>
         </div>
 
         {submitError && (
-          <div className="mb-4 bg-natural-primary/5 text-natural-primary p-3 rounded-md text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-            <span className="shrink-0">⚠️</span>
+          <div className="notice notice-error mb-4" role="alert">
+            <AlertCircle aria-hidden="true" />
             <span>{submitError}</span>
           </div>
         )}
@@ -232,14 +261,14 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
                     value={answers[q.key] || ''}
                     onChange={(e) => setAnswer(q.key, e.target.value)}
                     placeholder={q.hasPlaceholder ? t('group.amount') : undefined}
-                    className="w-full pl-7 p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
+                    className="field pl-7"
                   />
                 </div>
               ) : (
                 <select
                   value={answers[q.key] || ''}
                   onChange={(e) => setAnswer(q.key, e.target.value)}
-                  className="w-full p-3 bg-natural-sidebar border border-natural-border rounded-md focus:outline-none focus:ring-1 focus:ring-natural-text text-sm"
+                  className="field"
                 >
                   <option value="">{t('quiz.select')}</option>
                   {q.options?.map((value) => (
@@ -257,10 +286,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
 
           <div className="flex gap-3 pt-2">
             {step > 0 && (
-              <button
-                onClick={() => setStep((s) => s - 1)}
-                className="w-1/3 bg-natural-border text-natural-text font-medium py-3 px-4 rounded-md hover:bg-natural-border/80"
-              >
+              <button onClick={() => setStep((s) => s - 1)} className="btn-secondary w-1/3">
                 {t('common.back')}
               </button>
             )}
@@ -268,7 +294,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               <button
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!isStepComplete}
-                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary/90 disabled:opacity-50`}
+                className={`${step > 0 ? 'w-2/3' : 'w-full'} btn-primary`}
               >
                 {t('common.next')}
               </button>
@@ -276,7 +302,7 @@ export default function ProfileSetup({ userId, onComplete }: ProfileSetupProps) 
               <button
                 onClick={handleSubmit}
                 disabled={!isStepComplete}
-                className={`${step > 0 ? 'w-2/3' : 'w-full'} bg-natural-primary text-white font-medium py-3 px-4 rounded-md hover:bg-natural-primary-ink transition-colors disabled:opacity-50`}
+                className={`${step > 0 ? 'w-2/3' : 'w-full'} btn-primary`}
               >
                 {t('quiz.generateProfile')}
               </button>

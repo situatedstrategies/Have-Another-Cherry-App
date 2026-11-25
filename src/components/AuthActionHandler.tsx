@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, AlertCircle, CheckCircle2, Check, Circle } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   PASSWORD_REQUIREMENTS,
@@ -201,7 +201,7 @@ export default function AuthActionHandler() {
 
   return (
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-sm overflow-hidden relative">
+      <div className="entry-card max-w-sm overflow-hidden relative">
         <div className="p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
@@ -213,22 +213,23 @@ export default function AuthActionHandler() {
           </div>
 
           {phase.kind === 'loading' && (
-            <p className="text-center text-sm text-natural-muted py-4">{t('authAction.checkingLink')}</p>
+            <p className="text-center text-sm text-natural-muted py-4">
+              {t('authAction.checkingLink')}
+            </p>
           )}
 
           {phase.kind === 'unsupported' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.unsupportedLink')}</h2>
+                <h2 className="text-sm font-medium text-natural-muted">
+                  {t('authAction.unsupportedLink')}
+                </h2>
               </div>
-              <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-                <span className="shrink-0">⚠️</span>
+              <div className="notice notice-error mb-6" role="alert">
+                <AlertCircle aria-hidden="true" />
                 <span>{t('authAction.unsupportedBody', { email: SUPPORT_EMAIL })}</span>
               </div>
-              <a
-                href="/"
-                className="block w-full text-center bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm"
-              >
+              <a href="/" className="btn-primary w-full">
                 {t('authAction.backToApp')}
               </a>
             </>
@@ -237,44 +238,42 @@ export default function AuthActionHandler() {
           {phase.kind === 'error' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.linkDidNotWork')}</h2>
+                <h2 className="text-sm font-medium text-natural-muted">
+                  {t('authAction.linkDidNotWork')}
+                </h2>
               </div>
-              <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-                <span className="shrink-0">⚠️</span>
+              <div className="notice notice-error mb-6" role="alert">
+                <AlertCircle aria-hidden="true" />
                 <span>{phase.message}</span>
               </div>
 
               {phase.offerNewLink ? (
                 <>
                   {newLinkInfo && (
-                    <div className="bg-natural-sidebar text-natural-text p-3 rounded-md mb-6 text-sm font-medium border border-natural-border flex items-start gap-2">
-                      <span className="shrink-0">✅</span>
+                    <div className="notice notice-ok mb-6" role="status">
+                      <CheckCircle2 aria-hidden="true" />
                       <span>{newLinkInfo}</span>
                     </div>
                   )}
                   {newLinkError && (
-                    <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-                      <span className="shrink-0">⚠️</span>
+                    <div className="notice notice-error mb-6" role="alert">
+                      <AlertCircle aria-hidden="true" />
                       <span>{newLinkError}</span>
                     </div>
                   )}
                   {!newLinkInfo && (
                     <form onSubmit={handleRequestNewLink} className="space-y-4 mb-6">
-                      <p className="text-sm text-natural-muted">
-                        {t('authAction.freshLink')}
-                      </p>
+                      <p className="text-sm text-natural-muted">{t('authAction.freshLink')}</p>
                       <div>
-                        <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                          {t('auth.email')}
-                        </label>
+                        <label className="field-label">{t('auth.email')}</label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                           <input
                             type="email"
                             required
                             value={newLinkEmail}
                             onChange={(e) => setNewLinkEmail(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                            className="field pl-10"
                             placeholder={t('auth.emailPlaceholder')}
                           />
                         </div>
@@ -282,7 +281,7 @@ export default function AuthActionHandler() {
                       <button
                         type="submit"
                         disabled={sendingNewLink}
-                        className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="btn-primary w-full"
                       >
                         {sendingNewLink ? t('common.pleaseWait') : t('authAction.sendNewLink')}
                       </button>
@@ -307,14 +306,11 @@ export default function AuthActionHandler() {
               <div className="text-center mb-6">
                 <h2 className="text-sm font-medium text-natural-muted">{phase.heading}</h2>
               </div>
-              <div className="bg-natural-sidebar text-natural-text p-3 rounded-md mb-6 text-sm font-medium border border-natural-border flex items-start gap-2">
-                <span className="shrink-0">✅</span>
+              <div className="notice notice-ok mb-6" role="status">
+                <CheckCircle2 aria-hidden="true" />
                 <span>{phase.message}</span>
               </div>
-              <a
-                href={continueHref}
-                className="block w-full text-center bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm"
-              >
+              <a href={continueHref} className="btn-primary w-full">
                 {continueLabel}
               </a>
             </>
@@ -323,7 +319,9 @@ export default function AuthActionHandler() {
           {phase.kind === 'resetForm' && (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-sm font-medium text-natural-muted">{t('authAction.chooseNewPassword')}</h2>
+                <h2 className="text-sm font-medium text-natural-muted">
+                  {t('authAction.chooseNewPassword')}
+                </h2>
               </div>
 
               <p className="text-sm text-natural-muted mb-4">
@@ -335,25 +333,23 @@ export default function AuthActionHandler() {
               </p>
 
               {formError && (
-                <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-                  <span className="shrink-0">⚠️</span>
+                <div className="notice notice-error mb-6" role="alert">
+                  <AlertCircle aria-hidden="true" />
                   <span>{formError}</span>
                 </div>
               )}
 
               <form onSubmit={handleSetPassword} className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                    {t('authAction.newPassword')}
-                  </label>
+                  <label className="field-label">{t('authAction.newPassword')}</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                      className="field pl-10"
                       placeholder="••••••••"
                       minLength={8}
                       autoComplete="new-password"
@@ -371,7 +367,11 @@ export default function AuthActionHandler() {
                             checks[req.key] ? 'text-natural-text' : 'text-natural-muted'
                           }`}
                         >
-                          <span>{checks[req.key] ? '✓' : '○'}</span>{' '}
+                          {checks[req.key] ? (
+                            <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          ) : (
+                            <Circle className="h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
+                          )}
                           {passwordRequirementLabel(req.labelKey)}
                         </li>
                       ))}
@@ -380,17 +380,15 @@ export default function AuthActionHandler() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                    {t('authAction.confirmNewPassword')}
-                  </label>
+                  <label className="field-label">{t('authAction.confirmNewPassword')}</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                     <input
                       type="password"
                       required
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                      className="field pl-10"
                       placeholder="••••••••"
                       minLength={8}
                       autoComplete="new-password"
@@ -401,7 +399,7 @@ export default function AuthActionHandler() {
                 <button
                   type="submit"
                   disabled={submitting || !valid || password !== confirm}
-                  className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                  className="btn-primary w-full mt-2"
                 >
                   {submitting ? t('common.pleaseWait') : t('authAction.setNewPassword')}
                 </button>

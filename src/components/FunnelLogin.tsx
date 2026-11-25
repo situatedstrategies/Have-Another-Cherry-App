@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
 import { auth, forgetKeepSignedIn } from '../firebase';
@@ -110,13 +111,11 @@ export default function FunnelLogin() {
             {t('funnelLogin.invalidTitle')}
           </h2>
         </div>
-        <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15">
+        <div className="notice notice-error mb-6" role="alert">
+          <AlertCircle aria-hidden="true" />
           {t('funnelLogin.invalidBody')}
         </div>
-        <a
-          href="/"
-          className="block w-full text-center bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm"
-        >
+        <a href="/" className="btn-primary w-full">
           {t('authAction.backToApp')}
         </a>
       </Shell>
@@ -151,18 +150,10 @@ export default function FunnelLogin() {
           ? t('funnelLogin.signedInAs', { email: user.email })
           : t('funnelLogin.signedIn')}
       </p>
-      <button
-        type="button"
-        onClick={() => goBack(user)}
-        className="block w-full text-center bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm"
-      >
+      <button type="button" onClick={() => goBack(user)} className="btn-primary w-full">
         {t('authAction.continue')}
       </button>
-      <button
-        type="button"
-        onClick={switchAccount}
-        className="block w-full text-center text-sm text-natural-muted font-medium py-2 px-4 mt-3 rounded-md hover:text-natural-text transition-colors"
-      >
+      <button type="button" onClick={switchAccount} className="btn-quiet w-full mt-2">
         {t('funnelLogin.otherAccount')}
       </button>
     </Shell>
@@ -174,7 +165,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-natural-sidebar flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-lg shadow-sm border border-natural-border w-full max-w-sm overflow-hidden relative">
+      <div className="entry-card max-w-sm overflow-hidden relative">
         <div className="p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">

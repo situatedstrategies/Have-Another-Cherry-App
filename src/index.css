@@ -118,6 +118,128 @@
   }
 }
 
+/* ---------- states ----------
+
+   One focus ring for the whole app: a 2px cherry ring, 2px off the edge, on
+   keyboard focus only. Buttons had the browser default and inputs a thin grey
+   ring, so the two never matched. Inputs keep their own focus border as well
+   (the border turns cherry on any focus, the ring appears on keyboard focus),
+   and the ring never shows on a pointer click. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-natural-primary);
+  outline-offset: 2px;
+}
+
+/* Native checkboxes and radios take the brand colour instead of browser blue. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-natural-primary);
+}
+
+::selection {
+  background: var(--color-natural-primary-wash);
+  color: var(--color-natural-text);
+}
+
+/* ---------- motion ----------
+
+   Ten components ask for `animate-in fade-in` (and zoom-in-95,
+   slide-in-from-*), the vocabulary of tailwindcss-animate, which this project
+   never installed, so sheets and menus popped in with no transition. The same
+   vocabulary is defined here once: 200ms, eased out, run once. Everything that
+   moves does so because the person did something, and prefers-reduced-motion
+   switches all of it off. */
+@keyframes tc-enter {
+  from {
+    opacity: var(--tc-enter-opacity, 1);
+    transform: translate3d(var(--tc-enter-x, 0), var(--tc-enter-y, 0), 0)
+      scale(var(--tc-enter-scale, 1));
+  }
+}
+.animate-in {
+  animation: tc-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.fade-in {
+  --tc-enter-opacity: 0;
+}
+.zoom-in-95 {
+  --tc-enter-scale: 0.95;
+}
+.slide-in-from-top-2 {
+  --tc-enter-y: -0.5rem;
+}
+.slide-in-from-bottom-2 {
+  --tc-enter-y: 0.5rem;
+}
+.slide-in-from-right-4 {
+  --tc-enter-x: 1rem;
+}
+@media (min-width: 640px) {
+  .sm\:animate-in {
+    animation: tc-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .sm\:zoom-in-95 {
+    --tc-enter-scale: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- the entry surfaces ----------
+
+   The screens a new person meets first (sign in, create or join a household,
+   the quiz, the auth action and funnel pages) share these four pieces so they
+   match the Log sheet and the dashboard, and cannot drift from each other.
+   Controls are capsules; fields are the Log sheet's recipe. */
+@layer components {
+  .entry-card {
+    @apply bg-white rounded-3xl border border-natural-border shadow-sm w-full;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-natural-primary text-white text-sm font-semibold shadow-md transition-all cursor-pointer whitespace-nowrap;
+    @apply hover:bg-natural-primary-ink hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-natural-primary disabled:hover:shadow-md;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-white border border-natural-border text-natural-text text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap;
+    @apply hover:border-natural-muted hover:bg-natural-bg disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-dark {
+    @apply inline-flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-black text-white text-sm font-semibold shadow-sm transition-colors cursor-pointer whitespace-nowrap;
+    @apply hover:bg-black/85 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-quiet {
+    @apply inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-full text-sm font-medium text-natural-muted transition-colors cursor-pointer;
+    @apply hover:text-natural-text;
+  }
+  .field {
+    @apply w-full h-11 px-3.5 bg-natural-bg/50 border border-natural-border rounded-xl text-natural-text text-sm outline-none transition-all placeholder:text-natural-muted/60;
+    @apply hover:bg-natural-bg focus:bg-white focus:border-natural-primary;
+  }
+  .field-label {
+    @apply block text-xs font-bold uppercase tracking-wider text-natural-text mb-1.5;
+  }
+  .notice {
+    @apply flex items-start gap-2.5 p-3.5 rounded-xl text-sm font-medium border leading-snug;
+  }
+  .notice-error {
+    @apply bg-natural-primary-wash/60 text-natural-primary border-natural-primary/20;
+  }
+  .notice-ok {
+    @apply bg-natural-bg text-natural-text border-natural-border;
+  }
+  .notice > svg {
+    @apply h-4 w-4 shrink-0 mt-0.5;
+  }
+}
+
 /* Custom styles for professional scrollbars and subtle animations */
 ::-webkit-scrollbar {
   width: 6px;

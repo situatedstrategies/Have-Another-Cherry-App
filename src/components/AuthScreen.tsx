@@ -18,7 +18,7 @@ import { t } from '../i18n';
 import LanguageSelect from './LanguageSelect';
 import { auth, db, applyKeepSignedIn, ensureAppCheck } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
-import { Mail, Lock, User } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, CheckCircle2, Check, Circle } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
 import {
   PASSWORD_REQUIREMENTS,
@@ -486,17 +486,21 @@ export default function AuthScreen() {
 
   return (
     <div className="min-h-screen bg-natural-sidebar flex flex-col font-sans">
-      <nav className="w-full flex items-center justify-between px-6 py-4">
-        <a href="https://haveanothercherry.com" className="flex items-center gap-2">
-          <CherryLogo className="h-6 w-6" />
-          <span className="font-display font-semibold text-natural-text tracking-tight">
+      <nav className="w-full flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4">
+        <a
+          href="https://haveanothercherry.com"
+          className="flex items-center gap-2 min-h-11 rounded-full"
+        >
+          <CherryLogo className="h-7 w-7" />
+          {/* The name hides on the narrowest phones, where it wrapped onto two lines beside the links. */}
+          <span className="hidden min-[360px]:inline whitespace-nowrap font-display font-semibold text-natural-text tracking-tight">
             {t('common.brand')}
           </span>
         </a>
         <div className="flex items-center gap-4">
           <a
             href="https://haveanothercherry.com/blog"
-            className="text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
+            className="inline-flex items-center min-h-11 px-1 rounded-full text-sm font-medium text-natural-muted hover:text-natural-text transition-colors"
           >
             {t('auth.blog')}
           </a>
@@ -505,13 +509,11 @@ export default function AuthScreen() {
       </nav>
 
       <div className="flex-1 flex items-center justify-center p-4">
-        <div
-          className={`bg-white rounded-lg shadow-sm border border-natural-border w-full overflow-hidden relative max-w-sm`}
-        >
-          <div className="p-8">
+        <div className={`entry-card overflow-hidden relative max-w-sm`}>
+          <div className="p-6 sm:p-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center mb-4">
-                <CherryLogo className="h-10 w-10" />
+                <CherryLogo className="h-14 w-14" />
               </div>
               <h1 className="text-2xl sm:text-3xl font-semibold font-display text-natural-text mb-1 tracking-tight">
                 {t('common.brand')}
@@ -520,7 +522,7 @@ export default function AuthScreen() {
                   the way the marketing site's footer carries it. It is where
                   the address haveanothercherry.com comes from, and it is never
                   the app's name. */}
-              <p className="font-display italic font-medium text-base text-natural-dark-cherry mb-2">
+              <p className="font-display italic font-medium text-base text-natural-dark-cherry mb-3">
                 {t('common.motto')}
               </p>
               {/* The category line the marketing homepage carries above its
@@ -543,13 +545,13 @@ export default function AuthScreen() {
               button meant hunting for the form you had already asked for. */}
                 {isReset ? (
                   <div className="text-center mb-6">
-                    <h2 className="text-sm font-medium text-natural-muted">
+                    <h2 className="text-sm font-semibold text-natural-text">
                       {t('auth.resetYourPassword')}
                     </h2>
                   </div>
                 ) : (
                   <div
-                    className="grid grid-cols-2 gap-1 p-1 mb-6 bg-natural-sidebar border border-natural-border rounded-full"
+                    className="grid grid-cols-2 gap-1 p-1 mb-5 bg-natural-sidebar rounded-full"
                     role="tablist"
                   >
                     {(
@@ -588,7 +590,7 @@ export default function AuthScreen() {
                       data-defer-appcheck
                       type="button"
                       disabled={loading}
-                      className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-black/85 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed text-sm mb-3"
+                      className="btn-dark w-full mb-3"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 384 512" aria-hidden="true">
                         <path
@@ -604,7 +606,7 @@ export default function AuthScreen() {
                       data-defer-appcheck
                       type="button"
                       disabled={loading}
-                      className="w-full bg-white border border-natural-border text-natural-text font-medium py-2 px-4 rounded-md hover:bg-natural-sidebar transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                      className="btn-secondary w-full"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path
@@ -627,7 +629,7 @@ export default function AuthScreen() {
                       {googleLoading ? t('auth.waitingGoogle') : t('auth.continueGoogle')}
                     </button>
 
-                    <div className="relative my-6">
+                    <div className="relative my-5">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-natural-border"></div>
                       </div>
@@ -639,15 +641,15 @@ export default function AuthScreen() {
                 )}
 
                 {error && (
-                  <div className="bg-natural-primary/5 text-natural-primary p-3 rounded-md mb-6 text-sm font-medium border border-natural-primary/15 flex items-start gap-2">
-                    <span className="shrink-0">⚠️</span>
+                  <div className="notice notice-error mb-6" role="alert">
+                    <AlertCircle aria-hidden="true" />
                     <span>{error}</span>
                   </div>
                 )}
 
                 {info && (
-                  <div className="bg-natural-sidebar text-natural-text p-3 rounded-md mb-6 text-sm font-medium border border-natural-border flex items-start gap-2">
-                    <span className="shrink-0">✅</span>
+                  <div className="notice notice-ok mb-6" role="status">
+                    <CheckCircle2 aria-hidden="true" />
                     <span>{info}</span>
                   </div>
                 )}
@@ -657,22 +659,22 @@ export default function AuthScreen() {
                   className="space-y-4"
                 >
                   {isReset && (
-                    <p className="text-sm text-natural-muted -mt-1">{t('auth.resetExplainer')}</p>
+                    <p className="text-sm leading-relaxed text-natural-muted -mt-1">
+                      {t('auth.resetExplainer')}
+                    </p>
                   )}
 
                   {!isLogin && !isReset && (
                     <div>
-                      <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                        {t('auth.name')}
-                      </label>
+                      <label className="field-label">{t('auth.name')}</label>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                         <input
                           type="text"
                           required
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                          className="field pl-10"
                           placeholder={t('auth.name')}
                         />
                       </div>
@@ -680,17 +682,15 @@ export default function AuthScreen() {
                   )}
 
                   <div>
-                    <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                      {t('auth.email')}
-                    </label>
+                    <label className="field-label">{t('auth.email')}</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                       <input
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                        className="field pl-10"
                         placeholder={t('auth.emailPlaceholder')}
                       />
                     </div>
@@ -698,31 +698,29 @@ export default function AuthScreen() {
 
                   {!isReset && (
                     <div>
-                      <label className="block text-xs font-semibold text-natural-text uppercase tracking-wide mb-1.5">
-                        {t('auth.password')}
-                      </label>
+                      <label className="field-label">{t('auth.password')}</label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-accent h-4 w-4" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted h-4 w-4 pointer-events-none" />
                         <input
                           type="password"
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 bg-white border border-natural-border focus:border-natural-muted focus:ring-1 focus:ring-natural-muted rounded-md text-natural-text placeholder-natural-accent font-sans text-sm outline-none transition-all"
+                          className="field pl-10"
                           placeholder="••••••••"
                           minLength={isLogin ? undefined : 8}
                         />
                       </div>
                       {!isLogin && (
                         <div className="mt-2">
-                          <p className="text-xs font-semibold text-natural-text mb-1">
+                          <p className="text-xs font-semibold text-natural-text mb-1.5">
                             {t('auth.createPasswordWith')}
                           </p>
                           <ul className="space-y-1">
                             {PASSWORD_REQUIREMENTS.map((req) => (
                               <li
                                 key={req.key}
-                                className={`flex items-center gap-1.5 text-xs ${
+                                className={`flex items-center gap-2 text-xs leading-5 ${
                                   passwordChecks[req.key]
                                     ? 'text-natural-text'
                                     : error
@@ -730,7 +728,14 @@ export default function AuthScreen() {
                                       : 'text-natural-muted'
                                 }`}
                               >
-                                <span>{passwordChecks[req.key] ? '✓' : '○'}</span>{' '}
+                                {passwordChecks[req.key] ? (
+                                  <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                ) : (
+                                  <Circle
+                                    className="h-3 w-3 shrink-0 opacity-60"
+                                    aria-hidden="true"
+                                  />
+                                )}
                                 {passwordRequirementLabel(req.labelKey)}
                               </li>
                             ))}
@@ -742,7 +747,7 @@ export default function AuthScreen() {
                           <button
                             type="button"
                             onClick={() => switchMode('reset')}
-                            className="text-xs font-medium text-natural-primary hover:underline"
+                            className="inline-flex items-center min-h-9 text-xs font-medium text-natural-primary hover:underline rounded-full"
                           >
                             {t('auth.forgotPassword')}
                           </button>
@@ -752,12 +757,12 @@ export default function AuthScreen() {
                   )}
 
                   {!isLogin && !isReset && (
-                    <label className="flex items-start gap-2 text-xs text-natural-muted cursor-pointer select-none">
+                    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-natural-muted cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={agreeTerms}
                         onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0"
                       />
                       <span>
                         <Trans
@@ -789,12 +794,12 @@ export default function AuthScreen() {
                   {!isReset && (
                     /* Applies to whichever way they sign in, email below or Google
                  further down: the handlers both read this one checkbox. */
-                    <label className="flex items-start gap-2 text-xs text-natural-muted cursor-pointer select-none">
+                    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-natural-muted cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={keepSignedIn}
                         onChange={(e) => setKeepSignedIn(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0"
                       />
                       <span>
                         <span className="font-semibold text-natural-text">
@@ -805,11 +810,7 @@ export default function AuthScreen() {
                     </label>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-natural-primary text-white font-medium py-2 px-4 rounded-md hover:bg-natural-primary/90 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-                  >
+                  <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
                     {emailLoading
                       ? t('common.pleaseWait')
                       : isReset
@@ -827,7 +828,7 @@ export default function AuthScreen() {
                 {t('auth.rememberedPassword')}{' '}
                 <button
                   onClick={() => switchMode('login')}
-                  className="text-natural-text hover:underline font-medium transition-colors"
+                  className="inline-flex min-h-9 items-center text-natural-text hover:underline font-medium transition-colors"
                 >
                   {t('auth.backToLogin')}
                 </button>
