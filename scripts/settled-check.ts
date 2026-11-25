@@ -92,7 +92,7 @@ check(
   getNormalizedExpenseStatus(fullPending),
   'PENDING'
 );
-check('and labelled so', getExpenseStatusLabel(fullPending), 'Pending Confirmation');
+check('and labelled so', getExpenseStatusLabel(fullPending), 'Pending confirmation');
 check(
   'a pending payment for part of the share is partial',
   getNormalizedExpenseStatus(base({ settlements: [pending(10)] })),
