@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { t as tr } from '../i18n';
 import { formatDateTime } from '../lib/format';
-import { Cloud, Download, Shield, Key, RefreshCw, Check, Sparkles } from 'lucide-react';
+import {
+  Cloud,
+  Download,
+  Shield,
+  Key,
+  RefreshCw,
+  Check,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react';
 import { doc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 import Modal from './Modal';
@@ -266,15 +276,11 @@ export default function BackupModal({
       <div className="space-y-6">
         {msg && (
           <div
-            className={`p-3 text-sm rounded-xl border ${
-              msg.type === 'success'
-                ? 'bg-natural-sidebar text-natural-text border-natural-border'
-                : msg.type === 'error'
-                  ? 'bg-natural-primary/5 text-natural-primary border-natural-primary/25'
-                  : 'bg-natural-sidebar text-natural-text border-natural-border'
-            }`}
+            className={`notice ${msg.type === 'error' ? 'notice-error' : 'notice-ok'}`}
+            role={msg.type === 'error' ? 'alert' : 'status'}
           >
-            {msg.text}
+            {msg.type === 'error' ? <AlertCircle /> : <CheckCircle2 />}
+            <span>{msg.text}</span>
           </div>
         )}
 

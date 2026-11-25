@@ -120,7 +120,7 @@ export default function ExpenseDetail({
       id="detail-overlay"
     >
       <div
-        className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-lg shadow-2xl sm:border border-natural-border flex flex-col max-h-full sm:max-h-[90vh]"
+        className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-lg shadow-xl sm:border border-natural-border flex flex-col max-h-full sm:max-h-[90vh]"
         id="detail-container"
       >
         {/* Header */}
@@ -228,7 +228,7 @@ export default function ExpenseDetail({
                     </div>
                     <button
                       onClick={() => onConfirmReceipt(s.id)}
-                      className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="btn-primary w-full sm:w-auto"
                     >
                       <ShieldCheck className="h-4 w-4" /> {t('detail.confirmReceipt')}
                     </button>
@@ -594,13 +594,13 @@ export default function ExpenseDetail({
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder={t('detail.commentPlaceholder')}
                 aria-label={t('detail.addComment')}
-                className="w-full text-xs px-3.5 py-2.5 bg-natural-sidebar/50 border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary pr-10"
+                className="field pr-11"
               />
               <button
                 type="submit"
                 disabled={!commentText.trim()}
                 aria-label={t('detail.sendComment')}
-                className="absolute right-2 text-natural-primary hover:text-natural-dark disabled:opacity-50 disabled:cursor-not-allowed p-1 cursor-pointer"
+                className="absolute right-1 tap-target inline-flex items-center justify-center rounded-full text-natural-primary hover:text-natural-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -636,7 +636,7 @@ export default function ExpenseDetail({
 
         {/* Footer (Quick Actions) */}
         <div
-          className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0"
+          className="p-4 bg-natural-sidebar/30 border-t border-natural-border flex flex-col sm:flex-row sm:flex-wrap justify-between items-center gap-3 shrink-0"
           id="detail-footer"
         >
           <div className="flex items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
@@ -644,27 +644,21 @@ export default function ExpenseDetail({
                 delete it - the edit form would reveal the hidden numbers. */}
             {!maskNumbers && (
               <>
-                <button
-                  onClick={onEdit}
-                  className="px-3 py-2 text-xs font-semibold text-natural-text hover:bg-natural-sidebar border border-transparent hover:border-natural-border rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-                >
+                <button onClick={onEdit} className="btn-quiet text-natural-text">
                   <Edit2 className="h-3.5 w-3.5" /> {t('common.edit')}
                 </button>
 
                 {isDeleting ? (
-                  <div className="flex items-center gap-2 border border-natural-primary/25 bg-natural-primary/5 px-3 py-1.5 rounded-xl">
-                    <span className="text-xs font-bold text-natural-primary uppercase">
+                  <div className="flex flex-wrap items-center gap-1 max-w-full border border-natural-primary/25 bg-natural-primary/5 pl-3 pr-1 py-1 rounded-3xl">
+                    <span className="text-xs font-bold text-natural-primary uppercase whitespace-nowrap">
                       {t('detail.confirmDelete')}
                     </span>
-                    <button
-                      onClick={() => setIsDeleting(false)}
-                      className="text-xs font-bold text-natural-muted hover:text-natural-text"
-                    >
+                    <button onClick={() => setIsDeleting(false)} className="btn-quiet min-h-9 px-2">
                       {t('common.cancel')}
                     </button>
                     <button
                       onClick={onDelete}
-                      className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-2 py-1 rounded-md"
+                      className="btn-secondary h-9 px-3.5 text-natural-primary hover:text-natural-primary-ink"
                     >
                       {t('detail.yesDelete')}
                     </button>
@@ -672,7 +666,7 @@ export default function ExpenseDetail({
                 ) : (
                   <button
                     onClick={() => setIsDeleting(true)}
-                    className="px-3 py-2 text-xs font-semibold text-natural-primary hover:text-natural-dark bg-white hover:bg-natural-sidebar/30 border border-natural-primary/15 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="btn-secondary text-natural-primary hover:text-natural-primary-ink"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
                   </button>
@@ -716,10 +710,7 @@ export default function ExpenseDetail({
                 if (isDark) {
                   // No numbers on the button - that's the whole point.
                   return (
-                    <button
-                      onClick={onSettleClick}
-                      className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
+                    <button onClick={onSettleClick} className="btn-primary w-full sm:w-auto">
                       <Cherry className="h-4 w-4" /> {t('settle.titleDark')}
                     </button>
                   );
@@ -728,10 +719,7 @@ export default function ExpenseDetail({
                 const leftToPay = getRemainingSettlementAmount(expense, activeUser, true);
 
                 return leftToPay > 0.01 ? (
-                  <button
-                    onClick={onSettleClick}
-                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
+                  <button onClick={onSettleClick} className="btn-primary w-full sm:w-auto">
                     <CreditCard className="h-4 w-4" />{' '}
                     {t('detail.settleMyShare', { amount: formatCurrency(leftToPay) })}
                   </button>
@@ -753,7 +741,7 @@ export default function ExpenseDetail({
                     }}
                     disabled={nudging}
                     title={t('detail.remindTitle')}
-                    className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-natural-text bg-white border border-natural-border hover:border-natural-primary hover:text-natural-primary rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     <BellRing className="h-4 w-4" />{' '}
                     {nudging ? t('detail.nudging') : t('detail.gentlyRemind')}
@@ -761,7 +749,7 @@ export default function ExpenseDetail({
                 )}
                 <button
                   onClick={onSettleClick}
-                  className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-natural-primary bg-natural-sage border border-natural-primary/20 hover:bg-natural-primary hover:text-white rounded-full shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="btn-secondary w-full sm:w-auto text-natural-primary hover:text-natural-primary-ink"
                 >
                   <CreditCard className="h-4 w-4" /> {t('settle.titleReceived')}
                 </button>

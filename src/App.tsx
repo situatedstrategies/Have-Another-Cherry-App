@@ -719,9 +719,7 @@ export default function App() {
                 <span className="text-xs font-bold uppercase tracking-widest text-natural-muted">
                   {t('app.insights')}
                 </span>
-                <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                  Cherry +
-                </span>
+                <span className="plus-tag">Cherry +</span>
               </div>
               <p className="mt-2 font-display text-lg font-semibold text-natural-text">
                 {t('app.insightsTeaserTitle')}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NotebookPen, Lock, Users, Trash2, Share2 } from 'lucide-react';
+import { NotebookPen, Lock, Users, Trash2, Share2, AlertCircle } from 'lucide-react';
 import { Group } from '../types';
 import { getFullMembers, nameOf } from '../lib/members';
 import { formatDateTime } from '../lib/format';
@@ -125,8 +125,9 @@ export default function ReflectionsSection({
       </div>
 
       {error && (
-        <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">
-          {error}
+        <div className="notice notice-error" role="alert">
+          <AlertCircle />
+          <span>{error}</span>
         </div>
       )}
 
@@ -161,7 +162,7 @@ export default function ReflectionsSection({
           maxLength={2000}
           placeholder={t('reflect.placeholder')}
           aria-label={t('reflect.placeholder')}
-          className="w-full text-xs px-3.5 py-2.5 bg-white border border-natural-border rounded-xl focus:outline-none focus:border-natural-primary resize-y"
+          className="field h-auto min-h-11 py-2.5 resize-y"
         />
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -170,14 +171,14 @@ export default function ReflectionsSection({
               type="checkbox"
               checked={shareWithGroup}
               onChange={(e) => setShareWithGroup(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+              className="h-3.5 w-3.5 rounded border-natural-border text-natural-primary"
             />
             <span>{t('reflect.shareWithGroup')}</span>
           </label>
           <button
             type="submit"
             disabled={!text.trim() || saving}
-            className="px-4 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer self-end sm:self-auto"
+            className="btn-primary self-end sm:self-auto"
           >
             {saving ? t('common.saving') : t('reflect.save')}
           </button>

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../lib/format';
-import { Camera, Sparkles, HelpCircle, X } from 'lucide-react';
+import { Camera, Sparkles, HelpCircle, X, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
 import { authHeader } from '../firebase';
 import { VaultExtraction, VaultNote } from '../types';
@@ -200,15 +200,16 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
             />
           </div>
           {error && (
-            <p className="p-3 bg-natural-primary-wash border border-natural-primary/15 rounded-xl text-xs font-medium text-natural-primary">
-              {error}
-            </p>
+            <div className="notice notice-error" role="alert">
+              <AlertCircle />
+              <span>{error}</span>
+            </div>
           )}
           <button
             type="button"
             onClick={organise}
             disabled={busy || (!text.trim() && !image)}
-            className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5 disabled:opacity-60"
+            className="btn-primary w-full"
           >
             <Sparkles size={15} /> {busy ? t('capture.organising') : t('capture.organise')}
           </button>
@@ -216,7 +217,7 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
             type="button"
             onClick={savePlain}
             disabled={busy || saving || !text.trim()}
-            className="w-full py-2.5 text-sm font-semibold text-natural-text bg-white border border-natural-border rounded-full hover:border-natural-primary disabled:opacity-60"
+            className="btn-secondary w-full"
           >
             {saving ? t('common.saving') : t('capture.savePlain')}
           </button>
@@ -225,11 +226,14 @@ export default function VaultCaptureSheet({ activeUser, categories, onSave, onCl
       ) : (
         <div className="space-y-4">
           {uncertain.length > 0 && (
-            <p className="p-3 bg-natural-primary-wash border border-natural-primary/15 rounded-xl text-xs font-medium text-natural-primary">
-              {uncertain.length === 1
-                ? t('capture.oneGuess', { field: uncertain[0] })
-                : t('capture.someGuesses', { fields: uncertain.join(', ') })}
-            </p>
+            <div className="notice notice-ok" role="status">
+              <HelpCircle />
+              <span>
+                {uncertain.length === 1
+                  ? t('capture.oneGuess', { field: uncertain[0] })
+                  : t('capture.someGuesses', { fields: uncertain.join(', ') })}
+              </span>
+            </div>
           )}
           <div>
             <h3 className="font-display text-xl font-semibold text-natural-text">{result.title}</h3>

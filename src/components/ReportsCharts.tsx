@@ -115,7 +115,7 @@ export default function ReportsCharts({
   const frontedMax = Math.max(1, ...data.fronted.map((r) => r.total));
   const recurringPct = grand > 0 ? Math.round((data.recurring.recurring / grand) * 100) : 0;
 
-  const tile = `${panel} rounded-[20px] px-5 py-4 flex flex-col gap-1.5 min-w-0`;
+  const tile = `${panel} rounded-xl px-5 py-4 flex flex-col gap-1.5 min-w-0`;
   const big = 'font-mono text-[28px] leading-8 font-medium tracking-tight';
   const sub = 'font-mono text-xs';
 
@@ -177,7 +177,7 @@ export default function ReportsCharts({
       <div className="flex flex-wrap gap-4 items-stretch">
         {/* Month by month, by category */}
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3 [flex:999_1_440px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3 [flex:999_1_440px] min-w-0`}
           id="reports-stacked"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -187,10 +187,7 @@ export default function ReportsCharts({
             <span className="flex flex-wrap gap-3 text-xs text-natural-muted">
               {series.map((c) => (
                 <span key={c} className="flex items-center gap-1.5">
-                  <span
-                    className="w-2.5 h-2.5 rounded-[3px]"
-                    style={{ background: seriesColor(c) }}
-                  />
+                  <span className="w-2.5 h-2.5 rounded-xs" style={{ background: seriesColor(c) }} />
                   {seriesName(c)}
                 </span>
               ))}
@@ -253,7 +250,7 @@ export default function ReportsCharts({
 
         {/* By category donut */}
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3 [flex:1_1_280px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3 [flex:1_1_280px] min-w-0`}
           id="reports-donut"
         >
           <span className={label}>
@@ -310,7 +307,7 @@ export default function ReportsCharts({
       <div className="flex flex-wrap gap-4 items-stretch">
         {/* Who fronted what */}
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
           id="reports-fronted"
         >
           <span className={label}>{t('reports.whoFronted')}</span>
@@ -345,11 +342,11 @@ export default function ReportsCharts({
             ))}
             <span className="text-xs text-natural-muted flex gap-3 flex-wrap">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1.5 rounded-[3px]" style={{ background: colors.text }} />
+                <span className="w-2.5 h-1.5 rounded-xs" style={{ background: colors.text }} />
                 {t('reports.credit')}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1.5 rounded-[3px]" style={{ background: colors.accent }} />
+                <span className="w-2.5 h-1.5 rounded-xs" style={{ background: colors.accent }} />
                 {t('reports.cash')}
               </span>
             </span>
@@ -358,7 +355,7 @@ export default function ReportsCharts({
 
         {/* Biggest lines */}
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
           id="reports-biggest"
         >
           <span className={label}>{t('reports.biggestLines')}</span>
@@ -383,7 +380,7 @@ export default function ReportsCharts({
 
         {/* Payments: recurring against one-off */}
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2.5 [flex:1_1_260px] min-w-0`}
           id="reports-recurring"
         >
           <span className={label}>{t('reports.payments')}</span>

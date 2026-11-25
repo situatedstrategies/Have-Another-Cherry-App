@@ -389,7 +389,7 @@ export default function SettingsModal({
               <button
                 onClick={handleEnablePush}
                 disabled={enablingPush}
-                className="shrink-0 self-start sm:self-auto ml-[26px] sm:ml-0 h-9 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3.5 rounded-full shadow-sm transition-colors disabled:opacity-60 cursor-pointer"
+                className="btn-primary shrink-0 self-start sm:self-auto ml-[26px] sm:ml-0"
               >
                 {enablingPush ? t('settings.asking') : t('settings.turnOn')}
               </button>
@@ -421,7 +421,7 @@ export default function SettingsModal({
               checked={!userProfile?.noticesOptOut}
               disabled={noticesBusy || !userProfile}
               onChange={(e) => handleNoticesChange(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+              className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary"
               id="settings-notices"
             />
             <span className="text-xs text-natural-muted leading-relaxed">
@@ -437,7 +437,7 @@ export default function SettingsModal({
               checked={!!userProfile?.marketingOptIn}
               disabled={marketingBusy || !userProfile}
               onChange={(e) => handleMarketingChange(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary focus:ring-natural-primary"
+              className="mt-0.5 h-4 w-4 rounded border-natural-border text-natural-primary"
             />
             <span className="text-xs text-natural-muted leading-relaxed">
               <span className="font-semibold text-natural-text flex items-center gap-1.5">
@@ -466,11 +466,11 @@ export default function SettingsModal({
                   }}
                   autoFocus
                   placeholder={t('settings.yourName')}
-                  className="w-36 px-2 py-1 text-sm text-right border border-natural-border focus:border-natural-primary rounded-md outline-none"
+                  className="field w-36 text-right"
                 />
                 <button
                   onClick={saveName}
-                  className="text-natural-primary hover:text-natural-dark p-1"
+                  className="tap-target inline-flex items-center justify-center rounded-full text-natural-primary hover:text-natural-dark"
                   title={t('common.save')}
                   aria-label={t('settings.saveName')}
                 >
@@ -478,7 +478,7 @@ export default function SettingsModal({
                 </button>
                 <button
                   onClick={() => setEditingName(false)}
-                  className="text-natural-muted hover:text-natural-text p-1"
+                  className="tap-target inline-flex items-center justify-center rounded-full text-natural-muted hover:text-natural-text"
                   title={t('common.cancel')}
                   aria-label={t('settings.cancelEditingName')}
                 >
@@ -519,13 +519,13 @@ export default function SettingsModal({
                     }}
                     placeholder={t('settings.yearlyIncome')}
                     aria-label={t('settings.yourYearlyIncome')}
-                    className="w-32 pl-5 pr-2 py-1 text-sm text-right font-mono border border-natural-border focus:border-natural-primary rounded-md outline-none"
+                    className="field w-32 pl-5 pr-2 text-right font-mono"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={incomeBusy}
-                  className="text-natural-primary hover:text-natural-dark p-1"
+                  className="tap-target inline-flex items-center justify-center rounded-full text-natural-primary hover:text-natural-dark"
                   title={t('common.save')}
                   aria-label={t('settings.saveIncome')}
                 >
@@ -534,7 +534,7 @@ export default function SettingsModal({
                 <button
                   type="button"
                   onClick={() => setIncomeEditorAt(null)}
-                  className="text-natural-muted hover:text-natural-text p-1"
+                  className="tap-target inline-flex items-center justify-center rounded-full text-natural-muted hover:text-natural-text"
                   title={t('common.cancel')}
                   aria-label={t('settings.cancelEditingIncome')}
                 >
@@ -673,7 +673,7 @@ export default function SettingsModal({
                                   setSplitDraft((prev) => ({ ...prev, [uid]: e.target.value }))
                                 }
                                 aria-label={t('settings.shareOfSplit', { name: memberName })}
-                                className="w-16 px-2 py-1 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs font-mono text-right outline-none"
+                                className="field w-16 px-2 text-right font-mono"
                               />
                               <span className="text-xs font-mono text-natural-muted">%</span>
                             </span>
@@ -742,12 +742,12 @@ export default function SettingsModal({
                             onChange={(e) => setResendEmail(e.target.value)}
                             placeholder={t('settings.email')}
                             aria-label={t('settings.emailFor', { name: memberName })}
-                            className="flex-1 px-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-xs outline-none"
+                            className="field flex-1"
                           />
                           <button
                             type="submit"
                             disabled={resendBusy || !resendEmail.trim()}
-                            className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
+                            className="btn-primary"
                           >
                             {resendBusy ? t('settings.sending') : t('settings.send')}
                           </button>
@@ -813,13 +813,13 @@ export default function SettingsModal({
                                         }}
                                         placeholder={t('settings.yearlyIncome')}
                                         aria-label={t('settings.yourYearlyIncome')}
-                                        className="w-full pl-6 pr-3 py-1.5 bg-white border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
+                                        className="field pl-6 font-mono"
                                       />
                                     </div>
                                     <button
                                       type="submit"
                                       disabled={incomeBusy}
-                                      className="text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink px-3 py-1.5 rounded-lg disabled:opacity-60"
+                                      className="btn-primary"
                                     >
                                       {incomeBusy ? t('common.saving') : t('common.save')}
                                     </button>
@@ -983,7 +983,7 @@ export default function SettingsModal({
                 above become inputs; the total must land on exactly 100%. */}
             {!editingSplit ? (
               <button
-                className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors"
+                className="btn-secondary mt-3 w-full text-natural-primary hover:text-natural-primary-ink"
                 onClick={openSplitEditor}
               >
                 {t('settings.adjustSplit')}
@@ -1002,14 +1002,14 @@ export default function SettingsModal({
                 </p>
                 <div className="flex gap-2">
                   <button
-                    className="flex-1 text-sm font-bold bg-white text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text transition-colors"
+                    className="btn-secondary flex-1"
                     onClick={() => setEditingSplit(false)}
                     disabled={splitBusy}
                   >
                     {t('common.cancel')}
                   </button>
                   <button
-                    className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg transition-colors disabled:opacity-60"
+                    className="btn-primary flex-1"
                     onClick={saveSplit}
                     disabled={splitBusy || Math.abs(splitDraftTotal - 100) > 0.05}
                   >
@@ -1027,7 +1027,7 @@ export default function SettingsModal({
             {joinedUids(group).length >= 2 && !editingSplit && (
               <>
                 <button
-                  className="mt-3 w-full text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-60"
+                  className="btn-secondary mt-3 w-full text-natural-primary hover:text-natural-primary-ink"
                   onClick={recalculate}
                   disabled={recalcBusy}
                 >
@@ -1042,7 +1042,7 @@ export default function SettingsModal({
             {!addingSeat ? (
               <div className="mt-3">
                 <button
-                  className="w-full flex items-center justify-center gap-2 text-sm font-bold bg-white text-natural-primary py-2 rounded-lg border border-natural-border shadow-sm hover:border-natural-primary transition-colors disabled:opacity-50 disabled:hover:border-natural-border"
+                  className="btn-secondary w-full text-natural-primary hover:text-natural-primary-ink"
                   onClick={openSeatForm}
                   disabled={!!seatBlocker}
                 >
@@ -1068,7 +1068,7 @@ export default function SettingsModal({
                     onChange={(e) => setSeatName(e.target.value)}
                     placeholder={t('settings.theirName')}
                     maxLength={40}
-                    className="px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
+                    className="field"
                   />
                   <div className="relative">
                     <input
@@ -1079,7 +1079,7 @@ export default function SettingsModal({
                       step={0.1}
                       value={seatPercent}
                       onChange={(e) => setSeatPercent(e.target.value)}
-                      className="w-full pl-3 pr-7 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm font-mono outline-none"
+                      className="field pr-7 font-mono"
                       aria-label={t('settings.theirShare')}
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-natural-muted">
@@ -1094,7 +1094,7 @@ export default function SettingsModal({
                     onChange={(e) => setSeatEmail(e.target.value)}
                     placeholder={t('settings.email')}
                     aria-label={t('settings.theirEmailOptional')}
-                    className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border focus:border-natural-primary rounded-lg text-sm outline-none"
+                    className="field"
                   />
                   <p className="text-xs text-natural-muted mt-1">
                     {t('settings.emailOptionalNote')}
@@ -1120,15 +1120,11 @@ export default function SettingsModal({
                   <button
                     type="button"
                     onClick={() => setAddingSeat(false)}
-                    className="flex-1 text-sm font-bold text-natural-muted py-2 rounded-lg border border-natural-border hover:text-natural-text"
+                    className="btn-secondary flex-1"
                   >
                     {t('common.cancel')}
                   </button>
-                  <button
-                    type="submit"
-                    disabled={seatBusy}
-                    className="flex-1 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink py-2 rounded-lg disabled:opacity-60"
-                  >
+                  <button type="submit" disabled={seatBusy} className="btn-primary flex-1">
                     {seatBusy
                       ? t('settings.adding')
                       : seatEmail.trim()
@@ -1145,7 +1141,7 @@ export default function SettingsModal({
               {t('settings.inviteCode')}
             </span>
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text shadow-inner">
+              <div className="flex-1 bg-white border border-natural-border rounded-lg px-3 py-2 text-center font-mono font-bold tracking-widest text-lg text-natural-text">
                 {group?.inviteCode}
               </div>
               <button
@@ -1165,10 +1161,7 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-natural-border/50 pt-3">
-            <button
-              onClick={onLeaveGroup}
-              className="w-full py-2 flex items-center justify-center gap-2 text-sm font-bold text-natural-muted hover:text-natural-primary bg-white border border-natural-border rounded-lg transition-colors shadow-sm"
-            >
+            <button onClick={onLeaveGroup} className="btn-secondary w-full">
               <LogOut size={14} /> {t('settings.leaveGroup')}
             </button>
             <p className="text-xs text-natural-muted mt-1.5 text-center">

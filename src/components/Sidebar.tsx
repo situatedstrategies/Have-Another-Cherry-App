@@ -101,11 +101,7 @@ export default function Sidebar({
               className={`h-[18px] w-[18px] shrink-0 ${view === key ? 'text-natural-dark-cherry' : ''}`}
             />
             {label}
-            {key === 'vault' && vaultLocked && (
-              <span className="ml-auto text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                Cherry +
-              </span>
-            )}
+            {key === 'vault' && vaultLocked && <span className="plus-tag ml-auto">Cherry +</span>}
           </button>
         ))}
       </div>

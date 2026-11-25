@@ -215,9 +215,7 @@ export default function ReportsView({
             <h3 className={`${labelClass} flex items-center gap-1.5`}>
               <BarChart3 className="h-3.5 w-3.5 text-natural-primary" /> {t('nav.reports')}
             </h3>
-            <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
-              Cherry +
-            </span>
+            <span className="plus-tag">Cherry +</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-hidden="true">
             {[

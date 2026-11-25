@@ -74,7 +74,7 @@ export default function HouseAccount({
 
       <div className="flex flex-wrap gap-4 items-start">
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2 [flex:1_1_220px]`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2 [flex:1_1_220px]`}
           id="house-total"
         >
           <span className={label}>{t('house.totalDeposited')}</span>
@@ -87,7 +87,7 @@ export default function HouseAccount({
         </section>
 
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3 [flex:999_1_320px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3 [flex:999_1_320px] min-w-0`}
           id="house-ratio"
         >
           <div>
@@ -137,7 +137,7 @@ export default function HouseAccount({
         </section>
       </div>
 
-      <section className={`${panel} rounded-[20px] overflow-hidden`} id="house-grid">
+      <section className={`${panel} rounded-xl overflow-hidden`} id="house-grid">
         <div className="flex flex-wrap items-center justify-between gap-2.5 px-5 py-4 border-b border-natural-sidebar">
           <span className={label}>{t('house.byPeriod')}</span>
           <div className="flex gap-1.5 flex-wrap">

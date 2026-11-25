@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Plus, Trash2, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
 import { Goal, PlanScope } from '../lib/plan';
 import { formatCurrency } from '../lib/format';
@@ -139,8 +139,9 @@ export default function GoalSheet({
     >
       <div className="space-y-5">
         {error && (
-          <div className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold">
-            {error}
+          <div className="notice notice-error" role="alert">
+            <AlertCircle />
+            <span>{error}</span>
           </div>
         )}
         {goal && (

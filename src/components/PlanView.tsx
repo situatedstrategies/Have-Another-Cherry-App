@@ -234,9 +234,7 @@ export default function PlanView({
             <h3 className={`${label} flex items-center gap-1.5`}>
               <Target className="h-3.5 w-3.5 text-natural-primary" /> {t('planTab.budgets')}
             </h3>
-            <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
-              Cherry +
-            </span>
+            <span className="plus-tag">Cherry +</span>
           </div>
           <div className="grid grid-cols-3 gap-2" aria-hidden="true">
             {BUDGET_GROUPS.map((g) => (
@@ -342,7 +340,7 @@ export default function PlanView({
             })}
           </span>
         </div>
-        <div className={`${panel} rounded-[20px] divide-y divide-natural-sidebar`}>
+        <div className={`${panel} rounded-xl divide-y divide-natural-sidebar`}>
           {rows.map(renderRow)}
         </div>
       </section>
@@ -364,7 +362,7 @@ export default function PlanView({
       )}
 
       {statuses.length === 0 ? (
-        <section className={`${panel} rounded-[20px] px-5 py-[18px]`} id="plan-empty">
+        <section className={`${panel} rounded-xl px-5 py-[18px]`} id="plan-empty">
           <h3 className={`${label} flex items-center gap-1.5`}>
             <Target className="h-3.5 w-3.5 text-natural-primary" /> {t('planTab.budgets')}
           </h3>
@@ -447,7 +445,7 @@ export default function PlanView({
           </button>
         </div>
         {goals.open.length === 0 ? (
-          <p className={`${panel} rounded-[20px] px-5 py-4 text-sm text-natural-muted`}>
+          <p className={`${panel} rounded-xl px-5 py-4 text-sm text-natural-muted`}>
             {t('planTab.noGoals')}
           </p>
         ) : (
@@ -460,7 +458,7 @@ export default function PlanView({
                   key={goal.id}
                   type="button"
                   onClick={() => setGoalOpen(goal)}
-                  className={`${panel} rounded-[20px] px-5 py-[18px] text-left flex flex-col gap-2 hover:border-natural-primary/40 transition-colors cursor-pointer`}
+                  className={`${panel} rounded-xl px-5 py-[18px] text-left flex flex-col gap-2 hover:border-natural-primary/40 transition-colors cursor-pointer`}
                   id={`goal-${goal.id}`}
                 >
                   <span className="text-[17px] leading-6 font-medium truncate">{goal.name}</span>
@@ -510,7 +508,7 @@ export default function PlanView({
           </div>
         )}
         {goals.done.length > 0 && (
-          <div className={`${panel} rounded-[20px] overflow-hidden`} id="plan-goals-done">
+          <div className={`${panel} rounded-xl overflow-hidden`} id="plan-goals-done">
             <button
               type="button"
               onClick={() => setShowDone((v) => !v)}
@@ -547,7 +545,7 @@ export default function PlanView({
         <button
           type="button"
           onClick={onPlanPurchase}
-          className={`${panel} rounded-[20px] px-5 py-[18px] text-left flex items-center justify-between gap-4 hover:border-natural-primary/40 transition-colors cursor-pointer`}
+          className={`${panel} rounded-xl px-5 py-[18px] text-left flex items-center justify-between gap-4 hover:border-natural-primary/40 transition-colors cursor-pointer`}
           id="plan-purchase-card"
         >
           <div className="min-w-0">

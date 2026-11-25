@@ -39,7 +39,7 @@ export default function MonthCloseCard({
 
   return (
     <section
-      className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3 relative`}
+      className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3 relative`}
       id="month-close"
     >
       <button

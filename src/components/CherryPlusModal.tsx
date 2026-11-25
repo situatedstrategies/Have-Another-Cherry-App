@@ -118,9 +118,7 @@ export default function CherryPlusModal({
           >
             <p className="flex items-center gap-2 font-display text-lg font-semibold text-natural-text">
               {intro.title}
-              <span className="text-[10px] font-sans font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
-                Cherry +
-              </span>
+              <span className="plus-tag">Cherry +</span>
             </p>
             <p className="mt-0.5 text-sm text-natural-muted">{intro.pitch}</p>
           </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { todayLocal } from '../lib/recurring';
 import { Expense, Group, PaymentInstrument } from '../types';
-import { Check, Cherry, ExternalLink, Copy } from 'lucide-react';
+import { Check, Cherry, ExternalLink, Copy, AlertCircle } from 'lucide-react';
 import { getFullMembers } from '../lib/members';
 import {
   getRemainingSettlementAmount,
@@ -161,8 +161,9 @@ export default function SettleUpModal({
     >
       <form onSubmit={handleSettleSubmit} className="p-6 space-y-5">
         {error && (
-          <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-sm font-semibold">
-            {error}
+          <div className="notice notice-error" role="alert">
+            <AlertCircle />
+            <span>{error}</span>
           </div>
         )}
         <div className="bg-natural-sidebar/30 p-4 rounded-2xl border border-natural-border space-y-2">

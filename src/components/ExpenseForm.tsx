@@ -17,6 +17,7 @@ import {
   EyeOff,
   Copy,
   Check,
+  AlertCircle,
 } from 'lucide-react';
 import Modal from './Modal';
 import DarkCherryInfoModal, {
@@ -746,18 +747,10 @@ export default function ExpenseForm({
       bodyClassName=""
       footer={
         <div className="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-natural-muted hover:text-natural-text bg-natural-sidebar hover:bg-natural-sidebar/80 rounded-xl transition-all cursor-pointer"
-          >
+          <button type="button" onClick={onClose} className="btn-quiet">
             {t('common.cancel')}
           </button>
-          <button
-            type="submit"
-            form="expense-form"
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer"
-          >
+          <button type="submit" form="expense-form" className="btn-primary">
             {deposit
               ? editingExpense
                 ? t('house.updateDeposit')
@@ -776,11 +769,9 @@ export default function ExpenseForm({
       {/* Form Body */}
       <form onSubmit={handleFormSubmit} className="p-6 space-y-5" id="expense-form">
         {error && (
-          <div
-            className="p-3 bg-natural-sidebar border border-natural-border/20 rounded-xl text-natural-text text-sm font-semibold"
-            id="form-error"
-          >
-            {error}
+          <div className="notice notice-error" id="form-error" role="alert">
+            <AlertCircle />
+            <span>{error}</span>
           </div>
         )}
 
@@ -971,7 +962,7 @@ export default function ExpenseForm({
                     type="checkbox"
                     checked={isRecurring}
                     onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="w-4 h-4 rounded text-natural-primary focus:ring-natural-primary/30 border-natural-border"
+                    className="w-4 h-4 rounded text-natural-primary border-natural-border"
                   />
                   <span className="text-sm font-semibold text-natural-text flex items-center gap-1.5">
                     <Repeat size={14} className="text-natural-muted" /> {t('form.recurring')}
@@ -1178,7 +1169,7 @@ export default function ExpenseForm({
                     name="splitType"
                     checked={splitType === 'household_default'}
                     onChange={() => setSplitType('household_default')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    className="text-natural-text cursor-pointer h-4 w-4"
                     id="rule-default"
                   />
                   <div>
@@ -1209,7 +1200,7 @@ export default function ExpenseForm({
                     name="splitType"
                     checked={splitType === 'equal'}
                     onChange={() => setSplitType('equal')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    className="text-natural-text cursor-pointer h-4 w-4"
                     id="rule-5050"
                   />
                   <div>
@@ -1240,7 +1231,7 @@ export default function ExpenseForm({
                     name="splitType"
                     checked={splitType === 'custom_percentage'}
                     onChange={() => setSplitType('custom_percentage')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    className="text-natural-text cursor-pointer h-4 w-4"
                     id="rule-custom-pct"
                   />
                   <div>
@@ -1271,7 +1262,7 @@ export default function ExpenseForm({
                     name="splitType"
                     checked={splitType === 'custom_amount'}
                     onChange={() => setSplitType('custom_amount')}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    className="text-natural-text cursor-pointer h-4 w-4"
                     id="rule-custom-amt"
                   />
                   <div>
@@ -1303,7 +1294,7 @@ export default function ExpenseForm({
                       name="splitType"
                       checked={splitType === 'third_party'}
                       onChange={() => setSplitType('third_party')}
-                      className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                      className="text-natural-text cursor-pointer h-4 w-4"
                       id="rule-third-party"
                     />
                     <div>
@@ -1335,7 +1326,7 @@ export default function ExpenseForm({
                     name="splitType"
                     checked={splitType === 'dark_cherry'}
                     onChange={selectDarkCherry}
-                    className="text-natural-text focus:ring-natural-primary cursor-pointer h-4 w-4"
+                    className="text-natural-text cursor-pointer h-4 w-4"
                     id="rule-dark-cherry"
                   />
                   <div>
@@ -1348,7 +1339,7 @@ export default function ExpenseForm({
                           e.stopPropagation();
                           setShowCherryPlus(true);
                         }}
-                        className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md hover:bg-natural-primary transition-colors"
+                        className="plus-tag hover:bg-natural-primary transition-colors"
                         title={t('form.aboutPlus')}
                       >
                         Cherry +
@@ -1744,7 +1735,7 @@ export default function ExpenseForm({
               type="checkbox"
               checked={alreadySettled}
               onChange={(e) => setAlreadySettled(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded text-natural-primary focus:ring-natural-primary border-natural-border"
+              className="mt-0.5 h-4 w-4 rounded text-natural-primary border-natural-border"
             />
             <span>
               <span className="block text-sm font-bold text-natural-text">

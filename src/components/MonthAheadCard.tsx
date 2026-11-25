@@ -53,9 +53,7 @@ export default function MonthAheadCard({ expenses, activeUser, locked, onUnlock 
           <h3 className={`${labelClass} flex items-center gap-1.5`}>
             <CalendarRange className="h-3.5 w-3.5 text-natural-primary" /> {t('monthAhead.title')}
           </h3>
-          <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md">
-            Cherry +
-          </span>
+          <span className="plus-tag">Cherry +</span>
         </div>
         <div className="grid grid-cols-3 gap-2" aria-hidden="true">
           {[t('monthAhead.leftToPay'), t('monthAhead.yourShare'), t('monthAhead.carriedIn')].map(

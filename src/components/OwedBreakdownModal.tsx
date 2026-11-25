@@ -181,11 +181,7 @@ export default function OwedBreakdownModal({
                         <BellRing size={12} />
                       )}
                       {t('owed.sendReminder')}
-                      {!isPlus && (
-                        <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                          Cherry +
-                        </span>
-                      )}
+                      {!isPlus && <span className="plus-tag">Cherry +</span>}
                     </button>
                   ))}
               </div>

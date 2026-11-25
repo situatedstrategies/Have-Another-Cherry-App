@@ -70,7 +70,7 @@ export default function ReportsGrid({ expenses, filter, today, onOpenExpense }: 
   return (
     <div className="flex flex-wrap gap-4 items-start">
       <section
-        className={`${panel} rounded-[20px] overflow-hidden [flex:999_1_420px] min-w-0`}
+        className={`${panel} rounded-xl overflow-hidden [flex:999_1_420px] min-w-0`}
         id="reports-grid"
       >
         <div className="overflow-x-auto">
@@ -167,7 +167,7 @@ export default function ReportsGrid({ expenses, filter, today, onOpenExpense }: 
 
       {picked && (
         <section
-          className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2 [flex:1_1_240px] max-w-[360px] min-w-0`}
+          className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2 [flex:1_1_240px] max-w-[360px] min-w-0`}
           id="reports-cell-lines"
         >
           <span className={label}>

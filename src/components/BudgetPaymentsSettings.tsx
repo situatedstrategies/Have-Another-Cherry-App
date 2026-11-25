@@ -43,7 +43,7 @@ export default function BudgetPaymentsSettings({
         <h3 className={labelClass}>{t('budget.title')}</h3>
         <button
           onClick={() => setShowCherryPlus(true)}
-          className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-2 py-1 rounded-md hover:bg-natural-primary transition-colors"
+          className="plus-tag hover:bg-natural-primary transition-colors"
           title={t('form.aboutPlus')}
         >
           Cherry +
@@ -53,11 +53,7 @@ export default function BudgetPaymentsSettings({
         <div>
           <label className={`${labelClass} block mb-1 flex items-center gap-2`}>
             {t('budget.threshold')}
-            {!isPlus && (
-              <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded">
-                Cherry +
-              </span>
-            )}
+            {!isPlus && <span className="plus-tag">Cherry +</span>}
           </label>
           <p className="text-xs text-natural-muted mb-2">{t('budget.thresholdBody')}</p>
           {isPlus ? (

@@ -23,6 +23,7 @@ import {
 import { formatCurrency, formatDate } from '../lib/format';
 import CategoryChip from './CategoryChip';
 import RecurringMark from './RecurringMark';
+import { Chip } from './Controls';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -113,14 +114,11 @@ export default function ExpenseList({
             id="status-filters"
           >
             {(['all', 'OPEN', 'PENDING', 'PARTIALLY_SETTLED', 'CLOSED'] as const).map((status) => (
-              <button
+              <Chip
                 key={status}
+                small
+                selected={statusFilter === status}
                 onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-xl whitespace-nowrap transition-all cursor-pointer ${
-                  statusFilter === status
-                    ? 'bg-natural-primary text-white shadow-sm'
-                    : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'
-                }`}
                 id={`filter-status-${status}`}
               >
                 {status === 'all'
@@ -132,7 +130,7 @@ export default function ExpenseList({
                       : status === 'PARTIALLY_SETTLED'
                         ? t('list.partiallySettled')
                         : t('list.fullySettled')}
-              </button>
+              </Chip>
             ))}
           </div>
         </div>
@@ -148,7 +146,7 @@ export default function ExpenseList({
               aria-label={t('list.searchAria')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
+              className="field pl-9"
               id="search-input"
             />
           </div>
@@ -158,7 +156,7 @@ export default function ExpenseList({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text font-sans text-xs outline-none transition-all appearance-none cursor-pointer"
+              className="field appearance-none cursor-pointer pr-9"
               id="category-filter-select"
             >
               <option value="all">{t('list.allCategories')}</option>
@@ -174,7 +172,7 @@ export default function ExpenseList({
           <div className="flex items-center gap-2" id="sort-actions-group">
             <button
               onClick={() => toggleSort('date')}
-              className={`flex-1 py-2 px-2.5 text-xs font-semibold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 h-11 px-3 text-xs font-semibold rounded-full border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                 sortField === 'date'
                   ? 'border-natural-primary bg-natural-sage/30 text-natural-primary font-bold'
                   : 'border-natural-border text-natural-muted hover:bg-natural-sidebar/50'
@@ -186,7 +184,7 @@ export default function ExpenseList({
             </button>
             <button
               onClick={() => toggleSort('amount')}
-              className={`flex-1 py-2 px-2.5 text-xs font-semibold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 h-11 px-3 text-xs font-semibold rounded-full border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                 sortField === 'amount'
                   ? 'border-natural-primary bg-natural-sage/30 text-natural-primary font-bold'
                   : 'border-natural-border text-natural-muted hover:bg-natural-sidebar/50'
@@ -289,7 +287,7 @@ export default function ExpenseList({
                     onExpenseClick(exp);
                   }
                 }}
-                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 focus-visible:bg-natural-sidebar/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-natural-primary/40 cursor-pointer transition-all group"
+                className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between hover:bg-natural-sidebar/30 focus-visible:bg-natural-sidebar/30 cursor-pointer transition-all group"
                 id={`expense-row-${exp.id}`}
               >
                 <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
@@ -393,7 +391,7 @@ export default function ExpenseList({
         <div className="p-3 border-t border-natural-border text-center">
           <button
             onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-            className="text-xs font-bold text-natural-primary hover:text-natural-dark bg-natural-sage/30 hover:bg-natural-sage/50 border border-natural-primary/20 px-5 py-2 rounded-full transition-all cursor-pointer"
+            className="btn-secondary text-natural-primary hover:text-natural-primary-ink"
             id="show-more-expenses-btn"
           >
             {t('list.showMore', { count: filteredExpenses.length - visibleCount })}

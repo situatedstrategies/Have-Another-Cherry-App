@@ -219,7 +219,7 @@ export default function HomeView({
       />
     );
 
-  const tile = `${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2 min-w-0`;
+  const tile = `${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2 min-w-0`;
   const big = 'font-mono text-[32px] leading-9 font-medium tracking-tight';
 
   return (
@@ -312,11 +312,7 @@ export default function HomeView({
         >
           <span className={`${label} flex items-center justify-between gap-2`}>
             {t('home.budget')}
-            {budgets === null && (
-              <span className="text-[10px] font-bold tracking-wider text-white bg-natural-dark px-1 py-0.5 rounded normal-case">
-                Cherry +
-              </span>
-            )}
+            {budgets === null && <span className="plus-tag normal-case">Cherry +</span>}
           </span>
           {budget ? (
             <>
@@ -363,7 +359,7 @@ export default function HomeView({
       <div className="flex flex-wrap gap-4 items-start">
         {/* Itemized ledger */}
         <section
-          className={`${panel} rounded-[20px] overflow-hidden flex flex-col [flex:999_1_440px] min-w-0`}
+          className={`${panel} rounded-xl overflow-hidden flex flex-col [flex:999_1_440px] min-w-0`}
           id="home-ledger"
         >
           <div className="flex flex-wrap items-center justify-between gap-2.5 px-5 py-4 border-b border-natural-sidebar">
@@ -480,7 +476,7 @@ export default function HomeView({
         <aside className="flex flex-col gap-4 [flex:1_1_280px] min-w-0">
           {/* This month by category */}
           <section
-            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
+            className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2.5`}
             id="home-categories"
           >
             <span className={label}>{t('home.byCategory')}</span>
@@ -517,7 +513,7 @@ export default function HomeView({
 
           {/* Coming up */}
           <section
-            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-2.5`}
+            className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-2.5`}
             id="home-coming-up"
           >
             <span className={label}>{t('home.comingUp')}</span>
@@ -543,7 +539,7 @@ export default function HomeView({
           {aside}
           {/* Up next: the last card of the board (owner, November 14th 2026) */}
           <section
-            className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3`}
+            className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3`}
             id="up-next"
           >
             <span className={`${label} text-natural-primary`}>{t('home.upNext')}</span>

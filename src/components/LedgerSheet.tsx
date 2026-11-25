@@ -179,7 +179,7 @@ export default function LedgerSheet({
   const subtotalCell = 'px-3 py-2 text-right font-mono font-medium';
 
   return (
-    <section className={`${panel} rounded-[20px] overflow-hidden`} id="ledger-sheet">
+    <section className={`${panel} rounded-xl overflow-hidden`} id="ledger-sheet">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse min-w-[720px] text-sm leading-5">
           <thead>

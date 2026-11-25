@@ -232,7 +232,7 @@ export default function PlanPurchase({
 
   return (
     <div className="fixed inset-0 bg-natural-dark/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150">
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-xl border border-natural-border flex flex-col max-h-[90vh] animate-in fade-in-50 zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-natural-border">
           <h2 className="text-lg font-display font-semibold text-natural-text flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-natural-primary" /> {t('plan.title')}

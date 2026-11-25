@@ -34,7 +34,9 @@ import {
   X,
   NotebookPen,
   Camera,
+  AlertCircle,
 } from 'lucide-react';
+import { Chip } from './Controls';
 import { recurringDaysInMonth } from '../lib/recurring';
 
 interface HouseholdVaultProps {
@@ -446,8 +448,8 @@ export default function HouseholdVault({
       size="lg"
       bodyClassName=""
     >
-      {/* Tabs */}
-      <div className="flex items-center gap-1.5 px-6 pt-4">
+      {/* Tabs: capsule chips, wrapping to a second row where four do not fit. */}
+      <div className="flex flex-wrap items-center gap-1.5 px-6 pt-4">
         {(
           [
             { key: 'notebook', label: t('vault.tab.notebook'), icon: <NotebookPen size={14} /> },
@@ -456,27 +458,24 @@ export default function HouseholdVault({
             { key: 'docs', label: t('vault.tab.docs'), icon: <FileText size={14} /> },
           ] as const
         ).map((t) => (
-          <button
+          <Chip
             key={t.key}
+            selected={tab === t.key}
             onClick={() => {
               setTab(t.key);
               setCategoryFilter(null);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${
-              tab === t.key
-                ? 'bg-natural-primary text-white shadow-sm'
-                : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'
-            }`}
           >
             {t.icon} {t.label}
-          </button>
+          </Chip>
         ))}
       </div>
 
       <div className="p-6 space-y-4">
         {error && (
-          <div className="p-3 bg-natural-primary/5 border border-natural-primary/25 rounded-xl text-natural-primary text-xs font-semibold">
-            {error}
+          <div className="notice notice-error" role="alert">
+            <AlertCircle />
+            <span>{error}</span>
           </div>
         )}
 
@@ -496,7 +495,7 @@ export default function HouseholdVault({
                 }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-9 py-2 bg-natural-bg/50 hover:bg-natural-bg focus:bg-white border border-natural-border focus:border-natural-primary rounded-xl text-natural-text placeholder-natural-muted/60 font-sans text-xs outline-none transition-all"
+                className="field pl-9 pr-9"
               />
               {search && (
                 <button
@@ -511,22 +510,22 @@ export default function HouseholdVault({
             </div>
             {categoriesInUse.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
+                <Chip
+                  small
+                  selected={categoryFilter === null}
                   onClick={() => setCategoryFilter(null)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all ${categoryFilter === null ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'}`}
                 >
                   {t('vault.everything')}
-                </button>
+                </Chip>
                 {categoriesInUse.map((c) => (
-                  <button
+                  <Chip
                     key={c}
-                    type="button"
+                    small
+                    selected={categoryFilter === c}
                     onClick={() => setCategoryFilter(categoryFilter === c ? null : c)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all ${categoryFilter === c ? 'bg-natural-primary text-white shadow-sm' : 'text-natural-muted hover:text-natural-text bg-natural-sidebar/60 hover:bg-natural-sidebar'}`}
                   >
                     {c}
-                  </button>
+                  </Chip>
                 ))}
               </div>
             )}
@@ -539,11 +538,7 @@ export default function HouseholdVault({
           </div>
         ) : tab === 'notebook' ? (
           <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setCapturing(true)}
-              className="w-full py-2.5 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-full flex items-center justify-center gap-1.5"
-            >
+            <button type="button" onClick={() => setCapturing(true)} className="btn-primary w-full">
               <Plus size={15} /> {t('vault.addToVault')}
             </button>
             {filteredNotes.length === 0 ? (
@@ -726,11 +721,7 @@ export default function HouseholdVault({
                   )}
                 </span>
                 {editingBillId && (
-                  <button
-                    type="button"
-                    onClick={resetBillForm}
-                    className="text-xs font-semibold text-natural-muted hover:text-natural-text"
-                  >
+                  <button type="button" onClick={resetBillForm} className="btn-quiet text-xs">
                     {t('common.cancel')}
                   </button>
                 )}
@@ -744,7 +735,7 @@ export default function HouseholdVault({
                   placeholder={t('vault.billName')}
                   required
                   aria-label={t('vault.billName')}
-                  className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                  className="field col-span-2"
                 />
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-natural-muted text-sm">
@@ -758,7 +749,7 @@ export default function HouseholdVault({
                     onChange={(e) => setBillAmount(e.target.value)}
                     placeholder={t('form.amountPlaceholder')}
                     aria-label={t('vault.amountOptional')}
-                    className="w-full pl-7 pr-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                    className="field pl-7"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -772,14 +763,14 @@ export default function HouseholdVault({
                     value={billDueDay}
                     onChange={(e) => setBillDueDay(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary font-mono"
+                    className="field font-mono"
                   />
                 </div>
                 <select
                   value={billCategory}
                   onChange={(e) => setBillCategory(e.target.value)}
                   aria-label={t('vault.category')}
-                  className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
+                  className="field col-span-2"
                 >
                   {categoryOptions.map((c) => (
                     <option key={c} value={c}>
@@ -796,14 +787,10 @@ export default function HouseholdVault({
                   onChange={(e) => setBillNotes(e.target.value)}
                   placeholder={t('vault.notes')}
                   aria-label={t('vault.notesOptional')}
-                  className="col-span-2 px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                  className="field col-span-2"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={savingBill}
-                className="w-full py-2 text-sm font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl transition-colors disabled:opacity-60"
-              >
+              <button type="submit" disabled={savingBill} className="btn-primary w-full">
                 {savingBill
                   ? t('common.saving')
                   : editingBillId
@@ -872,7 +859,7 @@ export default function HouseholdVault({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
-              className="w-full py-2.5 text-xs font-bold text-natural-primary bg-white border border-natural-primary/30 hover:bg-natural-sage/30 rounded-xl flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              className="btn-secondary w-full text-natural-primary hover:text-natural-primary-ink"
             >
               <Upload size={14} />{' '}
               {busy
@@ -898,12 +885,12 @@ export default function HouseholdVault({
                         value={docName}
                         onChange={(e) => setDocName(e.target.value)}
                         autoFocus
-                        className="w-full px-3 py-2 bg-natural-bg/50 border border-natural-border rounded-xl text-sm outline-none focus:border-natural-primary"
+                        className="field"
                       />
                       <select
                         value={docCategory}
                         onChange={(e) => setDocCategory(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-natural-border rounded-xl text-sm outline-none"
+                        className="field"
                       >
                         <option value="">{t('vault.noCategory')}</option>
                         {categoryOptions.map((c) => (
@@ -919,14 +906,11 @@ export default function HouseholdVault({
                         <button
                           type="button"
                           onClick={() => setEditingDocId(null)}
-                          className="px-3 py-1.5 text-xs font-semibold text-natural-muted hover:text-natural-text"
+                          className="btn-quiet"
                         >
                           {t('common.cancel')}
                         </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1.5 text-xs font-bold text-white bg-natural-primary hover:bg-natural-primary-ink rounded-xl"
-                        >
+                        <button type="submit" className="btn-primary">
                           {t('common.save')}
                         </button>
                       </div>

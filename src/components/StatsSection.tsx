@@ -11,6 +11,7 @@ import {
 import { joinedUids } from '../lib/members';
 import { CreditCard, CheckCircle2, TrendingUp } from 'lucide-react';
 import { labelClass } from '../lib/ui';
+import { panel } from './Controls';
 
 interface StatsSectionProps {
   expenses: Expense[];
@@ -111,7 +112,7 @@ export default function StatsSection({
       <button
         type="button"
         onClick={() => onCardClick?.('you_owe')}
-        className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
+        className={`text-left w-full ${panel} p-6 hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer`}
         id="stat-card-you-owe"
         title={t('stats.seeYouOwe')}
       >
@@ -140,7 +141,7 @@ export default function StatsSection({
       <button
         type="button"
         onClick={() => onCardClick?.('owed_to_you')}
-        className="text-left w-full bg-white rounded-3xl border border-natural-border p-6 shadow-sm hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer"
+        className={`text-left w-full ${panel} p-6 hover:shadow-md hover:border-natural-primary/40 transition-all duration-200 cursor-pointer`}
         id="stat-card-others-owe"
         title={t('stats.seeOthersOwe')}
       >

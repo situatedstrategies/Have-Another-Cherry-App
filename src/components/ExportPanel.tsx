@@ -117,10 +117,7 @@ export default function ExportPanel({
   ];
 
   return (
-    <section
-      className={`${panel} rounded-[20px] px-5 py-[18px] flex flex-col gap-3`}
-      id="export-panel"
-    >
+    <section className={`${panel} rounded-xl px-5 py-[18px] flex flex-col gap-3`} id="export-panel">
       <div className="flex flex-col gap-0.5">
         <span className={label}>{t('export.title')}</span>
         <span className="text-[13px] leading-[18px] text-natural-muted">

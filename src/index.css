@@ -125,10 +125,12 @@
    ring, so the two never matched. Inputs keep their own focus border as well
    (the border turns cherry on any focus, the ring appears on keyboard focus),
    and the ring never shows on a pointer click. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
   outline: 2px solid var(--color-natural-primary);
   outline-offset: 2px;
 }
+/* A sheet or dialog takes focus programmatically (tabindex -1) so the
+   keyboard lands inside it; that focus is not a thing to mark. */
 
 /* Native checkboxes and radios take the brand colour instead of browser blue. */
 input[type='checkbox'],
@@ -237,6 +239,11 @@ input[type='radio'] {
   }
   .notice > svg {
     @apply h-4 w-4 shrink-0 mt-0.5;
+  }
+  /* The small "CHERRY +" tag on a locked feature: one spelling for the eleven
+     places that drew it by hand with three different corner radii. */
+  .plus-tag {
+    @apply inline-flex items-center text-[10px] font-sans font-bold tracking-wider text-white bg-natural-dark px-1.5 py-0.5 rounded-md whitespace-nowrap;
   }
 }
 

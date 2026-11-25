@@ -15,6 +15,7 @@ export function Chip({
   children,
   small,
   title,
+  id,
 }: {
   selected?: boolean;
   onClick: () => void;
@@ -22,14 +23,16 @@ export function Chip({
   /** 30px tall, for a row of filters inside a card. */
   small?: boolean;
   title?: string;
+  id?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
+      id={id}
       aria-pressed={selected}
-      className={`${small ? 'h-[30px] px-3 text-xs' : 'h-[34px] px-3.5 text-[13px]'} rounded-full font-semibold whitespace-nowrap transition-colors cursor-pointer chip ${
+      className={`${small ? 'h-[30px] px-3 text-xs' : 'h-[34px] px-3.5 text-[13px]'} rounded-full font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors cursor-pointer chip ${
         selected
           ? 'bg-natural-dark text-white border border-natural-dark'
           : 'bg-white text-natural-muted border border-natural-border hover:text-natural-text hover:border-natural-muted'
