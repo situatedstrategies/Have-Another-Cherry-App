@@ -238,11 +238,19 @@ export default function AuthScreen() {
   const [isReset, setIsReset] = useState(false);
   const [info, setInfo] = useState('');
 
-  // Load the reCAPTCHA script up front so the badge is visible on the auth
-  // screen and the first submit does not pay the script download cost.
-  useEffect(() => {
+  // reCAPTCHA Enterprise is fetched when the email form is first touched
+  // (focus or pointer, below), not when the page opens: its script is 350 KB
+  // plus two frames, which was the heaviest thing on the signed-out screen
+  // and arrived after everything else. Someone typing an email address has
+  // it ready long before they submit; the Google and Apple buttons never
+  // need it. Its badge is hidden (index.css) and Google's notice stands in,
+  // so nothing visible depends on when it loads.
+  const [recaptchaRequested, setRecaptchaRequested] = useState(false);
+  const requestRecaptcha = () => {
+    if (recaptchaRequested) return;
+    setRecaptchaRequested(true);
     preloadRecaptcha();
-  }, []);
+  };
 
   // Complete a Google sign-in that came back via the redirect flow (mobile).
   // Success swaps this screen out through onAuthStateChanged; this hook only
@@ -661,6 +669,8 @@ export default function AuthScreen() {
 
                 <form
                   onSubmit={(e) => void trackAuthFollowUp(handleEmailAuth(e))}
+                  onFocusCapture={requestRecaptcha}
+                  onPointerDownCapture={requestRecaptcha}
                   className="space-y-4"
                 >
                   {isReset && (
