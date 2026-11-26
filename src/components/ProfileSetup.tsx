@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { db, authHeader } from '../firebase';
+import { authHeader } from '../firebase';
+import { db } from '../firestore';
 import { doc, setDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 

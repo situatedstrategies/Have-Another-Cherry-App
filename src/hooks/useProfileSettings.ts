@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { updateDoc, doc, deleteField, onSnapshot } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
-import { auth, db, authHeader } from '../firebase';
+import { auth, authHeader } from '../firebase';
+import { db } from '../firestore';
 import { getFullMembers } from '../lib/members';
 import {
   getRemainingSettlementAmount,

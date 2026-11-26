@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { doc, onSnapshot, setDoc, DocumentReference } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { encryptData, decryptData } from '../lib/crypto';
 import { Budget, Goal, PlanPayload, PlanScope, monthOf, thresholdsAsBudgets } from '../lib/plan';
 import type { CategoryRule } from '../lib/rules';

@@ -10,7 +10,8 @@ import {
   EmailAuthProvider,
 } from 'firebase/auth';
 import { analytics } from '@heycatch/sdk';
-import { auth, db, authHeader, forgetKeepSignedIn } from '../firebase';
+import { auth, authHeader, forgetKeepSignedIn } from '../firebase';
+import { db } from '../firestore';
 import { disableWebPush } from '../lib/push';
 import { configureBilling, plusEntitlementActive } from '../lib/billing';
 import type { Dispatch, SetStateAction } from 'react';

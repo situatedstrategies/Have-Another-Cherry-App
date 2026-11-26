@@ -10,8 +10,6 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './locales/en/translation.json';
-import ru from './locales/ru/translation.json';
-import es from './locales/es/translation.json';
 
 export const SUPPORTED_LOCALES = ['en', 'ru', 'es'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
@@ -32,12 +30,12 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources: {
-      en: { translation: en },
-      ru: { translation: ru },
-      es: { translation: es },
-    },
-    // Inline resources: finish init synchronously so `t` works on first use.
+    // English is inline, so init finishes synchronously and `t` works on
+    // first use. Russian and Spanish arrive through loadLocale below: only
+    // the language in use is downloaded, not all three (the other two were
+    // 250 KB of the entry chunk for every visitor).
+    resources: { en: { translation: en } },
+    partialBundledLanguages: true,
     initAsync: false,
     fallbackLng: 'en',
     supportedLngs: [...SUPPORTED_LOCALES],
@@ -71,6 +69,38 @@ export function intlLocale(): string {
   return currentLocale() === 'en' ? 'en-US' : currentLocale();
 }
 
+// The two languages that are not inline, each its own chunk, fetched the
+// first time it is needed.
+const localeLoaders: Record<Exclude<Locale, 'en'>, () => Promise<{ default: object }>> = {
+  ru: () => import('./locales/ru/translation.json'),
+  es: () => import('./locales/es/translation.json'),
+};
+
+/** Make sure a language's strings are loaded; resolves at once for English. */
+async function loadLocale(locale: Locale): Promise<void> {
+  if (locale === 'en' || i18n.hasResourceBundle(locale, 'translation')) return;
+  const bundle = await localeLoaders[locale]();
+  i18n.addResourceBundle(locale, 'translation', bundle.default, true, true);
+}
+
+/**
+ * Settled once the detected language's strings are in place. main.tsx waits
+ * on this before the first render so a Russian or Spanish visitor never sees
+ * an English frame first. If the chunk fails to load the app still renders,
+ * in English (the fallback), rather than not at all.
+ */
+export const i18nReady: Promise<void> = (async () => {
+  // The detected language, not currentLocale(): resolvedLanguage falls back
+  // to English until the detected language's bundle is in place.
+  const detected = (i18n.language ?? 'en').split('-')[0];
+  const locale: Locale = isLocale(detected) ? detected : 'en';
+  if (locale === 'en') return;
+  await loadLocale(locale);
+  await i18n.changeLanguage(locale);
+})().catch((err) => {
+  console.warn('Language bundle unavailable, falling back to English:', err);
+});
+
 /** Switch language; remembered for the next visit. */
 export async function setLocale(locale: Locale): Promise<void> {
   try {
@@ -78,6 +108,7 @@ export async function setLocale(locale: Locale): Promise<void> {
   } catch {
     // Private mode: the choice lasts for this visit.
   }
+  await loadLocale(locale);
   await i18n.changeLanguage(locale);
 }
 

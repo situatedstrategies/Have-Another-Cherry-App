@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { currentLocale } from '../i18n';
 import { formatCurrency, formatDate, formatDateWith } from '../lib/format';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { encryptData, decryptData } from '../lib/crypto';
 import {
   Expense,

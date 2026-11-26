@@ -11,12 +11,11 @@ import {
   getAdditionalUserInfo,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { analytics } from '@heycatch/sdk';
 import { Trans, useTranslation } from 'react-i18next';
 import { t } from '../i18n';
 import LanguageSelect from './LanguageSelect';
-import { auth, db, applyKeepSignedIn, ensureAppCheck } from '../firebase';
+import { auth, applyKeepSignedIn, ensureAppCheck } from '../firebase';
 import { preloadRecaptcha, verifyRecaptcha } from '../lib/recaptcha';
 import { Mail, Lock, User, AlertCircle, CheckCircle2, Check, Circle } from 'lucide-react';
 import LegalModal, { LegalDoc } from './LegalModal';
@@ -178,6 +177,12 @@ function reportSignupCompleted(user: {
 // Record proof-of-consent on the user's doc (merge so it doesn't disturb other fields).
 async function recordTermsAcceptance(uid: string) {
   try {
+    // The sign-in screen's only Firestore use, so the database (a third of
+    // the signed-out page's code otherwise) is fetched here, on sign-up.
+    const [{ doc, setDoc }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('../firestore'),
+    ]);
     await setDoc(
       doc(db, 'users', uid),
       {

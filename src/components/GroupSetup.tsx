@@ -2,7 +2,8 @@ import { hashString } from '../lib/crypto';
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth, authHeader, forgetKeepSignedIn } from '../firebase';
+import { auth, authHeader, forgetKeepSignedIn } from '../firebase';
+import { db } from '../firestore';
 import { Group, User, DEFAULT_CATEGORIES } from '../types';
 import { groupCapacity, scalePercents } from '../lib/members';
 import {

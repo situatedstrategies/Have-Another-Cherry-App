@@ -1,5 +1,5 @@
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { getFullMembers } from '../lib/members';
 import { computeMismatchForSettlement } from '../lib/mismatch';
 import {
