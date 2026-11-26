@@ -98,7 +98,6 @@ async function startServer() {
     '/api/recaptcha-health',
     '/api/beta-signup',
     '/cherry2transparent.png',
-    '/icon.svg',
     '/favicon.ico',
   ]);
   const sha256Hex = (value: string) => createHash('sha256').update(value).digest('hex');
