@@ -15,7 +15,7 @@
 // and mood) always travels inside the encrypted payload.
 
 import { collection, doc, getDocs, query, where, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { encryptData, decryptData } from './crypto';
 import { t } from '../i18n';
 

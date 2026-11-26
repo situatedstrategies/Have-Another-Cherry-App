@@ -1,11 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import {
-  initializeFirestore,
-  memoryLocalCache,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from 'firebase/firestore';
-import {
   initializeAuth,
   setPersistence,
   indexedDBLocalPersistence,
@@ -64,7 +58,7 @@ export function ensureAppCheck(): void {
   });
 }
 
-function sessionLikelyRestoring(): boolean {
+export function sessionLikelyRestoring(): boolean {
   try {
     if (localStorage.getItem('hac:keepSignedIn') === '1') return true;
     for (const store of [sessionStorage, localStorage]) {
@@ -123,28 +117,13 @@ export function getKeepSignedIn(): boolean {
   }
 }
 
-// Offline cache. With "keep me signed in" on, Firestore keeps a copy of the
-// documents this browser has read in IndexedDB, so a repeat visit shows the
-// profile and the household straight from disk while the server confirms in
-// the background, instead of waiting on a round trip for each one. Without
-// it the cache stays in memory, as before: someone who did not ask to be
-// remembered on this browser leaves nothing behind on its disk.
-//
-// The two must never disagree, so the cache follows the sign-in choice as it
-// stood when the page loaded. Ticking the box at sign-in takes effect on the
-// next visit; signing out wipes the disk copy (see below).
+// Offline cache. With "keep me signed in" on, Firestore (src/firestore.ts)
+// keeps a copy of the documents this browser has read in IndexedDB; without
+// it the cache stays in memory. The two must never disagree, so the cache
+// follows the sign-in choice as it stood when the page loaded. Ticking the
+// box at sign-in takes effect on the next visit; signing out wipes the disk
+// copy (see below).
 export const offlineCacheEnabled = getKeepSignedIn() && typeof indexedDB !== 'undefined';
-
-// Initialize Firestore with the custom database ID as the third argument
-export const db = initializeFirestore(
-  app,
-  {
-    localCache: offlineCacheEnabled
-      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-      : memoryLocalCache(),
-  },
-  firebaseConfig.firestoreDatabaseId
-);
 
 // A page that loads without the disk cache deletes any copy a kept session
 // left behind (the user signed out, or the session ended). Done directly on

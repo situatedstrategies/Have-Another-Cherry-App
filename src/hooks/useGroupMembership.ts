@@ -8,7 +8,8 @@ import {
   deleteField,
   arrayRemove,
 } from 'firebase/firestore';
-import { auth, db, authHeader } from '../firebase';
+import { auth, authHeader } from '../firebase';
+import { db } from '../firestore';
 import {
   incomeRecalcBlocker,
   incomeRecalculatedShares,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { collection, query, onSnapshot, deleteDoc, doc, setDoc, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { claimSeats } from '../lib/seatClaims';
 import { mergeExpense } from '../lib/merge';
 import { advanceIntervalStr, parseLocalDate, todayLocal, toLocalIso } from '../lib/recurring';

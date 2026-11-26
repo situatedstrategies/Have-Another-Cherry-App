@@ -17,12 +17,17 @@ A household expense-splitter web app ("Two Cherries"). Users create a group, set
 
 ## Repo layout
 
-- `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry).
+- `index.html` -> `src/main.tsx` -> `src/App.tsx` (SPA entry). `App.tsx` is a thin shell: the
+  sign-in screen for a visitor, and `src/SignedInApp.tsx` (the household, ledger, reports, plan and
+  every modal, with its hooks) loaded lazily once someone is signed in, so the signed-out page
+  downloads only what it shows. `vite.config.ts` puts each vendor (React, the Firebase products,
+  i18next, each locale, lucide, recharts, motion, RevenueCat, ExcelJS, HeyCatch) in its own chunk.
 - `src/components/*.tsx` - screens (GroupSetup, ExpenseForm, ExpenseList, ExpenseDetail, SettleUpModal, ProfileSetup, StatsSection, AuthScreen, etc.).
 - `src/lib/*.ts` - client helpers (crypto, members, money, mismatch, format).
 - `server/*.ts` - server-only modules (resend, notion, reminders, actionLink, profiles) and `server/templates/` for the email templates. Nothing under `src/` may import from `server/` (ESLint enforces this).
 - `src/types.ts` - data model (Group, User, Expense, Settlement, etc.).
-- `src/firebase.ts` - Firebase init from `firebase-applet-config.json`.
+- `src/firebase.ts` - Firebase init (app, Auth, App Check) from `firebase-applet-config.json`;
+  `src/firestore.ts` exports `db`, kept apart so the sign-in screen never loads Firestore.
 - `server/index.ts` - app setup, middleware, static serving; `server/routes/*.ts` - API routes by concern (auth, invites, ai, billing, notifications, support); `server/middleware.ts` - requireAuth, rateLimit, requireSecret, requireGroupMember.
 - `public/` - static assets served at site root (e.g. `/cherry2transparent.png`). `app-store-badge.svg` and `google-play-badge.svg` are the official store badges from Apple's and Google's brand kits, the same files the marketing site serves; `AuthScreen.tsx` shows them under the sign up form. Never recolor, crop or restyle them, and keep the two black plates the same height (Google's file carries its own clear space, so it is set 1.5x taller).
 - `apphosting.yaml` - Firebase App Hosting runtime config (secrets).

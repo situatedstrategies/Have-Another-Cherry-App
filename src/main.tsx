@@ -1,12 +1,16 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { analytics } from '@heycatch/sdk';
-import './i18n';
+import { i18nReady } from './i18n';
 import App from './App.tsx';
-import AuthActionHandler from './components/AuthActionHandler.tsx';
-import FunnelLogin from './components/FunnelLogin.tsx';
+import LoadingScreen from './components/LoadingScreen.tsx';
 import { isFunnelLoginPath } from './lib/funnelLogin';
 import './index.css';
+
+// The two stand-alone pages are rare visits (a password reset link, the web
+// funnel's sign-in), so their code is fetched only on their own paths.
+const AuthActionHandler = lazy(() => import('./components/AuthActionHandler.tsx'));
+const FunnelLogin = lazy(() => import('./components/FunnelLogin.tsx'));
 
 // HeyCatch product analytics (https://heycatch.ai/agents.md). Module scope, in
 // the entry file, before anything renders: pageviews, clicks and view changes
@@ -39,4 +43,13 @@ const isFunnelLogin = isFunnelLoginPath(window.location.pathname);
 
 const page = isAuthAction ? <AuthActionHandler /> : isFunnelLogin ? <FunnelLogin /> : <App />;
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{page}</StrictMode>);
+const root = createRoot(document.getElementById('root')!);
+// Rendering waits for the visitor's language (English is inline and resolves
+// at once; Russian and Spanish are one small fetch), see i18n.ts.
+void i18nReady.then(() => {
+  root.render(
+    <StrictMode>
+      <Suspense fallback={<LoadingScreen />}>{page}</Suspense>
+    </StrictMode>
+  );
+});

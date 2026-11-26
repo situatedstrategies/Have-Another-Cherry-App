@@ -9,7 +9,8 @@
 
 import { getMessaging, getToken, deleteToken, onMessage, isSupported } from 'firebase/messaging';
 import { doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
-import { app, db, fcmVapidKey } from '../firebase';
+import { app, fcmVapidKey } from '../firebase';
+import { db } from '../firestore';
 
 export type PushStatus = 'granted' | 'denied' | 'default' | 'unavailable';
 

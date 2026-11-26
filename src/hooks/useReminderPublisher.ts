@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { decryptData } from '../lib/crypto';
 import { pushPermission } from '../lib/push';
 import { buildReminderIndex, reminderIndexSignature } from '../lib/reminderIndex';

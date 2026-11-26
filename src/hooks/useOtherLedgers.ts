@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDoc, getDocs, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth } from '../firebase';
+import { db } from '../firestore';
 import { decryptData } from '../lib/crypto';
 import { mergeExpenseLists } from '../lib/merge';
 import { Expense } from '../types';

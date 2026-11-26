@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { updateDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { getNormalizedExpenseStatus, isSavings, roundCurrency } from '../lib/money';
 import { mergeExpense } from '../lib/merge';
 import { normalizeAmount } from '../lib/limits';

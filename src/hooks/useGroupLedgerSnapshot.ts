@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { encryptData, decryptData } from '../lib/crypto';
 import { mergeExpenseLists } from '../lib/merge';
 import { splitForArchive } from '../lib/archive';

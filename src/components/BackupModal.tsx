@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { doc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import Modal from './Modal';
 import { hashString } from '../lib/crypto';
 import CryptoJS from 'crypto-js';

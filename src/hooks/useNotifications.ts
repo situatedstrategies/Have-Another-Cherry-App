@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { db, authHeader } from '../firebase';
+import { authHeader } from '../firebase';
+import { db } from '../firestore';
 import { pushPermission, enableWebPush, listenForegroundPush } from '../lib/push';
 import { getRemainingSettlementAmount } from '../lib/money';
 import { encryptData } from '../lib/crypto';
