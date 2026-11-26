@@ -330,11 +330,19 @@ async function startServer() {
       );
       res.sendFile(compressed);
     });
+    // The HTML is `no-cache`, not `no-store`: the browser keeps a copy and
+    // asks whether it changed (a 304 when it has not) instead of downloading
+    // it anew on every visit. Its hashed asset links are what make a deploy
+    // visible, so it must never be served stale, and no-cache guarantees the
+    // check. index.html is not served by express.static (index: false) so
+    // the catch-all below is the one place that sends it.
+    const HTML_CACHE = 'no-cache';
     app.use(
       express.static(distPath, {
+        index: false,
         setHeaders: (res, filePath) => {
           if (filePath.endsWith('index.html')) {
-            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+            res.setHeader('Cache-Control', HTML_CACHE);
           } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
             // Only Vite's content-hashed bundles are safe to cache forever.
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -345,9 +353,20 @@ async function startServer() {
         },
       })
     );
-    app.get('*', (_req, res) => {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', HTML_CACHE);
+      res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+      res.setHeader('Vary', 'Accept-Encoding');
+      // The pre-compressed copy when the browser accepts it, like the assets.
+      const accept = String(req.headers['accept-encoding'] || '');
+      const encoding = /\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null;
+      const compressed =
+        encoding && path.join(distPath, `index.html.${encoding === 'br' ? 'br' : 'gz'}`);
+      if (compressed && existsSync(compressed)) {
+        res.setHeader('Content-Encoding', encoding);
+        return res.sendFile(compressed);
+      }
+      return res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
